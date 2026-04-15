@@ -1,7 +1,23 @@
 # homurabi Cloudflare Worker definition.
-# Real Ruby + Rack on Cloudflare Workers via Opal.
+# Real Ruby + Rack + Sinatra on Cloudflare Workers via Opal.
 
 name = "homurabi"
 main = "src/worker.mjs"
 compatibility_date = "2026-04-15"
 compatibility_flags = ["nodejs_compat"]
+
+# Phase 3: D1 / KV / R2 bindings reachable from Sinatra routes via
+# `env['cloudflare.env'].DB` / `.KV` / `.BUCKET`.
+
+[[d1_databases]]
+binding = "DB"
+database_name = "homurabi-db"
+database_id = "3a59c955-198e-478f-8f11-71d5f3eb7600"
+
+[[kv_namespaces]]
+binding = "KV"
+id = "64ee32f1c6c64f85af9591e827da7462"
+
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "homurabi-bucket"

@@ -1,4 +1,5 @@
 # backtick_javascript: true
+# await: true
 # Cloudflare Workers runtime adapter for Opal.
 #
 # This file is the only place in the homurabi codebase that knows the
@@ -7,7 +8,7 @@
 # User Ruby code is therefore a plain Rack application and would run
 # unchanged on any Rack-compatible host.
 #
-# Two responsibilities, both modelled after existing Ruby conventions:
+# Three responsibilities, modelled after existing Ruby conventions:
 #
 #   1. CloudflareWorkersIO — replaces nodejs.rb's $stdout / $stderr (which
 #      try to write to a closed Socket on Workers) with shims that route
@@ -18,10 +19,16 @@
 #      code uses the conventional top-level `run app` from a config.ru-
 #      style entry point and never sees a Cloudflare-specific symbol.
 #
+#   3. Cloudflare::D1Database / KVNamespace / R2Bucket — tiny Ruby wrappers
+#      around the JS bindings. They expose the binding methods as regular
+#      Ruby method calls returning native JS Promises, which the user
+#      routes can `.__await__` inside a `# await: true` block.
+#
 # Note: Opal Strings are immutable (they map to JS Strings), so this file
 # uses reassignment (`@buffer = @buffer + str`) instead of `<<` mutation.
 
 require 'stringio'
+require 'await'
 
 # ---------------------------------------------------------------------------
 # 1. stdout / stderr → console.log / console.error
@@ -148,8 +155,12 @@ module Rack
         def install_dispatcher
           handler = self
           `
-            globalThis.__HOMURABI_RACK_DISPATCH__ = function(req, env, ctx, body_text) {
-              return #{handler}.$call(req, env, ctx, body_text == null ? "" : body_text);
+            globalThis.__HOMURABI_RACK_DISPATCH__ = async function(req, env, ctx, body_text) {
+              // The Ruby .$call may return either a plain Response (sync
+              // route) or a Promise<Response> (a route that awaited on a
+              // D1 / KV / R2 binding). Await unconditionally; awaiting a
+              // plain Response just resolves to it.
+              return await #{handler}.$call(req, env, ctx, body_text == null ? "" : body_text);
             };
           `
         end
@@ -193,6 +204,17 @@ module Rack
           env['cloudflare.env'] = js_env
           env['cloudflare.ctx'] = js_ctx
 
+          # Expose D1 / KV / R2 bindings as plain Ruby wrapper objects.
+          # The user Sinatra routes reach them via
+          # `env['cloudflare.DB']` / `.KV` / `.BUCKET`, call normal-looking
+          # Ruby methods on them, and `.__await__` the resulting JS Promise.
+          js_db = `#{js_env} && #{js_env}.DB`
+          js_kv = `#{js_env} && #{js_env}.KV`
+          js_r2 = `#{js_env} && #{js_env}.BUCKET`
+          env['cloudflare.DB']     = Cloudflare::D1Database.new(js_db)  if `#{js_db} != null`
+          env['cloudflare.KV']     = Cloudflare::KVNamespace.new(js_kv) if `#{js_kv} != null`
+          env['cloudflare.BUCKET'] = Cloudflare::R2Bucket.new(js_r2)    if `#{js_r2} != null`
+
           env
         end
 
@@ -219,12 +241,19 @@ module Rack
         # Convert a Rack response triple [status, headers, body] into a
         # Cloudflare Workers Response. `body` must respond to #each yielding
         # strings, per the Rack body contract. Arrays satisfy this.
+        #
+        # Chunks can also be JS Promises (returned by D1 / KV / R2 binding
+        # wrappers). When any chunk is a thenable, we return a JS Promise
+        # that awaits all of them, concatenates their results into a body
+        # string, and resolves to a fresh Response. worker.mjs awaits the
+        # value we return, so both sync and async paths look the same on
+        # the outside.
         def build_js_response(status, headers, body)
-          body_str = ''
+          chunks = []
           if body.respond_to?(:each)
-            body.each { |chunk| body_str = body_str + chunk.to_s }
+            body.each { |chunk| chunks << chunk }
           else
-            body_str = body.to_s
+            chunks << body
           end
 
           js_headers = `({})`
@@ -235,7 +264,21 @@ module Rack
           end
 
           status_int = status.to_i
-          `new Response(#{body_str}, { status: #{status_int}, headers: #{js_headers} })`
+
+          js_chunks = `[]`
+          has_promise = false
+          chunks.each do |c|
+            `#{js_chunks}.push(#{c})`
+            has_promise = true if `#{c} != null && typeof #{c}.then === 'function'`
+          end
+
+          if has_promise
+            `Promise.all(#{js_chunks}).then(function(resolved) { var parts = []; for (var i = 0; i < resolved.length; i++) { var r = resolved[i]; if (r == null) { parts.push(''); continue; } if (typeof r === 'string') { parts.push(r); continue; } if (r != null && r.$$is_string) { parts.push(r.toString()); continue; } try { parts.push(JSON.stringify(r)); } catch (e) { parts.push(String(r)); } } return new Response(parts.join(''), { status: #{status_int}, headers: #{js_headers} }); })`
+          else
+            body_str = ''
+            chunks.each { |c| body_str = body_str + c.to_s }
+            `new Response(#{body_str}, { status: #{status_int}, headers: #{js_headers} })`
+          end
         end
       end
     end
@@ -252,10 +295,175 @@ end
 # scope without leaking through method_missing or polluting Object's
 # public surface.
 
+# ---------------------------------------------------------------------------
+# 3. Top-level `run` so user code looks like config.ru
+# ---------------------------------------------------------------------------
 module Kernel
   private
 
   def run(app, **options)
     Rack::Handler::CloudflareWorkers.run(app, **options)
+  end
+end
+
+# ---------------------------------------------------------------------------
+# 4. Cloudflare bindings — D1 / KV / R2 wrappers
+# ---------------------------------------------------------------------------
+#
+# These wrappers give Sinatra routes a plain Ruby API over the underlying
+# Cloudflare JS objects. Each mutation method (D1 `.all`/`.first`/`.run`,
+# KV `.get`/`.put`/`.delete`, R2 `.get`/`.put`) returns a raw JS Promise
+# that user code is expected to `.__await__` inside a `# await: true`
+# route block.
+#
+# The wrappers convert incoming Ruby values to JS and outgoing JS values
+# to Ruby where it matters (D1 row hashes, KV strings, R2 object bodies),
+# so user code never has to reach for a backtick.
+
+module Cloudflare
+  # Check whether the argument is a native JS Promise / thenable.
+  # Ruby's `Object#then` (alias of `yield_self`) is a universal method
+  # since Ruby 2.6, so `obj.respond_to?(:then)` is always true and is
+  # useless as a Promise detector. We must check for a JS function
+  # at `.then` instead.
+  def self.js_promise?(obj)
+    `(#{obj} != null && typeof #{obj}.then === 'function' && typeof #{obj}.catch === 'function')`
+  end
+
+  # JS Array -> Ruby Array of Ruby Hashes (for D1 result.results).
+  def self.js_rows_to_ruby(js_rows)
+    out = []
+    return out if `#{js_rows} == null`
+    len = `#{js_rows}.length`
+    i = 0
+    while i < len
+      js_row = `#{js_rows}[#{i}]`
+      out << js_object_to_hash(js_row)
+      i += 1
+    end
+    out
+  end
+
+  # Shallow copy of a JS object's own enumerable string keys into a Hash.
+  def self.js_object_to_hash(js_obj)
+    h = {}
+    return h if `#{js_obj} == null`
+    keys = `Object.keys(#{js_obj})`
+    len  = `#{keys}.length`
+    i = 0
+    while i < len
+      k = `#{keys}[#{i}]`
+      v = `#{js_obj}[#{k}]`
+      h[k] = v
+      i += 1
+    end
+    h
+  end
+
+  # NOTE: the single-line backtick `...` form is used below instead of the
+  # multi-line `%x{ ... }` or multi-line backtick form. Opal's compiler
+  # treats a *multi-line* x-string as a raw statement and refuses to use
+  # it as an expression — which would silently return `undefined` from a
+  # wrapper method. Keeping each x-string on one line makes Opal emit it
+  # as a true expression that the surrounding Ruby code can return.
+
+  class D1Database
+    def initialize(js)
+      @js = js
+    end
+
+    def prepare(sql)
+      js = @js
+      D1Statement.new(`#{js}.prepare(#{sql})`)
+    end
+
+    # Run arbitrary SQL without binding. Returns a JS Promise.
+    def exec(sql)
+      js = @js
+      `(#{js}.exec ? #{js}.exec(#{sql}) : #{js}.prepare(#{sql}).run())`
+    end
+  end
+
+  class D1Statement
+    def initialize(js)
+      @js = js
+    end
+
+    def bind(*args)
+      js_args = `[]`
+      args.each { |a| `#{js_args}.push(#{a})` }
+      js = @js
+      D1Statement.new(`#{js}.bind.apply(#{js}, #{js_args})`)
+    end
+
+    # Returns a JS Promise that resolves to a Ruby Array of Ruby Hashes.
+    def all
+      js_stmt = @js
+      cf = Cloudflare
+      `#{js_stmt}.all().then(function(res) { return #{cf}.$js_rows_to_ruby(res.results); })`
+    end
+
+    # Returns a JS Promise that resolves to a single Ruby Hash (or nil).
+    def first
+      js_stmt = @js
+      cf = Cloudflare
+      `#{js_stmt}.first().then(function(res) { return res == null ? nil : #{cf}.$js_object_to_hash(res); })`
+    end
+
+    # Returns a JS Promise that resolves to a Ruby Hash with the D1 meta.
+    def run
+      js_stmt = @js
+      cf = Cloudflare
+      `#{js_stmt}.run().then(function(res) { return #{cf}.$js_object_to_hash(res); })`
+    end
+  end
+
+  class KVNamespace
+    def initialize(js)
+      @js = js
+    end
+
+    # KV#get returns a JS Promise resolving to a String or nil.
+    def get(key)
+      js_kv = @js
+      `#{js_kv}.get(#{key}, "text").then(function(v) { return v == null ? nil : v; })`
+    end
+
+    # Put a value. Returns a JS Promise.
+    def put(key, value)
+      js_kv = @js
+      `#{js_kv}.put(#{key}, #{value})`
+    end
+
+    # Delete a key. Returns a JS Promise.
+    def delete(key)
+      js_kv = @js
+      `#{js_kv}.delete(#{key})`
+    end
+  end
+
+  class R2Bucket
+    def initialize(js)
+      @js = js
+    end
+
+    # R2 get. Returns a JS Promise resolving to a Ruby Hash (or nil).
+    def get(key)
+      js_bucket = @js
+      fallback_key = key
+      `#{js_bucket}.get(#{key}).then(async function(obj) { if (obj == null) return nil; var text = await obj.text(); var rb = new Map(); rb.set('body', text); rb.set('etag', obj.etag || ''); rb.set('size', obj.size || 0); rb.set('key', obj.key || #{fallback_key}); return rb; })`
+    end
+
+    # Put a value. `body` may be a String. Returns a JS Promise.
+    def put(key, body, content_type = 'application/octet-stream')
+      js_bucket = @js
+      `#{js_bucket}.put(#{key}, #{body}, { httpMetadata: { contentType: #{content_type} } })`
+    end
+
+    # Delete a key. Returns a JS Promise.
+    def delete(key)
+      js_bucket = @js
+      `#{js_bucket}.delete(#{key})`
+    end
   end
 end

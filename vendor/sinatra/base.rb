@@ -204,7 +204,14 @@ module Sinatra
     private
 
     def calculate_content_length?
-      headers['content-type'] && !headers['content-length'] && (Array === body)
+      return false unless headers['content-type']
+      return false if headers['content-length']
+      return false unless Array === body
+      # homurabi patch: if any body chunk is a JS Promise (route compiled
+      # with `# await: true`), we can't compute bytesize yet — the real
+      # payload is resolved later in the adapter. Skip content-length.
+      return false if defined?(::Cloudflare) && body.any? { |c| ::Cloudflare.js_promise?(c) }
+      true
     end
 
     def drop_content_info?
@@ -1171,6 +1178,18 @@ module Sinatra
         headers(*res)
       elsif res.respond_to? :each
         body res
+      elsif defined?(::Cloudflare) && ::Cloudflare.js_promise?(res)
+        # homurabi patch: route blocks compiled with `# await: true`
+        # return a JS Promise (async functions implicitly wrap their
+        # return values). Stash the promise as a single-chunk body so
+        # Rack::Handler::CloudflareWorkers#build_js_response can detect
+        # it and return a Promise<Response> that worker.mjs awaits.
+        #
+        # We can't use `res.respond_to?(:then)` — Ruby's Kernel#then
+        # (alias of #yield_self) is defined on every object since Ruby
+        # 2.6, so that check would match `false` (from `error_block!`
+        # returning false) and poison the body array.
+        body [res]
       end
       nil # avoid double setting the same response tuple twice
     end

@@ -78,40 +78,63 @@ module Rack
       string
     end
 
+    # homurabi patch: the upstream implementation uses
+    # `template.result(binding)`, and the ERB template compiles at render
+    # time to a Ruby fragment that Opal in turn hands off to
+    # `Opal.Binding.$new(function($code) { return eval($code); }, ...)`.
+    # Cloudflare Workers rejects that with "Code generation from strings
+    # disallowed" on the first dispatch through ShowExceptions. We rebuild
+    # the same rescue page as a plain Ruby string builder so the entire
+    # pretty-printing path stays inside the Workers sandbox.
     def pretty(env, exception)
-      req = Rack::Request.new(env)
-
-      # This double assignment is to prevent an "unused variable" warning.
-      # Yes, it is dumb, but I don't like Ruby yelling at me.
-      path = path = (req.script_name + req.path_info).squeeze("/")
-
-      # This double assignment is to prevent an "unused variable" warning.
-      # Yes, it is dumb, but I don't like Ruby yelling at me.
-      frames = frames = exception.backtrace.map { |line|
-        frame = Frame.new
+      req    = Rack::Request.new(env)
+      path   = (req.script_name + req.path_info).squeeze('/')
+      frames = (exception.backtrace || []).map { |line|
         if line =~ /(.*?):(\d+)(:in `(.*)')?/
+          frame = Frame.new
           frame.filename = $1
-          frame.lineno = $2.to_i
+          frame.lineno   = $2.to_i
           frame.function = $4
-
-          begin
-            lineno = frame.lineno - 1
-            lines = ::File.readlines(frame.filename)
-            frame.pre_context_lineno = [lineno - CONTEXT, 0].max
-            frame.pre_context = lines[frame.pre_context_lineno...lineno]
-            frame.context_line = lines[lineno].chomp
-            frame.post_context_lineno = [lineno + CONTEXT, lines.size].min
-            frame.post_context = lines[lineno + 1..frame.post_context_lineno]
-          rescue
-          end
-
           frame
-        else
-          nil
         end
       }.compact
 
-      template.result(binding)
+      buffer = +'<!DOCTYPE html><html lang="en"><head>'
+      buffer += '<meta http-equiv="content-type" content="text/html; charset=utf-8"/>'
+      buffer += "<title>#{h(exception.class)} at #{h(path)}</title>"
+      buffer += '<style>body{font:14px -apple-system,sans-serif;margin:20px;color:#222}'
+      buffer += 'h1{font-weight:normal;color:#900}'
+      buffer += 'h2{margin-top:1.2em;font-size:1em;color:#555}'
+      buffer += 'pre{background:#f5f5f5;padding:10px;overflow:auto;white-space:pre-wrap}'
+      buffer += 'ol.traceback{font-family:monospace}'
+      buffer += 'ol.traceback li{margin-bottom:.3em}</style></head><body>'
+      buffer += "<h1>#{h(exception.class)} at #{h(path)}</h1>"
+      buffer += "<h2>#{h(exception.message)}</h2>"
+      buffer += '<h3>Traceback</h3>'
+      buffer += '<ol class="traceback">'
+      frames.each do |frame|
+        buffer += '<li>'
+        buffer += "<code>#{h(frame.filename)}:#{frame.lineno}</code>"
+        buffer += " in <code>#{h(frame.function)}</code>" if frame.function
+        buffer += '</li>'
+      end
+      buffer += '</ol>'
+      buffer += '<h3>Request</h3>'
+      buffer += '<pre>'
+      buffer += "#{h(req.request_method)} #{h(req.fullpath)}\n"
+      buffer += "Host: #{h(req.host_with_port)}\n"
+      buffer += '</pre>'
+      buffer += '<h3>Environment</h3>'
+      buffer += '<pre>'
+      env.sort_by { |k, _| k.to_s }.each do |k, v|
+        next unless k.is_a?(String)
+        next if k.start_with?('rack.')
+        next if k == 'cloudflare.env' || k == 'cloudflare.ctx'
+        buffer += "#{h(k)} = #{h(v.inspect)}\n"
+      end
+      buffer += '</pre>'
+      buffer += '</body></html>'
+      buffer
     end
 
     def template

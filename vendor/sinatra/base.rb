@@ -395,8 +395,9 @@ module Sinatra
       end
       params.delete :charset if mime_type.include? 'charset'
       unless params.empty?
-        mime_type << (mime_type.include?(';') ? ', ' : ';')
-        mime_type << params.map do |key, val|
+        # homurabi patch: Opal Strings are immutable, so `<<` is not supported.
+        mime_type += (mime_type.include?(';') ? ', ' : ';')
+        mime_type += params.map do |key, val|
           val = val.inspect if val =~ /[";,]/
           "#{key}=#{val}"
         end.join(', ')
@@ -1913,12 +1914,21 @@ module Sinatra
     end
 
     # Force data to specified encoding. It defaults to settings.default_encoding
-    # which is UTF-8 by default
+    # which is UTF-8 by default.
+    #
+    # homurabi patch: upstream calls `data.force_encoding(encoding).encode!`.
+    # Opal's String#force_encoding works (returns a re-tagged copy, since
+    # Opal Strings are immutable JS Strings), but `#encode!` raises
+    # NotImplementedError. Dropping the `encode!` is safe here because
+    # Opal stores all String data as JS UTF-16 — the call in CRuby is
+    # essentially a re-tag + transcode, and Opal already keeps one
+    # canonical unicode representation, so the transcode is a no-op in
+    # the observable sense.
     def self.force_encoding(data, encoding = default_encoding)
       return if data == settings || data.is_a?(Tempfile)
 
-      if data.respond_to? :force_encoding
-        data.force_encoding(encoding).encode!
+      if data.respond_to?(:force_encoding)
+        data.force_encoding(encoding)
       elsif data.respond_to? :each_value
         data.each_value { |v| force_encoding(v, encoding) }
       elsif data.respond_to? :each

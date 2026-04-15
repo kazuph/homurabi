@@ -1,15 +1,23 @@
-# A plain Rack application.
+# A plain Sinatra application.
 
-app = lambda do |env|
-  body = "hello from real ruby on opal\n" \
-         "method: #{env['REQUEST_METHOD']}\n" \
-         "path:   #{env['PATH_INFO']}\n"
+require 'sinatra/base'
 
-  [
-    200,
-    { 'content-type' => 'text/plain; charset=utf-8' },
-    [body]
-  ]
+class App < Sinatra::Base
+  get '/' do
+    "hello from real sinatra on opal\n" \
+    "method: #{request.request_method}\n" \
+    "path:   #{request.path_info}\n"
+  end
+
+  get '/hello/:name' do
+    "hello, #{params['name']}!\n"
+  end
+
+  post '/api/echo' do
+    content_type 'application/json'
+    body = request.body.read rescue ''
+    "{\"echo\": \"#{body}\"}"
+  end
 end
 
-run app
+run App

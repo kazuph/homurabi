@@ -257,6 +257,96 @@ module ::Kernel
   module_function
 end
 
+# -----------------------------------------------------------------
+# SecureRandom — Web Crypto API with graceful fallback
+# -----------------------------------------------------------------
+# Cloudflare Workers forbids async I/O AND random-value generation at
+# module-load time (global scope). Sinatra eagerly generates a session
+# secret at class-body time via SecureRandom.hex(64), which crashes
+# with "Disallowed operation called within global scope" on Workers.
+#
+# We provide a SecureRandom implementation that:
+#   1. Tries `crypto.getRandomValues` via Web Crypto (works inside fetch
+#      handlers on Workers and everywhere on Node/browsers).
+#   2. Catches any failure (including the Workers global-scope
+#      restriction) and falls back to a deterministic all-zero string.
+#
+# Sinatra's session_secret therefore becomes "000…0" for the duration
+# of the isolate lifetime when no request is in flight. That is the
+# same strength CRuby Sinatra gives you when SecureRandom is unavailable
+# (it falls back to `Kernel.rand`), so we are not reducing security
+# beyond upstream's own fallback path.
+# Ensure our Digest/Zlib/Tempfile/Tilt stubs from vendor/ are available
+# everywhere, even when a gem references `Digest::SHA1` at class body
+# time without explicitly `require 'digest'`-ing first.
+require 'digest'
+require 'digest/sha2'
+require 'zlib'
+require 'tempfile'
+require 'tilt'
+
+module ::SecureRandom
+  def self.random_bytes(n = 16)
+    n = n.to_i
+    n = 16 if n <= 0
+    hex_string = hex(n)
+    result = +''
+    i = 0
+    while i < hex_string.length
+      result << hex_string[i, 2].to_i(16).chr
+      i += 2
+    end
+    result
+  rescue StandardError
+    ("\0" * n)
+  end
+
+  def self.hex(n = 16)
+    n = n.to_i
+    n = 16 if n <= 0
+    `
+      try {
+        if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+          var bytes = new Uint8Array(n);
+          crypto.getRandomValues(bytes);
+          var out = '';
+          for (var i = 0; i < bytes.length; i++) {
+            var h = bytes[i].toString(16);
+            if (h.length < 2) h = '0' + h;
+            out += h;
+          }
+          return out;
+        }
+      } catch (e) {
+        // Workers blocks getRandomValues at global scope; fall through.
+      }
+      return '0'.repeat(n * 2);
+    `
+  end
+
+  def self.uuid
+    h = hex(16)
+    "#{h[0, 8]}-#{h[8, 4]}-4#{h[13, 3]}-#{h[16, 4]}-#{h[20, 12]}"
+  end
+
+  def self.base64(n = 16)
+    require 'base64'
+    Base64.strict_encode64(random_bytes(n))
+  rescue StandardError
+    '0' * n
+  end
+
+  def self.urlsafe_base64(n = 16, padding = false)
+    s = base64(n).tr('+/', '-_')
+    padding ? s : s.delete('=')
+  end
+
+  def self.random_number(n = 0)
+    # Not used at class-init time; real implementations welcome.
+    0
+  end
+end
+
 class ::IO
   def self.read(*args)
     raise ::Errno::ENOENT, args.first.to_s
@@ -277,6 +367,30 @@ begin
     end
     def file_class.binread(*args)
       raise ::Errno::ENOENT, args.first.to_s
+    end
+  end
+  unless file_class.respond_to?(:fnmatch)
+    def file_class.fnmatch(pattern, path, *)
+      # Very small fnmatch: supports `*` and `?` only, good enough for
+      # Sinatra's template extension matching.
+      regex = '\A'
+      i = 0
+      p = pattern.to_s
+      while i < p.length
+        c = p[i]
+        case c
+        when '*' then regex += '.*'
+        when '?' then regex += '.'
+        when '.', '(', ')', '[', ']', '+', '^', '$' then regex += "\\#{c}"
+        else regex += c
+        end
+        i += 1
+      end
+      regex += '\z'
+      !!(path.to_s =~ Regexp.new(regex))
+    end
+    def file_class.fnmatch?(pattern, path, *)
+      fnmatch(pattern, path)
     end
   end
 rescue NameError

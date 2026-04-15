@@ -41,4 +41,10 @@ module Digest
 
   class Base < Class
   end
+
+  # Concrete classes referenced by name at class-body time in gems.
+  # Methods fall through to NotImplementedError, but the constants
+  # have to exist so Ruby's constant lookup succeeds.
+  class SHA1 < Class; end
+  class MD5 < Class; end
 end

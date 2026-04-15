@@ -1,22 +1,21 @@
-// homurabi Phase 1: ESM Module Worker that delegates fetch handling
-// entirely to Ruby code compiled by Opal.
+// Cloudflare Workers Module Worker that hosts a pure Rack application
+// compiled from Ruby by Opal. The Ruby side is a regular Rack app that
+// would also run on Puma, Unicorn, etc.; this file is the Rack server
+// adapter on the JavaScript side.
 //
-// The imported bundle (build/hello.no-exit.mjs) installs the
-// `globalThis.__HOMURABI_HANDLE__` dispatcher via lib/cloudflare_workers.rb's
-// Homurabi.handle block. We forward every fetch to that dispatcher and
-// return whatever JS Response the Ruby handler produces.
-//
-// JS-side surface area is intentionally tiny: no routing, no formatting,
-// no framework — the response is composed entirely on the Ruby side.
+// The imported bundle (build/hello.no-exit.mjs) installs
+// `globalThis.__HOMURABI_RACK_DISPATCH__` via lib/cloudflare_workers.rb's
+// Rack::Handler::CloudflareWorkers. We forward every fetch event through
+// it and return whatever JS Response the Ruby Rack app produced.
 
 import "../build/hello.no-exit.mjs";
 
 export default {
   async fetch(request, env, ctx) {
-    const dispatch = globalThis.__HOMURABI_HANDLE__;
+    const dispatch = globalThis.__HOMURABI_RACK_DISPATCH__;
     if (typeof dispatch !== "function") {
       return new Response(
-        "homurabi: __HOMURABI_HANDLE__ not installed (Homurabi.handle was never called)\n",
+        "homurabi: Rack dispatcher not installed (Rack::Handler::CloudflareWorkers.run never called)\n",
         { status: 500, headers: { "content-type": "text/plain; charset=utf-8" } },
       );
     }

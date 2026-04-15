@@ -1,21 +1,21 @@
-# Phase 1 minimal Ruby app for homurabi.
+# A plain Rack application.
 #
-# This file MUST stay free of any JavaScript or Cloudflare-specific
-# constructs. The CF Workers runtime, the Request/Response wrappers,
-# and the bridge to the JS Module Worker live in lib/cloudflare_workers.rb.
-#
-# Goal: prove that pure Ruby can produce the HTTP response body that
-# is served from a Cloudflare Workers fetch handler.
+# Identical in shape to a config.ru you would feed to Puma, Unicorn,
+# Falcon, WEBrick, or any other Rack-compatible server. There is nothing
+# Cloudflare- or homurabi-specific here. The transport adapter that
+# turns Cloudflare Workers fetch events into Rack calls lives entirely
+# in lib/cloudflare_workers.rb and is invisible from this file.
 
-puts "homurabi: app/hello.rb loaded"
+app = lambda do |env|
+  body = "hello from real ruby on opal\n" \
+         "method: #{env['REQUEST_METHOD']}\n" \
+         "path:   #{env['PATH_INFO']}\n"
 
-Homurabi.handle do |request|
-  puts "homurabi: handling #{request.method} #{request.path}"
-  Homurabi::Response.new(
-    "hello from real ruby on opal\n" \
-    "method: #{request.method}\n" \
-    "path:   #{request.path}\n",
-    status: 200,
-    headers: { 'content-type' => 'text/plain; charset=utf-8' }
-  )
+  [
+    200,
+    { 'content-type' => 'text/plain; charset=utf-8' },
+    [body]
+  ]
 end
+
+run app

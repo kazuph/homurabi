@@ -1,3 +1,4 @@
+# backtick_javascript: true
 # frozen_string_literal: true
 
 # external dependencies
@@ -1650,7 +1651,13 @@ module Sinatra
       end
 
       # Create a new instance without middleware in front of it.
-      alias new! new unless method_defined? :new!
+      # homurabi patch: Opal does not preserve `alias new! new` correctly
+      # inside `class << self`, so we define new! explicitly via allocate.
+      def new!(*args, &block)
+        instance = allocate
+        instance.send(:initialize, *args, &block)
+        instance
+      end
 
       # Create a new instance of the class fronted by its middleware
       # pipeline. The object is guaranteed to respond to #call but may not be
@@ -1664,10 +1671,13 @@ module Sinatra
       # Creates a Rack::Builder instance with all the middleware set up and
       # the given +app+ as end point.
       def build(app)
+        `console.error('[HOMURABI build] app class=' + (#{app} && #{app}.$$class && #{app}.$$class.$$name))`
         builder = Rack::Builder.new
         setup_default_middleware builder
         setup_middleware builder
+        `console.error('[HOMURABI build] before builder.run, app class=' + (#{app} && #{app}.$$class && #{app}.$$class.$$name))`
         builder.run app
+        `console.error('[HOMURABI build] after builder.run, builder @run class=' + (#{builder}.instance_variable_get('@run') && #{builder}.instance_variable_get('@run').$$class && #{builder}.instance_variable_get('@run').$$class.$$name))`
         builder
       end
 

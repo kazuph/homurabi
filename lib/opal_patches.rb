@@ -115,8 +115,13 @@ module Kernel
   def method_missing(name, *args, &block)
     if @@homurabi_mm_log_count < HOMURABI_MM_LOG_MAX
       @@homurabi_mm_log_count += 1
-      klass_name = `(#{self}.$$class && #{self}.$$class.$$name) || typeof #{self}`
-      `console.error('[HOMURABI_MM ' + #{@@homurabi_mm_log_count} + '] ' + #{name.to_s} + ' on ' + klass_name)`
+      klass_name = `(#{self}.$$name) || (#{self}.$$class && #{self}.$$class.$$name) || typeof #{self}`
+      recv_inspect = begin
+        self.inspect[0, 80]
+      rescue
+        '<inspect-failed>'
+      end
+      `console.error('[HOMURABI_MM ' + #{@@homurabi_mm_log_count} + '] ' + #{name.to_s} + ' on ' + klass_name + ' recv=' + #{recv_inspect})`
     end
     __homurabi_original_method_missing(name, *args, &block)
   end
@@ -234,6 +239,48 @@ module ::URI
       end
     end
   end
+end
+
+# -----------------------------------------------------------------
+# IO.read / IO.binread / File.read / File.binread — Workers have no FS
+# -----------------------------------------------------------------
+# Opal does not implement IO.read / File.read. On Cloudflare Workers
+# there is no writable filesystem anyway, so any code that tries to
+# read a local file will fail. Gems that *optionally* read a file
+# (Sinatra's inline_templates= for example) expect an Errno::ENOENT
+# and rescue it silently; plain method_missing breaks that rescue.
+#
+# Install Errno::ENOENT-raising stubs so callers that rescue the
+# standard not-found exception take the silent path. Callers that
+# do not rescue get a clear, specific error instead of method_missing.
+module ::Kernel
+  module_function
+end
+
+class ::IO
+  def self.read(*args)
+    raise ::Errno::ENOENT, args.first.to_s
+  end
+
+  def self.binread(*args)
+    raise ::Errno::ENOENT, args.first.to_s
+  end
+end
+
+# File inherits from IO in CRuby; in Opal File is its own class.
+# Install the same stubs on File defensively.
+begin
+  file_class = ::File
+  unless file_class.respond_to?(:read) && !file_class.method(:read).source_location.nil?
+    def file_class.read(*args)
+      raise ::Errno::ENOENT, args.first.to_s
+    end
+    def file_class.binread(*args)
+      raise ::Errno::ENOENT, args.first.to_s
+    end
+  end
+rescue NameError
+  # File not available at this load point — ignore.
 end
 
 [

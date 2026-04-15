@@ -101,3 +101,136 @@ $stdout = CloudflareWorkersIO.new('log')
 $stderr = CloudflareWorkersIO.new('error')
 Object.const_set(:STDOUT, $stdout) unless Object.const_defined?(:STDOUT) && STDOUT.is_a?(CloudflareWorkersIO)
 Object.const_set(:STDERR, $stderr) unless Object.const_defined?(:STDERR) && STDERR.is_a?(CloudflareWorkersIO)
+
+# ---------------------------------------------------------------------------
+# Homurabi: minimal Ruby-side request/response API for Cloudflare Workers.
+#
+# This is the Phase 1 piece of the adapter. User Ruby code never touches
+# JavaScript — it only ever sees Homurabi::Request, Homurabi::Response, and
+# the Homurabi.handle { |req| ... } registration block. The bridge to the
+# JS Module Worker (`fetch(request, env, ctx)`) is published as
+# `globalThis.__HOMURABI_HANDLE__`; src/worker.mjs forwards every fetch to
+# this function and returns whatever JS Response it produces.
+#
+# Phase 1 is intentionally NOT Sinatra — that arrives in Phase 2 with the
+# real janbiedermann/sinatra fork. Phase 1 only proves the request/response
+# round-trip can be expressed in pure Ruby.
+# ---------------------------------------------------------------------------
+
+module Homurabi
+  class Headers
+    def initialize(js_headers)
+      @js = js_headers
+    end
+
+    def [](name)
+      key = name.to_s
+      `#@js && #@js.get ? #@js.get(#{key}) : null`
+    end
+
+    def each
+      js = @js
+      return self unless js
+      `js.forEach(function(value, key) { #{yield(`key`, `value`)} })`
+      self
+    end
+  end
+
+  class Request
+    def initialize(js_request)
+      @js = js_request
+    end
+
+    # Raw underlying JS Request (for advanced use; Sinatra layer in Phase 2
+    # will wrap most use cases so consumers should rarely need this).
+    def to_js
+      @js
+    end
+
+    def method
+      `#@js.method`
+    end
+
+    def url
+      `#@js.url`
+    end
+
+    def path
+      `new URL(#@js.url).pathname`
+    end
+
+    def query
+      `new URL(#@js.url).search`
+    end
+
+    def headers
+      @headers ||= Headers.new(`#@js.headers`)
+    end
+
+    def body_text
+      # Returns a Promise on the JS side — Phase 1 does not need request
+      # bodies for the hello-world handler, so we only expose the raw JS
+      # object. Phase 2 (Sinatra) will wrap this with await semantics.
+      `#@js.text()`
+    end
+  end
+
+  class Response
+    DEFAULT_HEADERS = { 'content-type' => 'text/plain; charset=utf-8' }.freeze
+
+    attr_reader :body, :status, :headers
+
+    def initialize(body = '', status: 200, headers: nil)
+      @body = body
+      @status = status
+      @headers = headers || DEFAULT_HEADERS.dup
+    end
+
+    # Convert this Ruby Response into a JS Response object suitable to
+    # return from a Module Worker fetch handler.
+    def to_js
+      body_str = @body.to_s
+      status_int = @status.to_i
+      js_headers = `({})`
+      @headers.each do |k, v|
+        ks = k.to_s
+        vs = v.to_s
+        `js_headers[#{ks}] = #{vs}`
+      end
+      `new Response(#{body_str}, { status: #{status_int}, headers: js_headers })`
+    end
+  end
+
+  class << self
+    attr_reader :handler
+
+    # Register the request handler. Block receives a Homurabi::Request and
+    # may return either a Homurabi::Response or any object whose to_s is
+    # the response body.
+    def handle(&block)
+      @handler = block
+      install_global_dispatcher
+      block
+    end
+
+    def dispatch(js_req, js_env, js_ctx)
+      raise 'Homurabi.handle has not been called yet' unless @handler
+
+      request = Request.new(js_req)
+      result = @handler.call(request)
+      response = result.is_a?(Response) ? result : Response.new(result.to_s)
+      response.to_js
+    end
+
+    private
+
+    def install_global_dispatcher
+      mod = self
+      `
+        globalThis.__HOMURABI_HANDLE__ = function(req, env, ctx) {
+          return #{mod}.$dispatch(req, env, ctx);
+        };
+      `
+    end
+  end
+end

@@ -1,0 +1,29 @@
+# Ruby / Bundler
+/.bundle/
+/vendor/bundle/
+/Gemfile.lock.local
+/.ruby-version.local
+
+# Node / wrangler
+node_modules/
+.wrangler/
+.dev.vars
+
+# Opal build outputs
+build/
+dist/
+*.opal.js
+*.opal.mjs
+
+# Editor / OS
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# Local secrets
+.env
+.env.local
+
+# mise local config (per-machine)
+.mise.local.toml

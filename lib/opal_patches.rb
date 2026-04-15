@@ -1,3 +1,4 @@
+# backtick_javascript: true
 # Runtime patches to extend Opal's corelib with methods required by
 # real-world gems (Sinatra, Rack, Mustermann, ...) that are missing
 # from upstream opal 1.8.3.rc1. Each patch is kept strictly additive:
@@ -47,10 +48,79 @@ end
 # as an alias of an encoding Opal already ships so that the constant
 # reference succeeds. If a gem actually calls .encode onto one of these
 # Opal will raise a clear error at the call site, which is what we want.
+# -----------------------------------------------------------------
+# Module#const_defined? / Module#const_get — qualified name support
+# -----------------------------------------------------------------
+# CRuby's `Module#const_defined?` and `Module#const_get` both accept
+# "Foo::Bar::Baz" style qualified names. Opal 1.8.3.rc1 supports
+# qualified names in `const_get` but NOT in `const_defined?`, so any
+# call like `Object.const_defined?('Mustermann::AST::Node::Root')`
+# returns false (or raises NameError) even when the constant exists,
+# and Mustermann's `Node[:root]` factory falls through to `nil`.
+#
+# Patch: split qualified names in `const_defined?` and walk the chain
+# exactly like `const_get` does.
+class Module
+  unless instance_method(:const_defined?).source_location.nil?
+    # pass — we monkey-patch regardless
+  end
+
+  alias_method :__homurabi_const_defined_simple, :const_defined?
+
+  def const_defined?(name, inherit = true)
+    name_str = name.to_s
+    if name_str.include?('::')
+      parts = name_str.split('::')
+      parts.shift if parts.first.empty?  # leading "::Foo::Bar"
+      current = self
+      parts.each do |part|
+        return false unless current.__homurabi_const_defined_simple(part, inherit)
+        current = current.const_get(part, inherit)
+        return false unless current.is_a?(Module)
+      end
+      true
+    else
+      __homurabi_const_defined_simple(name, inherit)
+    end
+  end
+end
+
+# -----------------------------------------------------------------
+# Global defaults that Opal does not initialise
+# -----------------------------------------------------------------
+# CRuby sets `$0` to the program name from argv[0]. Opal leaves it
+# as nil, which breaks gems that call `File.expand_path($0)` at class-
+# body time (sinatra/main.rb: `proc { File.expand_path($0) }`).
+# Install a harmless default string.
+$0 ||= '(homurabi)'
+$PROGRAM_NAME ||= $0
+
 # Load Opal's stdlib Forwardable BEFORE patching it, so our overrides
 # are applied last and are not clobbered when a vendored gem requires
 # 'forwardable' transitively.
 require 'forwardable'
+
+# -----------------------------------------------------------------
+# Debug: log the first 20 method_missing calls (Phase 2 investigation)
+# -----------------------------------------------------------------
+# Temporarily enabled while iterating through Opal/Sinatra/Rack/Mustermann
+# init-time issues so the offending method name is visible in node output.
+# Remove once Phase 2 stabilises.
+module Kernel
+  HOMURABI_MM_LOG_MAX = 40
+  @@homurabi_mm_log_count = 0
+
+  alias_method :__homurabi_original_method_missing, :method_missing
+
+  def method_missing(name, *args, &block)
+    if @@homurabi_mm_log_count < HOMURABI_MM_LOG_MAX
+      @@homurabi_mm_log_count += 1
+      klass_name = `(#{self}.$$class && #{self}.$$class.$$name) || typeof #{self}`
+      `console.error('[HOMURABI_MM ' + #{@@homurabi_mm_log_count} + '] ' + #{name.to_s} + ' on ' + klass_name)`
+    end
+    __homurabi_original_method_missing(name, *args, &block)
+  end
+end
 
 # -----------------------------------------------------------------
 # Forwardable#def_instance_delegator — support for expression accessors
@@ -110,6 +180,57 @@ module SingleForwardable
     else
       define_singleton_method ali do |*args, &block|
         instance_eval(accessor_str).__send__(method, *args, &block)
+      end
+    end
+  end
+end
+
+# -----------------------------------------------------------------
+# URI::DEFAULT_PARSER — CGI-backed stand-in
+# -----------------------------------------------------------------
+# Opal ships a tiny `uri.rb` that does not define RFC2396_PARSER or
+# DEFAULT_PARSER. Multiple gems reference URI::DEFAULT_PARSER at
+# method default-value time (eager on first call) or at constant
+# lookup time:
+#   - rack/utils.rb                             (already handled in vendor patch)
+#   - mustermann/ast/translator.rb line 121:    def escape(char, parser: URI::DEFAULT_PARSER, ...)
+#   - mustermann/pattern.rb line 12:            @@uri ||= URI::Parser.new
+#
+# We install a module-shaped URI::DEFAULT_PARSER that wraps CGI so
+# that gems that only call escape / unescape / regexp[:UNSAFE] on it
+# continue to work.
+require 'uri' rescue nil
+require 'cgi'
+
+module ::URI
+  unless const_defined?(:DEFAULT_PARSER)
+    DEFAULT_PARSER = Module.new do
+      UNSAFE = Regexp.compile('[^\-_.!~*\'()a-zA-Z0-9;/?:@&=+$,\[\]]').freeze
+
+      def self.regexp
+        { UNSAFE: UNSAFE }
+      end
+
+      def self.escape(s, unsafe = UNSAFE)
+        CGI.escape(s.to_s)
+      end
+
+      def self.unescape(s)
+        CGI.unescape(s.to_s)
+      end
+    end
+  end
+
+  unless const_defined?(:RFC2396_PARSER)
+    RFC2396_PARSER = DEFAULT_PARSER
+  end
+
+  unless const_defined?(:Parser)
+    # Some gems instantiate URI::Parser.new directly. Return the
+    # singleton module which has the same surface area.
+    class Parser
+      def self.new(*)
+        ::URI::DEFAULT_PARSER
       end
     end
   end

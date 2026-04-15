@@ -152,14 +152,16 @@ module Mustermann
       #
       # @!visibility private
       def read_brackets(open, close, char: nil, escape: ?\\, quote: false, **options)
+        # homurabi patch: Opal strings are immutable. Replace mutating
+        # `<<` chains with string-concatenating `+=`.
         result = String.new
         escape = false if escape.nil?
         while (current = getch)
           case current
           when close  then return result
-          when open   then result << open   << read_brackets(open, close) << close
-          when escape then result << escape << getch
-          else result << current
+          when open   then result += open + read_brackets(open, close) + close
+          when escape then result += escape + getch
+          else result += current
           end
         end
         unexpected(char, **options)
@@ -189,16 +191,25 @@ module Mustermann
       #
       # @!visibility private
       def read_list(*close, separator: ?,, escape: ?\\, quotes: [?", ?'], ignore: " ", **options)
+        # homurabi patch: Opal strings are immutable, so the original
+        # pattern `element = result.last; element << x` cannot mutate
+        # the list entry in place. We replace element-side mutation
+        # with an explicit `result[-1] = result.last + ...` rewrite.
         result = []
         while current = getch
-          element = result.empty? ? result : result.last
           case current
           when *close    then return result
           when ignore    then nil # do nothing
-          when separator then result  << String.new
-          when escape    then element << getch
-          when *quotes   then element << read_escaped(current, escape: escape)
-          else element << current
+          when separator then result << String.new
+          when escape
+            result << String.new if result.empty?
+            result[-1] = result.last + getch.to_s
+          when *quotes
+            result << String.new if result.empty?
+            result[-1] = result.last + read_escaped(current, escape: escape).to_s
+          else
+            result << String.new if result.empty?
+            result[-1] = result.last + current
           end
         end
         unexpected(current, **options)
@@ -208,12 +219,13 @@ module Mustermann
       #
       # @!visibility private
       def read_escaped(close, escape: ?\\, **options)
+        # homurabi patch: Opal strings are immutable; use +=.
         result = String.new
         while current = getch
           case current
           when close  then return result
-          when escape then result << getch
-          else result << current
+          when escape then result += getch
+          else result += current
           end
         end
         unexpected(current, **options)

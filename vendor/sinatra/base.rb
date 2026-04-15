@@ -2075,9 +2075,14 @@ module Sinatra
   module Delegator # :nodoc:
     def self.delegate(*methods)
       methods.each do |method_name|
+        # homurabi patch: Opal's `super` inside `define_method` is
+        # hard-wired to the enclosing Ruby method name ('delegate')
+        # instead of the dynamically defined method name, which
+        # breaks the original implementation. We unconditionally
+        # forward to Delegator.target; the top-level `main` object
+        # has no prior methods named get/post/etc. for super to
+        # reach, so skipping super is equivalent in practice.
         define_method(method_name) do |*args, &block|
-          return super(*args, &block) if respond_to? method_name
-
           Delegator.target.send(method_name, *args, &block)
         end
         # ensure keyword argument passing is compatible with ruby >= 2.7

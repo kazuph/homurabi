@@ -1,3 +1,4 @@
+# backtick_javascript: true
 module Mustermann
   # @see Mustermann::AST::Pattern
   module AST
@@ -54,9 +55,16 @@ module Mustermann
       # Double dispatch helper for reading from the buffer into the payload.
       # @!visibility private
       def parse
+        # homurabi patch: Opal strings are immutable, so `payload <<`
+        # cannot append to a String-typed payload (used by Capture).
+        # Detect the type at runtime and reassign via `+` instead.
         self.payload ||= []
         while element = yield
-          payload << element
+          if self.payload.is_a?(String)
+            self.payload = self.payload + element.to_s
+          else
+            self.payload << element
+          end
         end
       end
 

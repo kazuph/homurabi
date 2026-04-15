@@ -1,0 +1,7 @@
+# homurabi Phase 0 baseline Worker.
+# Goal: prove that Opal-compiled Ruby loads inside a Cloudflare Workers V8 isolate.
+
+name = "homurabi-phase0"
+main = "src/worker.mjs"
+compatibility_date = "2026-04-15"
+compatibility_flags = ["nodejs_compat"]

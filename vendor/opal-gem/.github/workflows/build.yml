@@ -1,0 +1,134 @@
+name: build
+
+on:
+  push:
+    branches:
+      - master
+      - '*-stable'
+      - '*/ci-check'
+  pull_request: {}
+
+permissions:
+  contents: read
+
+jobs:
+  rake:
+    name: ${{ matrix.combo.name || matrix.combo.ruby }}
+    env:
+      DEFAULT_RUBY: '3.3'
+    strategy:
+      fail-fast: false
+      matrix:
+        combo:
+          - name: mspec-nodejs
+            command: bin/rake mspec_nodejs
+          - name: mspec-chrome
+            command: bin/rake mspec_chrome
+          - name: mspec-firefox
+            firefox: '106.0.4'
+            command: xvfb-run bin/rake mspec_firefox
+          - name: minitest
+            command: bin/rake minitest
+          - name: minitest-strict-mode
+            command: bin/rake minitest
+            strict: 'true'
+          # - name: head-ruby
+          #   ruby: head
+          #   permissive: true
+          - name: current-ruby
+            ruby: '3.3'
+          - name: previous-ruby
+            ruby: '3.2'
+          - name: older-ruby
+            ruby: '3.1'
+          - name: near-eol-ruby
+            ruby: '3.0'
+          - name: smoke-test
+            command: bin/rake smoke_test
+          - name: windows-mspec-nodejs
+            command: bundle exec rake mspec_nodejs
+            os: windows-latest
+          - name: windows-mspec-chrome
+            command: bundle exec rake mspec_chrome
+            os: windows-latest
+          # - name: windows-mspec-firefox
+          #   firefox: '106.0.4'
+          #   command: bundle exec rake mspec_firefox
+          #   os: windows-latest
+          - name: macos-mspec-safari
+            command: bundle exec rake mspec_safari
+            os: 'macos-latest'
+          - name: windows-minitest
+            command: bundle exec rake minitest
+            os: windows-latest
+          - name: windows
+            command: bundle exec rake rspec
+            os: windows-latest
+          - name: macos
+            command: bundle exec rake rspec
+            os: 'macos-latest'
+          - name: lint
+            command: bin/rake lint
+          - name: timezone
+            command: bin/rake mspec_nodejs TZ="Pacific/Fiji"
+          - name: performance
+            permissive: true
+            fetchdepth: '0'
+            command: bin/rake performance:compare
+            # os: ryzen
+
+          # Currently failing:
+          # - ruby: truffleruby
+          # - ruby: jruby
+
+    runs-on: ${{ matrix.combo.os || 'ubuntu-latest' }}
+    continue-on-error: ${{ matrix.combo.permissive || false }}
+    steps:
+      - if: ${{ matrix.combo.firefox }}
+        id: setup-firefox
+        uses: browser-actions/setup-firefox@latest
+        with:
+          firefox-version: ${{ matrix.combo.firefox }}
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: ${{ fromJSON(matrix.combo.fetchdepth || '1') }}
+      - if: ${{ matrix.combo.os != 'ryzen' }}
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.combo.ruby || env.DEFAULT_RUBY }}
+          bundler-cache: false
+      - run: ruby bin/git-submodule-fast-install
+      - run: bundle lock
+      - uses: actions/cache@v4
+        env:
+          KEY_PREFIX: ${{ runner.os }}-${{ matrix.combo.ruby || env.DEFAULT_RUBY }}
+        with:
+          path: ./vendor/bundle
+          key: ${{ env.KEY_PREFIX }}-gem-${{ github.ref }}-${{ hashFiles('**/Gemfile.lock') }}
+          restore-keys: |
+            ${{ env.KEY_PREFIX }}-gem-${{ github.ref }}
+            ${{ env.KEY_PREFIX }}-gem-master
+            ${{ env.KEY_PREFIX }}-gem-
+      - uses: actions/cache@v4
+        with:
+          path: ./node_modules
+          key: ${{ runner.os }}-npm-${{ github.ref }}-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-${{ github.ref }}
+            ${{ runner.os }}-npm-master
+            ${{ runner.os }}-npm-
+      - run: yarn install
+      - name: bundle install
+        run: |
+          bundle config path $PWD/vendor/bundle
+          bundle install --jobs 4 --retry 3
+          bundle clean
+      - name: set environment variables USE_STRICT
+        if: ${{ matrix.combo.strict == 'true' }}
+        run: |
+          echo "USE_STRICT=true" >> $GITHUB_ENV
+      - name: set environment variables MOZILLA_FIREFOX_BINARY
+        if: ${{ matrix.combo.firefox }}
+        run: |
+          echo "MOZILLA_FIREFOX_BINARY=${{ steps.setup-firefox.outputs.firefox-path }}" >> $GITHUB_ENV
+      - run: ${{ matrix.combo.command || 'bin/rake rspec' }}

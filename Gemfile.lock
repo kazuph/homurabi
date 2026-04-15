@@ -1,12 +1,16 @@
+PATH
+  remote: vendor/opal-gem
+  specs:
+    opal (1.8.3.rc1)
+      ast (>= 2.3.0)
+      base64 (>= 0.2.0)
+      parser (~> 3.0, >= 3.0.3.2)
+
 GEM
   remote: https://rubygems.org/
   specs:
     ast (2.4.3)
     base64 (0.3.0)
-    opal (1.8.3.rc1)
-      ast (>= 2.3.0)
-      base64 (>= 0.2.0)
-      parser (~> 3.0, >= 3.0.3.2)
     parser (3.3.11.1)
       ast (~> 2.4.1)
       racc
@@ -17,7 +21,7 @@ PLATFORMS
   ruby
 
 DEPENDENCIES
-  opal (= 1.8.3.rc1)
+  opal!
 
 RUBY VERSION
    ruby 3.4.9p82

@@ -81,11 +81,19 @@ class CloudflareWorkersIO
     end
   end
 
-  # Bridge to V8's console.* via Opal's backtick JS escape.
+  # Bridge to V8's console.* via Opal's backtick JS escape, and also
+  # mirror every emitted line into a global ring buffer so a host
+  # JavaScript caller (worker.mjs) can prove from the response side
+  # that Ruby code actually executed inside the V8 isolate.
   def emit(line)
     channel = @channel
     text = line
-    `globalThis.console[#{channel}](#{text})`
+    `
+      globalThis.console[#{channel}](#{text});
+      var __h = globalThis.__HOMURABI_OUTPUT__ = globalThis.__HOMURABI_OUTPUT__ || [];
+      __h.push({channel: #{channel}, text: #{text}, t: Date.now()});
+      if (__h.length > 256) { __h.shift(); }
+    `
   end
 end
 

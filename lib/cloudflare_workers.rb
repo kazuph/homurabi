@@ -114,7 +114,7 @@ Object.const_set(:STDERR, $stderr) unless Object.const_defined?(:STDERR) && STDE
 module Rack
   module Handler
     module CloudflareWorkers
-      DEFAULT_RACK_INPUT = StringIO.new('').freeze
+      EMPTY_STRING_IO = StringIO.new('').freeze
 
       def self.run(app, **_options)
         @app = app
@@ -129,11 +129,13 @@ module Rack
       # Entry point invoked from the Module Worker (src/worker.mjs) for
       # every fetch event. `js_req` is a Cloudflare Workers Request,
       # `js_env` is the bindings object (D1, KV, R2, secrets...),
-      # `js_ctx` is the ExecutionContext.
-      def self.call(js_req, js_env, js_ctx)
+      # `js_ctx` is the ExecutionContext, `body_text` is the pre-resolved
+      # request body (the worker.mjs front awaits req.text() before
+      # handing control to Ruby because Opal runs synchronously).
+      def self.call(js_req, js_env, js_ctx, body_text = '')
         raise '`run app` was never called from user code' if @app.nil?
 
-        env = build_rack_env(js_req, js_env, js_ctx)
+        env = build_rack_env(js_req, js_env, js_ctx, body_text)
         status, headers, body = @app.call(env)
         build_js_response(status, headers, body)
       ensure
@@ -146,15 +148,15 @@ module Rack
         def install_dispatcher
           handler = self
           `
-            globalThis.__HOMURABI_RACK_DISPATCH__ = function(req, env, ctx) {
-              return #{handler}.$call(req, env, ctx);
+            globalThis.__HOMURABI_RACK_DISPATCH__ = function(req, env, ctx, body_text) {
+              return #{handler}.$call(req, env, ctx, body_text == null ? "" : body_text);
             };
           `
         end
 
         # Build a Rack-compliant env Hash from a Cloudflare Workers Request.
         # See https://github.com/rack/rack/blob/main/SPEC.rdoc for the contract.
-        def build_rack_env(js_req, js_env, js_ctx)
+        def build_rack_env(js_req, js_env, js_ctx, body_text = '')
           method  = `#{js_req}.method`
           url_obj = `new URL(#{js_req}.url)`
           path    = `#{url_obj}.pathname`
@@ -175,7 +177,7 @@ module Rack
             'SERVER_PROTOCOL'   => 'HTTP/1.1',
             'HTTPS'             => scheme == 'https' ? 'on' : 'off',
             'rack.url_scheme'   => scheme,
-            'rack.input'        => DEFAULT_RACK_INPUT,
+            'rack.input'        => body_text.nil? || body_text.empty? ? EMPTY_STRING_IO : StringIO.new(body_text),
             'rack.errors'       => $stderr,
             'rack.multithread'  => false,
             'rack.multiprocess' => false,

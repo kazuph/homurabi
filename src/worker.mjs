@@ -19,6 +19,23 @@ export default {
         { status: 500, headers: { "content-type": "text/plain; charset=utf-8" } },
       );
     }
-    return dispatch(request, env, ctx);
+
+    // Read the body here while we still have the async context. The Opal
+    // side runs synchronous Ruby, so it cannot `await req.text()` inside
+    // the dispatcher. For methods that are defined to have no body
+    // (GET, HEAD, OPTIONS by spec) we skip the read entirely to avoid
+    // wasting a round-trip.
+    let bodyText = "";
+    const method = request.method.toUpperCase();
+    if (method !== "GET" && method !== "HEAD" && method !== "OPTIONS") {
+      try {
+        bodyText = await request.text();
+      } catch (err) {
+        // Body already consumed / network error — fall through with ''.
+        bodyText = "";
+      }
+    }
+
+    return dispatch(request, env, ctx, bodyText);
   },
 };

@@ -95,37 +95,25 @@ end
 $0 ||= '(homurabi)'
 $PROGRAM_NAME ||= $0
 
+# (Previously this file force-set APP_ENV/RACK_ENV to 'production' to
+# keep Rack::ShowExceptions out of the way — its ERB renderer uses
+# `binding.eval` which lands on `new Function($code)`, forbidden on
+# Workers. The real fix is now in `vendor/rack/show_exceptions.rb`
+# where `#pretty` builds the HTML directly, so we no longer need to
+# hide development mode. Users who want production settings should
+# set `APP_ENV=production` themselves, same as on any Rack server.)
+
 # Load Opal's stdlib Forwardable BEFORE patching it, so our overrides
 # are applied last and are not clobbered when a vendored gem requires
 # 'forwardable' transitively.
 require 'forwardable'
 
 # -----------------------------------------------------------------
-# Debug: log the first 20 method_missing calls (Phase 2 investigation)
+# (removed) Debug method_missing logger — was used while iterating
+# through Phase 2 init-time issues. Permanent fix for the root cause
+# (Opal `@prototype` collision) landed in vendor/opal-gem/. Keeping
+# method_missing unpatched restores the fast path for real requests.
 # -----------------------------------------------------------------
-# Temporarily enabled while iterating through Opal/Sinatra/Rack/Mustermann
-# init-time issues so the offending method name is visible in node output.
-# Remove once Phase 2 stabilises.
-module Kernel
-  HOMURABI_MM_LOG_MAX = 40
-  @@homurabi_mm_log_count = 0
-
-  alias_method :__homurabi_original_method_missing, :method_missing
-
-  def method_missing(name, *args, &block)
-    if @@homurabi_mm_log_count < HOMURABI_MM_LOG_MAX
-      @@homurabi_mm_log_count += 1
-      klass_name = `(#{self}.$$name) || (#{self}.$$class && #{self}.$$class.$$name) || typeof #{self}`
-      recv_inspect = begin
-        self.inspect[0, 80]
-      rescue
-        '<inspect-failed>'
-      end
-      `console.error('[HOMURABI_MM ' + #{@@homurabi_mm_log_count} + '] ' + #{name.to_s} + ' on ' + klass_name + ' recv=' + #{recv_inspect})`
-    end
-    __homurabi_original_method_missing(name, *args, &block)
-  end
-end
 
 # -----------------------------------------------------------------
 # Forwardable#def_instance_delegator — support for expression accessors
@@ -146,12 +134,43 @@ end
 # re-implements def_instance_delegator / def_single_delegator so that
 # non-ivar accessors that look like Ruby expressions go through
 # `instance_eval` / `class_eval` instead of `__send__`.
+# homurabi patch: Cloudflare Workers disallows `new Function($code)` /
+# `eval($code)` (Workers' "Code generation from strings disallowed" rule).
+# Opal's `instance_eval(String)` compiles to a `new Function($code)` call,
+# so any Forwardable delegation with an *expression* accessor (Mustermann's
+# `instance_delegate %i[parser compiler] => 'self.class'` is the real-world
+# trigger) crashes on Workers at first dispatch.
+#
+# The helper below walks a small subset of dot-separated accessor
+# expressions — `self`, `self.class`, `@ivar`, `@ivar.method`, plain
+# `method_name`, `method_name.other_method` — without going through
+# `instance_eval`. Mustermann (and the Ruby stdlib itself) only uses
+# identifiers from that subset, so we never need the full Ruby parser.
+module ForwardableAccessor
+  module_function
+
+  def resolve(instance, expr)
+    expr = expr.to_s
+    current = instance
+    expr.split('.').each do |part|
+      current = if part == 'self'
+                  instance
+                elsif part.start_with?('@')
+                  instance.instance_variable_get(part)
+                else
+                  current.__send__(part)
+                end
+    end
+    current
+  end
+end
+
 module Forwardable
   remove_method :def_instance_delegator if method_defined?(:def_instance_delegator)
 
   def def_instance_delegator(accessor, method, ali = method)
     accessor_str = accessor.to_s
-    if accessor_str.start_with?('@')
+    if accessor_str.start_with?('@') && !accessor_str.include?('.')
       define_method ali do |*args, &block|
         instance_variable_get(accessor_str).__send__(method, *args, &block)
       end
@@ -161,9 +180,9 @@ module Forwardable
         __send__(accessor_str).__send__(method, *args, &block)
       end
     else
-      # Expression like 'self.class'. Evaluate on the instance.
+      # Dot-path expression like 'self.class'. Resolve without eval.
       define_method ali do |*args, &block|
-        instance_eval(accessor_str).__send__(method, *args, &block)
+        ForwardableAccessor.resolve(self, accessor_str).__send__(method, *args, &block)
       end
     end
   end
@@ -174,7 +193,7 @@ module SingleForwardable
 
   def def_single_delegator(accessor, method, ali = method)
     accessor_str = accessor.to_s
-    if accessor_str.start_with?('@')
+    if accessor_str.start_with?('@') && !accessor_str.include?('.')
       define_singleton_method ali do |*args, &block|
         instance_variable_get(accessor_str).__send__(method, *args, &block)
       end
@@ -184,7 +203,7 @@ module SingleForwardable
       end
     else
       define_singleton_method ali do |*args, &block|
-        instance_eval(accessor_str).__send__(method, *args, &block)
+        ForwardableAccessor.resolve(self, accessor_str).__send__(method, *args, &block)
       end
     end
   end
@@ -226,6 +245,23 @@ module ::URI
     end
   end
 
+  # CRuby's URI.decode_www_form_component / encode_www_form_component are used
+  # by Rack::Utils#unescape / Rack::Utils#escape. Opal's `uri` stdlib omits
+  # them. Back them with CGI so that Rack's query-string parser works for
+  # any request with a body / query (Sinatra's `request.body.read` path
+  # eventually walks through this code).
+  unless respond_to?(:decode_www_form_component)
+    def self.decode_www_form_component(str, _enc = nil)
+      CGI.unescape(str.to_s)
+    end
+  end
+
+  unless respond_to?(:encode_www_form_component)
+    def self.encode_www_form_component(str, _enc = nil)
+      CGI.escape(str.to_s)
+    end
+  end
+
   unless const_defined?(:RFC2396_PARSER)
     RFC2396_PARSER = DEFAULT_PARSER
   end
@@ -238,6 +274,65 @@ module ::URI
         ::URI::DEFAULT_PARSER
       end
     end
+  end
+
+  # Rack::Protection::JsonCsrf#has_vector? does `rescue URI::InvalidURIError`,
+  # so the constant needs to exist even if the referrer is actually valid.
+  unless const_defined?(:InvalidURIError)
+    class InvalidURIError < StandardError; end
+  end
+
+  unless const_defined?(:Error)
+    class Error < StandardError; end
+  end
+
+  # Opal's stdlib does not implement URI.parse. Rack::Protection calls
+  # `URI.parse(env['HTTP_REFERER']).host`. A tiny JS-URL-backed parser is
+  # enough to cover that and any equivalent `host`-only usage.
+  class Generic
+    attr_reader :host, :scheme, :port, :path, :query, :fragment
+
+    def initialize(host:, scheme:, port:, path:, query:, fragment:)
+      @host = host
+      @scheme = scheme
+      @port = port
+      @path = path
+      @query = query
+      @fragment = fragment
+    end
+  end
+
+  def self.parse(str)
+    s = str.to_s
+    return Generic.new(host: nil, scheme: nil, port: nil, path: '', query: nil, fragment: nil) if s.empty?
+
+    js_url = `
+      (function() {
+        try { return new URL(#{s}); }
+        catch (e) {
+          try { return new URL(#{s}, "http://__homurabi.invalid/"); }
+          catch (e2) { return null; }
+        }
+      })()
+    `
+    raise ::URI::InvalidURIError, "bad URI(is not URI?): #{s}" if `#{js_url} == null`
+
+    host     = `#{js_url}.host` || ''
+    host     = nil if host == '' || host.include?('__homurabi.invalid')
+    scheme   = `#{js_url}.protocol` || ''
+    scheme   = scheme.sub(/:$/, '')
+    scheme   = nil if scheme == ''
+    port_raw = `#{js_url}.port` || ''
+    port     = port_raw == '' ? nil : port_raw.to_i
+    path     = `#{js_url}.pathname` || ''
+    query    = `#{js_url}.search` || ''
+    query    = query.sub(/^\?/, '')
+    query    = nil if query == ''
+    frag     = `#{js_url}.hash` || ''
+    frag     = frag.sub(/^#/, '')
+    frag     = nil if frag == ''
+
+    Generic.new(host: host, scheme: scheme, port: port, path: path, query: query, fragment: frag)
   end
 end
 

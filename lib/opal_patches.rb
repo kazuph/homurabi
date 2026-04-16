@@ -385,10 +385,11 @@ module ::SecureRandom
     n = n.to_i
     n = 16 if n <= 0
     hex_string = hex(n)
-    result = +''
+    # homurabi patch: `<<` → `+` for Opal immutable Strings
+    result = ''
     i = 0
     while i < hex_string.length
-      result << hex_string[i, 2].to_i(16).chr
+      result = result + hex_string[i, 2].to_i(16).chr
       i += 2
     end
     result

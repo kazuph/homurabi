@@ -331,18 +331,20 @@ module Sinatra
 
     # Generates the absolute URI for a given path in the app.
     # Takes Rack routers and reverse proxies into account.
+    # homurabi patch: `host << …` → `host += …` (Opal Strings immutable).
     def uri(addr = nil, absolute = true, add_script_name = true)
       return addr if addr.to_s =~ /\A[a-z][a-z0-9+.\-]*:/i
 
-      uri = [host = String.new]
+      host = ''
       if absolute
-        host << "http#{'s' if request.secure?}://"
-        host << if request.forwarded? || (request.port != (request.secure? ? 443 : 80))
+        host = host + "http#{'s' if request.secure?}://"
+        host = host + if request.forwarded? || (request.port != (request.secure? ? 443 : 80))
                   request.host_with_port
                 else
                   request.host
                 end
       end
+      uri = [host]
       uri << request.script_name.to_s if add_script_name
       uri << (addr || request.path_info).to_s
       File.join uri

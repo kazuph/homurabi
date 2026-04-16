@@ -157,43 +157,22 @@ module Rack
       attr_reader :coder, :encryptors
 
       def initialize(app, options = {})
-        # support both :secrets and :secret for backwards compatibility
-        secrets = [*(options[:secrets] || options[:secret])]
+        # homurabi patch: Opal/Workers has no OpenSSL, so
+        # Rack::Session::Encryptor (which uses OpenSSL::Cipher and
+        # mutating String#slice!) cannot be instantiated. We skip
+        # encryption entirely and fall through to the plain
+        # Base64::Marshal coder. This is the same mode CRuby's
+        # Rack::Session::Cookie uses when no secret is provided —
+        # session data lives in the cookie as Base64'd Marshal, with
+        # no server-side verification. For production use, the
+        # operator should layer Cloudflare's own signed-cookie or
+        # JWT-based session management on top.
+        @encryptors = []
+        @legacy_hmac = false
 
-        encryptor_opts = {
-          purpose: options[:key], serialize_json: options[:serialize_json]
-        }
-
-        # For each secret, create an Encryptor. We have iterate this Array at
-        # decryption time to achieve key rotation.
-        @encryptors = secrets.map do |secret|
-          Rack::Session::Encryptor.new secret, encryptor_opts
-        end
-
-        # If a legacy HMAC secret is present, initialize those features.
-        # Fallback to :secret for backwards compatibility.
-        if options.has_key?(:legacy_hmac_secret) || options.has_key?(:secret)
-          @legacy_hmac = options.fetch(:legacy_hmac, 'SHA1')
-
-          @legacy_hmac_secret = options[:legacy_hmac_secret] || options[:secret]
-          @legacy_hmac_coder  = options.fetch(:legacy_hmac_coder, Base64::Marshal.new)
-        else
-          @legacy_hmac = false
-        end
-
-        warn <<-MSG unless secure?(options)
-        SECURITY WARNING: No secret option provided to Rack::Session::Cookie.
-        This poses a security threat. It is strongly recommended that you
-        provide a secret to prevent exploits that may be possible from crafted
-        cookies. This will not be supported in future versions of Rack, and
-        future versions will even invalidate your existing user cookies.
-
-        Called from: #{caller[0]}.
-        MSG
-
-        # Potential danger ahead! Marshal without verification and/or
-        # encryption could present a major security issue.
-        @coder = options[:coder] ||= Base64::Marshal.new
+        # homurabi patch: use JSON coder instead of Marshal — Opal doesn't
+        # ship a full Marshal implementation, but JSON is native on JS.
+        @coder = options[:coder] ||= Base64::JSON.new
 
         super(app, options.merge!(cookie_only: true))
       end

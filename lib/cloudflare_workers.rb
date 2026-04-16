@@ -367,17 +367,76 @@ module Cloudflare
   # wrapper method. Keeping each x-string on one line makes Opal emit it
   # as a true expression that the surrounding Ruby code can return.
 
+  # D1Database wraps a Cloudflare D1 JS binding. The public API is
+  # modelled on CRuby's `sqlite3-ruby` gem (`SQLite3::Database`) so
+  # that the calling code reads identically:
+  #
+  #     # sqlite3-ruby on CRuby:
+  #     rows = db.execute("SELECT * FROM users WHERE id = ?", [1])
+  #
+  #     # homurabi on Opal (+ async):
+  #     rows = db.execute("SELECT * FROM users WHERE id = ?", [1]).__await__
+  #
+  # Every query method returns a JS Promise. Use `.__await__` inside a
+  # `# await: true` route block to unwrap it synchronously (Opal
+  # compiles `.__await__` to a native JS `await`).
+  #
+  # Results are always Hashes — `results_as_hash` is effectively
+  # hardcoded to `true`. This matches the common `db.results_as_hash =
+  # true` convention in the sqlite3-ruby world and gives downstream ORM
+  # code a ready-made Hash-per-row interface to build on.
   class D1Database
     def initialize(js)
       @js = js
     end
+
+    # ---- sqlite3-ruby compatible high-level API ----------------------
+
+    # Execute a SQL statement with optional bind parameters and return
+    # all result rows as an Array of Hashes.
+    #
+    #   db.execute("SELECT * FROM users")                           → Array<Hash>
+    #   db.execute("SELECT * FROM users WHERE id = ?", [1])         → Array<Hash>
+    #   db.execute("INSERT INTO users (name) VALUES (?)", ["alice"]) → Array<Hash> (empty for writes)
+    def execute(sql, bind_params = [])
+      stmt = prepare(sql)
+      stmt = stmt.bind(*bind_params) unless bind_params.empty?
+      stmt.all
+    end
+
+    # Execute and return only the first row (or nil).
+    #
+    #   db.get_first_row("SELECT * FROM users WHERE id = ?", [1])  → Hash or nil
+    def get_first_row(sql, bind_params = [])
+      stmt = prepare(sql)
+      stmt = stmt.bind(*bind_params) unless bind_params.empty?
+      stmt.first
+    end
+
+    # Execute a write statement (INSERT / UPDATE / DELETE) and return
+    # a metadata Hash with `changes`, `last_row_id`, `duration`, etc.
+    #
+    #   meta = db.execute_insert("INSERT INTO users (name) VALUES (?)", ["alice"])
+    #   meta['last_row_id']  # → 7
+    def execute_insert(sql, bind_params = [])
+      stmt = prepare(sql)
+      stmt = stmt.bind(*bind_params) unless bind_params.empty?
+      stmt.run
+    end
+
+    # Execute one or more raw SQL statements separated by semicolons.
+    # Useful for schema migrations. Returns the D1 exec result.
+    def execute_batch(sql)
+      exec(sql)
+    end
+
+    # ---- low-level D1 API (prepare/bind/all/first/run) ---------------
 
     def prepare(sql)
       js = @js
       D1Statement.new(`#{js}.prepare(#{sql})`)
     end
 
-    # Run arbitrary SQL without binding. Returns a JS Promise.
     def exec(sql)
       js = @js
       `(#{js}.exec ? #{js}.exec(#{sql}) : #{js}.prepare(#{sql}).run())`

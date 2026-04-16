@@ -28,7 +28,7 @@ class App < Sinatra::Base
   get '/' do
     @title = 'Hello from Sinatra'
     db = env['cloudflare.DB']
-    @users = db ? db.prepare('SELECT id, name FROM users ORDER BY id').all.__await__ : []
+    @users = db ? db.execute('SELECT id, name FROM users ORDER BY id').__await__ : []
     @content = erb :index
     erb :layout
   end
@@ -61,18 +61,23 @@ class App < Sinatra::Base
   # the top is idiomatic for async routes.
   # ------------------------------------------------------------------
 
+  # D1 routes use the sqlite3-ruby compatible interface:
+  #   db.execute(sql, binds)      → Array<Hash>
+  #   db.get_first_row(sql, binds) → Hash or nil
+  #   db.execute_insert(sql, binds) → meta Hash
+  # Same calling convention as `SQLite3::Database` on CRuby.
+
   get '/d1/users' do
     content_type 'application/json'
     db = env['cloudflare.DB']
-    rows = db.prepare('SELECT id, name FROM users ORDER BY id').all.__await__
-    rows.to_json
+    db.execute('SELECT id, name FROM users ORDER BY id').__await__.to_json
   end
 
   get '/d1/users/:id' do
     content_type 'application/json'
     id = params['id'].to_i
     db = env['cloudflare.DB']
-    row = db.prepare('SELECT id, name FROM users WHERE id = ?').bind(id).first.__await__
+    row = db.get_first_row('SELECT id, name FROM users WHERE id = ?', [id]).__await__
     if row.nil?
       status 404
       { 'error' => 'not found', 'id' => id }.to_json
@@ -90,9 +95,9 @@ class App < Sinatra::Base
       status 400
       { 'error' => 'name required' }.to_json
     else
-      result = db.prepare('INSERT INTO users (name) VALUES (?) RETURNING id, name').bind(name).first.__await__
+      row = db.get_first_row('INSERT INTO users (name) VALUES (?) RETURNING id, name', [name]).__await__
       status 201
-      result.to_json
+      row.to_json
     end
   end
 

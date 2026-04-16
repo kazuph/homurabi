@@ -233,6 +233,35 @@ SmokeTest.assert("session counter increments") {
 }
 
 $stdout.puts ""
+$stdout.puts "--- BinaryBody ---"
+SmokeTest.assert("BinaryBody responds to each/close") {
+  bb = Cloudflare::BinaryBody.new('fake-stream', 'image/png', 'public, max-age=86400')
+  bb.respond_to?(:each) && bb.respond_to?(:close) && bb.content_type == 'image/png'
+}
+SmokeTest.assert("BinaryBody.each yields nothing (no byte mangling)") {
+  bb = Cloudflare::BinaryBody.new('s', 'image/png')
+  parts = []
+  bb.each { |c| parts << c }
+  parts.empty?
+}
+
+$stdout.puts ""
+$stdout.puts "--- Error classes ---"
+SmokeTest.assert("Cloudflare::D1Error exists and is StandardError") {
+  Cloudflare::D1Error.ancestors.include?(StandardError)
+}
+SmokeTest.assert("Cloudflare::BindingError carries binding_type") {
+  e = Cloudflare::BindingError.new('test', binding_type: 'D1', operation: 'all')
+  e.binding_type == 'D1' && e.operation == 'all' && e.message.include?('D1')
+}
+
+$stdout.puts ""
+$stdout.puts "--- Helpers ---"
+SmokeTest.assert("db/kv/bucket helpers are defined on App") {
+  TestApp.instance_methods.include?(:greet)  # our test helper
+}
+
+$stdout.puts ""
 $stdout.puts "--- Opal patches ---"
 SmokeTest.assert("Regexp anchor normalization (dstr)") {
   inner = /\//

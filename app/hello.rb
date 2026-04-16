@@ -1,36 +1,65 @@
 # await: true
-# A plain Sinatra application.
+# frozen_string_literal: true
+#
+# A plain Sinatra application. Ported as faithfully as possible from
+# the canonical Sinatra README / examples, so every line here reads
+# the same as it would in any other Sinatra project. Nothing about
+# Cloudflare Workers, Opal, or the Cloudflare bindings is visible in
+# this file — the adapter lives entirely in `lib/cloudflare_workers.rb`.
+#
+# HTML pages go through real ERB templates stored under `views/*.erb`
+# and rendered with the classic `erb :name` helper. homurabi's build
+# pipeline precompiles those templates with `bin/compile-erb` so the
+# Workers sandbox never has to call `eval` / `new Function` at runtime.
 
 require 'json'
 require 'sinatra/base'
 
 class App < Sinatra::Base
+  # ------------------------------------------------------------------
+  # HTML pages — each route sets a few `@ivars` then renders an ERB
+  # template from `views/`. Exactly like Sinatra's README example:
+  #
+  #     get '/' do
+  #       erb :index
+  #     end
+  # ------------------------------------------------------------------
+
   get '/' do
-    "hello from real sinatra on opal\n" \
-    "method: #{request.request_method}\n" \
-    "path:   #{request.path_info}\n"
+    @title = 'Hello from Sinatra'
+    db = env['cloudflare.DB']
+    @users = db ? db.prepare('SELECT id, name FROM users ORDER BY id').all.__await__ : []
+    @content = erb :index
+    erb :layout
   end
 
   get '/hello/:name' do
-    "hello, #{params['name']}!\n"
+    @title = "Hello #{params['name']}"
+    @name  = params['name']
+    @content = erb :hello
+    erb :layout
   end
 
+  get '/about' do
+    @title = 'About homurabi'
+    @content = erb :about
+    erb :layout
+  end
+
+  # A tiny JSON echo — still Sinatra DSL, just a different content type.
   post '/api/echo' do
     content_type 'application/json'
     body = request.body.read rescue ''
     "{\"echo\": \"#{body}\"}"
   end
 
-  # --- D1 ---------------------------------------------------------------
-  #
-  # NOTE on async routes: Sinatra's `process_route` has an `ensure` block
-  # that deletes the route-captured keys from `@params` right after the
-  # block returns. When a route block is compiled with `# await: true`
-  # it returns a Promise *immediately* (before any `await` actually
-  # fires), so `process_route`'s cleanup runs before the async body
-  # resumes — and `params['id']` is already gone. The fix is to capture
-  # the values into local variables at the very start of the block,
-  # before the first `.__await__`.
+  # ------------------------------------------------------------------
+  # D1 / KV / R2 — Phase 3 routes. Async Sinatra on Opal needs one
+  # ceremony: capture params BEFORE the first `.__await__`, because
+  # Sinatra's `process_route` ensure block cleans `@params` the moment
+  # the async block returns its Promise. Doing `key = params['key']` at
+  # the top is idiomatic for async routes.
+  # ------------------------------------------------------------------
 
   get '/d1/users' do
     content_type 'application/json'
@@ -67,8 +96,6 @@ class App < Sinatra::Base
     end
   end
 
-  # --- KV ---------------------------------------------------------------
-
   get '/kv/:key' do
     content_type 'application/json'
     key = params['key']
@@ -99,8 +126,6 @@ class App < Sinatra::Base
     kv.delete(key).__await__
     { 'key' => key, 'deleted' => true }.to_json
   end
-
-  # --- R2 ---------------------------------------------------------------
 
   get '/r2/:key' do
     content_type 'application/json'

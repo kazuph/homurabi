@@ -1,0 +1,22 @@
+<h1>About this Sinatra app</h1>
+
+<p>This is <code>app/hello.rb</code>, a real
+   <a href="https://github.com/janbiedermann/sinatra">janbiedermann/sinatra</a>
+   application running on Cloudflare Workers. The file would run
+   unchanged on any Rack server; the Cloudflare adapter lives entirely
+   in <code>lib/cloudflare_workers.rb</code> and doesn't leak through.</p>
+
+<h2>How the pieces fit</h2>
+<ul>
+  <li>Sinatra DSL &rarr; Opal compiler &rarr; a 580 KiB gzipped ESM</li>
+  <li>ERB templates in <code>views/*.erb</code> &rarr; precompiled by
+      <code>bin/compile-erb</code> &rarr; <code>HomurabiTemplates</code>
+      registry &rarr; <code>erb :name</code> helper</li>
+  <li>Cloudflare bindings (<code>DB</code>, <code>KV</code>, <code>BUCKET</code>)
+      exposed as plain Ruby wrappers in <code>env['cloudflare.DB']</code> etc.</li>
+  <li>Routes that touch bindings use
+      <code># await: true</code> and <code>.__await__</code> to bridge
+      sync Sinatra to async Workers I/O</li>
+</ul>
+
+<p><a href="/">&larr; back to home</a></p>

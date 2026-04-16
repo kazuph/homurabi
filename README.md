@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="public/homurabi-chan.png" alt="homurabi mascot" width="200">
+</p>
+
 # homurabi
 
 **Real Ruby + Real Sinatra on Cloudflare Workers, via Opal.**

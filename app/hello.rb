@@ -138,9 +138,21 @@ class App < Sinatra::Base
     { 'key' => key, 'deleted' => true }.to_json
   end
 
-  # NOTE: /images/:key is handled by the adapter's install_dispatcher
-  # (R2 binary passthrough) to avoid Sinatra's String body encoding.
-  # See lib/cloudflare_workers.rb install_dispatcher.
+  # Serve binary assets (images, etc.) from R2. Uses BinaryBody which
+  # passes the R2 ReadableStream directly to the JS Response, bypassing
+  # Opal's String encoding. This is a normal Sinatra route — no JS in
+  # worker.mjs, no backtick here.
+  get '/images/:key' do
+    key    = params['key']
+    bucket = env['cloudflare.BUCKET']
+    obj    = bucket.get_binary(key).__await__
+    if obj.nil?
+      status 404
+      'not found'
+    else
+      obj  # BinaryBody — build_js_response detects and streams directly
+    end
+  end
 
   get '/r2/:key' do
     content_type 'application/json'

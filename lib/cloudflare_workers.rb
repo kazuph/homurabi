@@ -156,30 +156,6 @@ module Rack
           handler = self
           `
             globalThis.__HOMURABI_RACK_DISPATCH__ = async function(req, env, ctx, body_text) {
-              // Binary asset serving from R2: /images/* paths are served
-              // directly as binary Responses WITHOUT going through Opal's
-              // String-based Rack body pipeline (which would mangle bytes).
-              // This keeps the responsibility inside the adapter layer
-              // rather than leaking product-specific routing into worker.mjs.
-              var url = new URL(req.url);
-              if (url.pathname.startsWith("/images/") && env.BUCKET) {
-                var key = url.pathname.slice("/images/".length);
-                var obj = await env.BUCKET.get(key);
-                if (obj) {
-                  return new Response(obj.body, {
-                    headers: {
-                      "content-type": obj.httpMetadata && obj.httpMetadata.contentType ? obj.httpMetadata.contentType : "image/png",
-                      "cache-control": "public, max-age=86400"
-                    }
-                  });
-                }
-                // Fall through to Sinatra for 404 handling
-              }
-
-              // The Ruby .$call may return either a plain Response (sync
-              // route) or a Promise<Response> (a route that awaited on a
-              // D1 / KV / R2 binding). Await unconditionally; awaiting a
-              // plain Response just resolves to it.
               return await #{handler}.$call(req, env, ctx, body_text == null ? "" : body_text);
             };
           `
@@ -269,6 +245,20 @@ module Rack
         # value we return, so both sync and async paths look the same on
         # the outside.
         def build_js_response(status, headers, body)
+          # Binary body fast-path: pass the JS ReadableStream directly
+          # to Response without touching Opal's String encoding.
+          if body.is_a?(::Cloudflare::BinaryBody) || (body.respond_to?(:first) && body.first.is_a?(::Cloudflare::BinaryBody))
+            bin = body.is_a?(::Cloudflare::BinaryBody) ? body : body.first
+            js_stream = bin.stream
+            ct = bin.content_type
+            cc = bin.cache_control
+            js_headers = `({})`
+            headers.each { |k, v| ks = k.to_s; vs = v.to_s; `#{js_headers}[#{ks}] = #{vs}` }
+            `#{js_headers}['content-type'] = #{ct}` if ct
+            `#{js_headers}['cache-control'] = #{cc}` if cc
+            return `new Response(#{js_stream}, { status: #{status.to_i}, headers: #{js_headers} })`
+          end
+
           chunks = []
           if body.respond_to?(:each)
             body.each { |chunk| chunks << chunk }
@@ -293,7 +283,7 @@ module Rack
           end
 
           if has_promise
-            `Promise.all(#{js_chunks}).then(function(resolved) { var parts = []; for (var i = 0; i < resolved.length; i++) { var r = resolved[i]; if (r == null) { parts.push(''); continue; } if (typeof r === 'string') { parts.push(r); continue; } if (r != null && r.$$is_string) { parts.push(r.toString()); continue; } try { parts.push(JSON.stringify(r)); } catch (e) { parts.push(String(r)); } } return new Response(parts.join(''), { status: #{status_int}, headers: #{js_headers} }); })`
+            `Promise.all(#{js_chunks}).then(function(resolved) { for (var i = 0; i < resolved.length; i++) { var r = resolved[i]; if (r != null && r.stream != null && r.content_type != null) { var bh = {}; bh['content-type'] = r.content_type; if (r.cache_control) bh['cache-control'] = r.cache_control; return new Response(r.stream, { status: #{status_int}, headers: bh }); } } var parts = []; for (var i = 0; i < resolved.length; i++) { var r = resolved[i]; if (r == null) { parts.push(''); continue; } if (typeof r === 'string') { parts.push(r); continue; } if (r != null && r.$$is_string) { parts.push(r.toString()); continue; } try { parts.push(JSON.stringify(r)); } catch (e) { parts.push(String(r)); } } return new Response(parts.join(''), { status: #{status_int}, headers: #{js_headers} }); })`
           else
             body_str = ''
             chunks.each { |c| body_str = body_str + c.to_s }
@@ -378,6 +368,26 @@ module Cloudflare
       i += 1
     end
     h
+  end
+
+  # BinaryBody wraps a JS ReadableStream (from R2, fetch, etc.) so it can
+  # flow through the Rack/Sinatra body pipeline without being converted to
+  # an Opal String (which would mangle the bytes). `build_js_response`
+  # detects BinaryBody and passes the stream directly to `new Response`.
+  class BinaryBody
+    attr_reader :stream, :content_type, :cache_control
+
+    def initialize(stream, content_type = 'application/octet-stream', cache_control = nil)
+      @stream = stream
+      @content_type = content_type
+      @cache_control = cache_control
+    end
+
+    # Rack body contract — yield nothing so Sinatra's content-length
+    # calculation skips this body. The real bytes go through JS.
+    def each; end
+
+    def close; end
   end
 
   # NOTE: the single-line backtick `...` form is used below instead of the
@@ -533,11 +543,23 @@ module Cloudflare
       `#{js_bucket}.get(#{key}).then(async function(obj) { if (obj == null) return nil; var text = await obj.text(); var rb = new Map(); rb.set('body', text); rb.set('etag', obj.etag || ''); rb.set('size', obj.size || 0); rb.set('key', obj.key || #{fallback_key}); return rb; })`
     end
 
-    # R2 get_raw. Returns the raw body as a String (for serving binary
-    # content like images). Returns nil if the object doesn't exist.
-    def get_raw(key)
+    # R2 get_binary. Returns a JS Promise that resolves to a
+    # Cloudflare::BinaryBody (wrapping the R2 object's ReadableStream)
+    # or nil. Use this for serving images and other binary content
+    # through Sinatra routes without byte-mangling.
+    #
+    #   get '/images/:key' do
+    #     obj = bucket.get_binary(key).__await__
+    #     halt 404 if obj.nil?
+    #     obj  # BinaryBody flows through build_js_response as a stream
+    #   end
+    # Returns a JS Promise resolving to a Cloudflare::BinaryBody or nil.
+    # BinaryBody wraps the R2 ReadableStream so build_js_response can
+    # pass it straight to `new Response(stream)` without mangling bytes.
+    def get_binary(key)
       js_bucket = @js
-      `#{js_bucket}.get(#{key}).then(async function(obj) { if (obj == null) return nil; var buf = await obj.arrayBuffer(); return new Uint8Array(buf); })`
+      bb = Cloudflare::BinaryBody
+      `#{js_bucket}.get(#{key}).then(function(obj) { if (obj == null) return nil; var ct = (obj.httpMetadata && obj.httpMetadata.contentType) || 'application/octet-stream'; return #{bb}.$new(obj.body, ct, 'public, max-age=86400'); })`
     end
 
     # Put a value. `body` may be a String. Returns a JS Promise.

@@ -210,7 +210,7 @@ module Sinatra
       # homurabi patch: if any body chunk is a JS Promise (route compiled
       # with `# await: true`), we can't compute bytesize yet — the real
       # payload is resolved later in the adapter. Skip content-length.
-      return false if defined?(::Cloudflare) && body.any? { |c| ::Cloudflare.js_promise?(c) }
+      return false if defined?(::Cloudflare) && body.any? { |c| ::Cloudflare.js_promise?(c) || c.is_a?(::Cloudflare::BinaryBody) }
       true
     end
 

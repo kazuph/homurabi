@@ -6,6 +6,9 @@
    unchanged on any Rack server; the Cloudflare adapter lives entirely
    in <code>lib/cloudflare_workers.rb</code> and doesn't leak through.</p>
 
+<h2>Architecture</h2>
+<img src="/architecture.svg" alt="homurabi architecture diagram" style="width:100%; max-width:800px; margin:1em 0;">
+
 <h2>How the pieces fit</h2>
 <ul>
   <li>Sinatra DSL &rarr; Opal compiler &rarr; a 580 KiB gzipped ESM</li>

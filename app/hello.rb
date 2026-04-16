@@ -16,6 +16,14 @@ require 'json'
 require 'sinatra/base'
 
 class App < Sinatra::Base
+  # --- Cloudflare binding helpers ------------------------------------
+  # These let routes access D1/KV/R2 with the same brevity as
+  # ActiveRecord's `User.find(id)` pattern, without introducing an ORM.
+  helpers do
+    def db;     env['cloudflare.DB'];     end
+    def kv;     env['cloudflare.KV'];     end
+    def bucket; env['cloudflare.BUCKET']; end
+  end
   # ------------------------------------------------------------------
   # HTML pages — each route sets a few `@ivars` then renders an ERB
   # template from `views/`. Exactly like Sinatra's README example:
@@ -27,7 +35,6 @@ class App < Sinatra::Base
 
   get '/' do
     @title = 'Hello from Sinatra'
-    db = env['cloudflare.DB']
     @users = db ? db.execute('SELECT id, name FROM users ORDER BY id').__await__ : []
     @content = erb :index
     erb :layout
@@ -70,14 +77,12 @@ class App < Sinatra::Base
 
   get '/d1/users' do
     content_type 'application/json'
-    db = env['cloudflare.DB']
     db.execute('SELECT id, name FROM users ORDER BY id').__await__.to_json
   end
 
   get '/d1/users/:id' do
     content_type 'application/json'
     id = params['id'].to_i
-    db = env['cloudflare.DB']
     row = db.get_first_row('SELECT id, name FROM users WHERE id = ?', [id]).__await__
     if row.nil?
       status 404
@@ -96,7 +101,6 @@ class App < Sinatra::Base
       return { 'error' => 'invalid JSON body', 'detail' => e.message }.to_json
     end
     name = payload['name'].to_s
-    db = env['cloudflare.DB']
     if name.empty?
       status 400
       { 'error' => 'name required' }.to_json
@@ -110,7 +114,6 @@ class App < Sinatra::Base
   get '/kv/:key' do
     content_type 'application/json'
     key = params['key']
-    kv  = env['cloudflare.KV']
     value = kv.get(key).__await__
     if value.nil?
       status 404
@@ -124,7 +127,6 @@ class App < Sinatra::Base
     content_type 'application/json'
     key  = params['key']
     body = request.body.read
-    kv   = env['cloudflare.KV']
     kv.put(key, body).__await__
     status 201
     { 'key' => key, 'value' => body, 'stored' => true }.to_json
@@ -133,7 +135,6 @@ class App < Sinatra::Base
   delete '/kv/:key' do
     content_type 'application/json'
     key = params['key']
-    kv  = env['cloudflare.KV']
     kv.delete(key).__await__
     { 'key' => key, 'deleted' => true }.to_json
   end
@@ -144,7 +145,6 @@ class App < Sinatra::Base
   # worker.mjs, no backtick here.
   get '/images/:key' do
     key    = params['key']
-    bucket = env['cloudflare.BUCKET']
     obj    = bucket.get_binary(key).__await__
     if obj.nil?
       status 404
@@ -157,7 +157,6 @@ class App < Sinatra::Base
   get '/r2/:key' do
     content_type 'application/json'
     key    = params['key']
-    bucket = env['cloudflare.BUCKET']
     obj    = bucket.get(key).__await__
     if obj.nil?
       status 404
@@ -177,7 +176,6 @@ class App < Sinatra::Base
     key             = params['key']
     body            = request.body.read rescue ''
     content_type_in = request.env['CONTENT_TYPE'] || 'application/octet-stream'
-    bucket          = env['cloudflare.BUCKET']
     bucket.put(key, body, content_type_in).__await__
     status 201
     { 'key' => key, 'size' => body.bytesize, 'stored' => true }.to_json
@@ -186,7 +184,6 @@ class App < Sinatra::Base
   delete '/r2/:key' do
     content_type 'application/json'
     key    = params['key']
-    bucket = env['cloudflare.BUCKET']
     bucket.delete(key).__await__
     { 'key' => key, 'deleted' => true }.to_json
   end

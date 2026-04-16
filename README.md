@@ -358,52 +358,39 @@ This pulls Opal from the vendored path in `Gemfile`
 (`gem 'opal', path: 'vendor/opal-gem'`) so there's no pre-release
 download to worry about.
 
-### Precompile ERB templates
+### Build (one command)
 
 ```sh
-ruby bin/compile-erb
-# → writes build/homurabi_templates.rb with 1 Proc per view
+npm run build
 ```
 
-Run this whenever anything under `views/` changes. The generated file
-is regenerated in place and *only* the stdlib (plus a tiny ERB
-tokenizer inside the script) is used — no gems outside Ruby core.
+This runs three steps in sequence:
 
-### Compile Ruby → JS
+1. **`npm run build:erb`** — `ruby bin/compile-erb` scans `views/*.erb`
+   and writes `build/homurabi_templates.rb`.
+2. **`npm run build:assets`** — `ruby bin/compile-assets` embeds
+   `public/*` (CSS, SVG — NOT binary images, which go through R2)
+   into `build/homurabi_assets.rb`.
+3. **`npm run build:opal`** — `bundle exec opal -c -E --esm …` compiles
+   everything into `build/hello.no-exit.mjs` with the full flag set:
+   `-I lib -I vendor -I build`,
+   `-r opal_patches -r cloudflare_workers -r homurabi_templates -r homurabi_assets`.
 
-```sh
-rm -f build/hello.no-exit.mjs build/opal.stderr.log
-OPAL_PREFORK_DISABLE=1 bundle exec opal \
-  -c -E --esm --no-source-map \
-  -I lib -I vendor -I build \
-  -r opal_patches -r cloudflare_workers -r homurabi_templates \
-  -o build/hello.no-exit.mjs \
-  app/hello.rb \
-  2>build/opal.stderr.log
-```
-
-- `OPAL_PREFORK_DISABLE=1` because Opal's prefork scheduler swallows
-  error lines.
-- `-I lib -I vendor -I build` puts our patches, vendored gems, and the
-  generated ERB table on the load path.
-- `-r opal_patches -r cloudflare_workers -r homurabi_templates`
-  installs the runtime shims, the Rack handler, and the precompiled
-  views *before* `app/hello.rb` runs.
+All three generated files live under `build/` (gitignored). Running
+`npm run build` is the **only** build command you need to remember.
 
 ### Dev server
 
 ```sh
-npx wrangler dev --port 8787 --ip 127.0.0.1
-curl -i http://127.0.0.1:8787/
+npm run dev
+# → builds, then starts wrangler dev on http://127.0.0.1:8787
 ```
-
-With `--local`, wrangler mocks D1/KV/R2 locally; without it, the dev
-server hits the real bindings. Both work.
 
 ### Deploy
 
 ```sh
-npx wrangler deploy
+npm run deploy
+# → builds, then runs wrangler deploy
 ```
 
 `wrangler.toml` declares the `[[d1_databases]]` / `[[kv_namespaces]]`

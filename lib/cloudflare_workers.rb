@@ -156,6 +156,26 @@ module Rack
           handler = self
           `
             globalThis.__HOMURABI_RACK_DISPATCH__ = async function(req, env, ctx, body_text) {
+              // Binary asset serving from R2: /images/* paths are served
+              // directly as binary Responses WITHOUT going through Opal's
+              // String-based Rack body pipeline (which would mangle bytes).
+              // This keeps the responsibility inside the adapter layer
+              // rather than leaking product-specific routing into worker.mjs.
+              var url = new URL(req.url);
+              if (url.pathname.startsWith("/images/") && env.BUCKET) {
+                var key = url.pathname.slice("/images/".length);
+                var obj = await env.BUCKET.get(key);
+                if (obj) {
+                  return new Response(obj.body, {
+                    headers: {
+                      "content-type": obj.httpMetadata && obj.httpMetadata.contentType ? obj.httpMetadata.contentType : "image/png",
+                      "cache-control": "public, max-age=86400"
+                    }
+                  });
+                }
+                // Fall through to Sinatra for 404 handling
+              }
+
               // The Ruby .$call may return either a plain Response (sync
               // route) or a Promise<Response> (a route that awaited on a
               // D1 / KV / R2 binding). Await unconditionally; awaiting a

@@ -49,7 +49,8 @@ class App < Sinatra::Base
   # A tiny JSON echo — still Sinatra DSL, just a different content type.
   post '/api/echo' do
     content_type 'application/json'
-    body = request.body.read rescue ''
+    request.body.rewind
+    body = request.body.read
     "{\"echo\": \"#{body}\"}"
   end
 
@@ -88,7 +89,12 @@ class App < Sinatra::Base
 
   post '/d1/users' do
     content_type 'application/json'
-    payload = JSON.parse(request.body.read) rescue {}
+    begin
+      payload = JSON.parse(request.body.read)
+    rescue JSON::ParserError, StandardError => e
+      status 400
+      return { 'error' => 'invalid JSON body', 'detail' => e.message }.to_json
+    end
     name = payload['name'].to_s
     db = env['cloudflare.DB']
     if name.empty?
@@ -117,7 +123,7 @@ class App < Sinatra::Base
   put '/kv/:key' do
     content_type 'application/json'
     key  = params['key']
-    body = request.body.read rescue ''
+    body = request.body.read
     kv   = env['cloudflare.KV']
     kv.put(key, body).__await__
     status 201
@@ -132,8 +138,9 @@ class App < Sinatra::Base
     { 'key' => key, 'deleted' => true }.to_json
   end
 
-  # NOTE: /images/:key is handled directly in worker.mjs (R2 binary
-  # passthrough) to avoid Sinatra's String body encoding. See worker.mjs.
+  # NOTE: /images/:key is handled by the adapter's install_dispatcher
+  # (R2 binary passthrough) to avoid Sinatra's String body encoding.
+  # See lib/cloudflare_workers.rb install_dispatcher.
 
   get '/r2/:key' do
     content_type 'application/json'

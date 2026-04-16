@@ -331,6 +331,22 @@ end
 # so user code never has to reach for a backtick.
 
 module Cloudflare
+  # Base error class for Cloudflare binding failures. Wraps the JS
+  # error message so Ruby rescue can handle it meaningfully.
+  class BindingError < StandardError
+    attr_reader :binding_type, :operation
+
+    def initialize(message, binding_type: nil, operation: nil)
+      @binding_type = binding_type
+      @operation = operation
+      super("[Cloudflare::#{binding_type}] #{operation}: #{message}")
+    end
+  end
+
+  class D1Error < BindingError; end
+  class KVError < BindingError; end
+  class R2Error < BindingError; end
+
   # Check whether the argument is a native JS Promise / thenable.
   # Ruby's `Object#then` (alias of `yield_self`) is a universal method
   # since Ruby 2.6, so `obj.respond_to?(:then)` is always true and is
@@ -489,21 +505,24 @@ module Cloudflare
     def all
       js_stmt = @js
       cf = Cloudflare
-      `#{js_stmt}.all().then(function(res) { return #{cf}.$js_rows_to_ruby(res.results); })`
+      err_cls = Cloudflare::D1Error
+      `#{js_stmt}.all().then(function(res) { return #{cf}.$js_rows_to_ruby(res.results); }).catch(function(e) { #{Kernel}.$$raise(#{err_cls}.$new(e.message || String(e), Opal.hash({binding_type: 'D1', operation: 'all'}))); })`
     end
 
     # Returns a JS Promise that resolves to a single Ruby Hash (or nil).
     def first
       js_stmt = @js
       cf = Cloudflare
-      `#{js_stmt}.first().then(function(res) { return res == null ? nil : #{cf}.$js_object_to_hash(res); })`
+      err_cls = Cloudflare::D1Error
+      `#{js_stmt}.first().then(function(res) { return res == null ? nil : #{cf}.$js_object_to_hash(res); }).catch(function(e) { #{Kernel}.$$raise(#{err_cls}.$new(e.message || String(e), Opal.hash({binding_type: 'D1', operation: 'first'}))); })`
     end
 
     # Returns a JS Promise that resolves to a Ruby Hash with the D1 meta.
     def run
       js_stmt = @js
       cf = Cloudflare
-      `#{js_stmt}.run().then(function(res) { return #{cf}.$js_object_to_hash(res); })`
+      err_cls = Cloudflare::D1Error
+      `#{js_stmt}.run().then(function(res) { return #{cf}.$js_object_to_hash(res); }).catch(function(e) { #{Kernel}.$$raise(#{err_cls}.$new(e.message || String(e), Opal.hash({binding_type: 'D1', operation: 'run'}))); })`
     end
   end
 
@@ -515,19 +534,22 @@ module Cloudflare
     # KV#get returns a JS Promise resolving to a String or nil.
     def get(key)
       js_kv = @js
-      `#{js_kv}.get(#{key}, "text").then(function(v) { return v == null ? nil : v; })`
+      err_cls = Cloudflare::KVError
+      `#{js_kv}.get(#{key}, "text").then(function(v) { return v == null ? nil : v; }).catch(function(e) { #{Kernel}.$$raise(#{err_cls}.$new(e.message || String(e), Opal.hash({binding_type: 'KV', operation: 'get'}))); })`
     end
 
     # Put a value. Returns a JS Promise.
     def put(key, value)
       js_kv = @js
-      `#{js_kv}.put(#{key}, #{value})`
+      err_cls = Cloudflare::KVError
+      `#{js_kv}.put(#{key}, #{value}).catch(function(e) { #{Kernel}.$$raise(#{err_cls}.$new(e.message || String(e), Opal.hash({binding_type: 'KV', operation: 'put'}))); })`
     end
 
     # Delete a key. Returns a JS Promise.
     def delete(key)
       js_kv = @js
-      `#{js_kv}.delete(#{key})`
+      err_cls = Cloudflare::KVError
+      `#{js_kv}.delete(#{key}).catch(function(e) { #{Kernel}.$$raise(#{err_cls}.$new(e.message || String(e), Opal.hash({binding_type: 'KV', operation: 'delete'}))); })`
     end
   end
 

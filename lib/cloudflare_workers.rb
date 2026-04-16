@@ -513,6 +513,13 @@ module Cloudflare
       `#{js_bucket}.get(#{key}).then(async function(obj) { if (obj == null) return nil; var text = await obj.text(); var rb = new Map(); rb.set('body', text); rb.set('etag', obj.etag || ''); rb.set('size', obj.size || 0); rb.set('key', obj.key || #{fallback_key}); return rb; })`
     end
 
+    # R2 get_raw. Returns the raw body as a String (for serving binary
+    # content like images). Returns nil if the object doesn't exist.
+    def get_raw(key)
+      js_bucket = @js
+      `#{js_bucket}.get(#{key}).then(async function(obj) { if (obj == null) return nil; var buf = await obj.arrayBuffer(); return new Uint8Array(buf); })`
+    end
+
     # Put a value. `body` may be a String. Returns a JS Promise.
     def put(key, body, content_type = 'application/octet-stream')
       js_bucket = @js

@@ -132,6 +132,9 @@ class App < Sinatra::Base
     { 'key' => key, 'deleted' => true }.to_json
   end
 
+  # NOTE: /images/:key is handled directly in worker.mjs (R2 binary
+  # passthrough) to avoid Sinatra's String body encoding. See worker.mjs.
+
   get '/r2/:key' do
     content_type 'application/json'
     key    = params['key']

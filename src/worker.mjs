@@ -36,6 +36,24 @@ export default {
       }
     }
 
+    // Serve R2 images directly as binary. Sinatra's String-based body
+    // can't handle raw bytes, so we short-circuit here before the Opal
+    // dispatcher sees the request.
+    const url = new URL(request.url);
+    if (url.pathname.startsWith("/images/") && env.BUCKET) {
+      const key = url.pathname.slice("/images/".length);
+      const obj = await env.BUCKET.get(key);
+      if (obj) {
+        return new Response(obj.body, {
+          headers: {
+            "content-type": obj.httpMetadata?.contentType || "image/png",
+            "cache-control": "public, max-age=86400",
+          },
+        });
+      }
+      // Fall through to Sinatra for 404 handling
+    }
+
     return dispatch(request, env, ctx, bodyText);
   },
 };

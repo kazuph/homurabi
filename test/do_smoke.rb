@@ -298,6 +298,66 @@ SmokeTest.assert('counter DO handler increments across two calls on the same sto
 end
 
 # ---------------------------------------------------------------------
+# 5b. DurableObjectState — blockConcurrencyWhile
+# ---------------------------------------------------------------------
+$stdout.puts ''
+$stdout.puts '--- DurableObjectState#block_concurrency_while ---'
+
+SmokeTest.assert('block_concurrency_while forwards to state.blockConcurrencyWhile and resolves') do
+  # Fake state that records whether blockConcurrencyWhile was called
+  # and resolves the supplied async function's promise.
+  `globalThis.__homurabi_do_fake_state_with_bcw = function() { var calls = 0; return { id: { toString: function() { return 'xyz'; } }, blockConcurrencyWhile: function(fn) { calls += 1; return fn(); }, storage: {}, __calls: function() { return calls; } }; };`
+  js_state = `globalThis.__homurabi_do_fake_state_with_bcw()`
+  state = Cloudflare::DurableObjectState.new(js_state)
+  resolved = state.block_concurrency_while(`Promise.resolve('locked-value')`).__await__
+  resolved == 'locked-value' && `#{js_state}.__calls()` == 1
+end
+
+SmokeTest.assert('block_concurrency_while falls back to the raw promise when state lacks BCW') do
+  # Older DO runtimes (and some tests) don't expose blockConcurrencyWhile;
+  # the helper must pass the promise through unchanged rather than raise.
+  js_state = `({ id: { toString: function() { return 'nobcw'; } } })`
+  state = Cloudflare::DurableObjectState.new(js_state)
+  resolved = state.block_concurrency_while(`Promise.resolve(42)`).__await__
+  resolved == 42
+end
+
+SmokeTest.assert('block_concurrency_while serialises two reads of a shared counter') do
+  # Emulate the classic "read + modify + write" race that BCW exists to
+  # solve: two async tasks each read the current counter, increment it,
+  # and write it back. Without serialisation, both read 0 and both
+  # write 1 (the second write clobbers the first). With
+  # block_concurrency_while wrapping each read-modify-write, the
+  # counter ends at 2.
+  #
+  # The fake state implements blockConcurrencyWhile with a shared
+  # async mutex — identical semantics to the Workers runtime.
+  `globalThis.__homurabi_do_fake_bcw_serialising = function() { var currentMutex = Promise.resolve(); return { id: { toString: function() { return 's'; } }, storage: (function() { var m = 0; return { get: function() { return new Promise(function(r) { setTimeout(function() { r(m); }, 5); }); }, put: function(_k, v) { m = v; return Promise.resolve(); } }; })(), blockConcurrencyWhile: function(fn) { var next = currentMutex.then(function() { return fn(); }); currentMutex = next.catch(function() {}); return next; } }; };`
+  js_state = `globalThis.__homurabi_do_fake_bcw_serialising()`
+  state = Cloudflare::DurableObjectState.new(js_state)
+  # Schedule two concurrent increments, both protected by BCW.
+  p1 = state.block_concurrency_while(`
+    (async function(storage) {
+      var prev = await storage.get('c');
+      await new Promise(function(r) { setTimeout(r, 5); });   // widen the window
+      await storage.put('c', prev + 1);
+      return prev + 1;
+    })(#{`#{js_state}.storage`})
+  `)
+  p2 = state.block_concurrency_while(`
+    (async function(storage) {
+      var prev = await storage.get('c');
+      await new Promise(function(r) { setTimeout(r, 5); });
+      await storage.put('c', prev + 1);
+      return prev + 1;
+    })(#{`#{js_state}.storage`})
+  `)
+  final = p1.__await__
+  final2 = p2.__await__
+  final == 1 && final2 == 2
+end
+
+# ---------------------------------------------------------------------
 # 6. JS dispatcher hook
 # ---------------------------------------------------------------------
 $stdout.puts ''

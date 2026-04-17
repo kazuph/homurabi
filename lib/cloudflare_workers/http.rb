@@ -78,6 +78,15 @@ module Cloudflare
       headers_to_hash = method(:js_headers_to_hash)
       _ = headers_to_hash # silence opal lint
 
+      # NOTE: the multi-line backtick below returns a Promise BECAUSE it
+      # is assigned to `js_promise` (and `js_promise.__await__` awaits
+      # it). Opal treats a multi-line x-string as a statement, not an
+      # expression — safe when assigned, but a bare multi-line backtick
+      # at end-of-method silently drops the Promise. Do NOT refactor
+      # this into `def fetch ... end` with the backtick as the last
+      # expression. See the single-line IIFE pattern used in
+      # lib/cloudflare_workers/{cache,queue,durable_object}.rb#put for
+      # the alternative that survives either position. (Phase 11B audit.)
       js_promise = `
         (async function() {
           var init = { method: #{method_str}, headers: #{js_headers}, redirect: 'follow' };

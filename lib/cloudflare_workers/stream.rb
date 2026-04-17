@@ -138,14 +138,22 @@ module Cloudflare
   # Writes are fire-and-forget: the WritableStream internally queues
   # them in order, so a sequence of `out << a; out << b` always lands
   # on the wire as "ab" without the caller having to manually `.__await__`
-  # each write. `close` waits on the accumulated write-promise list so
-  # it doesn't close the writer mid-queue (which would truncate bytes
-  # the client had not yet drained).
+  # each write. `close` waits on the tail promise in the chain so it
+  # doesn't close the writer mid-queue (which would truncate bytes the
+  # client had not yet drained).
+  #
+  # Memory is O(1) — we chain promises instead of accumulating them in
+  # an ever-growing array. A long-lived / high-frequency SSE endpoint
+  # therefore doesn't leak once-flushed write-ack promises.
   class SSEOut
     def initialize(writer)
       @writer = writer
       @encoder = `new TextEncoder()`
-      @pending = `[]`
+      # `@tail` tracks only the *latest* pending writer.write()
+      # promise. Each write() chains onto it via .then(), so the
+      # chain length stays 1 regardless of how many writes have
+      # already flushed.
+      @tail = `Promise.resolve()`
       @closed = false
     end
 
@@ -156,12 +164,11 @@ module Cloudflare
       s = data.to_s
       w = @writer
       enc = @encoder
-      pending = @pending
-      # Dispatch the write without awaiting — the underlying
-      # WritableStream guarantees in-order delivery. We stash the
-      # promise so close() can Promise.all() before flipping the
-      # closed flag.
-      `#{pending}.push(#{w}.write(#{enc}.encode(#{s})))`
+      # Chain the write onto the current tail so ordering is still
+      # enforced but the promise graph stays flat (Copilot review #3 —
+      # prior implementation pushed every write into an unbounded
+      # array which would leak memory on long-running streams).
+      @tail = `#{@tail}.then(function() { return #{w}.write(#{enc}.encode(#{s})); })`
       self
     end
     alias_method :<<, :write
@@ -193,21 +200,21 @@ module Cloudflare
       self
     end
 
-    # Close the writable side. Waits for all in-flight writes to drain
-    # so the client receives the final bytes before `done: true`. After
-    # this, subsequent writes become no-ops so a racing producer
-    # doesn't crash on a closed writer.
+    # Close the writable side. Waits for the tail promise in the write
+    # chain to drain so the client receives the final bytes before
+    # `done: true`. After this, subsequent writes become no-ops so a
+    # racing producer doesn't crash on a closed writer.
     def close
       return self if @closed
       @closed = true
       w = @writer
-      pending = @pending
+      tail = @tail
       # writer.close() itself can reject if the consumer bailed out.
       # Swallow — the Workers runtime already surfaces the underlying
       # error to the client via the HTTP layer. Single-line x-string
       # so Opal emits it as an expression (see Multipart#to_uint8_array
       # for the same gotcha).
-      `(async function(p, wr){ try { await Promise.all(p); } catch(e) {} try { await wr.close(); } catch(e) {} })(#{pending}, #{w})`.__await__
+      `(async function(t, wr){ try { await t; } catch(e) {} try { await wr.close(); } catch(e) {} })(#{tail}, #{w})`.__await__
       self
     end
 

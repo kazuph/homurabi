@@ -69,6 +69,7 @@ opposite bet: no DSL, real Sinatra, real Rack, real middleware chain.
 - [Net::HTTP works (Phase 6)](#nethttp-works-phase-6)
 - [Crypto works (Phase 7)](#crypto-works-phase-7)
 - [JWT 認証 (Phase 8)](#jwt-認証-phase-8)
+- [Scheduled Workers — Cron Triggers (Phase 9)](#scheduled-workers--cron-triggers-phase-9)
 - [Project status & phases](#project-status--phases)
 - [Strict no-fallback policy](#strict-no-fallback-policy)
 - [License](#license)
@@ -764,6 +765,136 @@ $ curl -X POST http://127.0.0.1:8787/api/login/refresh \
 - **カスタム署名アルゴリズム** — SigningAlgorithm module は有効だが、
   Opal async 対応の完了はユーザー側の責務。
 
+## Scheduled Workers — Cron Triggers (Phase 9)
+
+Cloudflare Workers が `[triggers] crons` の時刻に発火する `scheduled(event,
+env, ctx)` ハンドラを Sinatra DSL で書けるようにする。**Sidekiq-Cron や
+whenever のようにアプリと同じファイルに `schedule` ブロックを並べる**だけで、
+Workers ランタイムからのクロン発火が D1 / KV / R2 に届く。
+
+```ruby
+class App < Sinatra::Base
+  register Sinatra::Scheduled
+
+  # 5分ごとに D1 に行を入れる
+  schedule '*/5 * * * *', name: 'heartbeat' do |event|
+    db.execute_insert(
+      'INSERT INTO heartbeats (cron, scheduled_at, fired_at, note) VALUES (?, ?, ?, ?)',
+      [event.cron, event.scheduled_time.to_i, Time.now.to_i, 'phase9-heartbeat']
+    ).__await__
+  end
+
+  # 1時間ごとに KV カウンタを更新（read-modify-write）
+  schedule '0 */1 * * *', name: 'hourly-housekeeping' do |event|
+    raw  = kv.get('cron:hourly-counter').__await__
+    prev = raw ? JSON.parse(raw)['count'].to_i : 0
+    kv.put('cron:hourly-counter', { 'count' => prev + 1, 'last_run_at' => Time.now.to_i }.to_json).__await__
+  end
+end
+```
+
+`wrangler.toml`:
+
+```toml
+[triggers]
+crons = [
+  "*/5 * * * *",   # heartbeat — 5分ごと D1 書き込み
+  "0 */1 * * *",   # hourly housekeeping — 1時間ごと KV カウンタ
+]
+```
+
+### ローカルでクロンを手動発火
+
+Cloudflare Workers の標準的な方法と全く同じ。`wrangler dev --test-scheduled`
+を立てて、`/__scheduled` エンドポイントに `cron` をクエリパラメータで投げる。
+
+```bash
+$ npm run dev   # 内部で wrangler dev を起動
+
+# 別ターミナルから — 5分ごとのクロンを今すぐ発火
+$ curl 'http://127.0.0.1:8787/__scheduled?cron=*/5+*+*+*+*'
+Ran scheduled event
+
+# D1 に行が入った
+$ wrangler d1 execute homurabi-db --local \
+    --command "SELECT * FROM heartbeats ORDER BY id DESC LIMIT 1;"
+{"cron":"*/5 * * * *","note":"phase9-heartbeat", ...}
+```
+
+### イントロスペクション (`/test/scheduled`)
+
+Phase 7 / 8 の `/test/crypto` と同じノリで、開発時に登録済みクロンの一覧と
+任意発火を curl で確認できる。**default deny** — `wrangler.toml [vars]
+HOMURABI_ENABLE_SCHEDULED_DEMOS = "1"`（あるいは `.dev.vars` で上書き）
+にしないと 404 を返す。
+
+```bash
+$ curl http://127.0.0.1:8787/test/scheduled
+{"jobs":[
+  {"name":"heartbeat","cron":"*/5 * * * *", ...},
+  {"name":"hourly-housekeeping","cron":"0 */1 * * *", ...}
+]}
+
+# 手動で hourly cron だけ発火
+$ curl -X POST 'http://127.0.0.1:8787/test/scheduled/run?cron=0%20*/1%20*%20*%20*'
+{"fired":1,"total":2,
+ "results":[{"name":"hourly-housekeeping","cron":"0 */1 * * *","ok":true,"duration":0.003}],
+ "cron":"0 */1 * * *","registered_crons":["*/5 * * * *","0 */1 * * *"]}
+```
+
+### `schedule` API
+
+| 引数 | 型 | 必須 | 説明 |
+|---|---|---|---|
+| `cron` | String | ✓ | 5- または 6-フィールドのクロン式。`wrangler.toml` の `[triggers] crons` の文字列と完全一致しないとマッチしない |
+| `name:` | String | — | ログ用ラベル（既定: クロン式そのもの） |
+| `match:` | Proc | — | 完全一致以外のマッチング（テスト用、`->(c) { true }` で常時発火） |
+| ブロック | `\|event\|` | ✓ | `Cloudflare::ScheduledEvent` (`#cron` / `#scheduled_time` / `#type`) を受け取る |
+
+`schedule` ブロックの中では HTTP ルートと同じヘルパが使える:
+
+| ヘルパ | 値 |
+|---|---|
+| `db` | `Cloudflare::D1Database` ラッパ（D1 バインディング設定時のみ） |
+| `kv` | `Cloudflare::KVNamespace` ラッパ |
+| `bucket` | `Cloudflare::R2Bucket` ラッパ |
+| `env` | `'cloudflare.cron'` / `'cloudflare.scheduled_time'` / `'cloudflare.env'` / `'cloudflare.ctx'` を含む Hash |
+| `wait_until(promise)` | `ctx.waitUntil(promise)` 相当。長時間 Promise をハンドラ完了後も走らせる |
+| `logger` | `info` / `warn` / `error` / `debug` を持つ簡易ロガー |
+
+### `# await: true` ルール
+
+D1 / KV / R2 / fetch / 暗号系と同じく、内部で `__await__` を呼ぶブロックは
+**Opal `# await: true` モード**で動く。`app/hello.rb` の先頭にこのマジックコメントが
+ある限り、`schedule do ... end` の中で `kv.get(key).__await__` のような同期風
+構文が使える（ES8 `await` に変換される）。
+
+ブロックが投げた例外は **per-job rescue** に捕まり、結果の `results` 配列に
+`ok: false, error: "Class: msg"` として記録される。一つのクロンが落ちても兄弟ジョブは
+止まらない。
+
+### 制約 (Cloudflare Workers の物理制約により未対応)
+
+- **動的クロン登録** — `wrangler.toml` の静的宣言のみ。実行時に
+  `unschedule` / `reschedule` する API は提供しない（プラットフォーム制約）。
+- **長時間ジョブ** — Workers の CPU 時間制限あり（30s wall、〜30s CPU）。
+  外部 fetch を伴う重い処理は `wait_until` で続行させる。
+- **クロス-job sequencing** — 各ジョブは並列・独立。`A の完了を待って B`
+  のような宣言的シーケンスはなし（必要なら呼び出し順を `schedule` 宣言で
+  制御）。
+
+### テスト
+
+29 ケースの回帰スイート (`test/scheduled_smoke.rb`) — DSL 登録、クロン式
+バリデーション、ディスパッチ、`ScheduledContext` ヘルパ、`ScheduledEvent.from_js`、
+カスタム match proc、per-job エラー隔離、`globalThis.__HOMURABI_SCHEDULED_DISPATCH__`
+JS フック経由の round-trip。
+
+```bash
+$ npm run test:scheduled
+29 tests, 29 passed, 0 failed
+```
+
 ## Project status & phases
 
 The project follows a strict four-phase plan (see
@@ -780,6 +911,7 @@ of each phase:
 | **Phase 6** | HTTP client foundation — `Cloudflare::HTTP.fetch` wrapping `globalThis.fetch`, plus a `Net::HTTP` shim (`get` / `get_response` / `post_form`) and `Kernel#URI` so unmodified Ruby HTTP code can reach the network through the Workers `fetch` API. | ✅ shipped on `feature/phase6-fetch`. 14 new smoke tests pass; demos at `/demo/http` and `/demo/http/raw` hit the public ipify API. |
 | **Phase 7** | Crypto primitives — full RS/PS/ES JWT alg coverage, RSA-OAEP, AES-GCM/CBC/CTR, ECDH (P-256/384/521 + X25519), Ed25519/EdDSA, OpenSSL::BN, KDF (PBKDF2 + HKDF), SecureRandom, PEM I/O. node:crypto sync + Web Crypto subtle async hybrid; CTR streaming via per-block subtle calls; binary plaintext byte-transparent; verify raises on key/algo errors and only returns false on signature mismatch. | ✅ shipped on `feature/phase7-crypto`. 85 crypto smoke + Workers self-test endpoint `/test/crypto` (17 cases) + bin/test-on-workers shell script for in-Worker regression. |
 | **Phase 8** | JWT 認証フレームワーク — vendored ruby-jwt v2.9.3 に Opal/async パッチを適用。HS/RS/PS/ES/EdDSA 全アルゴリズム対応、`Sinatra::JwtAuth` ヘルパで `authenticate!` / `current_user` / `issue_token`、KV-backed refresh token、`/api/login?alg=<name>` で全アルゴリズムが実働 Workers 上で発行・検証できる。`JWT.encode` / `JWT.decode` は subtle バックエンドのため async（caller が `.__await__`）、HS256 系は sync。 | ✅ shipped on `feature/phase8-jwt`. 43 jwt smoke + Workers self-test `/test/crypto` が 26 ケース（JWT 9 追加）+ dogfooding で全 7 alg のログイン→/api/me→refresh を実測。 |
+| **Phase 9** | Scheduled Workers (Cron Triggers) — `src/worker.mjs#scheduled` を経由して `globalThis.__HOMURABI_SCHEDULED_DISPATCH__` から Sinatra ディスパッチャに委譲。**`Sinatra::Scheduled` 拡張**で `schedule '*/5 * * * *' do \|event\| ... end` DSL（`db` / `kv` / `bucket` / `wait_until` ヘルパ込み）。ブロックは `define_method` 経由でコンパイルされるため `# await: true` の `__await__` がそのまま使え、D1 / KV へのリード・モディファイ・ライトが Workers ランタイムから正しく到達する。per-job 例外隔離 + `/test/scheduled` `/test/scheduled/run` 内省 API（`HOMURABI_ENABLE_SCHEDULED_DEMOS` で default deny）。 | ✅ shipped on `feature/phase9-cron`. 29 scheduled smoke + 実機 `wrangler dev --test-scheduled` で `/__scheduled?cron=...` 経由の D1 行追加と KV カウンタ increment を実測（4 連発で `count: 1→4`）。 |
 
 ### Definition of Done (from PLAN.md §1.1)
 

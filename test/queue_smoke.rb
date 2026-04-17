@@ -153,6 +153,30 @@ SmokeTest.assert('send_batch accepts a list of plain bodies') do
   `#{msgs}.length` == 3 && `#{msgs}[0].body` == 'a' && `#{msgs}[2].body` == 'c'
 end
 
+SmokeTest.assert('send_batch preserves order + count across 100 messages') do
+  js_p = fake_queue_producer
+  q = Cloudflare::Queue.new(js_p, 'jobs')
+  msgs = (1..100).map { |i| { 'seq' => i, 'tag' => "t-#{i}" } }
+  q.send_batch(msgs).__await__
+  arr = `#{js_p}._batches[0].msgs`
+  ok = `#{arr}.length` == 100
+  if ok
+    # Random sample ordering to catch reordering bugs without iterating
+    # every message. 0 / 42 / 99 covers start/middle/end.
+    ok &&= `#{arr}[0].body.seq`   == 1   && `#{arr}[0].body.tag`   == 't-1'
+    ok &&= `#{arr}[42].body.seq`  == 43  && `#{arr}[42].body.tag`  == 't-43'
+    ok &&= `#{arr}[99].body.seq`  == 100 && `#{arr}[99].body.tag`  == 't-100'
+  end
+  ok
+end
+
+SmokeTest.assert('send_batch with delay_seconds forwards top-level opts.delaySeconds') do
+  js_p = fake_queue_producer
+  q = Cloudflare::Queue.new(js_p, 'jobs')
+  q.send_batch(['a', 'b', 'c'], delay_seconds: 17).__await__
+  `#{js_p}._batches[0].opts.delaySeconds` == 17
+end
+
 SmokeTest.assert('send_batch accepts Hash messages with body + options') do
   js_p = fake_queue_producer
   q = Cloudflare::Queue.new(js_p, 'jobs')

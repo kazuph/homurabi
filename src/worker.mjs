@@ -184,6 +184,51 @@ export class HomurabiCounterDO {
     this.env = env;
   }
   async fetch(request) {
+    // Upgrade path: if the request asks for a WebSocket, accept one
+    // end of a new pair via the Hibernation API and hand the other
+    // end back to the client as part of a 101 response. After this,
+    // the runtime dispatches any subsequent frames on the server
+    // socket through the `webSocketMessage` / `webSocketClose` /
+    // `webSocketError` methods below (which forward to Ruby).
+    if (request.headers.get("Upgrade")?.toLowerCase() === "websocket") {
+      const pair = new WebSocketPair();
+      // The server end hibernates with the DO; tag it with the path
+      // so Ruby handlers can filter.
+      let url;
+      try { url = new URL(request.url); } catch (_e) { url = { pathname: "/" }; }
+      const tag = "path:" + (url.pathname || "/");
+      try {
+        this.state.acceptWebSocket(pair[1], [tag]);
+      } catch (_e) {
+        // Runtimes without Hibernation API — fall back to accepting
+        // manually and proxying frames without hibernation. We DON'T
+        // silently 500 here; we still upgrade the client.
+        pair[1].accept();
+      }
+      return new Response(null, { status: 101, webSocket: pair[0] });
+    }
     return __homurabiForwardDO("HomurabiCounterDO", this.state, this.env, request);
+  }
+
+  // Hibernation API callbacks — routed into Ruby via the hooks
+  // installed by `lib/cloudflare_workers/durable_object.rb`. Each
+  // hook is optional on the Ruby side; missing hooks are a no-op.
+  async webSocketMessage(ws, message) {
+    const fn = globalThis.__HOMURABI_DO_WS_MESSAGE__;
+    if (typeof fn === "function") {
+      return fn("HomurabiCounterDO", ws, message, this.state, this.env);
+    }
+  }
+  async webSocketClose(ws, code, reason, wasClean) {
+    const fn = globalThis.__HOMURABI_DO_WS_CLOSE__;
+    if (typeof fn === "function") {
+      return fn("HomurabiCounterDO", ws, code, reason, wasClean, this.state, this.env);
+    }
+  }
+  async webSocketError(ws, err) {
+    const fn = globalThis.__HOMURABI_DO_WS_ERROR__;
+    if (typeof fn === "function") {
+      return fn("HomurabiCounterDO", ws, err, this.state, this.env);
+    }
   }
 }

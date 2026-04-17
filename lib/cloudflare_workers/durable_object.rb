@@ -124,8 +124,27 @@ module Cloudflare
   # `Cloudflare::HTTPResponse` shape as Phase 6 so routes don't need to
   # learn a second API.
   class DurableObjectStub
+    attr_reader :js
+
     def initialize(js)
       @js = js
+    end
+
+    # Same as `fetch` but returns the raw JS Response (a JS Promise
+    # resolving to it) instead of wrapping it in a
+    # `Cloudflare::HTTPResponse`. Needed for WebSocket-upgrade
+    # responses — the 101 Response carries its WebSocket in a
+    # `.webSocket` property that disappears if we reconstruct the
+    # Response via the HTTPResponse wrapper.
+    def fetch_raw(url_or_request, method: 'GET', headers: nil, body: nil)
+      hdrs = headers || {}
+      method_str = method.to_s.upcase
+      js_headers = Cloudflare::HTTP.ruby_headers_to_js(hdrs)
+      js_body = body.nil? ? nil : body.to_s
+      url_str = url_or_request.to_s
+      js_stub = @js
+      err_klass = Cloudflare::DurableObjectError
+      `(async function(stub, url_str, method_str, js_headers, js_body, Kernel, err_klass) { var init = { method: method_str, headers: js_headers }; if (js_body !== null && js_body !== undefined && js_body !== Opal.nil) { init.body = js_body; } try { return await stub.fetch(url_str, init); } catch (e) { Kernel.$raise(err_klass.$new(e && e.message ? e.message : String(e), Opal.hash({ operation: 'stub.fetch_raw' }))); } })(#{js_stub}, #{url_str}, #{method_str}, #{js_headers}, #{js_body}, #{Kernel}, #{err_klass})`
     end
 
     # Call the DO with a plain URL (String) and optional init-Hash. The
@@ -217,6 +236,35 @@ module Cloudflare
       nil
     end
 
+    # Register a WebSocket-event handler for a DO class. Accepts any
+    # combination of `on_message: proc { |ws, msg, state| ... }`,
+    # `on_close: proc { |ws, code, reason, clean, state| ... }`,
+    # `on_error: proc { |ws, err, state| ... }`.
+    #
+    #   Cloudflare::DurableObject.define_web_socket_handlers('HomurabiCounterDO',
+    #     on_message: ->(ws, msg, _state) { `#{ws}.send(#{msg})` },
+    #     on_close:   ->(ws, code, reason, clean, _state) { `#{ws}.close(#{code}, #{reason})` }
+    #   )
+    #
+    # The callbacks are invoked from `webSocketMessage` /
+    # `webSocketClose` / `webSocketError` dispatches on the JS DO
+    # class (wired by the exported HomurabiCounterDO in
+    # src/worker.mjs). Return value is ignored — the runtime doesn't
+    # expect a body.
+    def self.define_web_socket_handlers(class_name, on_message: nil, on_close: nil, on_error: nil)
+      @ws_handlers ||= {}
+      @ws_handlers[class_name] = {
+        on_message: on_message,
+        on_close:   on_close,
+        on_error:   on_error
+      }.compact
+      nil
+    end
+
+    def self.web_socket_handlers_for(class_name)
+      (@ws_handlers || {})[class_name.to_s]
+    end
+
     # Lookup handler by class name.
     def self.handler_for(class_name)
       (@handlers || {})[class_name.to_s]
@@ -278,14 +326,47 @@ module Cloudflare
       `new Response(#{body_str}, { status: #{status_int}, headers: #{js_headers} })`
     end
 
+    # WebSocket dispatchers — called from the JS DO class's
+    # `webSocketMessage` / `webSocketClose` / `webSocketError`
+    # methods. Each returns a JS Promise that resolves to undefined.
+    def self.dispatch_ws_message(class_name, js_ws, js_message, js_state, js_env)
+      h = web_socket_handlers_for(class_name)
+      return nil if h.nil? || h[:on_message].nil?
+      state = DurableObjectState.new(js_state)
+      h[:on_message].call(js_ws, js_message, state)
+      nil
+    end
+
+    def self.dispatch_ws_close(class_name, js_ws, code, reason, was_clean, js_state, js_env)
+      h = web_socket_handlers_for(class_name)
+      return nil if h.nil? || h[:on_close].nil?
+      state = DurableObjectState.new(js_state)
+      h[:on_close].call(js_ws, code, reason, was_clean, state)
+      nil
+    end
+
+    def self.dispatch_ws_error(class_name, js_ws, js_error, js_state, js_env)
+      h = web_socket_handlers_for(class_name)
+      return nil if h.nil? || h[:on_error].nil?
+      state = DurableObjectState.new(js_state)
+      h[:on_error].call(js_ws, js_error, state)
+      nil
+    end
+
     # Install the JS dispatcher hook. Idempotent.
     #
     # Kept as a single-line backtick x-string — Opal's compiler refuses
     # multi-line backticks as expressions (same constraint documented
     # in `lib/cloudflare_workers/scheduled.rb#install_dispatcher`).
+    # Installs FOUR hooks: fetch dispatcher + 3 websocket event
+    # dispatchers. Each wraps Ruby exceptions in a console.error so a
+    # bad handler doesn't crash the DO.
     def self.install_dispatcher
       mod = self
       `globalThis.__HOMURABI_DO_DISPATCH__ = async function(class_name, state, env, request, body_text) { try { return await #{mod}.$dispatch_js(class_name, state, env, request, body_text == null ? '' : body_text); } catch (err) { try { globalThis.console.error('[Cloudflare::DurableObject] dispatch failed:', err && err.stack || err); } catch (e) {} return new Response(JSON.stringify({ error: String(err && err.message || err) }), { status: 500, headers: { 'content-type': 'application/json' } }); } };`
+      `globalThis.__HOMURABI_DO_WS_MESSAGE__ = async function(class_name, ws, message, state, env) { try { await #{mod}.$dispatch_ws_message(class_name, ws, message, state, env); } catch (err) { try { globalThis.console.error('[Cloudflare::DurableObject] ws.message dispatch failed:', err && err.stack || err); } catch (e) {} } };`
+      `globalThis.__HOMURABI_DO_WS_CLOSE__ = async function(class_name, ws, code, reason, wasClean, state, env) { try { await #{mod}.$dispatch_ws_close(class_name, ws, code, reason, wasClean, state, env); } catch (err) { try { globalThis.console.error('[Cloudflare::DurableObject] ws.close dispatch failed:', err && err.stack || err); } catch (e) {} } };`
+      `globalThis.__HOMURABI_DO_WS_ERROR__ = async function(class_name, ws, err, state, env) { try { await #{mod}.$dispatch_ws_error(class_name, ws, err, state, env); } catch (e2) { try { globalThis.console.error('[Cloudflare::DurableObject] ws.error dispatch failed:', e2 && e2.stack || e2); } catch (_) {} } };`
     end
   end
 
@@ -315,6 +396,49 @@ module Cloudflare
     def block_concurrency_while(promise)
       js_state = @js_state
       `(#{js_state} && #{js_state}.blockConcurrencyWhile ? #{js_state}.blockConcurrencyWhile(async function(){ return await #{promise}; }) : #{promise})`
+    end
+
+    # Accept an incoming WebSocket for the Hibernation API. The DO
+    # instance transparently survives `webSocketMessage` /
+    # `webSocketClose` callbacks even if the isolate goes idle in
+    # between — the runtime wakes the DO, invokes the callback, and
+    # lets it hibernate again. Without `acceptWebSocket`, the DO must
+    # stay alive for the lifetime of the socket (billed per-invocation
+    # second).
+    #
+    # `tags` is an optional Array of string tags attached to the
+    # socket so callers can later filter `get_web_sockets(tag: ...)`.
+    def accept_web_socket(js_ws, tags: nil)
+      js_state = @js_state
+      if tags && !tags.empty?
+        js_tags = `([])`
+        tags.each { |t| ts = t.to_s; `#{js_tags}.push(#{ts})` }
+        `#{js_state}.acceptWebSocket(#{js_ws}, #{js_tags})`
+      else
+        `#{js_state}.acceptWebSocket(#{js_ws})`
+      end
+      nil
+    end
+
+    # List every WebSocket the runtime has attached to this DO via
+    # `acceptWebSocket`. Optional `tag:` filter forwards to
+    # `getWebSockets(tag)`.
+    def web_sockets(tag: nil)
+      js_state = @js_state
+      js_arr = if tag
+                 ts = tag.to_s
+                 `(#{js_state}.getWebSockets ? #{js_state}.getWebSockets(#{ts}) : [])`
+               else
+                 `(#{js_state}.getWebSockets ? #{js_state}.getWebSockets() : [])`
+               end
+      out = []
+      len = `#{js_arr}.length`
+      i = 0
+      while i < len
+        out << `#{js_arr}[#{i}]`
+        i += 1
+      end
+      out
     end
   end
 

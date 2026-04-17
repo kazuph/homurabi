@@ -108,6 +108,13 @@ class App < Sinatra::Base
       env['cloudflare.QUEUE_JOBS']
     end
 
+    # The `JOBS_DLQ` dead-letter-queue producer. Routes can post to
+    # this directly when the caller already knows a message should not
+    # go through the main retry loop.
+    def jobs_dlq
+      env['cloudflare.QUEUE_JOBS_DLQ']
+    end
+
     # Serve an expensive computation through Cache API. On a cache
     # hit the cached Response body is returned; on a miss the block
     # is evaluated, the result is stored with the given TTL, and
@@ -1506,6 +1513,32 @@ class App < Sinatra::Base
   # message stores a timestamp into KV under `queue:last-consumed:<i>`
   # so `wrangler dev` + `/demo/queue/status` can confirm round-trip
   # delivery without invasive logging.
+  # DLQ consumer — logs every message the runtime moves into the
+  # dead-letter queue, keyed `queue:dlq:<i>`. Phase 11B local-only
+  # (production requires `wrangler queues create homurabi-jobs-dlq`).
+  consume_queue 'homurabi-jobs-dlq' do |batch|
+    if kv
+      msgs = batch.messages
+      i = 0
+      while i < msgs.length
+        msg = msgs[i]
+        record = {
+          'id'           => msg.id,
+          'body'         => msg.body,
+          'from_queue'   => batch.queue,
+          'dead_at'      => Time.now.to_i,
+          'batch_index'  => i
+        }
+        kv.put("queue:dlq:#{i}", record.to_json, expiration_ttl: 86_400).__await__
+        msg.ack
+        i += 1
+      end
+    else
+      batch.ack_all
+    end
+    batch.size
+  end
+
   consume_queue 'homurabi-jobs' do |batch|
     # Under `# await: true`, using `Array#each` with an internal
     # `__await__` is unreliable because Opal yields to an async
@@ -1518,21 +1551,96 @@ class App < Sinatra::Base
       total = msgs.length
       while i < total
         msg = msgs[i]
-        record = {
-          'id'           => msg.id,
-          'body'         => msg.body,
-          'queue'        => batch.queue,
-          'consumed_at'  => Time.now.to_i,
-          'batch_index'  => i
-        }
-        kv.put("queue:last-consumed:#{i}", record.to_json, expiration_ttl: 86_400).__await__
-        msg.ack
+        body_hash = msg.body.is_a?(Hash) ? msg.body : {}
+        # Test hook: messages with `"fail": true` are retried so the
+        # Workers runtime eventually routes them into the DLQ after
+        # exhausting `max_retries`. Exists so
+        # `GET /demo/queue/dlq-status` can observe a live DLQ flow in
+        # `wrangler dev` without a real failing job.
+        if body_hash['fail'] == true
+          msg.retry
+        else
+          record = {
+            'id'           => msg.id,
+            'body'         => msg.body,
+            'queue'        => batch.queue,
+            'consumed_at'  => Time.now.to_i,
+            'batch_index'  => i
+          }
+          kv.put("queue:last-consumed:#{i}", record.to_json, expiration_ttl: 86_400).__await__
+          msg.ack
+        end
         i += 1
       end
     else
       batch.ack_all
     end
     batch.size
+  end
+
+  # Phase 11B — WebSocket handlers for HomurabiCounterDO. The DO
+  # echoes any text frame back prefixed with "echo:" AND atomically
+  # bumps the counter per received frame so clients can observe the
+  # hibernation-aware storage writes. Uses state.storage (same path
+  # that HTTP /inc uses) so `wrangler dev` + `/demo/do?action=peek`
+  # sees the increments after a WebSocket session.
+  Cloudflare::DurableObject.define_web_socket_handlers('HomurabiCounterDO',
+    on_message: ->(ws, message, state) {
+      text = `typeof #{message} === 'string' ? #{message} : (typeof Buffer !== 'undefined' && Buffer.isBuffer(#{message}) ? #{message}.toString('utf8') : '')`
+      # Fire-and-forget the storage increment inside the async IIFE
+      # so the ws.send is not blocked by the round-trip. We pass the
+      # JS state into a single-line async fn to avoid the multi-line
+      # x-string quirk documented elsewhere.
+      js_state_raw = state.js_state
+      `(async function(ws, state, text) { try { var prev = (await state.storage.get('count')) || 0; var next = (typeof prev === 'number' ? prev : parseInt(prev, 10) || 0) + 1; await state.storage.put('count', next); ws.send('echo:' + text + ' count=' + next); } catch (e) { try { ws.send('error: ' + String(e && e.message || e)); } catch (_) {} } })(#{ws}, #{js_state_raw}, #{text})`
+      nil
+    },
+    on_close: ->(ws, code, reason, _clean, _state) {
+      # Mirror the close back to the client so both sides agree on
+      # the shutdown code. Hibernation API requires an explicit
+      # server-side close call.
+      c = code.to_i
+      r = reason.to_s
+      `(function(ws, c, r) { try { ws.close(c, r); } catch (_) {} })(#{ws}, #{c}, #{r})`
+      nil
+    },
+    on_error: ->(ws, err, _state) {
+      # Just log the error — nothing meaningful to do beyond record it.
+      `try { globalThis.console.error('[HomurabiCounterDO.ws] error:', #{err}); } catch (_) {}`
+      nil
+    }
+  )
+
+  # GET /demo/do/ws — upgrades to a WebSocket routed into the DO.
+  # The DO's Hibernation handlers echo every frame back with
+  # "echo:<text> count=<n>" where <n> is the shared counter, so a
+  # single WS session also increments the same counter that
+  # `/demo/do?action=peek` reads from over HTTP.
+  get '/demo/do/ws' do
+    unless binding_demos_enabled?
+      status 404
+      content_type 'application/json'
+      next({ 'error' => 'binding demos disabled' }.to_json)
+    end
+    ns = do_counter
+    if ns.nil?
+      status 503
+      content_type 'application/json'
+      next({ 'error' => 'COUNTER binding not bound' }.to_json)
+    end
+    name = (params['name'] || 'ws-demo').to_s
+    stub = ns.get_by_name(name)
+    # Forward a WebSocket-upgrade request to the DO stub. The stub's
+    # fetch() returns a 101 Response with `.webSocket` attached;
+    # Cloudflare::RawResponse signals to build_js_response that the
+    # JS Response must be passed through untouched (normal bodies
+    # lose the WebSocket property when reconstructed).
+    js_resp = stub.fetch_raw(
+      "https://homurabi-do.internal/ws/#{name}",
+      method: 'GET',
+      headers: { 'upgrade' => 'websocket' }
+    ).__await__
+    Cloudflare::RawResponse.new(js_resp)
   end
 
   # DO handler — implements the counter. One instance per "name"
@@ -1715,6 +1823,65 @@ class App < Sinatra::Base
     }.to_json
   end
 
+  # GET /demo/cache/named — named cache partitions. `caches.open(name)`
+  # gives a Worker a separate cache namespace that does NOT collide
+  # with `caches.default`. Useful for partitioning expensive responses
+  # (e.g. "search-results" vs "user-sessions") so evicting one class
+  # doesn't evict the others.
+  #
+  # Query params:
+  #   namespace — cache partition name (default "frag-default")
+  #   key       — logical key (reused with the same pseudo-URL scheme
+  #               per namespace so two namespaces can key the same
+  #               logical name independently).
+  get '/demo/cache/named' do
+    content_type 'application/json'
+    unless binding_demos_enabled?
+      status 404
+      next({ 'error' => 'binding demos disabled' }.to_json)
+    end
+    namespace = (params['namespace'] || 'frag-default').to_s
+    raise ArgumentError, 'namespace must be [A-Za-z0-9_-]{1,32}' unless namespace =~ /\A[A-Za-z0-9_-]{1,32}\z/
+    key = (params['key'] || 'demo').to_s
+    cache_key = "https://homurabi-named-cache.internal/#{namespace}/#{key}"
+    started = Time.now.to_f
+    # Open the named partition fresh per request — the JS handle is
+    # cached per-isolate internally but the Ruby wrapper is cheap.
+    named = ::Cloudflare::Cache.open(namespace).__await__
+    cached = named.match(cache_key).__await__
+    if cached
+      state = 'HIT'
+      # Tiny pass-through of the cached body.
+      payload = JSON.parse(cached.body) rescue { 'raw' => cached.body }
+      payload.merge(
+        'cache' => state,
+        'namespace' => namespace,
+        'key' => key,
+        'elapsed_ms' => ((Time.now.to_f - started) * 1000).round
+      ).to_json
+    else
+      state = 'MISS'
+      # Compute something uniquely attributable to this namespace/key
+      # so we can assert that two namespaces with the same key don't
+      # collide.
+      payload = {
+        'namespace' => namespace,
+        'key'       => key,
+        'nonce'     => SecureRandom.hex(8),
+        'computed_at' => Time.now.to_i
+      }
+      named.put(cache_key, payload.to_json, status: 200, headers: {
+        'content-type'  => 'application/json',
+        'cache-control' => 'public, max-age=60',
+        'date'          => Time.now.httpdate
+      }).__await__
+      payload.merge(
+        'cache' => state,
+        'elapsed_ms' => ((Time.now.to_f - started) * 1000).round
+      ).to_json
+    end
+  end
+
   # POST /test/queue/fire — manually invoke the queue consumer with a
   # synthesised batch so local `wrangler dev` can exercise the
   # `consume_queue` handler without waiting for miniflare's
@@ -1755,6 +1922,63 @@ class App < Sinatra::Base
     js_batch = `({ queue: #{qname}, messages: #{js_msgs}, ackAll: function() {}, retryAll: function() {} })`
     summary = Cloudflare::QueueConsumer.dispatch_js(js_batch, env['cloudflare.env'], env['cloudflare.ctx']).__await__
     summary.merge('injected' => messages.size).to_json
+  end
+
+  # GET /demo/queue/dlq-status — reads entries the DLQ consumer wrote
+  # into KV under `queue:dlq:<i>`. Matches `/demo/queue/status` in
+  # shape so UI/automation can query either.
+  get '/demo/queue/dlq-status' do
+    content_type 'application/json'
+    unless binding_demos_enabled?
+      status 404
+      next({ 'error' => 'binding demos disabled' }.to_json)
+    end
+    if kv.nil?
+      status 503
+      next({ 'error' => 'KV not bound — cannot read DLQ state' }.to_json)
+    end
+    limit = (params['limit'] || '10').to_i
+    recent = []
+    i = 0
+    while i < limit
+      raw = kv.get("queue:dlq:#{i}").__await__
+      break if raw.nil? || raw.empty?
+      begin
+        recent << JSON.parse(raw)
+      rescue JSON::ParserError
+        recent << { 'raw' => raw }
+      end
+      i += 1
+    end
+    {
+      'queue'   => 'homurabi-jobs-dlq',
+      'count'   => recent.size,
+      'recent'  => recent
+    }.to_json
+  end
+
+  # POST /demo/queue/force-dlq — enqueue a message whose body has
+  # `"fail": true`, which the main consumer interprets as "retry me".
+  # After `max_retries` retries the Workers runtime forwards it to the
+  # DLQ; the DLQ consumer then writes it under `queue:dlq:<i>`.
+  #
+  # Convenience for `wrangler dev` — avoids hand-crafting a payload
+  # just to exercise the retry → DLQ path.
+  post '/demo/queue/force-dlq' do
+    content_type 'application/json'
+    unless binding_demos_enabled?
+      status 404
+      next({ 'error' => 'binding demos disabled' }.to_json)
+    end
+    q = jobs_queue
+    if q.nil?
+      status 503
+      next({ 'error' => 'Queue binding JOBS_QUEUE not bound' }.to_json)
+    end
+    payload = { 'fail' => true, 'reason' => 'force-dlq demo', 'ts' => Time.now.to_i }
+    q.send(payload).__await__
+    status 202
+    { 'enqueued' => true, 'payload' => payload, 'note' => 'main consumer will retry up to max_retries; then the runtime forwards the message to homurabi-jobs-dlq' }.to_json
   end
 
   # GET /test/bindings — Phase 11B self-test. Confirms that every

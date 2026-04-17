@@ -1155,16 +1155,40 @@ return `undefined`. The `put` / `match` / `delete` / `send` / `fetch`
 helpers in `lib/cloudflare_workers/{cache,queue,durable_object}.rb`
 document this at the call site.
 
+### Phase 11B 追加パック (max-effort 完遂)
+
+初回 PR 後、本家 PR 無し / 費用発生無し の範囲で **「工数で潰せる妥協」を全部潰した** アップデート:
+
+- **DurableObject WebSocket (Hibernation API)** — `Cloudflare::DurableObject.define_web_socket_handlers`
+  で `on_message` / `on_close` / `on_error` を Ruby で登録。`state.accept_web_socket` / `state.web_sockets`
+  ラッパも同時提供。`/demo/do/ws` が **101 upgrade + フレーム echo + 同一 DO counter の increment** を
+  行う実機デモ (Node `ws` client で 3 frames round-trip 確認)。Sinatra ルートが WebSocket 101 を
+  返せるよう `Cloudflare::RawResponse` ラッパと `build_js_response` のパススルー分岐を追加。
+- **Named Cache demo** — `/demo/cache/named?namespace=X&key=Y` で `caches.open(X)` 間の key 衝突が
+  ないことを実機確認。smoke test にも 2 namespace 独立ケース追加。
+- **Cache TTL 期限切れ** — 時間制御可能な fake で `max-age` 越えの `cache.match` が nil に落ちる
+  （post-expiry MISS）ケースを追加。
+- **DLQ 実機検証** — `[[queues.consumers]] dead_letter_queue = "homurabi-jobs-dlq"` + DLQ 側 consumer
+  + `POST /demo/queue/force-dlq` (`{ fail: true }` を送ると main が retry → max_retries 超で DLQ 行き)。
+  miniflare local で `/demo/queue/dlq-status` 経由の round-trip 実機確認。
+- **Queue send_batch 大量ケース** — 100 件 batch の順序保存 + 件数検証。
+- **DO `blockConcurrencyWhile`** — 共有カウンタへの並行 read-modify-write がシリアライズされる
+  ケースを fake mutex で再現。
+- **#9 Opal multi-line backtick audit** — `http.rb` / `ai.rb` に「変数代入ありの multi-line は
+  安全、末尾式として置くと Promise silent drop」警告コメント追加。
+
+これで smoke 合計 280 ケース (DO 31 / Cache 18 / Queue 22 + 既存 209)。
+
 ### テスト
 
-56 ケースの新規回帰スイート (`test/do_smoke.rb` 22 + `test/cache_smoke.rb`
-14 + `test/queue_smoke.rb` 20) + Workers self-test `/test/bindings`。
+初回 56 + max-effort 15 = 71 ケースの新規回帰 (`test/do_smoke.rb` 31 / `test/cache_smoke.rb` 18 /
+`test/queue_smoke.rb` 22) + Workers self-test `/test/bindings`。
 
 ```bash
 $ npm run test:do && npm run test:cache && npm run test:queue
+31 tests, 31 passed, 0 failed
+18 tests, 18 passed, 0 failed
 22 tests, 22 passed, 0 failed
-14 tests, 14 passed, 0 failed
-20 tests, 20 passed, 0 failed
 ```
 
 ## Project status & phases

@@ -40,8 +40,11 @@ binding = "AI"
 # Phase 10: same default-deny pattern for the AI demo (`/chat`,
 # `/api/chat/*`, `/test/ai`). Workers AI is metered; leaving the chat
 # endpoints publicly reachable in production lets anyone burn the
-# account's neuron quota. Default ON in dev (this file ships with "1")
-# but flip to "0" before deploying anywhere with real users.
+# account's neuron quota. Default OFF in the committed config so a
+# casual `wrangler deploy` cannot accidentally expose the metered
+# routes — flip to "1" only in a private dev environment (e.g.
+# `wrangler dev --var HOMURABI_ENABLE_AI_DEMOS:1`) or with a per-env
+# section.
 [vars]
 HOMURABI_ENABLE_CRYPTO_DEMOS = "0"
-HOMURABI_ENABLE_AI_DEMOS = "1"
+HOMURABI_ENABLE_AI_DEMOS = "0"

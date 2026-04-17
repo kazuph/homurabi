@@ -26,14 +26,15 @@
   </div>
 
   <main class="chat-thread" id="chat-thread"
-        data-session-id="<%= @session_id %>"
-        data-primary-model="<%= @primary_model %>"
-        data-fallback-model="<%= @fallback_model %>">
+        data-session-id="<%= Rack::Utils.escape_html(@session_id) %>"
+        data-primary-model="<%= Rack::Utils.escape_html(@primary_model) %>"
+        data-fallback-model="<%= Rack::Utils.escape_html(@fallback_model) %>">
     <% if @history && @history.any? %>
       <% @history.each do |msg| %>
-        <article class="chat-msg chat-msg-<%= msg['role'] %>">
-          <header class="chat-msg-role"><%= msg['role'] %></header>
-          <div class="chat-msg-body"><%= msg['content'] %></div>
+        <% role = Rack::Utils.escape_html(msg['role'].to_s) %>
+        <article class="chat-msg chat-msg-<%= role %>">
+          <header class="chat-msg-role"><%= role %></header>
+          <div class="chat-msg-body"><%= Rack::Utils.escape_html(msg['content'].to_s) %></div>
         </article>
       <% end %>
     <% else %>
@@ -46,7 +47,9 @@
   </main>
 
   <form id="chat-form" class="chat-composer" autocomplete="off">
+    <label for="chat-input" class="chat-visually-hidden">Chat message</label>
     <textarea id="chat-input" name="content" rows="2"
+              aria-label="Chat message"
               placeholder="日本語でも英語でも。Enterで送信、Shift+Enterで改行。"></textarea>
     <div class="chat-composer-actions">
       <label class="chat-model-pick">
@@ -62,7 +65,7 @@
   </form>
 
   <p class="chat-foot">
-    Session id <code id="chat-session-id"><%= @session_id %></code>
+    Session id <code id="chat-session-id"><%= Rack::Utils.escape_html(@session_id) %></code>
     &middot; persisted to KV under <code>chat:&lt;session&gt;</code>
     &middot; <a href="/api/chat/health">health</a>
   </p>

@@ -58,7 +58,12 @@ module Cloudflare
       ai_binding = binding
       err_klass = Cloudflare::AIError
       stream_klass = Cloudflare::AI::Stream
-      streaming = inputs.is_a?(Hash) && (inputs[:stream] == true || inputs['stream'] == true)
+      # Streaming may be requested either via `inputs[:stream]` (the
+       # newer Workers AI shape) or `options: { stream: true }` (the
+       # 3rd-arg "options" contract). Accept both so callers can use
+       # whichever idiom matches the model docs they're following.
+      streaming = (inputs.is_a?(Hash) && (inputs[:stream] == true || inputs['stream'] == true)) ||
+                  (options.is_a?(Hash) && (options[:stream] == true || options['stream'] == true))
       cf = Cloudflare
 
       js_promise = `

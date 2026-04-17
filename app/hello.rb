@@ -788,7 +788,17 @@ class App < Sinatra::Base
   #   npx wrangler dev --test-scheduled
   #   curl 'http://127.0.0.1:8787/__scheduled?cron=*/5+*+*+*+*'
   # ------------------------------------------------------------------
+  # Per-block guard: even though Phase 9 jobs are *registered*
+  # unconditionally (so `wrangler.toml`'s `[triggers] crons` declarations
+  # actually wire up to a Ruby handler), the *body* of these demo
+  # schedules is opt-in via the same `HOMURABI_ENABLE_SCHEDULED_DEMOS`
+  # var that gates `/test/scheduled*`. Without the flag, production
+  # cron firings short-circuit to a no-op so default deploys never
+  # accumulate heartbeat rows or burn KV write quota.
   schedule '*/5 * * * *', name: 'heartbeat' do |event|
+    cf_env = env['cloudflare.env']
+    enabled = cf_env && `(#{cf_env}.HOMURABI_ENABLE_SCHEDULED_DEMOS || '')`.to_s == '1'
+    next unless enabled
     # Insert one row into D1's heartbeats table per cron firing.
     # Falls back to a no-op when DB is not bound (test envs).
     if db
@@ -800,6 +810,9 @@ class App < Sinatra::Base
   end
 
   schedule '0 */1 * * *', name: 'hourly-housekeeping' do |event|
+    cf_env = env['cloudflare.env']
+    enabled = cf_env && `(#{cf_env}.HOMURABI_ENABLE_SCHEDULED_DEMOS || '')`.to_s == '1'
+    next unless enabled
     # Demo: bump a KV counter so we can prove hourly cron runs from
     # outside a test by inspecting `/kv/cron:hourly-counter` over HTTP.
     # Falls back to a no-op when KV is not bound (test envs).

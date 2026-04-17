@@ -185,6 +185,17 @@ SmokeTest.assert('schedule accepts 6-field (with seconds) cron expression') {
   app.scheduled_jobs.first.cron == '0 */5 * * * *'
 }
 
+SmokeTest.assert('schedule rejects non-callable match:') {
+  app = fresh_app
+  raised = false
+  begin
+    app.schedule('*/5 * * * *', match: 'not-a-proc') { |e| e }
+  rescue ArgumentError
+    raised = true
+  end
+  raised
+}
+
 # ---------------------------------------------------------------------
 # 3. Dispatch — exact match
 # ---------------------------------------------------------------------

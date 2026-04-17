@@ -39,10 +39,13 @@
 # never a derived expression — but a `match:` proc may be supplied for
 # fuzzy matching during local testing.
 #
-# Each block runs in a fresh anonymous Sinatra subclass instance so
-# `env`, `helpers`, `settings`, and `logger` are available. The block
-# receives a `Cloudflare::ScheduledEvent` argument exposing `.cron`,
-# `.scheduled_time` (Time), and `.type`.
+# Each block runs in a fresh `ScheduledContext` instance (NOT a full
+# Sinatra subclass instance — there is no HTTP request, so Sinatra's
+# `request` / `response` / `params` are not available). Within the
+# block, the helpers exposed by ScheduledContext are: `env`,
+# `db` / `kv` / `bucket` (Cloudflare bindings), `event`, `wait_until`,
+# and `logger`. The block receives a `Cloudflare::ScheduledEvent`
+# argument exposing `.cron`, `.scheduled_time` (Time), and `.type`.
 #
 # `wait_until(promise)` is a thin wrapper over the Workers
 # `ctx.waitUntil(...)` API so a job can hand back a long-running
@@ -89,10 +92,12 @@ module Sinatra
     end
 
     module ClassMethods
-      # Returns the (per-class) array of registered Job instances.
-      # Subclassing inherits the parent's jobs by reference — explicit
-      # `schedule` calls in the subclass append to its own private list
-      # so a subclass cannot mutate its parent's schedule.
+      # Returns the per-class array of registered Job instances.
+      # Stored in a class instance variable, so subclasses do **not**
+      # inherit the parent's jobs unless that behavior is implemented
+      # explicitly (e.g. via an `inherited` hook copying the parent's
+      # `@scheduled_jobs`). The current behavior keeps each Sinatra
+      # subclass's schedule registry independent.
       def scheduled_jobs
         @scheduled_jobs ||= []
       end
@@ -116,6 +121,13 @@ module Sinatra
         fields = cron_str.split(/\s+/)
         unless [5, 6].include?(fields.length)
           raise ArgumentError, "cron expression must have 5 or 6 fields, got #{fields.length}: #{cron_str.inspect}"
+        end
+        # Fail loudly at registration time if a non-callable `match:`
+        # was passed — otherwise the failure would surface only when
+        # the cron actually fires (as a NoMethodError during dispatch),
+        # which is a much worse debugging experience.
+        if !match.nil? && !match.respond_to?(:call)
+          raise ArgumentError, "match: must respond to #call (got #{match.class})"
         end
 
         loc = block.respond_to?(:source_location) ? block.source_location : nil

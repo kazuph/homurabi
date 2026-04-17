@@ -965,6 +965,166 @@ $ npm run test:scheduled
 29 tests, 29 passed, 0 failed
 ```
 
+## HTTP foundations (Phase 11A)
+
+Phase 11A は「HTTP 周り 3 点パック」。既存の Phase 6 (Net::HTTP shim) /
+Phase 10.3 (AI streaming) をベースに、downstream Ruby gem との互換性を
+底上げする基礎固め。
+
+### ① Faraday 互換アダプタ (`vendor/faraday.rb`)
+
+本物の ruby-faraday gem (〜9 kLOC + アダプタ/middleware) を vendor する代わりに、
+Cloudflare Workers が持つ唯一のトランスポート (`globalThis.fetch` →
+`Cloudflare::HTTP.fetch`) の上に **Faraday の公開 API の 95%** を直書き。
+
+```ruby
+require 'faraday'
+
+client = Faraday.new(url: 'https://api.github.com') do |c|
+  c.request :json                  # Hash body → JSON string
+  c.response :json                 # レスポンス body を JSON.parse
+  c.response :raise_error          # 4xx/5xx で Faraday::ResourceNotFound など
+  c.request :authorization, :bearer, ENV['GH_TOKEN']
+end
+
+res = client.get('/users/kazuph').__await__
+res.status       # => 200
+res.body         # => { "login" => "kazuph", ... }
+res.success?     # => true
+
+client.post('/widgets') do |req|
+  req.headers['X-Custom'] = 'yay'
+  req.body = { 'name' => 'homurabi' }
+end.__await__
+```
+
+- **Top-level shortcut**: `Faraday.get / post / put / patch / delete / head`
+- **Connection builder**: `Faraday.new(url:, headers:, params:) { |c| ... }`
+- **Middleware**: `:json` (encode/decode), `:url_encoded`, `:raise_error`,
+  `:authorization, :basic | :bearer | :token, ...`, `:logger`
+- **Error hierarchy**: `Faraday::ClientError` / `ServerError` /
+  `ResourceNotFound` (404) / `UnauthorizedError` (401) / `ForbiddenError` (403)
+  / `ConflictError` (409) / `UnprocessableEntityError` (422) /
+  `TooManyRequestsError` (429) / `TimeoutError` / `ConnectionFailed`
+- **`Faraday::Utils.build_query`** で nested Hash の
+  `a%5Bb%5D=1&list%5B%5D=1` 形式エンコードも。
+
+この shim のおかげで Faraday 依存の主要 gem (octokit 系の薄い client、
+slack-ruby-client、OpenAI 互換 client など) が **そのまま Workers で動く**
+ことが期待できる。
+
+```bash
+$ npm run test:faraday
+13 tests, 13 passed, 0 failed
+```
+
+### ② multipart/form-data 本格対応（受信側）
+
+Workers には書き込める FS が無いので Rack の既定 Tempfile 路線が使えない。
+代わりに `src/worker.mjs` 側で **multipart リクエストだけ** `request.arrayBuffer()`
+→ latin1 バイト文字列に変換して Ruby へ渡し、`lib/cloudflare_workers/multipart.rb`
+のバイナリ安全パーサが `Cloudflare::UploadedFile` を生成する。
+
+```ruby
+post '/api/upload' do
+  content_type 'application/json'
+  file = params['file']     # => Cloudflare::UploadedFile
+  note = params['note']     # => 普通の String
+  halt 400, { error: 'missing "file"' }.to_json unless file.is_a?(Cloudflare::UploadedFile)
+
+  # latin1 バイト文字列 → real Uint8Array。これを R2 / fetch へ流すと
+  # バイトが UTF-8 に触れず無傷で届く。
+  bucket.put("uploads/#{file.filename}", file.to_uint8_array, file.content_type).__await__
+  { stored: true, filename: file.filename, size: file.size, note: note }.to_json
+end
+```
+
+- `UploadedFile#filename / #content_type / #size / #read / #bytes_binstr`
+- `UploadedFile#to_uint8_array` → `new Uint8Array(...)` で真バイト配列
+- `UploadedFile#to_blob` → `new Blob([u8], { type: ct })`
+- `UploadedFile[:filename]` / `[:type]` / `[:tempfile]` (rack-compat Hash shape)
+- RFC 5987 `filename*=UTF-8''...` のパーセントエンコードも decode
+- boundary の quoted/bare form 両対応 (`boundary="foo bar"` もOK)
+
+```bash
+$ printf 'binary-payload' > /tmp/x.bin
+$ curl -F "file=@/tmp/x.bin;type=application/octet-stream" -F "note=hi" \
+       http://127.0.0.1:8787/api/upload
+{"stored":true,"key":"phase11a/uploads/abc-x.bin","filename":"x.bin",
+ "content_type":"application/octet-stream","size":14,"note":"hi"}
+
+$ npm run test:multipart
+10 tests, 10 passed, 0 failed
+```
+
+### ③ Sinatra streaming / SSE レスポンス
+
+Workers の `new Response(ReadableStream)` を Ruby 側の DSL で書けるよう、
+`Cloudflare::SSEStream` + `Cloudflare::SSEOut` を `Sinatra::Streaming` 拡張
+として同梱。Ruby のブロックから書き込んだチャンクが、JS の `TransformStream`
+→ `new Response(readable, ...)` を経由してクライアントに届く。
+
+```ruby
+register Sinatra::Streaming
+
+get '/demo/sse' do
+  sse do |out|
+    i = 0
+    while i < 5
+      out.event(
+        { tick: i, ts: Time.now.to_i }.to_json,
+        event: 'heartbeat',
+        id: i.to_s
+      )
+      out.sleep(1).__await__   # setTimeout 経由の真の 1 秒 await
+      i += 1
+    end
+    out.event('done', event: 'close')
+  end
+end
+```
+
+```bash
+$ curl -sN http://127.0.0.1:8787/demo/sse   # 5 秒かけて流れる
+event: heartbeat
+id: 0
+data: {"tick":0,"ts":1776461676}
+
+event: heartbeat
+id: 1
+...
+event: close
+data: done
+```
+
+- 書き込みは fire-and-forget (`out << chunk` / `out.event(...)`) で
+  WritableStream の内部キューに積まれる。`close` 時に `Promise.all(pending)`
+  → `writer.close()` をまとめて await するので、送信順が守られつつ
+  route の async ブロックはブロックされない。
+- 1 秒 sleep 等で本当に非同期 suspend したい場合は `out.sleep(1).__await__`。
+  ブロック自体を `# await: true` 文脈で動かすには `while` ループ推奨
+  （`5.times` は同期反復なので await が詰まる）。
+- 例外時は `ensure` で必ず writer を閉じる。クライアントは `done: true` を見る。
+
+```bash
+$ npm run test:streaming
+11 tests, 11 passed, 0 failed
+```
+
+### Workers 上の aggregate self-test
+
+```bash
+$ curl http://127.0.0.1:8787/test/foundations   # 要 HOMURABI_ENABLE_FOUNDATIONS_DEMOS=1
+{"passed":6,"failed":0,"total":6,"cases":[
+  {"pass":true,"case":"Faraday GET with :json middleware round-trips"},
+  {"pass":true,"case":"Faraday raise_error raises ResourceNotFound on 404"},
+  {"pass":true,"case":"Faraday :json middleware encodes Hash body (offline)"},
+  {"pass":true,"case":"Multipart parser extracts file + text field"},
+  {"pass":true,"case":"UploadedFile#to_uint8_array preserves raw bytes"},
+  {"pass":true,"case":"SSEStream frames data correctly"}
+]}
+```
+
 ## Project status & phases
 
 The project follows a strict four-phase plan (see
@@ -982,6 +1142,7 @@ of each phase:
 | **Phase 7** | Crypto primitives — full RS/PS/ES JWT alg coverage, RSA-OAEP, AES-GCM/CBC/CTR, ECDH (P-256/384/521 + X25519), Ed25519/EdDSA, OpenSSL::BN, KDF (PBKDF2 + HKDF), SecureRandom, PEM I/O. node:crypto sync + Web Crypto subtle async hybrid; CTR streaming via per-block subtle calls; binary plaintext byte-transparent; verify raises on key/algo errors and only returns false on signature mismatch. | ✅ shipped on `feature/phase7-crypto`. 85 crypto smoke + Workers self-test endpoint `/test/crypto` (17 cases) + bin/test-on-workers shell script for in-Worker regression. |
 | **Phase 8** | JWT 認証フレームワーク — vendored ruby-jwt v2.9.3 に Opal/async パッチを適用。HS/RS/PS/ES/EdDSA 全アルゴリズム対応、`Sinatra::JwtAuth` ヘルパで `authenticate!` / `current_user` / `issue_token`、KV-backed refresh token、`/api/login?alg=<name>` で全アルゴリズムが実働 Workers 上で発行・検証できる。`JWT.encode` / `JWT.decode` は subtle バックエンドのため async（caller が `.__await__`）、HS256 系は sync。 | ✅ shipped on `feature/phase8-jwt`. 43 jwt smoke + Workers self-test `/test/crypto` が 26 ケース（JWT 9 追加）+ dogfooding で全 7 alg のログイン→/api/me→refresh を実測。 |
 | **Phase 9** | Scheduled Workers (Cron Triggers) — `src/worker.mjs#scheduled` を経由して `globalThis.__HOMURABI_SCHEDULED_DISPATCH__` から Sinatra ディスパッチャに委譲。**`Sinatra::Scheduled` 拡張**で `schedule '*/5 * * * *' do \|event\| ... end` DSL（`db` / `kv` / `bucket` / `wait_until` ヘルパ込み）。ブロックは `define_method` 経由でコンパイルされるため `# await: true` の `__await__` がそのまま使え、D1 / KV へのリード・モディファイ・ライトが Workers ランタイムから正しく到達する。per-job 例外隔離 + `/test/scheduled` `/test/scheduled/run` 内省 API（`HOMURABI_ENABLE_SCHEDULED_DEMOS` で default deny）。 | ✅ shipped on `feature/phase9-cron`. 29 scheduled smoke + 実機 `wrangler dev --test-scheduled` で `/__scheduled?cron=...` 経由の D1 行追加と KV カウンタ increment を実測（4 連発で `count: 1→4`）。 |
+| **Phase 11A** | HTTP foundations 基礎固めパック — ① **Faraday 互換 shim** (`vendor/faraday.rb`) で `Faraday.new { \|c\| c.request :json; c.response :json, :raise_error }` 一式。② **multipart/form-data バイナリ受信** (`src/worker.mjs` + `lib/cloudflare_workers/multipart.rb`) + `Cloudflare::UploadedFile`（latin1 byte-str ↔ real Uint8Array）。③ **Sinatra streaming / SSE** (`Cloudflare::SSEStream` + `Sinatra::Streaming`) で `sse do \|out\| ... end` が Workers `ReadableStream` に直通し、`/demo/sse` で 5 秒かけて 5 tick 流れる。Workers self-test `/test/foundations` 6 ケース (`HOMURABI_ENABLE_FOUNDATIONS_DEMOS=1`)。 | ✅ shipped on `feature/phase11a-http-foundations`. 34 smoke (13 faraday + 10 multipart + 11 streaming) + `/test/foundations` 6/6 実機グリーン。 |
 
 ### Definition of Done (from PLAN.md §1.1)
 

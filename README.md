@@ -66,6 +66,7 @@ opposite bet: no DSL, real Sinatra, real Rack, real middleware chain.
   - [bin/compile-erb + views/ — build-time ERB precompiler](#bincompile-erb--views--build-time-erb-precompiler)
 - [Build & run](#build--run)
 - [Directory layout](#directory-layout)
+- [Net::HTTP works (Phase 6)](#nethttp-works-phase-6)
 - [Project status & phases](#project-status--phases)
 - [Strict no-fallback policy](#strict-no-fallback-policy)
 - [License](#license)
@@ -466,6 +467,48 @@ rg "homurabi patch" vendor lib
 
 ---
 
+## Net::HTTP works (Phase 6)
+
+The Phase 6 patch added `Cloudflare::HTTP.fetch` (a thin Ruby wrapper
+around `globalThis.fetch`) and a `Net::HTTP` shim that delegates to it.
+Existing Ruby code that uses `Net::HTTP.get(URI('...'))` works
+unchanged inside Sinatra routes — the only addition required is the
+`.__await__` suffix that already appears around D1/KV/R2 calls.
+
+```ruby
+get '/demo/http' do
+  content_type 'application/json'
+  res = Net::HTTP.get_response(URI('https://api.ipify.org/?format=json')).__await__
+  {
+    'status'       => res.code,
+    'content_type' => res['content-type'],
+    'body'         => JSON.parse(res.body)
+  }.to_json
+end
+```
+
+What's covered:
+
+- `Cloudflare::HTTP.fetch(url, method:, headers:, body:)` →
+  `Cloudflare::HTTPResponse` with `status` / `headers` (lowercased
+  Hash) / `body` (String) / `json` / `ok?` / `[]`.
+- `Net::HTTP.get(uri)` → body String.
+- `Net::HTTP.get_response(uri)` → `Net::HTTPResponse` with `body`
+  / `code` / `message` / `[]` / `each_header`.
+- `Net::HTTP.post_form(uri, hash)` → urlencoded POST returning
+  `Net::HTTPResponse`.
+- `Kernel#URI('https://...')` shorthand for `URI.parse(...)`.
+
+What's *not* covered (raw TCP is impossible on Workers): persistent
+connections, `Net::HTTP.start`-style block forms, request objects, raw
+socket access, multipart upload, chunked streaming bodies. Use
+`Cloudflare::HTTP.fetch` directly for those — it accepts arbitrary
+fetch `init` options through `headers:` / `method:` / `body:`.
+
+Smoke tests live in `test/http_smoke.rb` and run as part of `npm test`.
+
+---
+
 ## Project status & phases
 
 The project follows a strict four-phase plan (see
@@ -479,6 +522,7 @@ of each phase:
 | **Phase 2** | Real `janbiedermann/sinatra` compiled and served through the Rack handler, full middleware chain (Rack::Protection headers), production `curl` returning actual Sinatra bodies, no ERB-in-dev-mode workarounds, no `request.body.read` stub. | ✅ shipped at commits `d74c329` / `e6d5f66` / `93fba66` — and the 5 1st-pass compromises (body stub, APP_ENV force, force_encoding no-op, Sinatra-side `next` patch, grep-ability) were all closed in a subsequent pass. |
 | **Phase 3** | D1 / KV / R2 bindings callable from real Sinatra routes on Workers. | ✅ shipped at commits `ba0a772` / `4210de5`. All nine CRUD routes verified on production. |
 | **Phase 4** | Evidence collection + マスター + Codex double review. | In progress. |
+| **Phase 6** | HTTP client foundation — `Cloudflare::HTTP.fetch` wrapping `globalThis.fetch`, plus a `Net::HTTP` shim (`get` / `get_response` / `post_form`) and `Kernel#URI` so unmodified Ruby HTTP code can reach the network through the Workers `fetch` API. | ✅ shipped on `feature/phase6-fetch`. 14 new smoke tests pass; demos at `/demo/http` and `/demo/http/raw` hit the public ipify API. |
 
 ### Definition of Done (from PLAN.md §1.1)
 

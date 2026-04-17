@@ -506,7 +506,7 @@ module Cloudflare
       js_stmt = @js
       cf = Cloudflare
       err_cls = Cloudflare::D1Error
-      `#{js_stmt}.all().then(function(res) { return #{cf}.$js_rows_to_ruby(res.results); }).catch(function(e) { #{Kernel}.$$raise(#{err_cls}.$new(e.message || String(e), Opal.hash({binding_type: 'D1', operation: 'all'}))); })`
+      `#{js_stmt}.all().then(function(res) { return #{cf}.$js_rows_to_ruby(res.results); }).catch(function(e) { #{Kernel}.$raise(#{err_cls}.$new(e.message || String(e), Opal.hash({binding_type: 'D1', operation: 'all'}))); })`
     end
 
     # Returns a JS Promise that resolves to a single Ruby Hash (or nil).
@@ -514,7 +514,7 @@ module Cloudflare
       js_stmt = @js
       cf = Cloudflare
       err_cls = Cloudflare::D1Error
-      `#{js_stmt}.first().then(function(res) { return res == null ? nil : #{cf}.$js_object_to_hash(res); }).catch(function(e) { #{Kernel}.$$raise(#{err_cls}.$new(e.message || String(e), Opal.hash({binding_type: 'D1', operation: 'first'}))); })`
+      `#{js_stmt}.first().then(function(res) { return res == null ? nil : #{cf}.$js_object_to_hash(res); }).catch(function(e) { #{Kernel}.$raise(#{err_cls}.$new(e.message || String(e), Opal.hash({binding_type: 'D1', operation: 'first'}))); })`
     end
 
     # Returns a JS Promise that resolves to a Ruby Hash with the D1 meta.
@@ -522,7 +522,7 @@ module Cloudflare
       js_stmt = @js
       cf = Cloudflare
       err_cls = Cloudflare::D1Error
-      `#{js_stmt}.run().then(function(res) { return #{cf}.$js_object_to_hash(res); }).catch(function(e) { #{Kernel}.$$raise(#{err_cls}.$new(e.message || String(e), Opal.hash({binding_type: 'D1', operation: 'run'}))); })`
+      `#{js_stmt}.run().then(function(res) { return #{cf}.$js_object_to_hash(res); }).catch(function(e) { #{Kernel}.$raise(#{err_cls}.$new(e.message || String(e), Opal.hash({binding_type: 'D1', operation: 'run'}))); })`
     end
   end
 
@@ -535,21 +535,21 @@ module Cloudflare
     def get(key)
       js_kv = @js
       err_cls = Cloudflare::KVError
-      `#{js_kv}.get(#{key}, "text").then(function(v) { return v == null ? nil : v; }).catch(function(e) { #{Kernel}.$$raise(#{err_cls}.$new(e.message || String(e), Opal.hash({binding_type: 'KV', operation: 'get'}))); })`
+      `#{js_kv}.get(#{key}, "text").then(function(v) { return v == null ? nil : v; }).catch(function(e) { #{Kernel}.$raise(#{err_cls}.$new(e.message || String(e), Opal.hash({binding_type: 'KV', operation: 'get'}))); })`
     end
 
     # Put a value. Returns a JS Promise.
     def put(key, value)
       js_kv = @js
       err_cls = Cloudflare::KVError
-      `#{js_kv}.put(#{key}, #{value}).catch(function(e) { #{Kernel}.$$raise(#{err_cls}.$new(e.message || String(e), Opal.hash({binding_type: 'KV', operation: 'put'}))); })`
+      `#{js_kv}.put(#{key}, #{value}).catch(function(e) { #{Kernel}.$raise(#{err_cls}.$new(e.message || String(e), Opal.hash({binding_type: 'KV', operation: 'put'}))); })`
     end
 
     # Delete a key. Returns a JS Promise.
     def delete(key)
       js_kv = @js
       err_cls = Cloudflare::KVError
-      `#{js_kv}.delete(#{key}).catch(function(e) { #{Kernel}.$$raise(#{err_cls}.$new(e.message || String(e), Opal.hash({binding_type: 'KV', operation: 'delete'}))); })`
+      `#{js_kv}.delete(#{key}).catch(function(e) { #{Kernel}.$raise(#{err_cls}.$new(e.message || String(e), Opal.hash({binding_type: 'KV', operation: 'delete'}))); })`
     end
   end
 
@@ -597,3 +597,8 @@ module Cloudflare
     end
   end
 end
+
+# Phase 6 — HTTP client foundation. Loaded as part of the Cloudflare
+# Workers adapter so user code can simply `require 'sinatra/base'`
+# and use Net::HTTP / Cloudflare::HTTP.fetch without an extra require.
+require 'cloudflare_workers/http'

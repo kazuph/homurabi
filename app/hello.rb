@@ -14,6 +14,7 @@
 
 require 'json'
 require 'sinatra/base'
+require 'net/http'
 
 class App < Sinatra::Base
   # --- Cloudflare binding helpers ------------------------------------
@@ -186,6 +187,36 @@ class App < Sinatra::Base
     key    = params['key']
     bucket.delete(key).__await__
     { 'key' => key, 'deleted' => true }.to_json
+  end
+
+  # ------------------------------------------------------------------
+  # Phase 6 demo — Net::HTTP shim through globalThis.fetch.
+  # GET /demo/http hits the public ipify API and echoes back the JSON
+  # the way any other Net::HTTP-based Ruby gem would see it.
+  # ------------------------------------------------------------------
+  get '/demo/http' do
+    content_type 'application/json'
+    res = Net::HTTP.get_response(URI('https://api.ipify.org/?format=json')).__await__
+    {
+      'demo'    => 'Net::HTTP through Cloudflare fetch',
+      'status'  => res.code,
+      'message' => res.message,
+      'content_type' => res['content-type'],
+      'body'    => JSON.parse(res.body)
+    }.to_json
+  end
+
+  # Same demo using the lower-level Cloudflare::HTTP.fetch directly.
+  get '/demo/http/raw' do
+    content_type 'application/json'
+    res = Cloudflare::HTTP.fetch('https://api.ipify.org/?format=json').__await__
+    {
+      'demo'    => 'Cloudflare::HTTP.fetch (raw)',
+      'status'  => res.status,
+      'ok'      => res.ok?,
+      'headers' => { 'content-type' => res['content-type'] },
+      'json'    => res.json
+    }.to_json
   end
 end
 

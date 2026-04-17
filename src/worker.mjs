@@ -46,4 +46,60 @@ export default {
 
     return dispatch(request, env, ctx, bodyText);
   },
+
+  // Phase 9 — Cloudflare Workers Cron Triggers entry point.
+  //
+  // The Workers runtime invokes this `scheduled` export once per
+  // matching `[triggers] crons` entry in wrangler.toml. We forward
+  // the (event, env, ctx) triple to the Ruby-side dispatcher
+  // installed by `lib/cloudflare_workers/scheduled.rb`
+  // (which registers `globalThis.__HOMURABI_SCHEDULED_DISPATCH__`).
+  //
+  // The Ruby dispatcher walks every job registered via the
+  // Sinatra DSL `schedule '*/5 * * * *' do ... end` and runs
+  // each one whose cron pattern matches `event.cron`.
+  //
+  // Local manual triggering (no cron poll wait):
+  //   wrangler dev --test-scheduled
+  //   curl 'http://127.0.0.1:8787/__scheduled?cron=*/5+*+*+*+*'
+  //
+  // Tip: ALWAYS call ctx.waitUntil on long-running work so the
+  // Workers runtime keeps the isolate alive past the dispatcher's
+  // synchronous return. The Ruby helper `wait_until(promise)` does
+  // exactly that.
+  async scheduled(event, env, ctx) {
+    const dispatch = globalThis.__HOMURABI_SCHEDULED_DISPATCH__;
+    if (typeof dispatch !== "function") {
+      // No Ruby dispatcher installed — the Opal bundle didn't
+      // require 'cloudflare_workers/scheduled'. Log loudly so this
+      // misconfiguration surfaces instead of silently dropping
+      // every cron firing.
+      try {
+        globalThis.console.error(
+          "homurabi: scheduled dispatcher not installed (require 'cloudflare_workers/scheduled' missing)",
+        );
+      } catch (e) {
+        // ignore — console may itself be broken in pathological cases
+      }
+      return;
+    }
+
+    // Hand the work to ctx.waitUntil so an async Ruby dispatcher
+    // (D1 writes, KV writes, fetch calls) can finish even though
+    // `scheduled` returns a Promise the runtime may not fully await
+    // on its own.
+    const work = (async () => {
+      try {
+        return await dispatch(event, env, ctx);
+      } catch (err) {
+        try {
+          globalThis.console.error("[scheduled] dispatcher threw:", err && err.stack || err);
+        } catch (e) {
+          // ignore
+        }
+      }
+    })();
+    ctx.waitUntil(work);
+    return work;
+  },
 };

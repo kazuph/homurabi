@@ -48,3 +48,35 @@ binding = "AI"
 [vars]
 HOMURABI_ENABLE_CRYPTO_DEMOS = "0"
 HOMURABI_ENABLE_AI_DEMOS = "0"
+# Phase 9: gating for the educational scheduled-introspection routes
+# (`/test/scheduled`, `/test/scheduled/run`). Default OFF — the run
+# endpoint manually fires every registered cron handler and could
+# write to D1 / KV from any unauthenticated caller in production.
+# Set to "1" only in dev or behind a private route.
+HOMURABI_ENABLE_SCHEDULED_DEMOS = "0"
+
+# Phase 9 — Cloudflare Workers Cron Triggers.
+#
+# Each entry below produces one `scheduled(event, env, ctx)` firing
+# per match. `event.cron` will literally be the string declared here,
+# so the Ruby `schedule '*/5 * * * *' do ... end` blocks match by
+# exact-string equality.
+#
+# The schedules below mirror the demo `schedule` blocks in
+# `app/hello.rb`. Edit / extend in tandem when adding new jobs.
+#
+# Production safety: the demo schedule *bodies* in app/hello.rb
+# short-circuit to a no-op unless `HOMURABI_ENABLE_SCHEDULED_DEMOS`
+# is set to "1" (default-deny via the `[vars]` block above). Cron
+# firings still happen on every deploy — they just don't write to
+# D1 / KV unless the gate is open. To stop the firings entirely in
+# production, comment out / remove the `crons` entries below.
+#
+# To trigger manually in local dev:
+#   npx wrangler dev --test-scheduled
+#   curl 'http://127.0.0.1:8787/__scheduled?cron=*/5+*+*+*+*'
+[triggers]
+crons = [
+  "*/5 * * * *",   # heartbeat — writes a row to D1 every 5 minutes (gated)
+  "0 */1 * * *",   # hourly housekeeping — KV counter demo (gated)
+]

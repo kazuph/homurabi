@@ -68,6 +68,7 @@ opposite bet: no DSL, real Sinatra, real Rack, real middleware chain.
 - [Directory layout](#directory-layout)
 - [Net::HTTP works (Phase 6)](#nethttp-works-phase-6)
 - [Crypto works (Phase 7)](#crypto-works-phase-7)
+- [JWT 認証 (Phase 8)](#jwt-認証-phase-8)
 - [Project status & phases](#project-status--phases)
 - [Strict no-fallback policy](#strict-no-fallback-policy)
 - [License](#license)
@@ -629,6 +630,140 @@ at `GET /test/crypto` (both work via `npm run dev`).
 
 ---
 
+## JWT 認証 (Phase 8)
+
+Phase 8 は **real `jwt` gem (ruby-jwt v2.9.3) を vendor して Cloudflare Workers
+上で動かす** フェーズ。7 つの JWT アルゴリズム全てを Workers ランタイム上で
+発行・検証でき、Sinatra の薄いヘルパを被せて 1 行で `authenticate!`
+できる。
+
+| アルゴリズム | 署名バックエンド | プラットフォーム | 同期性 |
+|---|---|---|---|
+| HS256 / HS384 / HS512 | `node:crypto.createHmac` (nodejs_compat) | sync | 追加 `.__await__` 不要 |
+| RS256 / RS384 / RS512 | Web Crypto `subtle.sign('RSASSA-PKCS1-v1_5')` | async | caller が `.__await__` |
+| PS256 / PS384 / PS512 | Web Crypto `subtle.sign('RSA-PSS', saltLength: digest)` | async | caller が `.__await__` |
+| ES256 / ES384 / ES512 | Web Crypto `subtle.sign('ECDSA')` (raw R‖S そのまま) | async | caller が `.__await__` |
+| EdDSA (= ED25519) | Web Crypto `subtle.sign('Ed25519')` | async | caller が `.__await__` |
+
+### ファイル構成
+
+```
+vendor/jwt.rb                  ← require 'jwt' のエントリ（ruby-jwt 互換）
+vendor/jwt/
+├── base64.rb                  ← url_encode / url_decode（Opal 対応、padding 手動）
+├── encode.rb                  ← # await: true、sign() Promise を内部で unwrap
+├── decode.rb                  ← # await: true、any? を while ループに置換
+├── jwa/
+│   ├── hmac.rb                ← HS256/384/512（sync）— secure_compare を hex 正規化
+│   ├── rsa.rb                 ← RS256/384/512（subtle, .__await__）
+│   ├── ps.rb                  ← PS256/384/512（subtle, salt_length: :digest 固定）
+│   ├── ecdsa.rb               ← ES256/384/512（sign_jwt / verify_jwt = raw R‖S）
+│   └── eddsa.rb               ← Ed25519 置き換え版（RbNaCl 依存を除去）
+├── jwk.rb                     ← JWKS は Phase 8 非対応。呼ぶとエラー（明示）
+├── claims.rb, claims/*.rb     ← exp / nbf / iss / aud / sub / jti / iat / required
+└── configuration/*.rb         ← decode 既定値（verify_expiration 等）
+
+lib/sinatra/jwt_auth.rb        ← Sinatra::JwtAuth 拡張
+test/jwt_smoke.rb              ← 43 ケース（各 alg encode/decode + tamper 拒否 + claims）
+```
+
+### 使い方 — Sinatra ルートで 1 行認証
+
+```ruby
+require 'sinatra/base'
+require 'sinatra/jwt_auth'
+
+class App < Sinatra::Base
+  register Sinatra::JwtAuth
+  set :jwt_secret,    'super-secret'
+  set :jwt_algorithm, 'HS256'
+
+  get '/api/me' do
+    authenticate!                       # 401 を自動 halt（missing/expired/tampered）
+    content_type 'application/json'
+    { 'user' => current_user }.to_json  # current_user は payload Hash
+  end
+
+  post '/api/login' do
+    token = issue_token({ 'sub' => 'alice', 'role' => 'admin' }, expires_in: 3600)
+    content_type 'application/json'
+    { 'access_token' => token }.to_json
+  end
+end
+```
+
+非対称鍵アルゴリズム（RS/PS/ES/EdDSA）を使う場合は署名鍵と検証鍵を
+別々に設定する:
+
+```ruby
+private_key = OpenSSL::PKey::EC.generate('prime256v1')
+set :jwt_sign_key,   private_key
+set :jwt_verify_key, private_key  # EC は秘密鍵から公開鍵を取れるので同じでOK
+set :jwt_algorithm,  'ES256'
+```
+
+### デモルート (`app/hello.rb`)
+
+`POST /api/login?alg=<name>` は **7 つのアルゴリズム全て**で JWT を発行し、
+`GET /api/me` は token の header から alg を自動検出して検証する:
+
+```
+$ curl -X POST http://127.0.0.1:8787/api/login?alg=ES256 \
+    -H 'content-type: application/json' \
+    -d '{"username":"alice","role":"admin"}'
+{"access_token":"eyJhbGciOi...","refresh_token":"kaj4akI0p3dL7tP6KMbXU7FmnfEeho...","alg":"ES256",...}
+
+$ curl -H "Authorization: Bearer eyJhbGciOi..." http://127.0.0.1:8787/api/me
+{"current_user":"alice","role":"admin","alg":"ES256","claims":{...}}
+
+$ curl -X POST http://127.0.0.1:8787/api/login/refresh \
+    -H 'content-type: application/json' \
+    -d '{"refresh_token":"kaj4akI0p3dL7tP6KMbXU7FmnfEeho..."}'
+{"access_token":"eyJhbGci...(new)...","alg":"HS256","expires_in":3600,...}
+```
+
+- `refresh_token` は 48-byte urlsafe base64 で、**KV にオパーク文字列として
+  保持**（`refresh:<token>` キー）。アクセストークンが漏れても `JWT_ACCESS_TTL`
+  = 3600 秒で失効するが、リフレッシュトークンは KV に残っているので
+  再認証不要で新しいアクセストークンを貰える。
+- 有効期限切れのリフレッシュトークンは KV から削除される。
+- 改竄された署名は全アルゴリズムで `JWT::VerificationError` を投げ、
+  `authenticate!` が 401 を返す。
+
+### 適用した主なパッチ
+
+| ファイル | パッチ | 理由 |
+|---|---|---|
+| `vendor/jwt.rb`, `vendor/jwt/encode.rb`, `vendor/jwt/decode.rb` | `# await: true` + `JWT.encode / JWT.decode` 公開面に `.__await__` | 署名 API が Promise を返す（RS/PS/ES/EdDSA）ため、呼び出し側が同期的に使えるよう await を内部で解決 |
+| `vendor/jwt/jwa/hmac.rb` `SecurityUtils.secure_compare` | `a.unpack1('H*') == b.unpack1('H*')` で hex 正規化比較 | `Array#pack('H*')` と `Base64.urlsafe_decode64` がバイト同値でも `bytesize` を別々に返すため、upstream の `a.bytesize == b.bytesize` 前ガードが常に false を返していた |
+| `vendor/jwt/jwa/rsa.rb` / `ps.rb` | `.__await__` 付与、PSS は `salt_length: :digest` 固定 | Web Crypto subtle は `:auto` salt を表現できない |
+| `vendor/jwt/jwa/ecdsa.rb` | `OpenSSL::PKey::EC#sign_jwt` / `#verify_jwt` に差し替え（raw R‖S） | subtle は ECDSA で raw R‖S をそのまま返す — JWT スペックと一致。upstream の DER↔raw 変換ロジックと `OpenSSL::ASN1` 依存を丸ごと回避 |
+| `vendor/jwt/jwa/eddsa.rb` | RbNaCl 依存を削除し `OpenSSL::PKey::Ed25519` で置換、無条件ロード | Workers に libsodium はない。Phase 7 で subtle.sign('Ed25519') を EdDSA として実装済み |
+| `vendor/jwt/decode.rb` `verify_signature_for?` / `verify_signature` | `Array#any?` を while ループに置換 | `any?` のブロックは JS で同期評価される — Promise を返してもそのまま truthy と判定され、実質バイパスされてしまう |
+| `vendor/jwt/decode.rb` `decode_segments` | `verify_signature.__await__` を明示 | verify_signature は内部で `.__await__` を呼ぶので async 関数。呼び出し側で await しないと未処理 Promise rejection が発生し、検証失敗を検出できない |
+| `vendor/jwt/base64.rb` `url_decode` | padding を手動で補填して `urlsafe_decode64` に渡す | Opal base64 は padding 必須、upstream の `padding: false` オプションは未対応 |
+| `vendor/jwt/jwk.rb` | 全面的にスタブ、呼ぶと `JWKError` | JWKS / kid 解決は OpenSSL::PKey の JWK シリアライザが必要 — Phase 8 スコープ外 |
+| `vendor/jwt/jwa.rb` | `require 'rbnacl'` ブロックを削除、`jwt/jwa/eddsa` を無条件 require | Workers に libsodium なし |
+| `vendor/jwt/configuration/jwk_configuration.rb` | `kid_generator_type=` をスタブ化 | 起動時に OpenSSL::Digest を引く副作用を避ける |
+
+### テスト
+
+- `npm run test:jwt` — **43 ケース**: HS/RS/PS/ES/EdDSA × (encode-decode + tamper
+  拒否)、alg-none 拒否、alg 不一致拒否、exp/nbf/iss クレーム、`decode(verify: false)`、
+  2 セグメント検出、`algorithms: [...]` 配列指定 など。
+- `npm test` — 全スイート: 27 smoke + 14 http + 85 crypto + 43 jwt = **169 tests**。
+- `GET /test/crypto` (Workers self-test) — Phase 7 の 17 ケース + Phase 8 の
+  9 JWT ケース = **26 ケース**を実稼働 Workers 上で回す。
+
+### 非対応 (Phase 8 スコープ外)
+
+- **JWKS (`kty` / `kid` で公開鍵セットを取得する仕組み)** — OpenSSL JWK
+  シリアライザが必要。`JWT::JWK.create_from` は明確にエラーを返す。
+- **X5C (`x5c` ヘッダによる証明書チェーン検証)** — OpenSSL::X509 非実装。
+- **ES256K (secp256k1)** — Web Crypto 仕様外。
+- **カスタム署名アルゴリズム** — SigningAlgorithm module は有効だが、
+  Opal async 対応の完了はユーザー側の責務。
+
 ## Project status & phases
 
 The project follows a strict four-phase plan (see
@@ -644,6 +779,7 @@ of each phase:
 | **Phase 4** | Evidence collection + マスター + Codex double review. | In progress. |
 | **Phase 6** | HTTP client foundation — `Cloudflare::HTTP.fetch` wrapping `globalThis.fetch`, plus a `Net::HTTP` shim (`get` / `get_response` / `post_form`) and `Kernel#URI` so unmodified Ruby HTTP code can reach the network through the Workers `fetch` API. | ✅ shipped on `feature/phase6-fetch`. 14 new smoke tests pass; demos at `/demo/http` and `/demo/http/raw` hit the public ipify API. |
 | **Phase 7** | Crypto primitives — full RS/PS/ES JWT alg coverage, RSA-OAEP, AES-GCM/CBC/CTR, ECDH (P-256/384/521 + X25519), Ed25519/EdDSA, OpenSSL::BN, KDF (PBKDF2 + HKDF), SecureRandom, PEM I/O. node:crypto sync + Web Crypto subtle async hybrid; CTR streaming via per-block subtle calls; binary plaintext byte-transparent; verify raises on key/algo errors and only returns false on signature mismatch. | ✅ shipped on `feature/phase7-crypto`. 85 crypto smoke + Workers self-test endpoint `/test/crypto` (17 cases) + bin/test-on-workers shell script for in-Worker regression. |
+| **Phase 8** | JWT 認証フレームワーク — vendored ruby-jwt v2.9.3 に Opal/async パッチを適用。HS/RS/PS/ES/EdDSA 全アルゴリズム対応、`Sinatra::JwtAuth` ヘルパで `authenticate!` / `current_user` / `issue_token`、KV-backed refresh token、`/api/login?alg=<name>` で全アルゴリズムが実働 Workers 上で発行・検証できる。`JWT.encode` / `JWT.decode` は subtle バックエンドのため async（caller が `.__await__`）、HS256 系は sync。 | ✅ shipped on `feature/phase8-jwt`. 43 jwt smoke + Workers self-test `/test/crypto` が 26 ケース（JWT 9 追加）+ dogfooding で全 7 alg のログイン→/api/me→refresh を実測。 |
 
 ### Definition of Done (from PLAN.md §1.1)
 

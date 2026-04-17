@@ -234,9 +234,16 @@ module Cloudflare
     # Extract a quoted or bare parameter from a Content-Disposition value.
     # Handles `name="file"; filename="pic.png"` and RFC 5987
     # `filename*=UTF-8''pic.png` (best-effort URL decoding).
+    #
+    # The `(^|[;\s])` prefix is load-bearing: without it, looking up
+    # `name` would also match inside `filename*=...` (substring "name*=")
+    # and mis-attribute the filename to the form-field name. RFC 7578
+    # places each parameter after `;` (with optional whitespace), so the
+    # prefix is free.
     def self.extract_disposition_param(disposition, key)
+      k = Regexp.escape(key)
       # filename*=charset'lang'encoded  (RFC 5987)
-      star_re = /#{Regexp.escape(key)}\*\s*=\s*([^;]+)/i
+      star_re = /(?:^|[;\s])#{k}\*\s*=\s*([^;]+)/i
       if (m = disposition.match(star_re))
         raw = m[1].strip
         parts = raw.split("'", 3)
@@ -244,12 +251,12 @@ module Cloudflare
         return decode_rfc5987(encoded)
       end
       # Quoted `key="value"`
-      q_re = /#{Regexp.escape(key)}\s*=\s*"((?:\\"|[^"])*)"/i
+      q_re = /(?:^|[;\s])#{k}\s*=\s*"((?:\\"|[^"])*)"/i
       if (m = disposition.match(q_re))
         return m[1].gsub('\\"', '"')
       end
       # Bare `key=value`
-      b_re = /#{Regexp.escape(key)}\s*=\s*([^;]+)/i
+      b_re = /(?:^|[;\s])#{k}\s*=\s*([^;]+)/i
       if (m = disposition.match(b_re))
         return m[1].strip
       end

@@ -159,5 +159,44 @@ StreamingSmoke.assert('SSEStream extra headers merge over defaults') {
   h['x-phase'] == '11a' && h['content-type'].include?('text/event-stream')
 }
 
+# 12. Sinatra::Streaming#stream(type: :plain) uses text/plain
+StreamingSmoke.assert('Sinatra::Streaming#stream type: :plain emits text/plain body') {
+  # Minimal stub Sinatra context
+  ctx_stub = Class.new {
+    include Sinatra::Streaming
+    def env; {}; end
+  }.new
+  s = ctx_stub.stream(type: :plain) { |o| o << "hi"; o.close }
+  s.is_a?(Cloudflare::SSEStream) && s.response_headers['content-type'].include?('text/plain')
+}
+
+# 13. Sinatra::Streaming#stream(type: :sse) uses SSE defaults
+StreamingSmoke.assert('Sinatra::Streaming#stream type: :sse emits event-stream headers') {
+  ctx_stub = Class.new {
+    include Sinatra::Streaming
+    def env; {}; end
+  }.new
+  s = ctx_stub.stream(type: :sse) { |o| o.close }
+  s.response_headers['content-type'].include?('text/event-stream')
+}
+
+# 14. Sinatra::Base#stream (upstream-compat override) builds an SSEStream
+require 'sinatra/base'
+StreamingSmoke.assert('Sinatra::Base#stream override returns Cloudflare::SSEStream') {
+  app = Class.new(Sinatra::Base) do
+    get '/test-stream' do
+      stream do |out|
+        out << "hello"
+      end
+    end
+  end
+  # We don't actually dispatch — just verify the override is installed.
+  inst = app.new!
+  inst.instance_variable_set(:@env, {})
+  # Calling stream directly with a block returns the SSEStream.
+  s = inst.stream { |o| o << "x" }
+  s.is_a?(Cloudflare::SSEStream)
+}
+
 success = StreamingSmoke.report
 `process.exit(#{success ? 0 : 1})`

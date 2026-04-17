@@ -183,5 +183,75 @@ MultipartSmoke.assert('Rack::Request#POST parses multipart body via our parser')
   posted.is_a?(Hash) && posted['greeting'] == 'yo' && posted['doc'].is_a?(Cloudflare::UploadedFile)
 }
 
+# 11. Multiple file parts in a single request
+MultipartSmoke.assert('parses multiple file parts by field name') {
+  b = 'B11'
+  body = build_multipart(b, [
+    { name: 'avatar', filename: 'a.png', content_type: 'image/png', data: 'AA' },
+    { name: 'banner', filename: 'b.jpg', content_type: 'image/jpeg', data: 'BB' }
+  ])
+  parts = Cloudflare::Multipart.parse(body, "multipart/form-data; boundary=#{b}")
+  parts['avatar'].is_a?(Cloudflare::UploadedFile) &&
+    parts['banner'].is_a?(Cloudflare::UploadedFile) &&
+    parts['avatar'].filename == 'a.png' &&
+    parts['banner'].filename == 'b.jpg'
+}
+
+# 12. RFC 5987 — filename*=UTF-8''<percent-encoded> is URL-decoded
+MultipartSmoke.assert('RFC 5987 filename*=UTF-8\'\'... is URL-decoded') {
+  b = 'B12'
+  # "ファイル.txt" percent-encoded in UTF-8
+  encoded = '%E3%83%95%E3%82%A1%E3%82%A4%E3%83%AB.txt'
+  body =  "--#{b}\r\n"
+  body += "Content-Disposition: form-data; name=\"doc\"; filename*=UTF-8''#{encoded}\r\n"
+  body += "Content-Type: text/plain\r\n\r\n"
+  body += "contents"
+  body += "\r\n--#{b}--\r\n"
+  parts = Cloudflare::Multipart.parse(body, "multipart/form-data; boundary=#{b}")
+  parts['doc'].filename == 'ファイル.txt'
+}
+
+# 13. Large-ish payload (64 KiB binary) round-trips losslessly
+MultipartSmoke.assert('64 KiB binary body survives parsing intact') {
+  b = 'B13'
+  # 64 KiB of byte pattern (0x00..0xFF repeating)
+  payload = ''
+  i = 0
+  while i < 65536
+    payload += (i % 256).chr
+    i += 1
+  end
+  body = build_multipart(b, [
+    { name: 'big', filename: 'big.bin', content_type: 'application/octet-stream', data: payload }
+  ])
+  parts = Cloudflare::Multipart.parse(body, "multipart/form-data; boundary=#{b}")
+  f = parts['big']
+  f && f.size == 65536 &&
+    f.bytes_binstr[12345].ord == (12345 % 256) &&
+    f.bytes_binstr[65535].ord == (65535 % 256)
+}
+
+# 14. Multibyte (Japanese) filename via the quoted form also works
+MultipartSmoke.assert('quoted UTF-8 filename (Japanese) survives') {
+  b = 'B14'
+  body =  "--#{b}\r\n"
+  body += "Content-Disposition: form-data; name=\"doc\"; filename=\"レポート.pdf\"\r\n"
+  body += "Content-Type: application/pdf\r\n\r\n"
+  body += "pdf-bytes"
+  body += "\r\n--#{b}--\r\n"
+  parts = Cloudflare::Multipart.parse(body, "multipart/form-data; boundary=#{b}")
+  parts['doc'].filename == 'レポート.pdf'
+}
+
+# 15. Text field with multi-line content (CR/LF preserved)
+MultipartSmoke.assert('text field preserves embedded newlines') {
+  b = 'B15'
+  body = build_multipart(b, [
+    { name: 'note', data: "line one\r\nline two\r\nline three" }
+  ])
+  parts = Cloudflare::Multipart.parse(body, "multipart/form-data; boundary=#{b}")
+  parts['note'] == "line one\r\nline two\r\nline three"
+}
+
 success = MultipartSmoke.report
 `process.exit(#{success ? 0 : 1})`

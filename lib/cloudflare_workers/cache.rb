@@ -153,7 +153,11 @@ module Cloudflare
       # silent bug: the inner `await` ran, but the outer await had
       # already proceeded. See lib/cloudflare_workers/scheduled.rb for
       # the same Opal multi-line x-string constraint.
-      `(async function(js, req, body_str, status_int, hdrs, Kernel, err_klass) { if (js == null || js === Opal.nil) { try { globalThis.console.warn('[Cloudflare::Cache] caches.default unavailable; skipping put'); } catch (_) {} return null; } try { var resp = new Response(String(body_str), { status: status_int, headers: hdrs }); await js.put(req, resp); } catch (e) { try { globalThis.console.error('[Cloudflare::Cache] put threw:', e && e.stack || e); } catch (_) {} Kernel.$raise(err_klass.$new(e && e.message ? e.message : String(e), Opal.hash({ operation: 'put' }))); } return null; })(#{js}, #{req}, #{body_str}, #{status_int}, #{hdrs}, #{Kernel}, #{err_klass})`
+      # Warn ONCE per isolate on a nil cache. Non-Workers runtimes
+      # hit `Cache.new(nil, ...)` intentionally (tests, safe fall-back
+      # for routes that can run without caching) and repeated warn
+      # output would drown signal in noise — Copilot review PR #9.
+      `(async function(js, req, body_str, status_int, hdrs, Kernel, err_klass) { if (js == null || js === Opal.nil) { try { if (!globalThis.__HOMURABI_CACHE_NOOP_WARNED__) { globalThis.__HOMURABI_CACHE_NOOP_WARNED__ = true; globalThis.console.warn('[Cloudflare::Cache] caches.default unavailable; skipping put (this is expected in non-Workers runtimes). Further warnings suppressed.'); } } catch (_) {} return null; } try { var resp = new Response(String(body_str), { status: status_int, headers: hdrs }); await js.put(req, resp); } catch (e) { try { globalThis.console.error('[Cloudflare::Cache] put threw:', e && e.stack || e); } catch (_) {} Kernel.$raise(err_klass.$new(e && e.message ? e.message : String(e), Opal.hash({ operation: 'put' }))); } return null; })(#{js}, #{req}, #{body_str}, #{status_int}, #{hdrs}, #{Kernel}, #{err_klass})`
     end
 
     # Remove a Request/URL from the cache. Returns a JS Promise

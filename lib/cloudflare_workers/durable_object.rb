@@ -359,9 +359,18 @@ module Cloudflare
       `#{js}.deleteAll().catch(function(e) { #{Kernel}.$raise(#{err_klass}.$new(e && e.message ? e.message : String(e), Opal.hash({ operation: 'storage.deleteAll' }))); })`
     end
 
-    # List keys. Returns a JS Promise resolving to a Ruby Hash of
-    # { key => parsed value }. Options (prefix:, limit:, reverse:)
-    # forward to the JS call untouched.
+    # List keys. Returns a JS Promise resolving to a Ruby `Hash`
+    # of `{ key => parsed-value }` (values are JSON-parsed when they
+    # round-tripped through `put`; opaque strings are returned as-is).
+    # Options `prefix:`, `limit:`, `reverse:`, `start:`, `end_key:`
+    # forward to the underlying Workers `storage.list({...})` call.
+    #
+    # The earlier iteration returned a JS `Map`; that was documented as
+    # a Ruby Hash but forced callers to reach for JS iteration, which
+    # Copilot review (#9) flagged. The JS side still builds the
+    # intermediate Map (the Workers runtime also gives us a Map) and we
+    # copy it into a Ruby Hash before resolving so downstream code can
+    # use `each` / `[]` / `keys` without backticks.
     def list(prefix: nil, limit: nil, reverse: nil, start: nil, end_key: nil)
       js = @js
       err_klass = Cloudflare::DurableObjectError
@@ -371,7 +380,12 @@ module Cloudflare
       `#{js_opts}.reverse = #{!!reverse}`   unless reverse.nil?
       `#{js_opts}.start   = #{start.to_s}`  unless start.nil?
       `#{js_opts}.end     = #{end_key.to_s}` unless end_key.nil?
-      `#{js}.list(#{js_opts}).then(function(m) { var h = new Map(); if (m && typeof m.forEach === 'function') { m.forEach(function(v, k) { if (typeof v === 'string') { try { v = JSON.parse(v); } catch (e) {} } h.set(k, v); }); } return h; }).catch(function(e) { #{Kernel}.$raise(#{err_klass}.$new(e && e.message ? e.message : String(e), Opal.hash({ operation: 'storage.list' }))); })`
+      js_promise = `#{js}.list(#{js_opts}).catch(function(e) { #{Kernel}.$raise(#{err_klass}.$new(e && e.message ? e.message : String(e), Opal.hash({ operation: 'storage.list' }))); })`
+      js_result = js_promise.__await__
+      out = {}
+      return out if `#{js_result} == null`
+      `(#{js_result}.forEach && typeof #{js_result}.forEach === 'function') && #{js_result}.forEach(function(v, k) { var pv = v; if (typeof pv === 'string') { try { pv = JSON.parse(pv); } catch (_) {} } #{out}.$store(String(k), pv); })`
+      out
     end
   end
 

@@ -203,15 +203,14 @@ SmokeTest.assert('delete_all clears every key') do
   `#{js_storage}._map.size` == 0
 end
 
-SmokeTest.assert('list returns a Hash of parsed values') do
+SmokeTest.assert('list returns a Ruby Hash of parsed values') do
   storage = Cloudflare::DurableObjectStorage.new(fake_storage)
   storage.put('u:1', { 'name' => 'alice' }).__await__
   storage.put('u:2', { 'name' => 'bob' }).__await__
   result = storage.list.__await__
-  # Result is a JS Map — iterate through it
-  out = {}
-  `#{result}.forEach(function(v, k) { #{out}.$store(k, v); })`
-  out['u:1']['name'] == 'alice' && out['u:2']['name'] == 'bob'
+  # Copilot review PR #9: list now returns a Ruby Hash directly,
+  # not a JS Map — callers no longer need backticks to iterate.
+  result.is_a?(Hash) && result['u:1']['name'] == 'alice' && result['u:2']['name'] == 'bob'
 end
 
 # ---------------------------------------------------------------------

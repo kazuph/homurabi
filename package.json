@@ -10,6 +10,7 @@
     "build:opal": "OPAL_PREFORK_DISABLE=1 bundle exec opal -c -E --esm --no-source-map -I lib -I vendor -I build -r opal_patches -r cloudflare_workers -r homurabi_templates -r homurabi_assets -o build/hello.no-exit.mjs app/hello.rb 2>build/opal.stderr.log",
     "build": "npm run build:erb && npm run build:assets && npm run build:opal",
     "dev": "npm run build && wrangler dev --port 8787 --ip 127.0.0.1",
+    "dev:dlq": "npm run build && wrangler dev --env dlq-demo --port 8787 --ip 127.0.0.1",
     "d1:init": "bin/init-local-d1",
     "test:workers": "bin/test-on-workers",
     "deploy": "npm run build && wrangler deploy",

@@ -103,7 +103,21 @@ module Cloudflare
       response_klass = Cloudflare::HTTPResponse
       err_klass = Cloudflare::CacheError
       req = request_to_js(request_or_url)
-      url_str = request_or_url.to_s
+      # Copilot review PR #9 (fourth pass): `request_or_url.to_s` is
+      # correct for a String URL but produces "#<Cloudflare::HTTPResponse:...>"
+      # for the HTTPResponse wrapper and "[object Request]" for a raw
+      # JS Request. Derive the URL from the same shapes supported by
+      # `request_to_js` so the `url` field on the returned
+      # HTTPResponse is always a real URL.
+      url_str = if request_or_url.is_a?(String)
+                  request_or_url
+                elsif defined?(Cloudflare::HTTPResponse) && request_or_url.is_a?(Cloudflare::HTTPResponse)
+                  request_or_url.url.to_s
+                elsif `(#{request_or_url} != null && typeof #{request_or_url} === 'object' && typeof #{request_or_url}.url === 'string')`
+                  `String(#{request_or_url}.url)`
+                else
+                  request_or_url.to_s
+                end
 
       # Single-line backtick IIFE — see `put` for the Opal multi-line
       # x-string quirk that silently drops the returned Promise.

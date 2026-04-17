@@ -1030,7 +1030,15 @@ post '/api/upload' do
   content_type 'application/json'
   file = params['file']     # => Cloudflare::UploadedFile
   note = params['note']     # => 普通の String
-  halt 400, { error: 'missing "file"' }.to_json unless file.is_a?(Cloudflare::UploadedFile)
+  # 注: このルートは `.__await__` を含む (= async) ので Sinatra の
+  # `halt` / `throw :halt` は使わない。homurabi の確立したパターンで
+  # `status N; next(body)` を使う（Phase 8/10 の JwtAuth helper 書き換え
+  # コメント参照）。throw は async 境界を越えて Sinatra の
+  # `catch :halt` から抜けてしまう。
+  unless file.is_a?(Cloudflare::UploadedFile)
+    status 400
+    next({ error: 'missing "file"' }.to_json)
+  end
 
   # latin1 バイト文字列 → real Uint8Array。これを R2 / fetch へ流すと
   # バイトが UTF-8 に触れず無傷で届く。

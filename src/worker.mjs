@@ -28,12 +28,16 @@ import "../build/hello.no-exit.mjs";
 function binaryArrayBufferToLatin1String(arrayBuffer) {
   const u8 = new Uint8Array(arrayBuffer);
   const CHUNK = 0x8000;
-  let out = "";
+  // Accumulate into an array and join once at the end — in-loop
+  // String concatenation is O(n²) on V8 for large uploads. Each
+  // `chunk` here is already a small String (≤ 32768 chars), so
+  // join() can reuse rope structures efficiently.
+  const parts = [];
   for (let i = 0; i < u8.length; i += CHUNK) {
     const slice = u8.subarray(i, Math.min(i + CHUNK, u8.length));
-    out += String.fromCharCode.apply(null, slice);
+    parts.push(String.fromCharCode.apply(null, slice));
   }
-  return out;
+  return parts.join("");
 }
 
 export default {

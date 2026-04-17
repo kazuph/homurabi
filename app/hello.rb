@@ -1432,8 +1432,16 @@ class App < Sinatra::Base
   # GET /demo/faraday — hit a public JSON API through Faraday + the
   # bundled :json middleware. Proves the Faraday shim can stand in for
   # the real gem for the usual "talk to a REST API" pattern.
+  #
+  # Gated on HOMURABI_ENABLE_FOUNDATIONS_DEMOS (default deny) because
+  # the route makes outbound calls to an external service and shouldn't
+  # be reachable by anonymous traffic in production.
   get '/demo/faraday' do
     content_type 'application/json'
+    unless foundations_demos_enabled?
+      status 404
+      next({ 'error' => 'foundations demos disabled (set HOMURABI_ENABLE_FOUNDATIONS_DEMOS=1)' }.to_json)
+    end
     client = Faraday.new(url: 'https://api.ipify.org') do |c|
       c.request :json
       c.response :json
@@ -1458,8 +1466,15 @@ class App < Sinatra::Base
   # Cloudflare::UploadedFile objects with `.filename`, `.content_type`,
   # `.size`, `.to_uint8_array` (for R2.put / fetch), and Hash-style
   # `[:filename]` access for gems that expect the Rack shape.
+  #
+  # Gated on HOMURABI_ENABLE_FOUNDATIONS_DEMOS — a world-writable R2
+  # bucket is a trivially-abused quota vector in production.
   post '/api/upload' do
     content_type 'application/json'
+    unless foundations_demos_enabled?
+      status 404
+      next({ 'error' => 'foundations demos disabled (set HOMURABI_ENABLE_FOUNDATIONS_DEMOS=1)' }.to_json)
+    end
     # pull params BEFORE the first await — Sinatra clears @params when
     # it starts a Promise-returning route (same ceremony as /d1/users).
     file_param = params['file']
@@ -1495,7 +1510,15 @@ class App < Sinatra::Base
   # GET /demo/sse — 5-tick SSE countdown, 1 second between ticks.
   #
   # curl -N http://127.0.0.1:8787/demo/sse
+  #
+  # Same gate as the other foundations demos — a long-lived SSE
+  # response ties up an isolate slot, so we default-deny.
   get '/demo/sse' do
+    unless foundations_demos_enabled?
+      content_type 'application/json'
+      status 404
+      next({ 'error' => 'foundations demos disabled (set HOMURABI_ENABLE_FOUNDATIONS_DEMOS=1)' }.to_json)
+    end
     sse do |out|
       # Manual `while` instead of `Integer#times` because Opal compiles
       # `.each` / `.times` iterators as synchronous JS `for` loops —

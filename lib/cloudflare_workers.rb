@@ -279,10 +279,23 @@ module Rack
           if stream_obj
             js_stream = stream_obj.js_stream
             js_headers = `({})`
+            # Order: Rack-response headers → stream-provided headers
+            # (SSE defaults + caller extras) → route-set hard wins. The
+            # old code hardcoded text/event-stream here, which silently
+            # dropped any `headers:` hash the caller passed to `sse`.
+            # Merge the stream's own response_headers if it exposes them
+            # (duck-type; non-SSE stream wrappers may not).
             headers.each { |k, v| ks = k.to_s; vs = v.to_s; `#{js_headers}[#{ks}] = #{vs}` }
-            `#{js_headers}['content-type'] = 'text/event-stream; charset=utf-8'`
-            `#{js_headers}['cache-control'] = 'no-cache, no-transform'`
-            `#{js_headers}['x-accel-buffering'] = 'no'`
+            if stream_obj.respond_to?(:response_headers)
+              stream_obj.response_headers.each { |k, v| ks = k.to_s; vs = v.to_s; `#{js_headers}[#{ks}] = #{vs}` }
+            else
+              # Legacy Cloudflare::AI::Stream (Phase 10.3) doesn't expose
+              # response_headers; keep the hardcoded SSE defaults for
+              # backwards compatibility in that case.
+              `#{js_headers}['content-type'] = 'text/event-stream; charset=utf-8'`
+              `#{js_headers}['cache-control'] = 'no-cache, no-transform'`
+              `#{js_headers}['x-accel-buffering'] = 'no'`
+            end
             return `new Response(#{js_stream}, { status: #{status.to_i}, headers: #{js_headers} })`
           end
 

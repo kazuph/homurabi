@@ -1,0 +1,209 @@
+<div class="chat-shell">
+  <header class="chat-hero">
+    <div class="chat-hero-text">
+      <h1>homurabi <span class="chat-hero-accent">/chat</span></h1>
+      <p class="chat-hero-sub">
+        Real Sinatra route, hosted on Cloudflare Workers, talking to
+        <strong>Workers AI</strong> via the <code>env.AI</code> binding.
+      </p>
+      <p class="chat-hero-meta">
+        <span class="chat-tag">model</span>
+        <code id="chat-current-model"><%= @primary_model %></code>
+        <span class="chat-tag">fallback</span>
+        <code><%= @fallback_model %></code>
+        <span class="chat-tag">history</span>
+        <code>Workers KV</code>
+        <span class="chat-tag">auth</span>
+        <code>JWT (HS256)</code>
+      </p>
+    </div>
+  </header>
+
+  <div id="chat-auth-banner" class="chat-banner chat-banner-info">
+    Mint a demo token to start chatting:
+    <button id="chat-login-btn" type="button">Issue HS256 token (demo)</button>
+    <span id="chat-auth-status">no token</span>
+  </div>
+
+  <main class="chat-thread" id="chat-thread"
+        data-session-id="<%= @session_id %>"
+        data-primary-model="<%= @primary_model %>"
+        data-fallback-model="<%= @fallback_model %>">
+    <% if @history && @history.any? %>
+      <% @history.each do |msg| %>
+        <article class="chat-msg chat-msg-<%= msg['role'] %>">
+          <header class="chat-msg-role"><%= msg['role'] %></header>
+          <div class="chat-msg-body"><%= msg['content'] %></div>
+        </article>
+      <% end %>
+    <% else %>
+      <div class="chat-empty">
+        No messages yet. Say
+        <button class="chat-suggest" type="button" data-text="こんにちは！自己紹介してください">こんにちは！自己紹介してください</button>
+        to get started.
+      </div>
+    <% end %>
+  </main>
+
+  <form id="chat-form" class="chat-composer" autocomplete="off">
+    <textarea id="chat-input" name="content" rows="2"
+              placeholder="日本語でも英語でも。Enterで送信、Shift+Enterで改行。"></textarea>
+    <div class="chat-composer-actions">
+      <label class="chat-model-pick">
+        model
+        <select id="chat-model">
+          <option value="<%= @primary_model %>"><%= @primary_model %> (Gemma 4)</option>
+          <option value="<%= @fallback_model %>"><%= @fallback_model %> (gpt-oss-120b)</option>
+        </select>
+      </label>
+      <button id="chat-send" type="submit">Send</button>
+      <button id="chat-clear" type="button">Clear history</button>
+    </div>
+  </form>
+
+  <p class="chat-foot">
+    Session id <code id="chat-session-id"><%= @session_id %></code>
+    &middot; persisted to KV under <code>chat:&lt;session&gt;</code>
+    &middot; <a href="/api/chat/health">health</a>
+  </p>
+</div>
+
+<script>
+  (function () {
+    var threadEl = document.getElementById('chat-thread');
+    var formEl   = document.getElementById('chat-form');
+    var inputEl  = document.getElementById('chat-input');
+    var modelEl  = document.getElementById('chat-model');
+    var clearEl  = document.getElementById('chat-clear');
+    var loginEl  = document.getElementById('chat-login-btn');
+    var statusEl = document.getElementById('chat-auth-status');
+    var bannerEl = document.getElementById('chat-auth-banner');
+    var sendBtn  = document.getElementById('chat-send');
+    var sessionId = threadEl.getAttribute('data-session-id');
+
+    function tokenKey() { return 'homurabi.chat.jwt'; }
+    function getToken() { return window.localStorage.getItem(tokenKey()); }
+    function setToken(t) {
+      if (t) window.localStorage.setItem(tokenKey(), t);
+      else   window.localStorage.removeItem(tokenKey());
+      reflectAuth();
+    }
+    function reflectAuth() {
+      var t = getToken();
+      if (t) {
+        statusEl.textContent = 'token: ' + t.slice(0, 14) + '…';
+        bannerEl.classList.remove('chat-banner-info');
+        bannerEl.classList.add('chat-banner-ok');
+      } else {
+        statusEl.textContent = 'no token';
+        bannerEl.classList.add('chat-banner-info');
+        bannerEl.classList.remove('chat-banner-ok');
+      }
+    }
+    reflectAuth();
+
+    function authHeaders() {
+      var h = { 'content-type': 'application/json' };
+      var t = getToken();
+      if (t) h['authorization'] = 'Bearer ' + t;
+      return h;
+    }
+
+    function appendMessage(role, content) {
+      var wrap = document.createElement('article');
+      wrap.className = 'chat-msg chat-msg-' + role;
+      var head = document.createElement('header');
+      head.className = 'chat-msg-role';
+      head.textContent = role;
+      var body = document.createElement('div');
+      body.className = 'chat-msg-body';
+      body.textContent = content;
+      wrap.appendChild(head);
+      wrap.appendChild(body);
+      // Drop the empty-state placeholder once a real message arrives.
+      var empty = threadEl.querySelector('.chat-empty');
+      if (empty) empty.remove();
+      threadEl.appendChild(wrap);
+      threadEl.scrollTop = threadEl.scrollHeight;
+      return wrap;
+    }
+
+    document.querySelectorAll('.chat-suggest').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        inputEl.value = btn.getAttribute('data-text') || btn.textContent;
+        inputEl.focus();
+      });
+    });
+
+    loginEl.addEventListener('click', async function () {
+      try {
+        var resp = await fetch('/api/login?alg=HS256', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ username: 'chat-demo', role: 'user' })
+        });
+        if (!resp.ok) throw new Error('login http ' + resp.status);
+        var json = await resp.json();
+        setToken(json.access_token);
+      } catch (err) {
+        alert('login failed: ' + err.message);
+      }
+    });
+
+    clearEl.addEventListener('click', async function () {
+      if (!confirm('Delete this session\'s history?')) return;
+      try {
+        var resp = await fetch('/api/chat/messages?session=' + encodeURIComponent(sessionId), {
+          method: 'DELETE',
+          headers: authHeaders()
+        });
+        if (!resp.ok) throw new Error('clear http ' + resp.status);
+        threadEl.innerHTML = '<div class="chat-empty">History cleared.</div>';
+      } catch (err) {
+        alert('clear failed: ' + err.message);
+      }
+    });
+
+    inputEl.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Enter' && !ev.shiftKey) {
+        ev.preventDefault();
+        formEl.requestSubmit();
+      }
+    });
+
+    formEl.addEventListener('submit', async function (ev) {
+      ev.preventDefault();
+      var text = inputEl.value.trim();
+      if (text === '') return;
+      if (!getToken()) {
+        alert('Please mint a JWT first (the button above).');
+        return;
+      }
+      appendMessage('user', text);
+      inputEl.value = '';
+      sendBtn.disabled = true;
+      var pending = appendMessage('assistant', '…');
+      try {
+        var resp = await fetch('/api/chat/messages', {
+          method: 'POST',
+          headers: authHeaders(),
+          body: JSON.stringify({
+            session: sessionId,
+            content: text,
+            model: modelEl.value
+          })
+        });
+        var json = await resp.json();
+        if (!resp.ok) throw new Error(json.error || ('http ' + resp.status));
+        pending.querySelector('.chat-msg-body').textContent = json.reply || '(no reply)';
+        document.getElementById('chat-current-model').textContent = json.model;
+      } catch (err) {
+        pending.querySelector('.chat-msg-body').textContent = 'error: ' + err.message;
+        pending.classList.add('chat-msg-error');
+      } finally {
+        sendBtn.disabled = false;
+        inputEl.focus();
+      }
+    });
+  })();
+</script>

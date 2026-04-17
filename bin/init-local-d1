@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# Initialize the LOCAL Wrangler D1 database with the schema in
+# bin/schema.sql so `wrangler dev --local` returns real rows from
+# routes like / and /d1/users instead of throwing D1Error.
+#
+# - Local Wrangler SQLite only (--local flag is enforced below).
+# - Idempotent: existing rows are preserved (CREATE TABLE IF NOT EXISTS,
+#   INSERT OR IGNORE).
+# - The remote production D1 database is never touched by this script.
+# - Not invoked automatically by build / dev / deploy — run manually.
+#
+# Usage:
+#   ./bin/init-local-d1
+#   npm run d1:init
+
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
+
+DB_NAME="homurabi-db"
+SCHEMA_FILE="bin/schema.sql"
+
+if [[ ! -f "$SCHEMA_FILE" ]]; then
+  echo "ERROR: $SCHEMA_FILE not found" >&2
+  exit 1
+fi
+
+echo "→ Applying $SCHEMA_FILE to local D1 database '$DB_NAME'..."
+npx wrangler d1 execute "$DB_NAME" --local --file "$SCHEMA_FILE"
+
+echo
+echo "✓ Local D1 ready. Try:"
+echo "    npx wrangler dev --local"
+echo "    curl http://127.0.0.1:8787/d1/users | jq ."

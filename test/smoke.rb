@@ -255,6 +255,41 @@ SmokeTest.assert("Cloudflare::BindingError carries binding_type") {
   e.binding_type == 'D1' && e.operation == 'all' && e.message.include?('D1')
 }
 
+# Phase 6.x — Regression test for the Phase 3 catch handler.
+# Before: `Kernel.$$raise(...)` (typo) made every D1 / KV failure
+# crash with "is not a function" instead of raising D1Error / KVError.
+# This test fakes a JS binding whose .all() returns a rejected Promise
+# and asserts that Ruby code can rescue Cloudflare::D1Error normally.
+SmokeTest.assert("D1 catch handler raises Cloudflare::D1Error (regression)") {
+  fake_db = `({
+    prepare: function(sql) {
+      return { all: function() { return Promise.reject(new Error('no such table: users')); } };
+    }
+  })`
+  db = Cloudflare::D1Database.new(fake_db)
+  raised = nil
+  begin
+    db.prepare('SELECT * FROM users').all.__await__
+  rescue Cloudflare::D1Error => e
+    raised = e
+  end
+  raised && raised.message.include?('no such table') && raised.binding_type == 'D1'
+}
+
+SmokeTest.assert("KV catch handler raises Cloudflare::KVError (regression)") {
+  fake_kv = `({
+    get: function(k, opts) { return Promise.reject(new Error('kv unavailable')); }
+  })`
+  kv = Cloudflare::KVNamespace.new(fake_kv)
+  raised = nil
+  begin
+    kv.get('missing').__await__
+  rescue Cloudflare::KVError => e
+    raised = e
+  end
+  raised && raised.message.include?('kv unavailable') && raised.binding_type == 'KV'
+}
+
 $stdout.puts ""
 $stdout.puts "--- Helpers ---"
 SmokeTest.assert("db/kv/bucket helpers are defined on App") {

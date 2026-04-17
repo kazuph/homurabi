@@ -174,9 +174,16 @@ module Cloudflare
 
     # Parsed body. Workers Queues gives us the structured clone of
     # whatever the producer sent, so this is usually already a Ruby
-    # Hash / Array after crossing the JS<->Ruby boundary. Strings
-    # that *look* like JSON are parsed for convenience; raw strings
-    # pass through untouched.
+    # Hash / Array after crossing the JS<->Ruby boundary. Raw
+    # strings pass through untouched — we deliberately do NOT attempt
+    # to `JSON.parse` an opaque String here because Workers Queues
+    # already structure-clones producer payloads, so a String body
+    # means the producer really meant a String. Callers that did
+    # encode a JSON string themselves can `JSON.parse(msg.body)` at
+    # the call site.
+    #
+    # (Copilot review PR #9 flagged the earlier "JSON-looking strings
+    # are parsed" comment — fixed by removing that claim.)
     def body
       return @body if defined?(@body)
       js = @js

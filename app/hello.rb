@@ -130,6 +130,11 @@ class App < Sinatra::Base
     # silently stores nothing — we populate it here so routes don't
     # have to know.
     def cache_get(cache_key, ttl: 60, content_type_override: nil, &block)
+      # Copilot review PR #9: fail loudly when no block is given
+      # instead of NoMethodError on nil.call later. Same pattern
+      # `consume_queue` / `DurableObject.define` use at registration
+      # time.
+      raise ArgumentError, 'cache_get requires a block' unless block
       c = cache
       cached = c.match(cache_key).__await__
       if cached

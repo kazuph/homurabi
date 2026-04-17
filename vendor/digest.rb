@@ -1,50 +1,93 @@
-# Minimal Digest stub for the homurabi Phase 2 hello-world handler.
-# Opal stdlib does not ship a digest module. Real homurabi apps that
-# need cryptographic hashing should use the Web Crypto API via the
-# CloudflareWorkers adapter; this stub only exists so that
-# `require 'digest/sha2'` (transitively pulled in by rack/etag and
-# rack/session) does not fail at compile time. None of the methods
-# below are reachable from the Phase 2 hello-world path.
+# frozen_string_literal: true
+# backtick_javascript: true
+
+require 'corelib/array/pack'
+require 'corelib/string/unpack'
+#
+# Phase 7 — Real Digest implementation backed by node:crypto.
+#
+# Replaces the Phase 2 NotImplementedError stub. All hash algos are
+# synchronous (no Promise glue), enabled by importing node:crypto via
+# src/setup-node-crypto.mjs and exposing it on globalThis.
+#
+# Available on:
+#   - Cloudflare Workers (with `compatibility_flags = ["nodejs_compat"]`)
+#   - Node.js (with `node --import ./src/setup-node-crypto.mjs`)
+#
+# Surface mirrors CRuby's `digest/sha1`, `digest/sha2`, `digest/md5`:
+#
+#   Digest::SHA256.hexdigest(str)            # one-shot hex
+#   Digest::SHA256.digest(str)               # one-shot binary
+#   Digest::SHA256.new.update(s).hexdigest   # streaming
 
 module Digest
-  class Class
-    def self.hexdigest(*)
-      raise NotImplementedError, 'Digest is stubbed in homurabi Phase 2'
-    end
-
+  # Common base class shared by SHA1 / SHA256 / SHA384 / SHA512 / MD5.
+  # Subclasses define ALGO (the node:crypto algorithm name).
+  class Base
     def initialize
-      @data = ''
-    end
-
-    def update(data)
-      @data = @data + data.to_s
-      self
-    end
-
-    def <<(data)
-      update(data)
-    end
-
-    def hexdigest
-      raise NotImplementedError, 'Digest is stubbed in homurabi Phase 2'
-    end
-
-    def digest
-      raise NotImplementedError, 'Digest is stubbed in homurabi Phase 2'
+      reset
     end
 
     def reset
-      @data = ''
+      @hasher = `globalThis.__nodeCrypto__.createHash(#{self.class::ALGO})`
       self
+    end
+
+    def update(data)
+      str = data.to_s
+      `#{@hasher}.update(#{str}, 'utf8')`
+      self
+    end
+    alias_method :<<, :update
+
+    def hexdigest
+      hasher = @hasher
+      `#{hasher}.copy().digest('hex')`
+    end
+
+    def digest
+      hex = hexdigest
+      [hex].pack('H*')
+    end
+
+    def base64digest
+      hasher = @hasher
+      `#{hasher}.copy().digest('base64')`
+    end
+
+    def to_s
+      hexdigest
+    end
+
+    def self.hexdigest(data)
+      algo = self::ALGO
+      str  = data.to_s
+      `globalThis.__nodeCrypto__.createHash(#{algo}).update(#{str}, 'utf8').digest('hex')`
+    end
+
+    def self.digest(data)
+      hex = hexdigest(data)
+      [hex].pack('H*')
+    end
+
+    def self.base64digest(data)
+      algo = self::ALGO
+      str  = data.to_s
+      `globalThis.__nodeCrypto__.createHash(#{algo}).update(#{str}, 'utf8').digest('base64')`
+    end
+
+    # Disk-backed digest is impossible on Workers (no FS).
+    def self.file(*)
+      raise NotImplementedError, 'Digest.file is unavailable on Cloudflare Workers (no filesystem)'
     end
   end
 
-  class Base < Class
-  end
+  # Backwards-compat alias for code that does `class Foo < Digest::Class`.
+  Class = Base unless const_defined?(:Class)
 
-  # Concrete classes referenced by name at class-body time in gems.
-  # Methods fall through to NotImplementedError, but the constants
-  # have to exist so Ruby's constant lookup succeeds.
-  class SHA1 < Class; end
-  class MD5 < Class; end
+  class SHA1   < Base; ALGO = 'sha1'.freeze;   end
+  class SHA256 < Base; ALGO = 'sha256'.freeze; end
+  class SHA384 < Base; ALGO = 'sha384'.freeze; end
+  class SHA512 < Base; ALGO = 'sha512'.freeze; end
+  class MD5    < Base; ALGO = 'md5'.freeze;    end
 end

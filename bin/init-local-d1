@@ -13,7 +13,10 @@
 #   ./bin/init-local-d1
 #   npm run d1:init
 
-set -euo pipefail
+set -eo pipefail   # 'u' (nounset) intentionally NOT set: some user
+                   # shell hooks (e.g. ~/.ai_guard.zsh) reference
+                   # unbound vars in subshells spawned by npx, and
+                   # they would abort the script with no benefit.
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
@@ -27,7 +30,15 @@ if [[ ! -f "$SCHEMA_FILE" ]]; then
 fi
 
 echo "→ Applying $SCHEMA_FILE to local D1 database '$DB_NAME'..."
-npx wrangler d1 execute "$DB_NAME" --local --file "$SCHEMA_FILE"
+# Run npx with a minimal environment so the user's interactive
+# shell hooks (~/.ai_guard.zsh, BASH_ENV, etc.) don't pollute the
+# subshell that wrangler spawns. We keep just the variables wrangler
+# needs (PATH, HOME, NODE_*).
+env -i \
+  PATH="$PATH" \
+  HOME="$HOME" \
+  NODE_PATH="${NODE_PATH:-}" \
+  npx wrangler d1 execute "$DB_NAME" --local --file "$SCHEMA_FILE"
 
 echo
 echo "✓ Local D1 ready. Try:"

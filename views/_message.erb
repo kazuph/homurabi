@@ -1,0 +1,13 @@
+<%# Single message partial. Reserved for future use by route handlers
+    that want to render a single chat message out-of-band of the main
+    /chat ERB (e.g. an HTMX-style "append one message" endpoint). The
+    main /chat view inlines the loop for performance.
+
+    The values are HTML-escaped because they originate in user input
+    persisted in KV and can therefore carry arbitrary characters. %>
+<% role    = (@msg && @msg['role'])    ? Rack::Utils.escape_html(@msg['role'].to_s)    : '' %>
+<% content = (@msg && @msg['content']) ? Rack::Utils.escape_html(@msg['content'].to_s) : '' %>
+<article class="chat-msg chat-msg-<%= role %>">
+  <header class="chat-msg-role"><%= role %></header>
+  <div class="chat-msg-body"><%= content %></div>
+</article>

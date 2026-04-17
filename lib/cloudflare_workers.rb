@@ -207,9 +207,16 @@ module Rack
           js_db = `#{js_env} && #{js_env}.DB`
           js_kv = `#{js_env} && #{js_env}.KV`
           js_r2 = `#{js_env} && #{js_env}.BUCKET`
+          js_ai = `#{js_env} && #{js_env}.AI`
           env['cloudflare.DB']     = Cloudflare::D1Database.new(js_db)  if `#{js_db} != null`
           env['cloudflare.KV']     = Cloudflare::KVNamespace.new(js_kv) if `#{js_kv} != null`
           env['cloudflare.BUCKET'] = Cloudflare::R2Bucket.new(js_r2)    if `#{js_r2} != null`
+          # Phase 10: env.AI is a Workers AI binding object. Routes call
+          # Cloudflare::AI.run(model, inputs, binding: env['cloudflare.AI'])
+          # to invoke a model. We expose the raw JS object (not a wrapper)
+          # because the wrapper is stateless — every call passes both the
+          # model id and the binding explicitly.
+          env['cloudflare.AI']     = js_ai if `#{js_ai} != null`
 
           env
         end
@@ -259,6 +266,26 @@ module Rack
             return `new Response(#{js_stream}, { status: #{status.to_i}, headers: #{js_headers} })`
           end
 
+          # Phase 10 — Workers AI streaming: a Cloudflare::AI::Stream wraps
+          # a JS ReadableStream<Uint8Array> emitting SSE-formatted bytes
+          # ("data: {json}\n\n"). Pass it straight through so the client
+          # receives the chunks as they arrive.
+          stream_obj = nil
+          if body.respond_to?(:sse_stream?) && body.sse_stream?
+            stream_obj = body
+          elsif body.respond_to?(:first) && body.first.respond_to?(:sse_stream?) && body.first.sse_stream?
+            stream_obj = body.first
+          end
+          if stream_obj
+            js_stream = stream_obj.js_stream
+            js_headers = `({})`
+            headers.each { |k, v| ks = k.to_s; vs = v.to_s; `#{js_headers}[#{ks}] = #{vs}` }
+            `#{js_headers}['content-type'] = 'text/event-stream; charset=utf-8'`
+            `#{js_headers}['cache-control'] = 'no-cache, no-transform'`
+            `#{js_headers}['x-accel-buffering'] = 'no'`
+            return `new Response(#{js_stream}, { status: #{status.to_i}, headers: #{js_headers} })`
+          end
+
           chunks = []
           if body.respond_to?(:each)
             body.each { |chunk| chunks << chunk }
@@ -283,7 +310,11 @@ module Rack
           end
 
           if has_promise
-            `Promise.all(#{js_chunks}).then(function(resolved) { for (var i = 0; i < resolved.length; i++) { var r = resolved[i]; if (r != null && r.stream != null && r.content_type != null) { var bh = {}; bh['content-type'] = r.content_type; if (r.cache_control) bh['cache-control'] = r.cache_control; return new Response(r.stream, { status: #{status_int}, headers: bh }); } } var parts = []; for (var i = 0; i < resolved.length; i++) { var r = resolved[i]; if (r == null) { parts.push(''); continue; } if (typeof r === 'string') { parts.push(r); continue; } if (r != null && r.$$is_string) { parts.push(r.toString()); continue; } try { parts.push(JSON.stringify(r)); } catch (e) { parts.push(String(r)); } } return new Response(parts.join(''), { status: #{status_int}, headers: #{js_headers} }); })`
+            # Phase 10 patch: route may return [status, body] from a
+            # post-await branch so it can express a non-200 status the
+            # async-promise path of Sinatra::Base#invoke would otherwise
+            # snapshot away. Single-line x-string per the file convention.
+            `Promise.all(#{js_chunks}).then(function(resolved) { for (var i = 0; i < resolved.length; i++) { var r = resolved[i]; if (r != null && r.stream != null && r.content_type != null) { var bh = {}; bh['content-type'] = r.content_type; if (r.cache_control) bh['cache-control'] = r.cache_control; return new Response(r.stream, { status: #{status_int}, headers: bh }); } } if (resolved.length === 1 && resolved[0] != null && Array.isArray(resolved[0]) && resolved[0].length === 2 && typeof resolved[0][0] === 'number') { var ov = resolved[0]; var ovs = ov[0]|0; var ovb = ov[1] == null ? '' : (typeof ov[1] === 'string' ? ov[1] : (ov[1].$$is_string ? ov[1].toString() : String(ov[1]))); return new Response(ovb, { status: ovs, headers: #{js_headers} }); } var parts = []; for (var i = 0; i < resolved.length; i++) { var r = resolved[i]; if (r == null) { parts.push(''); continue; } if (typeof r === 'string') { parts.push(r); continue; } if (r != null && r.$$is_string) { parts.push(r.toString()); continue; } try { parts.push(JSON.stringify(r)); } catch (e) { parts.push(String(r)); } } return new Response(parts.join(''), { status: #{status_int}, headers: #{js_headers} }); })`
           else
             body_str = ''
             chunks.each { |c| body_str = body_str + c.to_s }
@@ -538,11 +569,19 @@ module Cloudflare
       `#{js_kv}.get(#{key}, "text").then(function(v) { return v == null ? nil : v; }).catch(function(e) { #{Kernel}.$raise(#{err_cls}.$new(e.message || String(e), Opal.hash({binding_type: 'KV', operation: 'get'}))); })`
     end
 
-    # Put a value. Returns a JS Promise.
-    def put(key, value)
+    # Put a value. `expiration_ttl:` (seconds) maps to the Workers KV
+    # `expirationTtl` option so callers can set TTLs without reaching
+    # for backticks. Returns a JS Promise.
+    def put(key, value, expiration_ttl: nil)
       js_kv = @js
       err_cls = Cloudflare::KVError
-      `#{js_kv}.put(#{key}, #{value}).catch(function(e) { #{Kernel}.$raise(#{err_cls}.$new(e.message || String(e), Opal.hash({binding_type: 'KV', operation: 'put'}))); })`
+      ttl = expiration_ttl
+      if ttl.nil?
+        `#{js_kv}.put(#{key}, #{value}).catch(function(e) { #{Kernel}.$raise(#{err_cls}.$new(e.message || String(e), Opal.hash({binding_type: 'KV', operation: 'put'}))); })`
+      else
+        ttl_int = ttl.to_i
+        `#{js_kv}.put(#{key}, #{value}, { expirationTtl: #{ttl_int} }).catch(function(e) { #{Kernel}.$raise(#{err_cls}.$new(e.message || String(e), Opal.hash({binding_type: 'KV', operation: 'put'}))); })`
+      end
     end
 
     # Delete a key. Returns a JS Promise.
@@ -610,3 +649,7 @@ require 'cloudflare_workers/http'
 # because it constructs D1Database/KVNamespace/R2Bucket instances
 # inside the dispatcher's per-job env.
 require 'cloudflare_workers/scheduled'
+
+# Phase 10 — Workers AI binding wrapper. Loaded here so any Sinatra
+# route can call Cloudflare::AI.run(...) without an extra require.
+require 'cloudflare_workers/ai'

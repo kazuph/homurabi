@@ -21,3 +21,18 @@ INSERT OR IGNORE INTO users (id, name) VALUES
   (2, 'Homurabi-chan'),
   (3, 'Sinatra'),
   (4, 'Opal');
+
+-- Phase 9 — Cron Trigger heartbeat demo. Each firing of the
+-- `*/5 * * * *` cron writes one row here. Verify the cron is
+-- actually wired by tailing this table in dev:
+--
+--   wrangler d1 execute homurabi-db --local \
+--     --command "SELECT * FROM heartbeats ORDER BY id DESC LIMIT 5;"
+--
+CREATE TABLE IF NOT EXISTS heartbeats (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  cron         TEXT    NOT NULL,
+  scheduled_at INTEGER NOT NULL,
+  fired_at     INTEGER NOT NULL,
+  note         TEXT
+);

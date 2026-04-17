@@ -20,6 +20,7 @@ require 'securerandom'
 require 'base64'
 require 'jwt'
 require 'sinatra/jwt_auth'
+require 'sinatra/scheduled'
 
 class App < Sinatra::Base
   # Phase 8 — JWT auth. The secret is the default HS256 path; asymmetric
@@ -32,6 +33,10 @@ class App < Sinatra::Base
   register Sinatra::JwtAuth
   set :jwt_secret, 'homurabi-phase8-demo-secret-change-me-in-prod'
   set :jwt_algorithm, 'HS256'
+  # Phase 9 — Cron Trigger DSL. Use `schedule '*/5 * * * *' do ... end`
+  # below; matching jobs are dispatched from `src/worker.mjs#scheduled`
+  # via `globalThis.__HOMURABI_SCHEDULED_DISPATCH__`.
+  register Sinatra::Scheduled
   # --- Cloudflare binding helpers ------------------------------------
   # These let routes access D1/KV/R2 with the same brevity as
   # ActiveRecord's `User.find(id)` pattern, without introducing an ORM.
@@ -48,6 +53,17 @@ class App < Sinatra::Base
       cf_env = env['cloudflare.env']
       return false unless cf_env
       val = `(#{cf_env} && #{cf_env}.HOMURABI_ENABLE_CRYPTO_DEMOS) || ''`
+      val.to_s == '1'
+    end
+
+    # Phase 9 — gate for the scheduled introspection / manual-fire
+    # routes. `/test/scheduled/run` writes to D1 + KV without auth, so
+    # leaving it open in production lets any caller burn binding quota.
+    # Default OFF; flip via wrangler [vars] HOMURABI_ENABLE_SCHEDULED_DEMOS=1.
+    def scheduled_demos_enabled?
+      cf_env = env['cloudflare.env']
+      return false unless cf_env
+      val = `(#{cf_env} && #{cf_env}.HOMURABI_ENABLE_SCHEDULED_DEMOS) || ''`
       val.to_s == '1'
     end
   end
@@ -752,6 +768,113 @@ class App < Sinatra::Base
         'uuid'            => SecureRandom.uuid
       }
     }.to_json
+  end
+  # ------------------------------------------------------------------
+  # Phase 9 — Cloudflare Workers Cron Triggers.
+  #
+  # Each `schedule` block is invoked from `src/worker.mjs#scheduled`
+  # via `globalThis.__HOMURABI_SCHEDULED_DISPATCH__` whenever the
+  # Workers runtime fires the matching cron (declared in
+  # `wrangler.toml [triggers] crons`). The block runs in a
+  # `Sinatra::Scheduled::ScheduledContext` instance, which exposes
+  # the same `db` / `kv` / `bucket` helpers as HTTP routes plus a
+  # `wait_until(promise)` wrapper around `ctx.waitUntil`.
+  #
+  # The block argument is a `Cloudflare::ScheduledEvent` with `.cron`
+  # (the literal cron string from wrangler.toml) and `.scheduled_time`
+  # (a Ruby Time at the epoch the event was scheduled for).
+  #
+  # Local manual trigger:
+  #   npx wrangler dev --test-scheduled
+  #   curl 'http://127.0.0.1:8787/__scheduled?cron=*/5+*+*+*+*'
+  # ------------------------------------------------------------------
+  schedule '*/5 * * * *', name: 'heartbeat' do |event|
+    # Insert one row into D1's heartbeats table per cron firing.
+    # Falls back to a no-op when DB is not bound (test envs).
+    if db
+      db.execute_insert(
+        'INSERT INTO heartbeats (cron, scheduled_at, fired_at, note) VALUES (?, ?, ?, ?)',
+        [event.cron, event.scheduled_time.to_i, Time.now.to_i, 'phase9-heartbeat']
+      ).__await__
+    end
+  end
+
+  schedule '0 */1 * * *', name: 'hourly-housekeeping' do |event|
+    # Demo: bump a KV counter so we can prove hourly cron runs from
+    # outside a test by inspecting `/kv/cron:hourly-counter` over HTTP.
+    # Falls back to a no-op when KV is not bound (test envs).
+    if kv
+      raw  = kv.get('cron:hourly-counter').__await__
+      prev = 0
+      if raw
+        begin
+          prev = JSON.parse(raw)['count'].to_i
+        rescue StandardError
+          prev = 0
+        end
+      end
+      payload = {
+        'count'        => prev + 1,
+        'last_cron'    => event.cron,
+        'last_run_at'  => Time.now.to_i,
+        'last_sched_t' => event.scheduled_time.to_i
+      }.to_json
+      kv.put('cron:hourly-counter', payload).__await__
+    end
+  end
+
+  # ------------------------------------------------------------------
+  # Phase 9 self-test endpoints — gated on HOMURABI_ENABLE_SCHEDULED_DEMOS.
+  #
+  # GET  /test/scheduled            → list every registered job (cron,
+  #                                    name, source location)
+  # POST /test/scheduled/run?cron=… → manually fire every job whose
+  #                                    cron expression equals the
+  #                                    query param. Same code path the
+  #                                    Workers runtime takes; lets us
+  #                                    smoke-test cron handlers from
+  #                                    a curl in `wrangler dev`
+  #                                    without waiting 5 minutes.
+  # ------------------------------------------------------------------
+  get '/test/scheduled' do
+    content_type 'application/json'
+    unless scheduled_demos_enabled?
+      status 404
+      next { 'error' => 'scheduled demos disabled (set HOMURABI_ENABLE_SCHEDULED_DEMOS=1 in wrangler vars)' }.to_json
+    end
+    {
+      'jobs' => App.scheduled_jobs.map do |job|
+        {
+          'name' => job.name,
+          'cron' => job.cron,
+          'file' => job.file,
+          'line' => job.line
+        }
+      end
+    }.to_json
+  end
+
+  post '/test/scheduled/run' do
+    content_type 'application/json'
+    unless scheduled_demos_enabled?
+      status 404
+      next({ 'error' => 'scheduled demos disabled (set HOMURABI_ENABLE_SCHEDULED_DEMOS=1 in wrangler vars)' }.to_json)
+    end
+    cron = params['cron'].to_s
+    if cron.empty?
+      status 400
+      next({ 'error' => 'missing cron query param (e.g. ?cron=*/5%20*%20*%20*%20*)' }.to_json)
+    end
+    # Use the same dispatcher the Workers runtime invokes. Pass the
+    # JS env / ctx so D1 / KV writes hit the live bindings. The
+    # dispatcher is async (it `__await__`s each job's body), so we
+    # MUST `__await__` its return Promise before serialising the
+    # result — otherwise the inner D1 / KV writes get torn down when
+    # the HTTP response is sent. The literal `__await__` token is
+    # what Opal scans for to emit a JS `await`.
+    event  = Cloudflare::ScheduledEvent.new(cron: cron, scheduled_time: Time.now)
+    result = App.dispatch_scheduled(event, env['cloudflare.env'], env['cloudflare.ctx']).__await__
+    result.merge('cron' => cron, 'registered_crons' => App.scheduled_jobs.map(&:cron)).to_json
   end
 end
 

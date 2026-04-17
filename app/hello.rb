@@ -1622,6 +1622,23 @@ class App < Sinatra::Base
       content_type 'application/json'
       next({ 'error' => 'binding demos disabled' }.to_json)
     end
+    # Copilot review PR #9 (third pass): Workers only accepts a
+    # `Response` with a `.webSocket` property from a handler that
+    # was invoked by a real WebSocket-upgrade request. If a plain
+    # `curl` (no Upgrade header) hits this route, forwarding to the
+    # DO stub causes the runtime to throw ("Response with webSocket
+    # requires a WebSocket request"), surfacing as a confusing 500.
+    # Reject non-upgrade requests up-front with a 426 so clients
+    # get an intentional, documented response.
+    upgrade = (request.env['HTTP_UPGRADE'] || '').to_s.downcase
+    unless upgrade == 'websocket'
+      status 426
+      content_type 'application/json'
+      next({
+        'error' => 'Upgrade Required',
+        'detail' => 'GET /demo/do/ws must be called with `Upgrade: websocket`; use a WebSocket client.'
+      }.to_json)
+    end
     ns = do_counter
     if ns.nil?
       status 503
@@ -1841,8 +1858,21 @@ class App < Sinatra::Base
       next({ 'error' => 'binding demos disabled' }.to_json)
     end
     namespace = (params['namespace'] || 'frag-default').to_s
-    raise ArgumentError, 'namespace must be [A-Za-z0-9_-]{1,32}' unless namespace =~ /\A[A-Za-z0-9_-]{1,32}\z/
+    # Copilot review PR #9 (third pass): return a stable 400 JSON
+    # response on client input validation failures instead of
+    # raising — the app has no Sinatra error handler for
+    # ArgumentError, which would otherwise surface as 500.
+    unless namespace =~ /\A[A-Za-z0-9_-]{1,32}\z/
+      status 400
+      next({ 'error' => 'namespace must match /\\A[A-Za-z0-9_-]{1,32}\\z/',
+             'got'   => namespace }.to_json)
+    end
     key = (params['key'] || 'demo').to_s
+    unless key =~ /\A[A-Za-z0-9._\-\/]{1,128}\z/
+      status 400
+      next({ 'error' => 'key must match /\\A[A-Za-z0-9._\\-\\/]{1,128}\\z/',
+             'got'   => key }.to_json)
+    end
     cache_key = "https://homurabi-named-cache.internal/#{namespace}/#{key}"
     started = Time.now.to_f
     # Open the named partition fresh per request — the JS handle is

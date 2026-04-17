@@ -124,15 +124,6 @@ new_sqlite_classes = ["HomurabiCounterDO"]
 binding    = "JOBS_QUEUE"
 queue      = "homurabi-jobs"
 
-# Phase 11B — DLQ producer (local emulator only; production deploy
-# requires `npx wrangler queues create homurabi-jobs-dlq` first).
-# Routes can call `jobs_dlq.send(payload)` to manually forward a
-# message to the dead-letter queue without going through the retry
-# path.
-[[queues.producers]]
-binding    = "JOBS_DLQ"
-queue      = "homurabi-jobs-dlq"
-
 [[queues.consumers]]
 queue              = "homurabi-jobs"
 # Small batches + short timeout so the consumer actually fires quickly
@@ -141,17 +132,90 @@ queue              = "homurabi-jobs"
 # the first message arrived.
 max_batch_size     = 3
 max_batch_timeout  = 2
+max_retries        = 3
+
+# ---------------------------------------------------------------------
+# Phase 11B — DLQ environment (`wrangler dev --env dlq-demo`).
+#
+# The dead-letter queue (`homurabi-jobs-dlq`) is intentionally NOT in
+# the default (top-level) config. Putting it there would make every
+# `wrangler deploy` fail until someone runs
+#   npx wrangler queues create homurabi-jobs-dlq
+# on the account — a foot-gun for anyone who inherits this repo and
+# tries to deploy (Copilot review PR #9, third pass).
+#
+# `[env.dlq-demo]` lives alongside the defaults so the DLQ flow can be
+# exercised in `wrangler dev` without breaking `wrangler deploy`:
+#
+#   npm run dev          # default config — no DLQ
+#   npm run dev:dlq      # [env.dlq-demo] — DLQ producer + consumer
+#                        #                  + `dead_letter_queue`
+#                        #                  wire-up on the main consumer
+#
+# wrangler 3.x environments do NOT inherit `[vars]`, `[[d1_databases]]`,
+# `[[kv_namespaces]]`, `[[r2_buckets]]`, `[[durable_objects.bindings]]`,
+# `[[queues.*]]`, `[[migrations]]`, `[triggers]`, or `[ai]` from the
+# top-level (verified empirically with `wrangler 3.114.17` — a bare
+# `[env.dlq-demo]` dropped KV/D1/R2). Every binding has to be
+# duplicated here to match default-env behaviour plus the DLQ extras.
+# ---------------------------------------------------------------------
+[env.dlq-demo]
+
+[env.dlq-demo.vars]
+HOMURABI_ENABLE_CRYPTO_DEMOS = "0"
+HOMURABI_ENABLE_AI_DEMOS = "0"
+HOMURABI_ENABLE_BINDING_DEMOS = "0"
+HOMURABI_ENABLE_SCHEDULED_DEMOS = "0"
+
+[[env.dlq-demo.d1_databases]]
+binding = "DB"
+database_name = "homurabi-db"
+database_id = "3a59c955-198e-478f-8f11-71d5f3eb7600"
+
+[[env.dlq-demo.kv_namespaces]]
+binding = "KV"
+id = "64ee32f1c6c64f85af9591e827da7462"
+
+[[env.dlq-demo.r2_buckets]]
+binding = "BUCKET"
+bucket_name = "homurabi-bucket"
+
+[env.dlq-demo.ai]
+binding = "AI"
+
+[[env.dlq-demo.durable_objects.bindings]]
+name       = "COUNTER"
+class_name = "HomurabiCounterDO"
+
+[[env.dlq-demo.migrations]]
+tag              = "v1"
+new_sqlite_classes = ["HomurabiCounterDO"]
+
+[env.dlq-demo.triggers]
+crons = [
+  "*/5 * * * *",
+  "0 */1 * * *",
+]
+
+[[env.dlq-demo.queues.producers]]
+binding = "JOBS_QUEUE"
+queue   = "homurabi-jobs"
+
+[[env.dlq-demo.queues.producers]]
+binding = "JOBS_DLQ"
+queue   = "homurabi-jobs-dlq"
+
+[[env.dlq-demo.queues.consumers]]
+queue              = "homurabi-jobs"
+max_batch_size     = 3
+max_batch_timeout  = 2
 max_retries        = 2
-# max_retries deliberately set to 2 so a message that always calls
-# msg.retry() eventually rolls over into the DLQ after two retries —
-# visible via GET /demo/queue/dlq-status. miniflare wires the DLQ
-# local-only; no production queue is created by `wrangler dev`.
+# After 2 retries the Workers runtime forwards the message to the
+# DLQ. Visible via `GET /demo/queue/dlq-status` in the same dev
+# session.
 dead_letter_queue  = "homurabi-jobs-dlq"
 
-# Phase 11B — DLQ consumer so we can observe messages that exceeded
-# max_retries land in the dead-letter queue. Same KV-logging pattern
-# as the main consumer, keyed under `queue:dlq:<i>`.
-[[queues.consumers]]
+[[env.dlq-demo.queues.consumers]]
 queue              = "homurabi-jobs-dlq"
 max_batch_size     = 3
 max_batch_timeout  = 2

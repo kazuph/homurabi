@@ -54,6 +54,10 @@ HOMURABI_ENABLE_AI_DEMOS = "0"
 # write to D1 / KV from any unauthenticated caller in production.
 # Set to "1" only in dev or behind a private route.
 HOMURABI_ENABLE_SCHEDULED_DEMOS = "0"
+# Phase 11A: gating for /test/foundations. The self-test hits an
+# external JSON API (ipify) and writes to R2 under phase11a/, so we
+# keep the pattern: default OFF, flip to "1" only in dev.
+HOMURABI_ENABLE_FOUNDATIONS_DEMOS = "0"
 
 # Phase 9 — Cloudflare Workers Cron Triggers.
 #

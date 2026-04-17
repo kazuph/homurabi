@@ -14,7 +14,7 @@
     "test:workers": "bin/test-on-workers",
     "deploy": "npm run build && wrangler deploy",
     "build:test": "ruby bin/compile-erb && OPAL_PREFORK_DISABLE=1 bundle exec opal -c -E --esm --no-source-map -I lib -I vendor -I build -r opal_patches -r cloudflare_workers -r homurabi_templates -o build/smoke-test.mjs test/smoke.rb 2>build/opal.stderr.log",
-    "test": "npm run build:test && node --import ./src/setup-node-crypto.mjs build/smoke-test.mjs && npm run test:http && npm run test:crypto && npm run test:jwt && npm run test:scheduled && npm run test:ai",
+    "test": "npm run build:test && node --import ./src/setup-node-crypto.mjs build/smoke-test.mjs && npm run test:http && npm run test:crypto && npm run test:jwt && npm run test:scheduled && npm run test:ai && npm run test:faraday && npm run test:multipart && npm run test:streaming",
     "build:http-test": "OPAL_PREFORK_DISABLE=1 bundle exec opal -c -E --esm --no-source-map -I lib -I vendor -I build -r opal_patches -o build/http-smoke.mjs test/http_smoke.rb 2>build/opal.stderr.log",
     "test:http": "npm run build:http-test && node --import ./src/setup-node-crypto.mjs build/http-smoke.mjs",
     "build:crypto-test": "OPAL_PREFORK_DISABLE=1 bundle exec opal -c -E --esm --no-source-map -I lib -I vendor -I build -r opal_patches -o build/crypto-smoke.mjs test/crypto_smoke.rb 2>build/opal.stderr.log",
@@ -25,7 +25,13 @@
     "test:ai": "npm run build:ai-test && node --import ./src/setup-node-crypto.mjs build/ai-smoke.mjs",
     "build:scheduled-test": "OPAL_PREFORK_DISABLE=1 bundle exec opal -c -E --esm --no-source-map -I lib -I vendor -I build -r opal_patches -o build/scheduled-smoke.mjs test/scheduled_smoke.rb 2>build/opal.stderr.log",
     "test:scheduled": "npm run build:scheduled-test && node --import ./src/setup-node-crypto.mjs build/scheduled-smoke.mjs",
-    "clean": "rm -f build/hello.no-exit.mjs build/smoke-test.mjs build/http-smoke.mjs build/crypto-smoke.mjs build/jwt-smoke.mjs build/ai-smoke.mjs build/scheduled-smoke.mjs build/homurabi_templates.rb build/homurabi_assets.rb build/opal.stderr.log"
+    "build:faraday-test": "OPAL_PREFORK_DISABLE=1 bundle exec opal -c -E --esm --no-source-map -I lib -I vendor -I build -r opal_patches -o build/faraday-smoke.mjs test/faraday_smoke.rb 2>build/opal.stderr.log",
+    "test:faraday": "npm run build:faraday-test && node --import ./src/setup-node-crypto.mjs build/faraday-smoke.mjs",
+    "build:multipart-test": "OPAL_PREFORK_DISABLE=1 bundle exec opal -c -E --esm --no-source-map -I lib -I vendor -I build -r opal_patches -o build/multipart-smoke.mjs test/multipart_smoke.rb 2>build/opal.stderr.log",
+    "test:multipart": "npm run build:multipart-test && node --import ./src/setup-node-crypto.mjs build/multipart-smoke.mjs",
+    "build:streaming-test": "OPAL_PREFORK_DISABLE=1 bundle exec opal -c -E --esm --no-source-map -I lib -I vendor -I build -r opal_patches -o build/streaming-smoke.mjs test/streaming_smoke.rb 2>build/opal.stderr.log",
+    "test:streaming": "npm run build:streaming-test && node --import ./src/setup-node-crypto.mjs build/streaming-smoke.mjs",
+    "clean": "rm -f build/hello.no-exit.mjs build/smoke-test.mjs build/http-smoke.mjs build/crypto-smoke.mjs build/jwt-smoke.mjs build/ai-smoke.mjs build/scheduled-smoke.mjs build/faraday-smoke.mjs build/multipart-smoke.mjs build/streaming-smoke.mjs build/homurabi_templates.rb build/homurabi_assets.rb build/opal.stderr.log"
   },
   "devDependencies": {
     "wrangler": "^3.99.0"

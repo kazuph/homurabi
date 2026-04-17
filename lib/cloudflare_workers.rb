@@ -653,3 +653,13 @@ require 'cloudflare_workers/scheduled'
 # Phase 10 — Workers AI binding wrapper. Loaded here so any Sinatra
 # route can call Cloudflare::AI.run(...) without an extra require.
 require 'cloudflare_workers/ai'
+
+# Phase 11A — HTTP foundations.
+#
+# `multipart` installs a Rack::Request#POST override so Sinatra routes
+# can `params['file']` an uploaded file part without any ceremony.
+# `stream`    adds `Cloudflare::SSEStream` + `Sinatra::Streaming#sse`
+#             so a route can `sse do |out| ... end` and flush chunks
+#             through a Workers ReadableStream.
+require 'cloudflare_workers/multipart'
+require 'cloudflare_workers/stream'

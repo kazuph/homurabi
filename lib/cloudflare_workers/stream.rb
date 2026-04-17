@@ -243,9 +243,75 @@ module Sinatra
       ::Cloudflare::SSEStream.new(headers: headers, ctx: ctx, &block)
     end
 
+    # Sinatra本家の `stream do |out| ... end` 互換 DSL。
+    # 本家の `Sinatra::Helpers#stream` は Rack EM/Thin で動くスケジューラを
+    # 前提にするが、Workers では EventMachine も Thread も無いので
+    # 代わりに Cloudflare の `ReadableStream` パスを使う。
+    #
+    # Call sites look identical to upstream Sinatra:
+    #
+    #   get '/numbers' do
+    #     stream do |out|
+    #       10.times do |i|
+    #         out << "chunk #{i}\n"
+    #         out.sleep(0.1).__await__
+    #       end
+    #     end
+    #   end
+    #
+    # SSE 用に `stream(type: :sse) do |out| ... end` もサポート。type の
+    # デフォルトは `:plain` (text/plain) で、SSE-like ヘッダは付かない。
+    # :sse / :event_stream を指定すると Cloudflare::SSEStream::DEFAULT_HEADERS
+    # がマージされる（`sse do |out|` と同じ挙動）。
+    #
+    # `keep_open:` は本家互換だが Workers では意味がない（EM 前提）ため
+    # 受け取るだけで使わない。
+    def stream(keep_open: false, type: :plain, headers: nil, &block)
+      ctx = env['cloudflare.ctx']
+      extra_headers = headers || {}
+      merged = case type
+               when :sse, :event_stream
+                 extra_headers  # SSE defaults は SSEStream 側で入る
+               else
+                 # Plain streaming — start from an empty default set so
+                 # the SSE headers don't get force-injected into e.g. a
+                 # log-tailing or chunked-JSON endpoint.
+                 { 'content-type' => 'text/plain; charset=utf-8' }.merge(extra_headers)
+               end
+      ::Cloudflare::SSEStream.new(headers: merged, ctx: ctx, &block)
+    end
+
     # Register the helper on a Sinatra app. Use `register Sinatra::Streaming`.
     def self.registered(app)
       app.helpers Streaming
     end
   end
 end
+
+# --------------------------------------------------------------------
+# Override the stock `Sinatra::Base#stream` so upstream Sinatra apps
+# that call it (without registering the helper module) also work on
+# Workers. The upstream implementation (vendor/sinatra/base.rb:524)
+# defers to EventMachine; Workers has no EM, so we re-route through
+# the Cloudflare ReadableStream path. This is explicit: calling
+# `register Sinatra::Streaming` still gets you the merging DSL above;
+# bare `stream do |out| ... end` still works via this override.
+# --------------------------------------------------------------------
+
+module Sinatra
+  class Base
+    # Re-open to override. We keep the signature compatible with
+    # upstream (`stream(keep_open = false, &block)`) but internally
+    # route through Cloudflare::SSEStream. Upstream's `Stream` class
+    # is not used on Workers (no EventMachine / Thread pool).
+    def stream(keep_open = false, &block)
+      ctx = env['cloudflare.ctx']
+      ::Cloudflare::SSEStream.new(
+        headers: { 'content-type' => 'text/plain; charset=utf-8' },
+        ctx: ctx,
+        &block
+      )
+    end
+  end
+end
+

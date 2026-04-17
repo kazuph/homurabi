@@ -349,19 +349,115 @@ module Faraday
         @io.puts "[#{@tag}] <- #{env.status} (#{env.reason_phrase})"
       end
     end
+
+    # Retry middleware. Mirrors `faraday-retry` (the real gem's) most
+    # common configuration. Unlike request/response middleware, retry
+    # has to run at a layer that can re-invoke the HTTP call, so the
+    # `Faraday::Connection#run_request` method special-cases the
+    # `Middleware::Retry` marker and drives the retry loop itself.
+    #
+    # Options (all optional):
+    #   max:               total attempts (including the first).  Default 3.
+    #   interval:          seconds between retries (float).      Default 0.
+    #   backoff_factor:    exponential backoff multiplier.       Default 2.
+    #   max_interval:      upper bound on interval (seconds).    Default 60.
+    #   retry_statuses:    Array<Integer> of response codes to retry.
+    #                      Default [408, 429, 500, 502, 503, 504].
+    #   methods:           idempotent HTTP methods to retry.
+    #                      Default [:get, :head, :options, :put, :delete].
+    #   exceptions:        Array<Class> of exception types to retry.
+    #                      Default [Faraday::TimeoutError,
+    #                               Faraday::ConnectionFailed].
+    #   retry_if:          proc { |env, exc| true/false } — extra predicate.
+    #
+    # Retry-After header is honored when present (seconds or HTTP-date).
+    class Retry < Base
+      DEFAULT_RETRY_STATUSES = [408, 429, 500, 502, 503, 504].freeze
+      DEFAULT_METHODS = %i[get head options put delete].freeze
+
+      attr_reader :max, :interval, :backoff_factor, :max_interval,
+                  :retry_statuses, :methods, :exceptions, :retry_if
+
+      def initialize(max: 3, interval: 0, backoff_factor: 2,
+                     max_interval: 60, retry_statuses: nil,
+                     methods: nil, exceptions: nil, retry_if: nil)
+        @max = [max.to_i, 1].max
+        @interval = interval.to_f
+        @backoff_factor = backoff_factor.to_f
+        @max_interval = max_interval.to_f
+        @retry_statuses = retry_statuses || DEFAULT_RETRY_STATUSES
+        @methods = methods || DEFAULT_METHODS
+        @exceptions = exceptions || [Faraday::TimeoutError, Faraday::ConnectionFailed]
+        @retry_if = retry_if
+      end
+
+      # Should we retry? Checks:
+      #   1. Same request method must be in `methods:` (idempotent by default)
+      #   2. If response: status is in retry_statuses
+      #   3. If exception: is_a? any of `exceptions:`
+      #   4. retry_if callback (if provided) must return truthy
+      def retry?(env, exception)
+        return false unless @methods.include?(env.method)
+        if exception
+          return false unless @exceptions.any? { |c| exception.is_a?(c) }
+        elsif env.status
+          return false unless @retry_statuses.include?(env.status.to_i)
+        else
+          return false
+        end
+        if @retry_if
+          return false unless @retry_if.call(env, exception)
+        end
+        true
+      end
+
+      # Delay in seconds for the given attempt (1-indexed). `env` is
+      # the Env at the time of the failed attempt (may carry a
+      # Retry-After header).
+      def delay_for(attempt, env)
+        server_hint = parse_retry_after(env)
+        return [server_hint, @max_interval].min if server_hint
+        base = @interval * (@backoff_factor**(attempt - 1))
+        [base, @max_interval].min
+      end
+
+      # Parse Retry-After HTTP header (seconds or HTTP-date). Returns a
+      # Float of seconds or nil if absent/unparseable.
+      def parse_retry_after(env)
+        return nil unless env.response_headers
+        v = env.response_headers['retry-after']
+        return nil if v.nil? || v.to_s.empty?
+        if v.to_s.match?(/\A\d+\.?\d*\z/)
+          return v.to_f
+        end
+        # HTTP-date — parse-of-last-resort. Fall back to nil on any failure.
+        begin
+          secs = (Time.parse(v).to_f - Time.now.to_f)
+          return secs.positive? ? secs : 0.0
+        rescue StandardError
+          nil
+        end
+      end
+    end
   end
 
   # Registry so `c.request :json` / `c.response :raise_error` resolve.
+  # Retry is a `response`-slot middleware in real Faraday, but the
+  # actual driver loop lives in `Connection#run_request` — the
+  # registry entry is only used so `c.request :retry` / `c.response :retry`
+  # still resolves to the marker class.
   MIDDLEWARE_REGISTRY = {
     request: {
       json:           Middleware::JSON,
       url_encoded:    Middleware::UrlEncoded,
-      authorization:  Middleware::Authorization
+      authorization:  Middleware::Authorization,
+      retry:          Middleware::Retry
     },
     response: {
       json:        Middleware::JSON,
       raise_error: Middleware::RaiseError,
-      logger:      Middleware::Logger
+      logger:      Middleware::Logger,
+      retry:       Middleware::Retry
     }
   }.freeze
 
@@ -399,11 +495,19 @@ module Faraday
 
     # Register a request-phase middleware. The real Faraday also accepts
     # anonymous classes; we accept a symbol keyed in MIDDLEWARE_REGISTRY.
+    # `:retry` is special: it's a control-flow middleware that drives
+    # the Connection's retry loop instead of participating in the
+    # request / response phases. Stashed separately so it's consulted
+    # by `run_request` at the right layer.
     def request(name, *args, **opts)
       klass = MIDDLEWARE_REGISTRY[:request][name]
       raise ArgumentError, "unknown request middleware: #{name.inspect}" unless klass
       mw = opts.any? ? klass.new(*args, **opts) : klass.new(*args)
-      @request_middlewares << mw
+      if mw.is_a?(Middleware::Retry)
+        @retry_middleware = mw
+      else
+        @request_middlewares << mw
+      end
       mw
     end
 
@@ -411,7 +515,11 @@ module Faraday
       klass = MIDDLEWARE_REGISTRY[:response][name]
       raise ArgumentError, "unknown response middleware: #{name.inspect}" unless klass
       mw = opts.any? ? klass.new(*args, **opts) : klass.new(*args)
-      @response_middlewares << mw
+      if mw.is_a?(Middleware::Retry)
+        @retry_middleware = mw
+      else
+        @response_middlewares << mw
+      end
       mw
     end
 
@@ -443,6 +551,14 @@ module Faraday
 
     # Main entry point. When a block is given the block is invoked with
     # a mutable Request (`conn.post('/foo') { |req| req.body = ...}`).
+    #
+    # If a Retry middleware is registered, the HTTP call is driven in
+    # a loop that exits on:
+    #   - a non-retry-able response (success OR any non-retry status),
+    #   - max attempts reached,
+    #   - a non-retry-able exception.
+    # Between attempts we sleep `delay_for(attempt, env)` honouring any
+    # Retry-After header the server returned.
     def run_request(method, path, body, headers, params, &block)
       req = Request.new(method, path)
       req.body = body if body
@@ -463,21 +579,61 @@ module Faraday
 
       @request_middlewares.each { |mw| mw.on_request(env) }
 
-      cf_res = Cloudflare::HTTP.fetch(
-        env.url,
-        method: env.method.to_s.upcase,
-        headers: env.request_headers,
-        body: env.body
-      ).__await__
+      # Snapshot the request-side state so retry loops re-use identical
+      # headers / body (request middleware already mutated env.body into
+      # the encoded form). Use `while` (not `loop do`) because Opal
+      # compiles `loop { … __await__ … break }` into a JS microtask
+      # storm that OOMs workerd — see lib/cloudflare_workers/stream.rb
+      # for the same workaround in the SSE pipe.
+      attempt = 0
+      keep_going = true
+      while keep_going
+        attempt += 1
+        begin
+          cf_res = Cloudflare::HTTP.fetch(
+            env.url,
+            method: env.method.to_s.upcase,
+            headers: env.request_headers,
+            body: env.body
+          ).__await__
 
-      env.status = cf_res.status
-      env.response_headers = cf_res.headers
-      env.body = cf_res.body
-      env.reason_phrase = http_reason(cf_res.status)
+          env.status = cf_res.status
+          env.response_headers = cf_res.headers
+          env.body = cf_res.body
+          env.reason_phrase = http_reason(cf_res.status)
+
+          if !@retry_middleware || !@retry_middleware.retry?(env, nil) ||
+             attempt >= @retry_middleware.max
+            keep_going = false
+          else
+            sleep_seconds(@retry_middleware.delay_for(attempt, env))
+            # Reset body after response to allow the next attempt to
+            # send the original request body again.
+            env.body = req.body
+          end
+        rescue Faraday::Error => e
+          raise e unless @retry_middleware
+          raise e unless @retry_middleware.retry?(env, e)
+          raise e if attempt >= @retry_middleware.max
+          sleep_seconds(@retry_middleware.delay_for(attempt, env))
+          env.body = req.body
+        end
+      end
 
       @response_middlewares.reverse_each { |mw| mw.on_response(env) }
 
       Response.new(env)
+    end
+
+    # Internal: pause for `seconds` via setTimeout so the Workers
+    # isolate doesn't burn CPU during backoff. `__await__`-returns
+    # nil. Zero/negative input fast-paths to no-op.
+    def sleep_seconds(seconds)
+      secs = seconds.to_f
+      return if secs <= 0
+      ms = (secs * 1000).to_i
+      `(new Promise(function(r){ setTimeout(r, #{ms}); }))`.__await__
+      nil
     end
 
     # --- helpers -------------------------------------------------------

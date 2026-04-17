@@ -229,5 +229,113 @@ FaradaySmoke.assert('Response#[] is case-insensitive') {
   res['X-Rate-Limit'] == '100' && res['x-rate-limit'] == '100'
 }
 
+# 13. Retry middleware retries 5xx and eventually returns the success
+reset_calls
+# Stub returns 503 twice, then 200.
+`globalThis.__faraday_retry_calls__ = 0`
+install_stub(lambda { |_u, _i|
+  n = `globalThis.__faraday_retry_calls__++`
+  if n < 2
+    json_response({ 'try' => n }, status: 503)
+  else
+    json_response({ 'ok' => true })
+  end
+})
+FaradaySmoke.assert('retry middleware retries 503 and returns success') {
+  c = Faraday.new(url: 'https://api.example.com') do |conn|
+    conn.request :retry, max: 5, interval: 0
+    conn.response :json
+  end
+  res = c.get('/').__await__
+  res.status == 200 && res.body['ok'] == true && `globalThis.__faraday_retry_calls__` == 3
+}
+
+# 14. Retry gives up after max attempts and returns last response
+reset_calls
+`globalThis.__faraday_retry_calls__ = 0`
+install_stub(lambda { |_u, _i|
+  `globalThis.__faraday_retry_calls__++`
+  json_response({}, status: 500)
+})
+FaradaySmoke.assert('retry middleware gives up after `max` attempts') {
+  c = Faraday.new(url: 'https://api.example.com') do |conn|
+    conn.request :retry, max: 3, interval: 0
+  end
+  res = c.get('/').__await__
+  res.status == 500 && `globalThis.__faraday_retry_calls__` == 3
+}
+
+# 15. Retry is NOT triggered for non-idempotent methods by default (POST)
+reset_calls
+`globalThis.__faraday_retry_calls__ = 0`
+install_stub(lambda { |_u, _i|
+  `globalThis.__faraday_retry_calls__++`
+  json_response({}, status: 500)
+})
+FaradaySmoke.assert('retry middleware does NOT retry POST by default') {
+  c = Faraday.new(url: 'https://api.example.com') do |conn|
+    conn.request :retry, max: 3, interval: 0
+  end
+  res = c.post('/', 'body').__await__
+  # POST is not in DEFAULT_METHODS, so 500 returns on the first hit.
+  res.status == 500 && `globalThis.__faraday_retry_calls__` == 1
+}
+
+# 16. Retry-After header honored (integer seconds)
+reset_calls
+`globalThis.__faraday_retry_calls__ = 0`
+`globalThis.__faraday_last_call_ts__ = 0`
+install_stub(lambda { |_u, _i|
+  n = `globalThis.__faraday_retry_calls__++`
+  if n == 0
+    `globalThis.__faraday_last_call_ts__ = Date.now()`
+    json_response({}, status: 429, headers: { 'retry-after' => '1', 'content-type' => 'application/json' })
+  else
+    json_response({ 'ok' => true })
+  end
+})
+FaradaySmoke.assert('Retry-After header is honored') {
+  c = Faraday.new(url: 'https://api.example.com') do |conn|
+    conn.request :retry, max: 2, interval: 0  # interval 0, so only Retry-After matters
+    conn.response :json
+  end
+  start_ms = `Date.now()`
+  res = c.get('/').__await__
+  elapsed_ms = `Date.now() - #{start_ms}`
+  # Should have slept ~1000ms thanks to Retry-After, allow wide margin.
+  res.status == 200 && elapsed_ms >= 900 && `globalThis.__faraday_retry_calls__` == 2
+}
+
+# 17. `retry_statuses:` configurable
+reset_calls
+`globalThis.__faraday_retry_calls__ = 0`
+install_stub(lambda { |_u, _i|
+  n = `globalThis.__faraday_retry_calls__++`
+  json_response({}, status: n == 0 ? 418 : 200)
+})
+FaradaySmoke.assert('retry_statuses: custom codes') {
+  c = Faraday.new(url: 'https://api.example.com') do |conn|
+    conn.request :retry, max: 3, interval: 0, retry_statuses: [418]
+    conn.response :json
+  end
+  res = c.get('/').__await__
+  res.status == 200 && `globalThis.__faraday_retry_calls__` == 2
+}
+
+# 18. `methods:` configurable (retry POST too)
+reset_calls
+`globalThis.__faraday_retry_calls__ = 0`
+install_stub(lambda { |_u, _i|
+  n = `globalThis.__faraday_retry_calls__++`
+  json_response({}, status: n == 0 ? 503 : 201)
+})
+FaradaySmoke.assert('methods: allows POST retry when opted in') {
+  c = Faraday.new(url: 'https://api.example.com') do |conn|
+    conn.request :retry, max: 3, interval: 0, methods: [:post]
+  end
+  res = c.post('/', 'body').__await__
+  res.status == 201 && `globalThis.__faraday_retry_calls__` == 2
+}
+
 success = FaradaySmoke.report
 `process.exit(#{success ? 0 : 1})`

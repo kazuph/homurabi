@@ -1507,6 +1507,59 @@ class App < Sinatra::Base
     }.to_json
   end
 
+  # GET /phase11a/download/* — binary round-trip endpoint for
+  # /api/upload. Sinatra's bare `/r2/:key` captures stop at slashes,
+  # so keys under `phase11a/uploads/xxxxx-y.bin` are unreachable via
+  # GET /r2/:key. Use a splat route to accept the whole sub-path and
+  # proxy it back through R2#get_binary so a test can verify the
+  # bytes survived the upload path unchanged.
+  #
+  # curl -o recovered.bin http://127.0.0.1:8787/phase11a/download/phase11a/uploads/xxxxx-y.bin
+  get '/phase11a/download/*' do
+    unless foundations_demos_enabled?
+      content_type 'application/json'
+      status 404
+      next({ 'error' => 'foundations demos disabled (set HOMURABI_ENABLE_FOUNDATIONS_DEMOS=1)' }.to_json)
+    end
+    if bucket.nil?
+      content_type 'application/json'
+      status 503
+      next({ 'error' => 'R2 binding not configured' }.to_json)
+    end
+    key = params['splat'].is_a?(Array) ? params['splat'].join('/') : params['splat'].to_s
+    obj = bucket.get_binary(key).__await__
+    if obj.nil?
+      content_type 'application/json'
+      status 404
+      next({ 'error' => 'not found', 'key' => key }.to_json)
+    else
+      obj  # BinaryBody — build_js_response streams raw bytes to client
+    end
+  end
+
+  # GET /demo/stream — plain-text streaming demo (Sinatra-native
+  # `stream do |out| ... end` DSL, text/plain). Exercises the compat
+  # shim: upstream Sinatra apps expect `stream` to stream chunked
+  # text through a block, so we keep the same shape on Workers.
+  #
+  # curl -N http://127.0.0.1:8787/demo/stream
+  get '/demo/stream' do
+    unless foundations_demos_enabled?
+      content_type 'application/json'
+      status 404
+      next({ 'error' => 'foundations demos disabled (set HOMURABI_ENABLE_FOUNDATIONS_DEMOS=1)' }.to_json)
+    end
+    stream do |out|
+      i = 0
+      while i < 3
+        out << "chunk #{i} @ #{Time.now.to_i}\n"
+        out.sleep(0.5).__await__
+        i += 1
+      end
+      out << "done\n"
+    end
+  end
+
   # GET /demo/sse — 5-tick SSE countdown, 1 second between ticks.
   #
   # curl -N http://127.0.0.1:8787/demo/sse

@@ -24,10 +24,11 @@ require 'sinatra/jwt_auth'
 class App < Sinatra::Base
   # Phase 8 — JWT auth. The secret is the default HS256 path; asymmetric
   # algo demos generate their own keys on first use and cache them in
-  # class-level ivars so repeat requests don't pay the 2048-bit RSA
-  # generation cost. The secret is deterministic only for local dev —
-  # in production it should come from a Workers secret (wrangler secret
-  # put JWT_SECRET) pulled via `env['cloudflare.env'].JWT_SECRET`.
+  # Ruby class variables (`@@rsa_key`, `@@ec256_key`, …) so repeat
+  # requests don't pay the 2048-bit RSA generation cost. The secret is
+  # deterministic only for local dev — in production it should come
+  # from a Workers secret (wrangler secret put JWT_SECRET) pulled via
+  # `env['cloudflare.env'].JWT_SECRET`.
   register Sinatra::JwtAuth
   set :jwt_secret, 'homurabi-phase8-demo-secret-change-me-in-prod'
   set :jwt_algorithm, 'HS256'
@@ -337,23 +338,32 @@ class App < Sinatra::Base
     }
     access_token = JWT.encode(payload, sign_key, alg).__await__
 
-    # Refresh token: opaque random string. Store in KV keyed by the
-    # token itself with the user info + expiry; opaque-only means a
-    # stolen refresh_token cannot be reversed into user claims.
-    refresh = SecureRandom.urlsafe_base64(48)
+    # Refresh token: opaque random string. Only minted when KV is bound
+    # (otherwise the token would never round-trip through /api/login/refresh
+    # and we'd be lying about rotation support). Store the role in the KV
+    # entry so refresh preserves the original role instead of demoting
+    # non-default roles to 'user' on re-issue.
+    refresh = nil
     if kv
-      entry = { 'sub' => username, 'alg' => alg, 'exp' => Time.now.to_i + JWT_REFRESH_TTL }
+      refresh = SecureRandom.urlsafe_base64(48)
+      entry = {
+        'sub'  => username,
+        'role' => body['role'] || 'user',
+        'alg'  => alg,
+        'exp'  => Time.now.to_i + JWT_REFRESH_TTL
+      }
       kv.put("refresh:#{refresh}", entry.to_json).__await__
     end
 
     status 201
-    {
-      'access_token'  => access_token,
-      'token_type'    => 'Bearer',
-      'expires_in'    => JWT_ACCESS_TTL,
-      'alg'           => alg,
-      'refresh_token' => refresh
-    }.to_json
+    resp = {
+      'access_token' => access_token,
+      'token_type'   => 'Bearer',
+      'expires_in'   => JWT_ACCESS_TTL,
+      'alg'          => alg
+    }
+    resp['refresh_token'] = refresh if refresh
+    resp.to_json
   end
 
   # GET /api/me — verifies Authorization: Bearer ..., returns payload.
@@ -368,7 +378,12 @@ class App < Sinatra::Base
     end
 
     token = parts[1].strip
-    alg   = alg_from_token(token)
+    if token.empty?
+      status 401
+      next { 'error' => 'missing Authorization: Bearer header' }.to_json
+    end
+
+    alg = alg_from_token(token)
     if alg.nil? || alg == 'none'
       status 401
       next { 'error' => 'unknown or unsafe algorithm' }.to_json

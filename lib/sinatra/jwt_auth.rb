@@ -113,7 +113,13 @@ module Sinatra
         parts = header.split(' ', 2)
         return nil unless parts.length == 2 && parts[0].downcase == 'bearer'
 
-        parts[1].strip
+        # Also treat a whitespace-only token as missing so authenticate!
+        # reports "missing bearer token" instead of falling through to
+        # JWT.decode and surfacing a confusing "invalid token" error.
+        token = parts[1].strip
+        return nil if token.empty?
+
+        token
       end
 
       def halt_unauthorized!(reason)

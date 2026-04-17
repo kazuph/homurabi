@@ -250,5 +250,36 @@ SmokeTest.assert('match error from the underlying cache is raised as CacheError'
   raised
 end
 
+# ---------------------------------------------------------------------
+# 6. request_to_js input accepts the documented shapes
+#    (Copilot review PR #9, second pass)
+# ---------------------------------------------------------------------
+$stdout.puts ''
+$stdout.puts '--- request key normalisation ---'
+
+SmokeTest.assert('put accepts a Cloudflare::HTTPResponse as the cache key') do
+  c = Cloudflare::Cache.default
+  url = 'https://example.com/from-httpresponse'
+  src = Cloudflare::HTTPResponse.new(status: 200, headers: { 'x-src' => 'upstream' },
+    body: 'forget-me', url: url)
+  # Use the HTTPResponse as the key — the wrapper should extract its
+  # `.url` and build the corresponding Request under the hood.
+  c.put(src, 'stored-through-httpresponse',
+    headers: { 'content-type' => 'text/plain' }).__await__
+  got = c.match(url).__await__
+  got && got.body == 'stored-through-httpresponse'
+end
+
+SmokeTest.assert('put rejects an unsupported input type with ArgumentError') do
+  c = Cloudflare::Cache.default
+  raised = false
+  begin
+    c.put(12345, 'x', headers: { 'content-type' => 'text/plain' }).__await__
+  rescue ArgumentError => e
+    raised = e.message.include?('String URL')
+  end
+  raised
+end
+
 success = SmokeTest.report
 `process.exit(#{success ? 0 : 1})`

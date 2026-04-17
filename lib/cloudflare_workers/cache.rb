@@ -172,13 +172,34 @@ module Cloudflare
 
     private
 
-    # Normalise Ruby inputs (String URL, Cloudflare::HTTPResponse,
-    # raw JS Request) to a JS Request. Passing a String URL is the
-    # common case; Workers accepts that directly.
+    # Normalise supported inputs to a JS `Request` suitable as a
+    # cache key:
+    #
+    #   - `String` URL                       → `new Request(url)`
+    #   - `Cloudflare::HTTPResponse`         → `new Request(resp.url)`
+    #     (the Phase 6 wrapper exposes a `.url` attr; we reuse its URL
+    #     as the cache key so `cache.put(response, ...)` reads natural.)
+    #   - raw JS `Request` / `Response` / any JS object carrying a
+    #     string `.url` property     → passed through unchanged.
+    #
+    # Anything else (integers, Hashes, etc.) is rejected with
+    # `ArgumentError` so callers don't silently build an invalid
+    # `Request('12345')`.
+    # (Copilot review PR #9: previous docstring advertised HTTPResponse
+    # support but the impl only covered JS Request-like objects — both
+    # the docs AND the code now line up.)
     def request_to_js(request_or_url)
-      return request_or_url if `(#{request_or_url} != null && typeof #{request_or_url} === 'object' && typeof #{request_or_url}.url === 'string')`
-      url_str = request_or_url.to_s
-      `new Request(#{url_str})`
+      if request_or_url.is_a?(String)
+        return `new Request(#{request_or_url})`
+      end
+      if defined?(Cloudflare::HTTPResponse) && request_or_url.is_a?(Cloudflare::HTTPResponse)
+        url_str = request_or_url.url.to_s
+        return `new Request(#{url_str})`
+      end
+      if `(#{request_or_url} != null && typeof #{request_or_url} === 'object' && typeof #{request_or_url}.url === 'string')`
+        return request_or_url
+      end
+      raise ArgumentError, "Cloudflare::Cache request must be a String URL, Cloudflare::HTTPResponse, or JS Request (got #{request_or_url.class})"
     end
 
     def ruby_headers_to_js(hash)

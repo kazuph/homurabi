@@ -403,23 +403,15 @@ module ::SecureRandom
   def self.random_bytes(n = 16)
     n = n.to_i
     n = 16 if n <= 0
-    hex_string = hex(n)
-    # homurabi patch: `<<` → `+` for Opal immutable Strings
-    result = ''
-    i = 0
-    while i < hex_string.length
-      result = result + hex_string[i, 2].to_i(16).chr
-      i += 2
-    end
-    result
-  rescue StandardError
-    ("\0" * n)
-  end
-
-  def self.hex(n = 16)
-    n = n.to_i
-    n = 16 if n <= 0
-    `
+    # Phase 7: prefer node:crypto.randomBytes (sync, available on
+    # Workers via nodejs_compat AND on Node test runner). Falls back
+    # to Web Crypto getRandomValues (sync) when node:crypto is absent.
+    hex_string = `(function(n) {
+      try {
+        if (typeof globalThis.__nodeCrypto__ !== 'undefined' && globalThis.__nodeCrypto__) {
+          return globalThis.__nodeCrypto__.randomBytes(n).toString('hex');
+        }
+      } catch (e) { /* fall through to Web Crypto */ }
       try {
         if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
           var bytes = new Uint8Array(n);
@@ -436,7 +428,40 @@ module ::SecureRandom
         // Workers blocks getRandomValues at global scope; fall through.
       }
       return '0'.repeat(n * 2);
-    `
+    })(#{n})`
+    [hex_string].pack('H*')
+  rescue StandardError
+    ("\0" * n)
+  end
+
+  def self.hex(n = 16)
+    n = n.to_i
+    n = 16 if n <= 0
+    # Same source-of-randomness rules as random_bytes.
+    out = `(function(n) {
+      try {
+        if (typeof globalThis.__nodeCrypto__ !== 'undefined' && globalThis.__nodeCrypto__) {
+          return globalThis.__nodeCrypto__.randomBytes(n).toString('hex');
+        }
+      } catch (e) { /* fall through to Web Crypto */ }
+      try {
+        if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+          var bytes = new Uint8Array(n);
+          crypto.getRandomValues(bytes);
+          var out = '';
+          for (var i = 0; i < bytes.length; i++) {
+            var h = bytes[i].toString(16);
+            if (h.length < 2) h = '0' + h;
+            out += h;
+          }
+          return out;
+        }
+      } catch (e) {
+        // Workers blocks getRandomValues at global scope; fall through.
+      }
+      return '0'.repeat(n * 2);
+    })(#{n})`
+    out
   end
 
   def self.uuid
@@ -459,6 +484,69 @@ module ::SecureRandom
   def self.random_number(n = 0)
     # Not used at class-init time; real implementations welcome.
     0
+  end
+end
+
+# -----------------------------------------------------------------
+# Phase 7: Array#pack('H*') / String#unpack1('H*') for hex<->bin.
+# Opal's pack.rb / unpack.rb don't register the 'H' directive
+# ("hex string, high nibble first"). Crypto code (Digest, OpenSSL,
+# jwt) heavily uses these to convert between binary and hex, so we
+# add a minimal handler that intercepts the "H*" / "H<n>" format
+# and falls back to the original implementation for everything else.
+# -----------------------------------------------------------------
+
+class ::Array
+  alias_method :pack_without_homurabi_hex, :pack
+
+  def pack(format)
+    fmt = format.to_s
+    if fmt == 'H*' || fmt =~ /\AH\d+\z/
+      hex = self.first.to_s
+      out = ''
+      i = 0
+      max = hex.length - (hex.length % 2)
+      while i < max
+        out = out + hex[i, 2].to_i(16).chr
+        i += 2
+      end
+      out
+    else
+      pack_without_homurabi_hex(format)
+    end
+  end
+end
+
+class ::String
+  alias_method :unpack1_without_homurabi_hex, :unpack1
+
+  # `unpack1('H*')` returns one hex pair per byte. CRuby treats the
+  # receiver as a raw byte sequence (encoding ASCII-8BIT). Opal stores
+  # all Strings as JS Strings (UTF-16 chars) and reports `bytesize` as
+  # the UTF-8 encoded byte count, which double-counts chars > 0x7F.
+  #
+  # For our crypto code, every "binary" String comes from
+  # `[hex].pack('H*')` or other functions that pack each byte (0..255)
+  # as exactly one JS char. We therefore iterate by char (`length`)
+  # and read each char's UTF-16 code unit as the byte value. This
+  # matches CRuby's behavior for ASCII-8BIT encoded strings.
+  def unpack1(format)
+    fmt = format.to_s
+    if fmt == 'H*' || fmt =~ /\AH\d+\z/
+      out = ''
+      i = 0
+      n = self.length
+      while i < n
+        b = `(#{self}.charCodeAt(#{i}) & 0xff)`
+        h = b.to_s(16)
+        h = '0' + h if h.length == 1
+        out = out + h
+        i += 1
+      end
+      out
+    else
+      unpack1_without_homurabi_hex(format)
+    end
   end
 end
 

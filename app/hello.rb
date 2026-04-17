@@ -135,6 +135,17 @@ class App < Sinatra::Base
       # `consume_queue` / `DurableObject.define` use at registration
       # time.
       raise ArgumentError, 'cache_get requires a block' unless block
+      # Copilot review PR #9 (additional): the Workers Cache API
+      # silently refuses to store a Response whose Cache-Control
+      # max-age is 0 or negative, so a caller asking for `ttl: 0` or
+      # a bad `params['ttl']` would compute the body, skip storage,
+      # and still claim it was cached. Make the contract explicit:
+      # ttl must be a positive integer; clamp to at least 1 second to
+      # protect the cache from being poisoned with unstorable entries.
+      cache_ttl = ttl.to_i
+      if cache_ttl <= 0
+        raise ArgumentError, "cache_get ttl must be > 0 (got #{ttl.inspect}); Workers refuses to store max-age=0"
+      end
       c = cache
       cached = c.match(cache_key).__await__
       if cached
@@ -151,7 +162,7 @@ class App < Sinatra::Base
         status: 200,
         headers: {
           'content-type'     => ct,
-          'cache-control'    => "public, max-age=#{ttl.to_i}",
+          'cache-control'    => "public, max-age=#{cache_ttl}",
           'date'             => Time.now.httpdate,
           'x-homurabi-cache' => 'MISS'
         }

@@ -21,21 +21,29 @@
 
 ```
 ✅ Phase 6  ── HTTP クライアント基盤        (Net::HTTP / Cloudflare::HTTP.fetch)
-   │            shipped 2026-04-17 (PR #1)
+   │            shipped 2026-04-17 (PR #1, commit 48c37a7)
    ↓
 ✅ Phase 7  ── 暗号プリミティブ完全実装    (Digest / HMAC / Cipher / RSA / EC / Ed25519 /
    │            X25519 / KDF / BN — node:crypto sync + subtle async hybrid)
-   │            shipped 2026-04-17 (PR #2)
+   │            shipped 2026-04-17 (PR #2, commit 4f53fa1)
    ↓
-🚧 Phase 8  ── JWT 認証フレームワーク       (jwt gem 動作 + Sinatra ヘルパ)
-   │
-   ├─ 並列可
-   │
-🚧 Phase 9  ── Scheduled Workers (Cron)     (scheduled handler + DSL)
-   │
-🚧 Phase 10 ── Workers AI バインディング   (env.AI ラッパ + Sinatra AI チャットデモ
-                                              with Gemma 4 + gpt-oss-120b)
-🚧 Phase 11 候補 — Vectorize / Durable Objects / Queues / Cache API / Email
+✅ Phase 8  ── JWT 認証フレームワーク       (ruby-jwt v2.9.3 vendored + Sinatra ヘルパ)
+   │            shipped 2026-04-17 (PR #4, commit cd38b52)
+   │            HS/RS/PS/ES/EdDSA 全 7 alg 実機 round-trip
+   ↓
+✅ Phase 9  ── Scheduled Workers (Cron)     (scheduled handler + Sinatra DSL)
+   │            shipped 2026-04-17 (PR #6, commit acb8271)
+   │            schedule '*/5 * * * *' do |event| ... end
+   ↓
+✅ Phase 10 ── Workers AI バインディング   (env.AI ラッパ + Sinatra AI チャットデモ
+   │            with Gemma 4 + gpt-oss-120b、KV 履歴、JWT 保護)
+   │            shipped 2026-04-17 (PR #5, commit 5f71953)
+   ↓
+🚧 Phase 11 — 基礎固めパック（並列着手中）
+   ├─ 11A: HTTP foundations (Faraday / multipart / streaming SSE)
+   ├─ 11B: Cloudflare native bindings (Durable Objects / Cache API / Queues)
+   └─ 候補（未着手）— Vectorize (RAG) / Email / Service Bindings /
+                      ChaCha20 / JWE / Phase 10.3 streaming chat
 ```
 
 依存関係:

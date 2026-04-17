@@ -22,9 +22,26 @@ id = "64ee32f1c6c64f85af9591e827da7462"
 binding = "BUCKET"
 bucket_name = "homurabi-bucket"
 
+# Phase 10: Workers AI binding. Routes reach this from Ruby as
+# `env['cloudflare.AI']` and pass it to `Cloudflare::AI.run(model, …)`.
+# The binding name "AI" matches the Cloudflare convention; the runtime
+# implements env.AI.run(model, inputs, options) automatically once
+# wrangler dev / deploy attaches the AI gateway. No account-side
+# configuration is required for `wrangler dev` (it proxies to the live
+# Workers AI catalog) once `wrangler login` has run.
+[ai]
+binding = "AI"
+
 # Phase 7: gating for the educational crypto routes (`/test/crypto`,
 # `/demo/crypto`). Default OFF — those routes generate fresh RSA keys
 # and run PBKDF2 per request, so leaving them open in production is a
 # CPU-DoS vector. Set to "1" only in dev or behind a private route.
+#
+# Phase 10: same default-deny pattern for the AI demo (`/chat`,
+# `/api/chat/*`, `/test/ai`). Workers AI is metered; leaving the chat
+# endpoints publicly reachable in production lets anyone burn the
+# account's neuron quota. Default ON in dev (this file ships with "1")
+# but flip to "0" before deploying anywhere with real users.
 [vars]
 HOMURABI_ENABLE_CRYPTO_DEMOS = "0"
+HOMURABI_ENABLE_AI_DEMOS = "1"

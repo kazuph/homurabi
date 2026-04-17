@@ -8,6 +8,76 @@
 
 Live demo: **<https://homurabi.kazu-san.workers.dev>**
 
+---
+
+## Phase 10 hero — Sinatra `/chat` × Workers AI (Gemma 4 + gpt-oss-120b)
+
+A real Sinatra route, hosted on Cloudflare Workers, talking to **Cloudflare
+Workers AI** through the `env.AI` binding — wrapped in a tiny Ruby helper so
+the route reads like any other Sinatra controller. JWT-protected via the
+Phase 8 vendored `ruby-jwt`. Conversation history persists in **Workers KV**.
+
+```ruby
+# app/hello.rb (excerpt)
+CHAT_MODELS = {
+  primary:  '@cf/google/gemma-4-26b-a4b-it',  # Google Gemma 4, 256K ctx, $0.10/$0.30 per Mtok
+  fallback: '@cf/openai/gpt-oss-120b'         # OpenAI gpt-oss-120b, 128K ctx, $0.35/$0.75 per Mtok
+}.freeze
+
+post '/api/chat/messages' do
+  content_type 'application/json'
+  # ... inline JWT verify (see source) ...
+  history = load_chat_history(session_id).__await__
+  result  = Cloudflare::AI.run(
+              model,
+              { messages: build_ai_messages(history, user_text), max_tokens: 1024 },
+              binding: env['cloudflare.AI']
+            ).__await__
+  reply_text = App.extract_ai_text(result).strip
+  save_chat_history(session_id, history + [...]).__await__
+  { 'ok' => true, 'reply' => reply_text, 'model' => model, 'history_len' => ... }.to_json
+end
+```
+
+```text
+# Live capture (wrangler dev → real Workers AI; full log: .artifacts/phase10-ai/api-evidence.txt)
+$ TOKEN=$(curl -s -X POST 'http://127.0.0.1:8788/api/login?alg=HS256' \
+            -H 'content-type: application/json' \
+            -d '{"username":"chat-demo","role":"user"}' | jq -r .access_token)
+
+$ curl -s -X POST 'http://127.0.0.1:8788/api/chat/messages' \
+       -H "authorization: Bearer $TOKEN" \
+       -H 'content-type: application/json' \
+       -d '{"session":"hero","content":"日本語で50字以内で挨拶＋自己紹介",
+            "model":"@cf/google/gemma-4-26b-a4b-it"}' | jq
+{
+  "ok": true,
+  "session": "hero",
+  "model": "@cf/google/gemma-4-26b-a4b-it",
+  "used_fallback": false,
+  "elapsed_ms": 3112,
+  "reply": "こんにちは！homurabiです。Sinatra-on-Cloudflare-Workersのフレンドリーな助手です。",
+  "history_len": 2
+}
+```
+
+| binding | what we use | model |
+|---|---|---|
+| `env.AI` | text generation, OpenAI-compatible chat completions | **`@cf/google/gemma-4-26b-a4b-it`** (primary) · `@cf/openai/gpt-oss-120b` (fallback) |
+| `env.KV` | per-session chat history (`chat:<session>`, capped at 32 messages) | n/a |
+| Phase 8 JWT | inline verify against `Authorization: Bearer …` (HS256 by default) | n/a |
+
+The chat UI lives at `GET /chat` (`views/chat.erb` precompiled by `bin/compile-erb`).
+`POST /api/chat/messages`, `GET /api/chat/messages`, `DELETE /api/chat/messages`
+are JWT-gated. `/test/ai` runs both models against the live Workers AI catalog
+as a "CI on Workers" smoke check; `/test/ai/debug` dumps the raw Workers AI
+response so you can spot model-specific schema drift.
+
+> **Llama-family models intentionally excluded.** Phase 10 ships Gemma 4 +
+> gpt-oss-120b only; see `docs/ROADMAP.md` for the rationale.
+
+---
+
 ```ruby
 # app/hello.rb — literal Sinatra DSL, no Cloudflare imports, no backtick JS.
 require 'sinatra/base'

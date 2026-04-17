@@ -1,0 +1,5 @@
+<%# Single message partial. Rendered server-side on /chat reload. %>
+<article class="chat-msg chat-msg-<%= @msg && @msg['role'] %>">
+  <header class="chat-msg-role"><%= @msg && @msg['role'] %></header>
+  <div class="chat-msg-body"><%= @msg && @msg['content'] %></div>
+</article>

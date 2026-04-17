@@ -400,67 +400,37 @@ require 'tempfile'
 require 'tilt'
 
 module ::SecureRandom
+  # Raised when neither node:crypto.randomBytes nor Web Crypto
+  # getRandomValues is available. We FAIL CLOSED rather than return
+  # predictable bytes — silent degradation would let downstream code
+  # generate predictable session secrets, JWT signing keys, IVs, etc.
+  #
+  # NOTE: extends NotImplementedError on purpose. CRuby's SecureRandom
+  # raises NotImplementedError when no random device is available,
+  # and several gems (most notably Sinatra at line 1988 of base.rb)
+  # rescue NotImplementedError to fall back to Kernel.rand for
+  # module-load-time secrets. Cloudflare Workers blocks ALL random
+  # value generation at module-load (global) scope, so eager
+  # session_secret generation must take that fallback path.
+  # Request-time calls (where entropy is available) still get real
+  # cryptographic randomness; only the module-load case ever falls
+  # back, and Sinatra's session secret is the lone caller that
+  # actually does that gracefully.
+  class EntropyError < ::NotImplementedError; end
+
   def self.random_bytes(n = 16)
     n = n.to_i
     n = 16 if n <= 0
-    # Phase 7: prefer node:crypto.randomBytes (sync, available on
-    # Workers via nodejs_compat AND on Node test runner). Falls back
-    # to Web Crypto getRandomValues (sync) when node:crypto is absent.
-    hex_string = `(function(n) {
-      try {
-        if (typeof globalThis.__nodeCrypto__ !== 'undefined' && globalThis.__nodeCrypto__) {
-          return globalThis.__nodeCrypto__.randomBytes(n).toString('hex');
-        }
-      } catch (e) { /* fall through to Web Crypto */ }
-      try {
-        if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
-          var bytes = new Uint8Array(n);
-          crypto.getRandomValues(bytes);
-          var out = '';
-          for (var i = 0; i < bytes.length; i++) {
-            var h = bytes[i].toString(16);
-            if (h.length < 2) h = '0' + h;
-            out += h;
-          }
-          return out;
-        }
-      } catch (e) {
-        // Workers blocks getRandomValues at global scope; fall through.
-      }
-      return '0'.repeat(n * 2);
-    })(#{n})`
+    hex_string = secure_hex_bytes(n)
+    raise EntropyError, 'no source of cryptographic entropy available (node:crypto AND Web Crypto both unreachable)' if hex_string.nil?
     [hex_string].pack('H*')
-  rescue StandardError
-    ("\0" * n)
   end
 
   def self.hex(n = 16)
     n = n.to_i
     n = 16 if n <= 0
-    # Same source-of-randomness rules as random_bytes.
-    out = `(function(n) {
-      try {
-        if (typeof globalThis.__nodeCrypto__ !== 'undefined' && globalThis.__nodeCrypto__) {
-          return globalThis.__nodeCrypto__.randomBytes(n).toString('hex');
-        }
-      } catch (e) { /* fall through to Web Crypto */ }
-      try {
-        if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
-          var bytes = new Uint8Array(n);
-          crypto.getRandomValues(bytes);
-          var out = '';
-          for (var i = 0; i < bytes.length; i++) {
-            var h = bytes[i].toString(16);
-            if (h.length < 2) h = '0' + h;
-            out += h;
-          }
-          return out;
-        }
-      } catch (e) {
-        // Workers blocks getRandomValues at global scope; fall through.
-      }
-      return '0'.repeat(n * 2);
-    })(#{n})`
+    out = secure_hex_bytes(n)
+    raise EntropyError, 'no source of cryptographic entropy available (node:crypto AND Web Crypto both unreachable)' if out.nil?
     out
   end
 
@@ -472,8 +442,6 @@ module ::SecureRandom
   def self.base64(n = 16)
     require 'base64'
     Base64.strict_encode64(random_bytes(n))
-  rescue StandardError
-    '0' * n
   end
 
   def self.urlsafe_base64(n = 16, padding = false)
@@ -484,6 +452,40 @@ module ::SecureRandom
   def self.random_number(n = 0)
     # Not used at class-init time; real implementations welcome.
     0
+  end
+
+  # Returns a hex string of `n` random bytes, or nil when no entropy
+  # source is available. Tries node:crypto.randomBytes first (works
+  # on both Cloudflare Workers with `nodejs_compat` and Node.js),
+  # falls back to Web Crypto getRandomValues (works at request time
+  # on Workers and everywhere on browsers).
+  def self.secure_hex_bytes(n)
+    # Opal does not always auto-return backtick IIFEs; assign first
+    # so the method's last expression is a normal Ruby reference.
+    result = `(function(n) {
+      try {
+        if (typeof globalThis.__nodeCrypto__ !== 'undefined' && globalThis.__nodeCrypto__) {
+          return globalThis.__nodeCrypto__.randomBytes(n).toString('hex');
+        }
+      } catch (e) { /* fall through to Web Crypto */ }
+      try {
+        if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+          var bytes = new Uint8Array(n);
+          crypto.getRandomValues(bytes);
+          var out = '';
+          for (var i = 0; i < bytes.length; i++) {
+            var h = bytes[i].toString(16);
+            if (h.length < 2) h = '0' + h;
+            out += h;
+          }
+          return out;
+        }
+      } catch (e) {
+        // Workers blocks getRandomValues at module-load scope; fall through.
+      }
+      return nil;   // Opal nil singleton, not JS null — so .nil? works
+    })(#{n})`
+    result
   end
 end
 
@@ -499,21 +501,28 @@ end
 class ::Array
   alias_method :pack_without_homurabi_hex, :pack
 
+  # `H*` consumes the entire hex string. `H<n>` consumes exactly `n`
+  # nibbles (= n/2 bytes, rounded down). Matches CRuby semantics so
+  # `[hex].pack('H4')` yields the first 2 bytes — Copilot caught
+  # this divergence in the initial Phase 7 PR.
   def pack(format)
     fmt = format.to_s
-    if fmt == 'H*' || fmt =~ /\AH\d+\z/
-      hex = self.first.to_s
-      out = ''
-      i = 0
-      max = hex.length - (hex.length % 2)
-      while i < max
-        out = out + hex[i, 2].to_i(16).chr
-        i += 2
-      end
-      out
-    else
-      pack_without_homurabi_hex(format)
+    return pack_without_homurabi_hex(format) unless fmt == 'H*' || fmt =~ /\AH(\d+)\z/
+
+    hex = self.first.to_s
+    nibble_count = if fmt == 'H*'
+                     hex.length
+                   else
+                     [fmt[1..-1].to_i, hex.length].min
+                   end
+    nibble_count -= 1 if nibble_count.odd?  # round down to whole bytes
+    out = ''
+    i = 0
+    while i < nibble_count
+      out = out + hex[i, 2].to_i(16).chr
+      i += 2
     end
+    out
   end
 end
 
@@ -530,23 +539,29 @@ class ::String
   # as exactly one JS char. We therefore iterate by char (`length`)
   # and read each char's UTF-16 code unit as the byte value. This
   # matches CRuby's behavior for ASCII-8BIT encoded strings.
+  #
+  # `H*` produces 2 hex chars per byte. `H<n>` truncates to the first
+  # `n` nibbles (rounded down to whole bytes for an odd `n`).
   def unpack1(format)
     fmt = format.to_s
-    if fmt == 'H*' || fmt =~ /\AH\d+\z/
-      out = ''
-      i = 0
-      n = self.length
-      while i < n
-        b = `(#{self}.charCodeAt(#{i}) & 0xff)`
-        h = b.to_s(16)
-        h = '0' + h if h.length == 1
-        out = out + h
-        i += 1
-      end
-      out
-    else
-      unpack1_without_homurabi_hex(format)
+    return unpack1_without_homurabi_hex(format) unless fmt == 'H*' || fmt =~ /\AH(\d+)\z/
+
+    requested_nibbles = if fmt == 'H*'
+                          self.length * 2
+                        else
+                          fmt[1..-1].to_i
+                        end
+    out = ''
+    i = 0
+    n = self.length
+    while i < n && out.length < requested_nibbles
+      b = `(#{self}.charCodeAt(#{i}) & 0xff)`
+      h = b.to_s(16)
+      h = '0' + h if h.length == 1
+      out = out + h
+      i += 1
     end
+    out[0, requested_nibbles]
   end
 end
 

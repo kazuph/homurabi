@@ -18,8 +18,19 @@ require 'net/http'
 require 'openssl'
 require 'securerandom'
 require 'base64'
+require 'jwt'
+require 'sinatra/jwt_auth'
 
 class App < Sinatra::Base
+  # Phase 8 — JWT auth. The secret is the default HS256 path; asymmetric
+  # algo demos generate their own keys on first use and cache them in
+  # class-level ivars so repeat requests don't pay the 2048-bit RSA
+  # generation cost. The secret is deterministic only for local dev —
+  # in production it should come from a Workers secret (wrangler secret
+  # put JWT_SECRET) pulled via `env['cloudflare.env'].JWT_SECRET`.
+  register Sinatra::JwtAuth
+  set :jwt_secret, 'homurabi-phase8-demo-secret-change-me-in-prod'
+  set :jwt_algorithm, 'HS256'
   # --- Cloudflare binding helpers ------------------------------------
   # These let routes access D1/KV/R2 with the same brevity as
   # ActiveRecord's `User.find(id)` pattern, without introducing an ORM.
@@ -234,6 +245,222 @@ class App < Sinatra::Base
   end
 
   # ------------------------------------------------------------------
+  # Phase 8 — JWT auth demo routes.
+  #
+  # `POST /api/login?alg=HS256|RS256|PS256|ES256|EdDSA` mints a JWT with
+  # the chosen algorithm so ops can confirm every algorithm round-trips
+  # on the Workers runtime with a simple `curl`. Asymmetric keys are
+  # generated once per Worker isolate and cached in class-level ivars.
+  # `GET /api/me` verifies the `Authorization: Bearer ...` header,
+  # auto-detecting the algorithm from the JWT header so the same route
+  # accepts tokens from any `/api/login?alg=...` flavour.
+  # `POST /api/login/refresh` exchanges a refresh-token for a new
+  # access-token. Refresh tokens are opaque random strings persisted in
+  # KV so a stolen access token expires after `JWT_ACCESS_TTL` without
+  # forcing the user to re-authenticate.
+  # ------------------------------------------------------------------
+  JWT_ACCESS_TTL  = 3600          # 1 hour
+  JWT_REFRESH_TTL = 86_400 * 30   # 30 days
+
+  helpers do
+    # Returns the signing key + verification key pair for the given alg.
+    # Keys are lazily generated and cached on the App class so repeat
+    # requests skip the 2048-bit RSA generation.
+    def jwt_keys_for(alg)
+      case alg
+      when 'HS256', 'HS384', 'HS512'
+        [settings.jwt_secret, settings.jwt_secret]
+      when 'RS256', 'RS384', 'RS512', 'PS256', 'PS384', 'PS512'
+        App.class_variable_set(:@@rsa_key, OpenSSL::PKey::RSA.new(2048)) unless App.class_variable_defined?(:@@rsa_key)
+        rsa = App.class_variable_get(:@@rsa_key)
+        [rsa, rsa.public_key]
+      when 'ES256'
+        App.class_variable_set(:@@ec256_key, OpenSSL::PKey::EC.generate('prime256v1')) unless App.class_variable_defined?(:@@ec256_key)
+        ec = App.class_variable_get(:@@ec256_key)
+        [ec, ec]
+      when 'ES384'
+        App.class_variable_set(:@@ec384_key, OpenSSL::PKey::EC.generate('secp384r1')) unless App.class_variable_defined?(:@@ec384_key)
+        ec = App.class_variable_get(:@@ec384_key)
+        [ec, ec]
+      when 'ES512'
+        App.class_variable_set(:@@ec521_key, OpenSSL::PKey::EC.generate('secp521r1')) unless App.class_variable_defined?(:@@ec521_key)
+        ec = App.class_variable_get(:@@ec521_key)
+        [ec, ec]
+      when 'EdDSA', 'ED25519'
+        App.class_variable_set(:@@ed_key, OpenSSL::PKey::Ed25519.generate) unless App.class_variable_defined?(:@@ed_key)
+        ed = App.class_variable_get(:@@ed_key)
+        [ed, ed]
+      else
+        raise ArgumentError, "unsupported alg: #{alg.inspect}"
+      end
+    end
+
+    # Inspect a JWT header without verifying so we can pick the right
+    # verification key. Safe to do because we always re-verify the
+    # signature with the detected alg.
+    def alg_from_token(token)
+      header_seg = token.to_s.split('.').first.to_s
+      padded     = header_seg + ('=' * ((4 - header_seg.length % 4) % 4))
+      json       = Base64.urlsafe_decode64(padded)
+      JSON.parse(json)['alg']
+    rescue StandardError
+      nil
+    end
+  end
+
+  # POST /api/login — issues access + refresh tokens.
+  # Body (JSON): { "username": "..." }
+  # Query: ?alg=HS256|RS256|PS256|ES256|ES384|ES512|EdDSA (default HS256)
+  post '/api/login' do
+    content_type 'application/json'
+    alg = params['alg'] || 'HS256'
+    begin
+      body = JSON.parse(request.body.read)
+    rescue JSON::ParserError, StandardError
+      body = {}
+    end
+    username = body['username'].to_s
+    username = 'demo' if username.empty?
+
+    begin
+      sign_key, _ = jwt_keys_for(alg)
+    rescue ArgumentError => e
+      status 400
+      return { 'error' => e.message }.to_json
+    end
+
+    payload = {
+      'sub'  => username,
+      'role' => body['role'] || 'user',
+      'iat'  => Time.now.to_i,
+      'exp'  => Time.now.to_i + JWT_ACCESS_TTL
+    }
+    access_token = JWT.encode(payload, sign_key, alg).__await__
+
+    # Refresh token: opaque random string. Store in KV keyed by the
+    # token itself with the user info + expiry; opaque-only means a
+    # stolen refresh_token cannot be reversed into user claims.
+    refresh = SecureRandom.urlsafe_base64(48)
+    if kv
+      entry = { 'sub' => username, 'alg' => alg, 'exp' => Time.now.to_i + JWT_REFRESH_TTL }
+      kv.put("refresh:#{refresh}", entry.to_json).__await__
+    end
+
+    status 201
+    {
+      'access_token'  => access_token,
+      'token_type'    => 'Bearer',
+      'expires_in'    => JWT_ACCESS_TTL,
+      'alg'           => alg,
+      'refresh_token' => refresh
+    }.to_json
+  end
+
+  # GET /api/me — verifies Authorization: Bearer ..., returns payload.
+  # Accepts any supported algorithm, detected from the JWT header.
+  get '/api/me' do
+    content_type 'application/json'
+    auth_header = request.env['HTTP_AUTHORIZATION'].to_s
+    parts = auth_header.split(' ', 2)
+    if parts.length != 2 || parts[0].downcase != 'bearer'
+      status 401
+      next { 'error' => 'missing Authorization: Bearer header' }.to_json
+    end
+
+    token = parts[1].strip
+    alg   = alg_from_token(token)
+    if alg.nil? || alg == 'none'
+      status 401
+      next { 'error' => 'unknown or unsafe algorithm' }.to_json
+    end
+
+    begin
+      _, verify_key = jwt_keys_for(alg)
+    rescue ArgumentError => e
+      status 401
+      next { 'error' => e.message }.to_json
+    end
+
+    begin
+      payload, header = JWT.decode(token, verify_key, true, algorithm: alg).__await__
+    rescue JWT::ExpiredSignature
+      status 401
+      next { 'error' => 'token expired' }.to_json
+    rescue JWT::VerificationError
+      status 401
+      next { 'error' => 'signature verification failed' }.to_json
+    rescue JWT::DecodeError => e
+      status 401
+      next({ 'error' => "invalid token: #{e.message}" }.to_json)
+    end
+
+    {
+      'current_user' => payload['sub'],
+      'role'         => payload['role'],
+      'alg'          => header['alg'],
+      'claims'       => payload
+    }.to_json
+  end
+
+  # POST /api/login/refresh — exchange a refresh token for a new access
+  # token. Body: { "refresh_token": "..." }
+  post '/api/login/refresh' do
+    content_type 'application/json'
+    if kv.nil?
+      status 500
+      next { 'error' => 'KV not bound' }.to_json
+    end
+
+    begin
+      body = JSON.parse(request.body.read)
+    rescue JSON::ParserError, StandardError
+      body = {}
+    end
+    refresh = body['refresh_token'].to_s
+    if refresh.empty?
+      status 400
+      next { 'error' => 'refresh_token required' }.to_json
+    end
+
+    raw = kv.get("refresh:#{refresh}").__await__
+    if raw.nil?
+      status 401
+      next { 'error' => 'unknown refresh_token' }.to_json
+    end
+
+    begin
+      entry = JSON.parse(raw)
+    rescue JSON::ParserError
+      status 500
+      next { 'error' => 'corrupt refresh entry' }.to_json
+    end
+
+    if entry['exp'].to_i < Time.now.to_i
+      kv.delete("refresh:#{refresh}").__await__
+      status 401
+      next { 'error' => 'refresh_token expired' }.to_json
+    end
+
+    alg = entry['alg'] || 'HS256'
+    sub = entry['sub']
+    sign_key, _ = jwt_keys_for(alg)
+    payload = {
+      'sub'  => sub,
+      'role' => entry['role'] || 'user',
+      'iat'  => Time.now.to_i,
+      'exp'  => Time.now.to_i + JWT_ACCESS_TTL
+    }
+    access_token = JWT.encode(payload, sign_key, alg).__await__
+
+    {
+      'access_token' => access_token,
+      'token_type'   => 'Bearer',
+      'expires_in'   => JWT_ACCESS_TTL,
+      'alg'          => alg
+    }.to_json
+  end
+
+  # ------------------------------------------------------------------
   # Phase 7 self-test — run every crypto primitive on Workers and
   # report pass/fail per case. Hit this endpoint after deploy as the
   # closest thing to "CI on Workers" — confirms each algo actually
@@ -344,6 +571,87 @@ class App < Sinatra::Base
     }
     run.call('SecureRandom.hex(16) returns 32 hex chars') {
       SecureRandom.hex(16).length == 32
+    }
+
+    # Phase 8 — JWT self-test. Exercises the vendored jwt gem through
+    # every algorithm against the live Workers runtime so we can prove
+    # RS/PS/ES/EdDSA signatures actually verify on the edge, not just
+    # in the Node test harness.
+    jwt_payload = { 'sub' => 'self-test', 'iat' => Time.now.to_i }
+    jwt_secret  = 'phase8-self-test-secret'
+
+    run.call('JWT HS256 encode/decode round-trip') {
+      tok = JWT.encode(jwt_payload, jwt_secret, 'HS256').__await__
+      dec, = JWT.decode(tok, jwt_secret, true, algorithm: 'HS256').__await__
+      dec['sub'] == 'self-test'
+    }
+    run.call('JWT HS256 tampered signature rejected') {
+      tok = JWT.encode(jwt_payload, jwt_secret, 'HS256').__await__
+      parts = tok.split('.')
+      parts[2] = parts[2][0..-2] + (parts[2][-1] == 'A' ? 'B' : 'A')
+      raised = false
+      begin
+        JWT.decode(parts.join('.'), jwt_secret, true, algorithm: 'HS256').__await__
+      rescue JWT::VerificationError
+        raised = true
+      end
+      raised
+    }
+
+    rsa = OpenSSL::PKey::RSA.new(2048)
+    run.call('JWT RS256 encode/decode round-trip') {
+      tok = JWT.encode(jwt_payload, rsa, 'RS256').__await__
+      dec, = JWT.decode(tok, rsa.public_key, true, algorithm: 'RS256').__await__
+      dec['sub'] == 'self-test'
+    }
+    run.call('JWT PS256 encode/decode round-trip') {
+      tok = JWT.encode(jwt_payload, rsa, 'PS256').__await__
+      dec, = JWT.decode(tok, rsa.public_key, true, algorithm: 'PS256').__await__
+      dec['sub'] == 'self-test'
+    }
+    run.call('JWT RS256 tampered signature rejected') {
+      tok = JWT.encode(jwt_payload, rsa, 'RS256').__await__
+      parts = tok.split('.')
+      parts[2] = parts[2][0..-2] + (parts[2][-1] == 'A' ? 'B' : 'A')
+      raised = false
+      begin
+        JWT.decode(parts.join('.'), rsa.public_key, true, algorithm: 'RS256').__await__
+      rescue JWT::VerificationError
+        raised = true
+      end
+      raised
+    }
+
+    ec256 = OpenSSL::PKey::EC.generate('prime256v1')
+    run.call('JWT ES256 encode/decode round-trip') {
+      tok = JWT.encode(jwt_payload, ec256, 'ES256').__await__
+      dec, = JWT.decode(tok, ec256, true, algorithm: 'ES256').__await__
+      dec['sub'] == 'self-test'
+    }
+    ec384 = OpenSSL::PKey::EC.generate('secp384r1')
+    run.call('JWT ES384 encode/decode round-trip') {
+      tok = JWT.encode(jwt_payload, ec384, 'ES384').__await__
+      dec, = JWT.decode(tok, ec384, true, algorithm: 'ES384').__await__
+      dec['sub'] == 'self-test'
+    }
+
+    ed = OpenSSL::PKey::Ed25519.generate
+    run.call('JWT EdDSA encode/decode round-trip') {
+      tok = JWT.encode(jwt_payload, ed, 'EdDSA').__await__
+      dec, = JWT.decode(tok, ed, true, algorithm: 'EdDSA').__await__
+      dec['sub'] == 'self-test'
+    }
+    run.call('JWT EdDSA tampered signature rejected') {
+      tok = JWT.encode(jwt_payload, ed, 'EdDSA').__await__
+      parts = tok.split('.')
+      parts[2] = parts[2][0..-2] + (parts[2][-1] == 'A' ? 'B' : 'A')
+      raised = false
+      begin
+        JWT.decode(parts.join('.'), ed, true, algorithm: 'EdDSA').__await__
+      rescue JWT::VerificationError
+        raised = true
+      end
+      raised
     }
 
     passed = cases.count { |c| c['pass'] }

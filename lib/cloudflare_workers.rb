@@ -642,6 +642,14 @@ end
 # and use Net::HTTP / Cloudflare::HTTP.fetch without an extra require.
 require 'cloudflare_workers/http'
 
+# Phase 9 — Scheduled (Cron Triggers) dispatcher. Installs the JS
+# `globalThis.__HOMURABI_SCHEDULED_DISPATCH__` hook that
+# `src/worker.mjs#scheduled` forwards every cron firing through.
+# Must be loaded after the Cloudflare::* binding wrappers above
+# because it constructs D1Database/KVNamespace/R2Bucket instances
+# inside the dispatcher's per-job env.
+require 'cloudflare_workers/scheduled'
+
 # Phase 10 — Workers AI binding wrapper. Loaded here so any Sinatra
 # route can call Cloudflare::AI.run(...) without an extra require.
 require 'cloudflare_workers/ai'

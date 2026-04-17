@@ -8,6 +8,10 @@
 // Rack::Handler::CloudflareWorkers. We forward every fetch event through
 // it and return whatever JS Response the Ruby Rack app produced.
 
+// Phase 7: expose node:crypto on globalThis BEFORE the Opal bundle
+// loads so Digest / OpenSSL / SecureRandom can use synchronous APIs.
+import "./setup-node-crypto.mjs";
+
 import "../build/hello.no-exit.mjs";
 
 export default {

@@ -15,6 +15,9 @@
 require 'json'
 require 'sinatra/base'
 require 'net/http'
+require 'openssl'
+require 'securerandom'
+require 'base64'
 
 class App < Sinatra::Base
   # --- Cloudflare binding helpers ------------------------------------
@@ -216,6 +219,196 @@ class App < Sinatra::Base
       'ok'      => res.ok?,
       'headers' => { 'content-type' => res['content-type'] },
       'json'    => res.json
+    }.to_json
+  end
+
+  # ------------------------------------------------------------------
+  # Phase 7 self-test — run every crypto primitive on Workers and
+  # report pass/fail per case. Hit this endpoint after deploy as the
+  # closest thing to "CI on Workers" — confirms each algo actually
+  # round-trips on the production runtime, not just on Node test.
+  # ------------------------------------------------------------------
+  get '/test/crypto' do
+    content_type 'application/json'
+    cases = []
+    run = lambda { |label, &blk|
+      result = begin
+        v = blk.call
+        v == false ? { 'pass' => false, 'note' => 'returned false' } : { 'pass' => true }
+      rescue ::Exception => e
+        { 'pass' => false, 'note' => "#{e.class}: #{e.message[0, 200]}" }
+      end
+      cases << result.merge('case' => label)
+    }
+
+    run.call('Digest::SHA256.hexdigest matches CRuby vector') {
+      Digest::SHA256.hexdigest('hello') == '2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824'
+    }
+    run.call('OpenSSL::HMAC SHA256') {
+      OpenSSL::HMAC.hexdigest('SHA256', 'secret', 'hello') == '88aab3ede8d3adf94d26ab90d3bafd4a2083070c3bcce9c014ee04a443847c0b'
+    }
+    run.call('OpenSSL::KDF.pbkdf2_hmac') {
+      d = OpenSSL::KDF.pbkdf2_hmac('password', salt: 'salt-1234', iterations: 4096, length: 32, hash: 'SHA256')
+      d.unpack1('H*') == '2038580f917370fe42b04462a7c26ed17a2e769b44eb6181134243a9dabf0136'
+    }
+    run.call('AES-256-GCM round-trip') {
+      key = SecureRandom.random_bytes(32); iv = SecureRandom.random_bytes(12)
+      e = OpenSSL::Cipher.new('AES-256-GCM').encrypt; e.key = key; e.iv = iv
+      e.update('payload-gcm'); ct = e.final.__await__; tag = e.auth_tag
+      d = OpenSSL::Cipher.new('AES-256-GCM').decrypt; d.key = key; d.iv = iv; d.auth_tag = tag
+      d.update(ct); d.final.__await__ == 'payload-gcm'
+    }
+    run.call('AES-256-CTR streaming') {
+      key = SecureRandom.random_bytes(32); iv = SecureRandom.random_bytes(16)
+      plain = 'streaming-' * 30
+      e = OpenSSL::Cipher.new('AES-256-CTR').encrypt; e.key = key; e.iv = iv
+      ct = ''
+      i = 0
+      while i < plain.length
+        ct = ct + e.update(plain[i, 13]).__await__; i += 13
+      end
+      ct = ct + e.final.__await__
+      d = OpenSSL::Cipher.new('AES-256-CTR').decrypt; d.key = key; d.iv = iv
+      d.update(ct).__await__ + d.final.__await__ == plain
+    }
+    run.call('AES-128-CBC round-trip') {
+      key = SecureRandom.random_bytes(16); iv = SecureRandom.random_bytes(16)
+      e = OpenSSL::Cipher.new('AES-128-CBC').encrypt; e.key = key; e.iv = iv
+      e.update('cbc-test'); ct = e.final.__await__
+      d = OpenSSL::Cipher.new('AES-128-CBC').decrypt; d.key = key; d.iv = iv
+      d.update(ct); d.final.__await__ == 'cbc-test'
+    }
+    run.call('RSA RS256 sign/verify') {
+      r = OpenSSL::PKey::RSA.new(2048)
+      sig = r.sign(OpenSSL::Digest::SHA256.new, 'rs256').__await__
+      r.public_key.verify(OpenSSL::Digest::SHA256.new, sig, 'rs256').__await__
+    }
+    run.call('RSA PS256 sign/verify') {
+      r = OpenSSL::PKey::RSA.new(2048)
+      sig = r.sign_pss('SHA256', 'ps256', salt_length: :digest, mgf1_hash: 'SHA256').__await__
+      r.public_key.verify_pss('SHA256', sig, 'ps256', salt_length: :digest, mgf1_hash: 'SHA256').__await__
+    }
+    run.call('RSA OAEP encrypt/decrypt') {
+      r = OpenSSL::PKey::RSA.new(2048)
+      ct = r.public_key.public_encrypt('oaep-payload').__await__
+      r.private_decrypt(ct).__await__ == 'oaep-payload'
+    }
+    run.call('ECDSA ES256 (DER) sign/verify') {
+      ec = OpenSSL::PKey::EC.generate('prime256v1')
+      sig = ec.sign(OpenSSL::Digest::SHA256.new, 'es256').__await__
+      sig.bytes[0] == 0x30 && ec.verify(OpenSSL::Digest::SHA256.new, sig, 'es256').__await__
+    }
+    run.call('ECDSA ES384 sign/verify') {
+      ec = OpenSSL::PKey::EC.generate('secp384r1')
+      sig = ec.sign(OpenSSL::Digest::SHA384.new, 'es384').__await__
+      ec.verify(OpenSSL::Digest::SHA384.new, sig, 'es384').__await__
+    }
+    run.call('ECDSA ES512 sign/verify') {
+      ec = OpenSSL::PKey::EC.generate('secp521r1')
+      sig = ec.sign(OpenSSL::Digest::SHA512.new, 'es512').__await__
+      ec.verify(OpenSSL::Digest::SHA512.new, sig, 'es512').__await__
+    }
+    run.call('ECDH P-256 agreement') {
+      a = OpenSSL::PKey::EC.generate('prime256v1')
+      b = OpenSSL::PKey::EC.generate('prime256v1')
+      a.dh_compute_key(b).__await__ == b.dh_compute_key(a).__await__
+    }
+    run.call('Ed25519 sign/verify (EdDSA)') {
+      ed = OpenSSL::PKey::Ed25519.generate
+      sig = ed.sign(nil, 'eddsa').__await__
+      ed.verify(nil, sig, 'eddsa').__await__
+    }
+    run.call('X25519 key agreement') {
+      a = OpenSSL::PKey::X25519.generate
+      b = OpenSSL::PKey::X25519.generate
+      a.dh_compute_key(b).__await__ == b.dh_compute_key(a).__await__
+    }
+    run.call('OpenSSL::BN arithmetic') {
+      (OpenSSL::BN.new(123) + OpenSSL::BN.new(456)).to_s == '579' &&
+        OpenSSL::BN.new(3).mod_exp(5, 13).to_s == '9'
+    }
+    run.call('SecureRandom.hex(16) returns 32 hex chars') {
+      SecureRandom.hex(16).length == 32
+    }
+
+    passed = cases.count { |c| c['pass'] }
+    failed = cases.size - passed
+    {
+      'passed' => passed,
+      'failed' => failed,
+      'total'  => cases.size,
+      'cases'  => cases
+    }.to_json
+  end
+
+  # ------------------------------------------------------------------
+  # Phase 7 demo — Digest / HMAC / Cipher / RSA sign / EC sign /
+  # KDF / SecureRandom in one JSON dump. Proves that an unmodified
+  # jwt-style Ruby program can do every cryptographic primitive at
+  # the edge.
+  # ------------------------------------------------------------------
+  get '/demo/crypto' do
+    content_type 'application/json'
+
+    # 1) Digest one-shots
+    sha256 = Digest::SHA256.hexdigest('hello, edge')
+    sha512 = Digest::SHA512.hexdigest('hello, edge')
+
+    # 2) HMAC (JWT HS256 signing input shape)
+    hmac_hex = OpenSSL::HMAC.hexdigest('SHA256', 'super-secret', 'hello, edge')
+
+    # 3) AES-256-GCM round-trip with random key/iv (Web Crypto subtle async)
+    key   = SecureRandom.random_bytes(32)
+    iv    = SecureRandom.random_bytes(12)
+    plain = 'phase 7 cipher payload'
+    enc = OpenSSL::Cipher.new('AES-256-GCM').encrypt
+    enc.key = key; enc.iv = iv
+    enc.update(plain)
+    ct  = enc.final.__await__
+    tag = enc.auth_tag
+    dec = OpenSSL::Cipher.new('AES-256-GCM').decrypt
+    dec.key = key; dec.iv = iv; dec.auth_tag = tag
+    dec.update(ct)
+    recovered = dec.final.__await__
+
+    # 4) RSA sign + verify (Web Crypto subtle async)
+    rsa = OpenSSL::PKey::RSA.new(2048)
+    msg = 'phase 7 rsa payload'
+    sig = rsa.sign(OpenSSL::Digest::SHA256.new, msg).__await__
+    rsa_ok = rsa.public_key.verify(OpenSSL::Digest::SHA256.new, sig, msg).__await__
+
+    # 5) PBKDF2 derived key
+    derived = OpenSSL::KDF.pbkdf2_hmac(
+      'p@ssw0rd', salt: 'phase7-salt', iterations: 4096, length: 32, hash: 'SHA256'
+    )
+
+    # 6) Hand-rolled HS256 JWT (proof Phase 8 jwt gem will work)
+    header  = { 'alg' => 'HS256', 'typ' => 'JWT' }
+    payload = { 'sub' => 'demo', 'iat' => Time.now.to_i }
+    enc_b64 = lambda { |obj| Base64.urlsafe_encode64(obj.to_json).delete('=') }
+    signing_input = enc_b64.call(header) + '.' + enc_b64.call(payload)
+    sig_bin = OpenSSL::HMAC.digest('SHA256', 'jwt-secret', signing_input)
+    token   = signing_input + '.' + Base64.urlsafe_encode64(sig_bin).delete('=')
+
+    {
+      'demo'              => 'Phase 7 — node:crypto-backed Ruby crypto',
+      'sha256_hello_edge' => sha256,
+      'sha512_hello_edge' => sha512,
+      'hmac_sha256_hex'   => hmac_hex,
+      'aes_gcm_round_trip' => {
+        'plain'     => plain,
+        'recovered' => recovered,
+        'match'     => recovered == plain,
+        'tag_b64'   => Base64.strict_encode64(tag)
+      },
+      'rsa_sign_verify'   => { 'ok' => rsa_ok, 'sig_len_bytes' => sig.bytesize },
+      'pbkdf2_sha256_hex' => derived.unpack1('H*'),
+      'jwt_hs256'         => token,
+      'secure_random'     => {
+        'hex'             => SecureRandom.hex(16),
+        'urlsafe_base64'  => SecureRandom.urlsafe_base64(24),
+        'uuid'            => SecureRandom.uuid
+      }
     }.to_json
   end
 end

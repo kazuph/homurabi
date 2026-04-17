@@ -889,6 +889,505 @@ class App < Sinatra::Base
     result = App.dispatch_scheduled(event, env['cloudflare.env'], env['cloudflare.ctx']).__await__
     result.merge('cron' => cron, 'registered_crons' => App.scheduled_jobs.map(&:cron)).to_json
   end
+
+  # ------------------------------------------------------------------
+  # Phase 10 — Workers AI chat demo.
+  #
+  # Sinatra routes call Cloudflare::AI.run(model, inputs, binding: ai)
+  # to invoke a Workers AI model. The chat UI lives at GET /chat,
+  # API endpoints under /api/chat/*.
+  #
+  # Models are pinned at the top of the chat block so swapping the
+  # primary or adding more fallbacks is one constant edit. Llama-family
+  # models are intentionally excluded per Phase 10 master directive.
+  # ------------------------------------------------------------------
+  CHAT_MODELS = {
+    primary:  '@cf/google/gemma-4-26b-a4b-it',
+    fallback: '@cf/openai/gpt-oss-120b'
+  }.freeze
+  CHAT_HISTORY_LIMIT = 32       # last N messages kept in KV per session
+  CHAT_HISTORY_TTL   = 86_400 * 7  # 1 week
+  CHAT_SYSTEM_PROMPT = 'You are homurabi, a friendly Sinatra-on-Cloudflare-Workers assistant. Reply concisely. If the user writes Japanese, reply in Japanese. If the user writes English, reply in English.'
+
+  # Workers AI returns one of two response shapes depending on the model:
+  # 1. legacy `{ response: "..." }`            (e.g. older llama, mistral)
+  # 2. OpenAI-style `{ choices: [{ message: { content: "..." } }] }`
+  #    (Gemma 4, gpt-oss-* and any other "chat completions"-shaped model)
+  # Helper that tolerates both so the route doesn't have to branch.
+  def self.extract_ai_text(out)
+    return out.to_s unless out.is_a?(Hash)
+    # OpenAI-style choices[].message.content
+    if out['choices'].is_a?(Array) && !out['choices'].empty?
+      msg = out['choices'][0].is_a?(Hash) ? out['choices'][0]['message'] : nil
+      if msg.is_a?(Hash)
+        c = msg['content']
+        return c.to_s if c.is_a?(String) && !c.empty?
+        # Some models put the visible answer in `reasoning` when the
+        # response is truncated by max_tokens. Surface it as a fallback
+        # so the user still sees something useful.
+        r = msg['reasoning']
+        return r.to_s if r.is_a?(String) && !r.empty?
+      end
+    end
+    # Legacy `{ response: "..." }` / generic fallbacks.
+    %w[response result output text].each do |k|
+      v = out[k]
+      return v.to_s if v.is_a?(String) && !v.empty?
+    end
+    ''
+  end
+
+  helpers do
+    def ai_demos_enabled?
+      cf_env = env['cloudflare.env']
+      return false unless cf_env
+      val = `(#{cf_env} && #{cf_env}.HOMURABI_ENABLE_AI_DEMOS) || ''`
+      val.to_s == '1'
+    end
+
+    def ai_binding
+      env['cloudflare.AI']
+    end
+
+    # JS-aware "is the binding present?" — env.AI is a raw JS object
+    # without a Ruby `.nil?` method, so `binding.nil?` would explode at
+    # runtime. This helper checks the JS-level null/undefined directly.
+    def ai_binding?
+      v = env['cloudflare.AI']
+      `(#{v} != null)`
+    end
+
+    # JSON body parse with a graceful default.
+    def parse_json_body
+      raw = request.body.read.to_s
+      return {} if raw.empty?
+      JSON.parse(raw)
+    rescue JSON::ParserError, StandardError
+      {}
+    end
+
+    # Allow only `[A-Za-z0-9_-]{1,64}` for session ids so a crafted
+    # `?session=` cannot inject HTML when echoed back to /chat, cannot
+    # generate exotic KV key names (which would also escape `chat:` and
+    # collide with other namespaces), and cannot create unbounded
+    # per-user key cardinality. Falls back to `'demo'` on rejection.
+    SESSION_ID_RE = /\A[A-Za-z0-9_-]{1,64}\z/.freeze
+
+    def normalize_session_id(raw)
+      s = raw.to_s
+      return 'demo' if s.empty?
+      SESSION_ID_RE.match?(s) ? s : 'demo'
+    end
+
+    def chat_kv_key(session_id)
+      "chat:#{session_id}"
+    end
+
+    # Returns the array of {role, content} message Hashes for a session,
+    # or [] if KV has nothing (or no KV is bound).
+    def load_chat_history(session_id)
+      return [] unless kv
+      raw = kv.get(chat_kv_key(session_id)).__await__
+      return [] if raw.nil? || raw.empty?
+      arr = JSON.parse(raw)
+      arr.is_a?(Array) ? arr : []
+    rescue JSON::ParserError
+      []
+    end
+
+    def save_chat_history(session_id, history)
+      return unless kv
+      trimmed = history.last(CHAT_HISTORY_LIMIT)
+      # Pass CHAT_HISTORY_TTL through so KV expires the entry
+      # automatically and the namespace doesn't accumulate dead
+      # sessions forever (the constant was previously documented but
+      # unused — Copilot review #5).
+      kv.put(chat_kv_key(session_id), trimmed.to_json, expiration_ttl: CHAT_HISTORY_TTL).__await__
+    end
+
+    def clear_chat_history(session_id)
+      return unless kv
+      kv.delete(chat_kv_key(session_id)).__await__
+    end
+
+    # Convert chat history to the messages array Workers AI expects.
+    # Always prepends a system prompt so the model has consistent persona.
+    def build_ai_messages(history, latest_user_text)
+      msgs = [{ 'role' => 'system', 'content' => CHAT_SYSTEM_PROMPT }]
+      history.each { |m| msgs << { 'role' => m['role'], 'content' => m['content'] } }
+      msgs << { 'role' => 'user', 'content' => latest_user_text }
+      msgs
+    end
+
+    # Both gates return either nil (= keep going) or a `[status, body]`
+    # tuple that the caller hands back via `next`. We deliberately do
+    # NOT use `halt` because the chat routes are `# await: true` async
+    # blocks; `halt` is implemented as `throw :halt`, and the throw
+    # escapes Sinatra's synchronous `catch :halt` wrapper through the
+    # async/await boundary (Copilot review #8/#9). Same root cause as
+    # the JWT auth helper rewrite.
+    def ai_demos_block_or_nil
+      return nil if ai_demos_enabled?
+      [404, { 'error' => 'AI demos disabled (set HOMURABI_ENABLE_AI_DEMOS=1 in wrangler vars)' }.to_json]
+    end
+
+    def ai_binding_block_or_nil
+      return nil if ai_binding?
+      [503, { 'error' => 'AI binding not configured (wrangler.toml [ai] block missing or wrangler version too old)' }.to_json]
+    end
+
+    # Inline JWT verification tailored for the chat routes.
+    #
+    # Sinatra's `Sinatra::JwtAuth#authenticate!` helper relies on `halt`,
+    # which is implemented via `throw :halt`. When the helper itself is
+    # `# await: true` (because JWT.decode awaits Web Crypto subtle), the
+    # `throw` escapes the async boundary before Sinatra's
+    # `catch :halt do ... end` wrapper can see it, and the route crashes
+    # with `UncaughtThrowError: "halt"`. Same root cause as the
+    # `each: undefined method for PromiseV2` issue — async Sinatra needs
+    # values, not control-flow exceptions, across the await boundary.
+    #
+    # `chat_verify_token!` returns either:
+    #   - a Hash with `{ ok: true, payload: <decoded> }` on success, or
+    #   - a Hash with `{ ok: false, status: 401, body: <json> }` on
+    #     failure (so the route can `next body` after a status set).
+    # The route is responsible for halting / returning early.
+    def chat_verify_token!
+      header = request.env['HTTP_AUTHORIZATION'].to_s
+      parts = header.split(' ', 2)
+      if parts.length != 2 || parts[0].downcase != 'bearer'
+        return { 'ok' => false, 'status' => 401,
+                 'body' => { 'error' => 'unauthorized', 'reason' => 'missing bearer token' }.to_json }
+      end
+      token = parts[1].strip
+      if token.empty?
+        return { 'ok' => false, 'status' => 401,
+                 'body' => { 'error' => 'unauthorized', 'reason' => 'missing bearer token' }.to_json }
+      end
+      verify_key = settings.jwt_secret
+      algorithm  = settings.jwt_algorithm
+      reason = nil
+      decoded = begin
+        JWT.decode(token, verify_key, true, algorithm: algorithm).__await__
+      rescue JWT::ExpiredSignature
+        reason = 'token expired'
+        nil
+      rescue JWT::VerificationError
+        reason = 'signature verification failed'
+        nil
+      rescue JWT::IncorrectAlgorithm
+        reason = 'algorithm mismatch'
+        nil
+      rescue JWT::DecodeError => e
+        reason = "invalid token: #{e.message}"
+        nil
+      rescue StandardError => e
+        reason = "auth error: #{e.message}"
+        nil
+      end
+      if decoded.nil?
+        return { 'ok' => false, 'status' => 401,
+                 'body' => { 'error' => 'unauthorized', 'reason' => reason || 'token verification failed' }.to_json }
+      end
+      payload, _header = decoded
+      @jwt_payload = payload
+      { 'ok' => true, 'payload' => payload }
+    end
+  end
+
+  # GET /chat — chat UI page. JWT-gated for API calls (the page itself
+  # is open so the user can mint a token from inside it).
+  get '/chat' do
+    @title = 'homurabi /chat — Workers AI'
+    @primary_model  = CHAT_MODELS[:primary]
+    @fallback_model = CHAT_MODELS[:fallback]
+    @session_id = normalize_session_id(params['session'])
+    @history = ai_demos_enabled? ? load_chat_history(@session_id).__await__ : []
+    @content = erb :chat
+    erb :layout
+  end
+
+  # GET /api/chat/health — lightweight binding check; no AI call.
+  get '/api/chat/health' do
+    content_type 'application/json'
+    {
+      'ok'             => true,
+      'demos_enabled'  => ai_demos_enabled?,
+      'ai_bound'       => ai_binding?,
+      'kv_bound'       => !kv.nil?,
+      'primary_model'  => CHAT_MODELS[:primary],
+      'fallback_model' => CHAT_MODELS[:fallback]
+    }.to_json
+  end
+
+  # POST /api/chat/messages — append a user message, call Workers AI,
+  # persist the round-trip in KV, and return the assistant reply.
+  # Body: { "session": "...", "content": "...", "model": "@cf/.../...?" }
+  post '/api/chat/messages' do
+    content_type 'application/json'
+    gate = ai_demos_block_or_nil
+    next gate if gate
+    # Inline JWT verification — early-exit with explicit `status` and
+    # `next` (the same pattern Phase 8's /api/me uses successfully).
+    # We deliberately do NOT call `Sinatra::JwtAuth#authenticate!`
+    # because that helper uses `halt` which throws past Opal's async
+    # boundary (Sinatra's `catch :halt` cannot see a JS Promise
+    # rejection). And we keep the token decode outside any helper so
+    # the `status N` call sits in the same `dispatch!` frame as the
+    # `next` — pulling it into a helper made the response leak out
+    # as 200 in earlier iterations.
+    auth_header = request.env['HTTP_AUTHORIZATION'].to_s
+    parts = auth_header.split(' ', 2)
+    if parts.length != 2 || parts[0].downcase != 'bearer'
+      status 401
+      next({ 'error' => 'unauthorized', 'reason' => 'missing bearer token' }.to_json)
+    end
+    auth_token = parts[1].strip
+    if auth_token.empty?
+      status 401
+      next({ 'error' => 'unauthorized', 'reason' => 'missing bearer token' }.to_json)
+    end
+    # JWT verify (post-await). Setting `status N` after the await would
+    # not take effect because Sinatra's `invoke` snapshots
+    # `response.status` synchronously when it sees a Promise body, so
+    # any mutation that happens later than that snapshot is lost. We
+    # work around it by returning `[status, body]` from the route — the
+    # homurabi patch in `build_js_response` detects that single-chunk
+    # shape and uses the embedded status when constructing the JS
+    # Response.
+    decode_err = `(async function(){
+      try {
+        await #{JWT.decode(auth_token, settings.jwt_secret, true, algorithm: settings.jwt_algorithm)};
+        return null;
+      } catch (e) {
+        var msg = (e && e.$message) ? e.$message() : (e && e.message) ? e.message : String(e);
+        return 'invalid token: ' + String(msg);
+      }
+    })()`.__await__
+    is_failure = `(#{decode_err} != null && #{decode_err} !== undefined)`
+    if is_failure
+      err_msg = decode_err.to_s
+      next [401, { 'error' => 'unauthorized', 'reason' => err_msg }.to_json]
+    end
+    bgate = ai_binding_block_or_nil
+    next bgate if bgate
+
+    body = parse_json_body
+    session_id = normalize_session_id(body['session'])
+    user_text  = body['content'].to_s
+    if user_text.strip.empty?
+      status 400
+      next({ 'error' => 'content required' }.to_json)
+    end
+
+    requested_model = body['model'].to_s
+    primary  = CHAT_MODELS[:primary]
+    fallback = CHAT_MODELS[:fallback]
+    # Allow either of the two configured models. Anything else is
+    # rejected so a client can't run up neuron costs on arbitrary models.
+    model = if requested_model == primary || requested_model == fallback
+              requested_model
+            else
+              primary
+            end
+
+    # Helper methods that internally call `__await__` on a binding
+    # (KV / D1 / AI) compile to async JS functions, so each helper
+    # call must be `__await__`'d at the call site to unwrap the
+    # returned Promise. Without the explicit await, `history` would
+    # be a PromiseV2 and downstream `JSON.parse` / Array iteration
+    # would crash with "undefined method `each` for PromiseV2".
+    history = load_chat_history(session_id).__await__
+    messages = build_ai_messages(history, user_text)
+
+    started_at = Time.now.to_f
+    used_model = model
+    used_fallback = false
+    reply_text = nil
+    ai_error  = nil
+
+    begin
+      result = Cloudflare::AI.run(
+        model,
+        # max_tokens raised to 1024 because OpenAI-style models (Gemma 4,
+        # gpt-oss-*) report `finish_reason: "length"` and surface the
+        # visible answer in `message.reasoning` instead of `content` when
+        # truncated. 1024 is generous enough for most chat replies and
+        # still well under Workers' 30s wall-time budget.
+        { messages: messages, max_tokens: 1024 },
+        binding: ai_binding
+      ).__await__
+      reply_text = App.extract_ai_text(result).strip
+      raise Cloudflare::AIError.new('empty response', model: model) if reply_text.empty?
+    rescue Cloudflare::AIError => e
+      ai_error = e
+    end
+
+    # Fallback: if the primary model fails or returns empty, retry with
+    # the secondary model exactly once before surfacing an error.
+    if reply_text.nil? || reply_text.empty?
+      used_fallback = true
+      used_model = (model == primary) ? fallback : primary
+      begin
+        result = Cloudflare::AI.run(
+          used_model,
+          { messages: messages, max_tokens: 1024 },
+          binding: ai_binding
+        ).__await__
+        reply_text = App.extract_ai_text(result).strip
+      rescue Cloudflare::AIError => e
+        status 502
+        next({ 'error' => 'workers AI call failed', 'detail' => e.message, 'fallback_error' => true }.to_json)
+      end
+      if reply_text.nil? || reply_text.empty?
+        status 502
+        next({ 'error' => 'workers AI returned empty response on both primary and fallback' }.to_json)
+      end
+    end
+
+    elapsed_ms = ((Time.now.to_f - started_at) * 1000).to_i
+    new_history = history + [
+      { 'role' => 'user',      'content' => user_text },
+      { 'role' => 'assistant', 'content' => reply_text }
+    ]
+    save_chat_history(session_id, new_history).__await__
+
+    {
+      'ok'           => true,
+      'session'      => session_id,
+      'model'        => used_model,
+      'used_fallback'=> used_fallback,
+      'elapsed_ms'   => elapsed_ms,
+      'reply'        => reply_text,
+      'history_len'  => new_history.size
+    }.to_json
+  end
+
+  # GET /api/chat/messages — return the persisted history for a session.
+  get '/api/chat/messages' do
+    content_type 'application/json'
+    gate = ai_demos_block_or_nil
+    next gate if gate
+    auth = chat_verify_token!.__await__
+    if auth['ok'] != true
+      # See the long comment in POST /api/chat/messages for why we
+      # return [status, body] instead of using `status N; next body`
+      # — Sinatra snapshots response.status before the await resolves,
+      # so any later mutation is lost.
+      next [auth['status'].to_i, auth['body']]
+    end
+    session_id = normalize_session_id(params['session'])
+    {
+      'session' => session_id,
+      'history' => load_chat_history(session_id).__await__
+    }.to_json
+  end
+
+  # DELETE /api/chat/messages?session=... — wipe history for a session.
+  delete '/api/chat/messages' do
+    content_type 'application/json'
+    gate = ai_demos_block_or_nil
+    next gate if gate
+    auth = chat_verify_token!.__await__
+    if auth['ok'] != true
+      # See the long comment in POST /api/chat/messages for why we
+      # return [status, body] instead of using `status N; next body`
+      # — Sinatra snapshots response.status before the await resolves,
+      # so any later mutation is lost.
+      next [auth['status'].to_i, auth['body']]
+    end
+    session_id = normalize_session_id(params['session'])
+    clear_chat_history(session_id).__await__
+    { 'ok' => true, 'session' => session_id, 'cleared' => true }.to_json
+  end
+
+  # GET /test/ai/debug — dump the raw AI binding response so we can see
+  # what shape Workers AI actually returns. Useful when adding support
+  # for a new model whose `extract_ai_text` mapping isn't obvious.
+  get '/test/ai/debug' do
+    content_type 'application/json'
+    unless ai_demos_enabled? && ai_binding?
+      status 404
+      next({ 'error' => 'disabled' }.to_json)
+    end
+    model = params['model'] || CHAT_MODELS[:primary]
+    out = Cloudflare::AI.run(
+      model,
+      { messages: [
+        { role: 'system', content: 'reply with a short Japanese greeting' },
+        { role: 'user',   content: 'こんにちは' }
+      ], max_tokens: 64 },
+      binding: ai_binding
+    ).__await__
+    {
+      'model'    => model,
+      'class'    => out.class.to_s,
+      'is_hash'  => out.is_a?(Hash),
+      'keys'     => out.is_a?(Hash) ? out.keys : nil,
+      'extracted'=> App.extract_ai_text(out),
+      'raw'      => out
+    }.to_json
+  end
+
+  # GET /test/ai — Workers self-test for the AI binding. Exercises the
+  # primary model with a trivial prompt and reports pass/fail. Gated
+  # behind the same HOMURABI_ENABLE_AI_DEMOS flag so it can't be hit
+  # accidentally in production.
+  get '/test/ai' do
+    content_type 'application/json'
+    unless ai_demos_enabled?
+      status 404
+      next({ 'error' => 'AI demos disabled (set HOMURABI_ENABLE_AI_DEMOS=1)' }.to_json)
+    end
+    unless ai_binding?
+      status 503
+      next({ 'error' => 'AI binding not bound (wrangler.toml [ai] block missing)' }.to_json)
+    end
+
+    cases = []
+    primary  = CHAT_MODELS[:primary]
+    fallback = CHAT_MODELS[:fallback]
+
+    # NOTE: blocks-with-`__await__` compile to async functions in Opal
+    # under `# await: true`. Iterators like `Array#each_with_index`
+    # don't await each step, so any work the block kicks off races
+    # against the JSON serialisation below — the route would return
+    # `{cases: []}` before the AI call even finished. Inline a manual
+    # loop where each step is followed by an explicit `__await__`.
+
+    test_one = lambda { |model, label|
+      result = begin
+        out = Cloudflare::AI.run(model,
+          { messages: [
+            { role: 'system', content: 'reply with the single word READY' },
+            { role: 'user',   content: 'ping' }
+          ], max_tokens: 64 },
+          binding: ai_binding
+        ).__await__
+        txt = App.extract_ai_text(out).strip
+        if txt.empty?
+          { 'pass' => false, 'note' => 'empty response from model' }
+        else
+          { 'pass' => true, 'note' => txt[0, 200] }
+        end
+      rescue ::Exception => e
+        { 'pass' => false, 'note' => "#{e.class}: #{e.message[0, 200]}" }
+      end
+      result.merge('case' => label)
+    }
+
+    cases << test_one.call(primary,  "primary model #{primary} responds").__await__
+    cases << test_one.call(fallback, "fallback model #{fallback} responds").__await__
+
+    passed = cases.count { |c| c['pass'] }
+    failed = cases.size - passed
+    {
+      'passed' => passed,
+      'failed' => failed,
+      'total'  => cases.size,
+      'cases'  => cases
+    }.to_json
+  end
 end
 
 run App

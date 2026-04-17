@@ -45,11 +45,18 @@ HOMURABI_ENABLE_SCHEDULED_DEMOS = "0"
 # The schedules below mirror the demo `schedule` blocks in
 # `app/hello.rb`. Edit / extend in tandem when adding new jobs.
 #
+# Production safety: the demo schedule *bodies* in app/hello.rb
+# short-circuit to a no-op unless `HOMURABI_ENABLE_SCHEDULED_DEMOS`
+# is set to "1" (default-deny via the `[vars]` block above). Cron
+# firings still happen on every deploy — they just don't write to
+# D1 / KV unless the gate is open. To stop the firings entirely in
+# production, comment out / remove the `crons` entries below.
+#
 # To trigger manually in local dev:
 #   npx wrangler dev --test-scheduled
 #   curl 'http://127.0.0.1:8787/__scheduled?cron=*/5+*+*+*+*'
 [triggers]
 crons = [
-  "*/5 * * * *",   # heartbeat — writes a row to D1 every 5 minutes
-  "0 */1 * * *",   # hourly housekeeping — KV cleanup demo
+  "*/5 * * * *",   # heartbeat — writes a row to D1 every 5 minutes (gated)
+  "0 */1 * * *",   # hourly housekeeping — KV counter demo (gated)
 ]

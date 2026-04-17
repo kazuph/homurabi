@@ -965,6 +965,208 @@ $ npm run test:scheduled
 29 tests, 29 passed, 0 failed
 ```
 
+## Cloudflare native bindings (Phase 11B)
+
+Phase 11B adds **three Cloudflare-native Worker bindings** on top of the
+Phase 3 D1/KV/R2 foundation — always the same "the wrapper IS the API"
+shape that turns a JS binding into a plain Ruby object:
+
+| Binding | Ruby API | Demo route | Self-test |
+|---|---|---|---|
+| **Durable Objects** | `Cloudflare::DurableObjectNamespace` / `Stub` / `Storage` + `Cloudflare::DurableObject.define` handler DSL | `GET /demo/do?name=...&action=inc\|peek\|reset` | `GET /test/bindings` |
+| **Cache API** | `Cloudflare::Cache.default` / `.match` / `.put` / `.delete` + Sinatra `cache_get(key, ttl:) { block }` helper | `GET /demo/cache/heavy?v=...` | `GET /test/bindings` |
+| **Queues** | `Cloudflare::Queue#send` / `#send_batch` + `consume_queue 'q' do \|batch\| ... end` DSL | `POST /api/enqueue` + `GET /demo/queue/status` | `GET /test/bindings` |
+
+Default deny like every other homurabi demo — all four routes above are
+gated behind `HOMURABI_ENABLE_BINDING_DEMOS=1` (wrangler `[vars]` entry).
+
+### Durable Objects
+
+One generic JS class `HomurabiCounterDO` is exported from
+`src/worker.mjs`; it forwards every `fetch(req)` call to a Ruby handler
+registered with `Cloudflare::DurableObject.define`. Storage is serialised
+to JSON on write, parsed back on read — Ruby code never touches JS.
+
+```ruby
+# app/hello.rb (excerpt) — the whole DO class lives in Ruby.
+Cloudflare::DurableObject.define('HomurabiCounterDO') do |state, request|
+  prev = (state.storage.get('count').__await__ || 0).to_i
+  if request.path.end_with?('/inc')
+    state.storage.put('count', prev + 1).__await__
+    [200, { 'content-type' => 'application/json' },
+     { 'count' => prev + 1, 'do_id' => state.id }.to_json]
+  elsif request.path.end_with?('/reset')
+    state.storage.delete('count').__await__
+    [200, {}, '{"reset":true}']
+  else
+    [200, {}, { 'count' => prev }.to_json]
+  end
+end
+
+get '/demo/do' do
+  stub = env['cloudflare.DO_COUNTER'].get_by_name(params['name'] || 'global')
+  res  = stub.fetch("https://homurabi-do.internal/#{params['action']}", method: 'POST').__await__
+  res.body
+end
+```
+
+`wrangler.toml`:
+
+```toml
+[[durable_objects.bindings]]
+name       = "COUNTER"
+class_name = "HomurabiCounterDO"
+
+[[migrations]]
+tag              = "v1"
+new_sqlite_classes = ["HomurabiCounterDO"]
+```
+
+Live evidence (`wrangler dev --local` + `HOMURABI_ENABLE_BINDING_DEMOS=1`):
+
+```text
+$ curl 'http://127.0.0.1:8787/demo/do?name=evidence&action=inc'   # ×4
+{"count":1,"do_id":"2ce054..."}
+{"count":2,"do_id":"2ce054..."}
+{"count":3,"do_id":"2ce054..."}
+{"count":4,"do_id":"2ce054..."}
+$ curl 'http://127.0.0.1:8787/demo/do?name=evidence&action=peek'
+{"count":4,"do_id":"2ce054..."}
+```
+
+### Cache API
+
+```ruby
+# app/hello.rb
+get '/demo/cache/heavy' do
+  content_type 'application/json'
+  cache_get(request.url, ttl: 60) do
+    # expensive PBKDF2 (50_000 iterations) — only runs on MISS
+    derived = OpenSSL::KDF.pbkdf2_hmac('homurabi-phase11b',
+                salt: SecureRandom.random_bytes(16),
+                iterations: 50_000, length: 32, hash: 'SHA256')
+    { 'derived_hex' => derived.unpack1('H*'), 'computed_at' => Time.now.to_i }.to_json
+  end.__await__   # cache_get is async — route must await
+end
+```
+
+```text
+# first hit — MISS, 6ms
+{"derived_hex":"6ac25e...","cache":"MISS","elapsed_ms":6}
+# second hit on the same URL — HIT, 1ms (same derived_hex proves it's cached)
+{"derived_hex":"6ac25e...","cache":"HIT","elapsed_ms":1}
+```
+
+The Workers Cache API requires the stored `Response` to have
+`Cache-Control: max-age>0` **and** a `Date` header — the `cache_get`
+helper sets both automatically so callers can't forget.
+
+### Queues
+
+```ruby
+# app/hello.rb — producer side
+post '/api/enqueue' do
+  content_type 'application/json'
+  jobs_queue.send(JSON.parse(request.body.read)).__await__
+  status 202
+  { 'enqueued' => true }.to_json
+end
+
+# consumer side — DSL runs inside `src/worker.mjs#queue(batch, env, ctx)`
+consume_queue 'homurabi-jobs' do |batch|
+  msgs = batch.messages
+  i = 0
+  while i < msgs.length    # indexed while — see `# await: true` notes
+    msg = msgs[i]
+    kv.put("queue:last-consumed:#{i}",
+      { 'id' => msg.id, 'body' => msg.body, 'consumed_at' => Time.now.to_i }.to_json,
+      expiration_ttl: 86_400).__await__
+    msg.ack
+    i += 1
+  end
+  batch.size
+end
+```
+
+`wrangler.toml`:
+
+```toml
+[[queues.producers]]
+binding = "JOBS_QUEUE"
+queue   = "homurabi-jobs"
+
+[[queues.consumers]]
+queue             = "homurabi-jobs"
+max_batch_size    = 3
+max_batch_timeout = 2
+max_retries       = 3
+```
+
+Live evidence (miniflare 3 local emulator):
+
+```text
+$ for t in alpha beta gamma; do
+    curl -s -X POST -H 'content-type: application/json' \
+      -d "{\"task\":\"$t\"}" http://127.0.0.1:8787/api/enqueue
+  done
+$ sleep 3   # wait for max_batch_timeout
+$ curl http://127.0.0.1:8787/demo/queue/status
+{"queue":"homurabi-jobs","count":3,"recent":[
+  {"id":"cabc5a...","body":{"task":"gamma"},"batch_index":0},
+  {"id":"819052...","body":{"task":"beta"},"batch_index":1},
+  {"id":"...","body":{"task":"alpha"},"batch_index":2}
+]}
+```
+
+A fallback `POST /test/queue/fire` route manually invokes
+`Cloudflare::QueueConsumer.dispatch_js` with a synthesised batch — useful
+when miniflare's auto-dispatch loop is flaky on rapid `wrangler dev`
+restarts.
+
+### `/test/bindings` self-test
+
+Mirrors the Phase 7 `/test/crypto` pattern: one HTTP endpoint that
+exercises every binding wrapper and reports pass/fail per case.
+
+```text
+$ curl http://127.0.0.1:8787/test/bindings
+{"passed":3,"failed":0,"total":3,"cases":[
+  {"case":"DurableObject counter inc/peek/reset round-trip","pass":true, ...},
+  {"case":"Cache API match after put returns same body","pass":true, ...},
+  {"case":"Queue producer send() returns without error","pass":true, ...}
+]}
+```
+
+### Opal x-string quirk worth knowing
+
+Opal treats a **multi-line** backtick x-string as a statement (not an
+expression), which silently drops the returned value. Every wrapper in
+Phase 11B uses the **single-line IIFE pattern** for that reason:
+
+```ruby
+# Works — single-line expression, value is the Promise.
+js_promise = `(async function(js, req) { await js.put(req, ...); })(#{js}, #{req})`
+js_promise.__await__
+```
+
+Multi-line backticks work fine when assigned (the other Phase 3/6/7/8/9
+wrappers use them that way), but at end-of-method they can sneakily
+return `undefined`. The `put` / `match` / `delete` / `send` / `fetch`
+helpers in `lib/cloudflare_workers/{cache,queue,durable_object}.rb`
+document this at the call site.
+
+### テスト
+
+56 ケースの新規回帰スイート (`test/do_smoke.rb` 22 + `test/cache_smoke.rb`
+14 + `test/queue_smoke.rb` 20) + Workers self-test `/test/bindings`。
+
+```bash
+$ npm run test:do && npm run test:cache && npm run test:queue
+22 tests, 22 passed, 0 failed
+14 tests, 14 passed, 0 failed
+20 tests, 20 passed, 0 failed
+```
+
 ## Project status & phases
 
 The project follows a strict four-phase plan (see
@@ -982,6 +1184,8 @@ of each phase:
 | **Phase 7** | Crypto primitives — full RS/PS/ES JWT alg coverage, RSA-OAEP, AES-GCM/CBC/CTR, ECDH (P-256/384/521 + X25519), Ed25519/EdDSA, OpenSSL::BN, KDF (PBKDF2 + HKDF), SecureRandom, PEM I/O. node:crypto sync + Web Crypto subtle async hybrid; CTR streaming via per-block subtle calls; binary plaintext byte-transparent; verify raises on key/algo errors and only returns false on signature mismatch. | ✅ shipped on `feature/phase7-crypto`. 85 crypto smoke + Workers self-test endpoint `/test/crypto` (17 cases) + bin/test-on-workers shell script for in-Worker regression. |
 | **Phase 8** | JWT 認証フレームワーク — vendored ruby-jwt v2.9.3 に Opal/async パッチを適用。HS/RS/PS/ES/EdDSA 全アルゴリズム対応、`Sinatra::JwtAuth` ヘルパで `authenticate!` / `current_user` / `issue_token`、KV-backed refresh token、`/api/login?alg=<name>` で全アルゴリズムが実働 Workers 上で発行・検証できる。`JWT.encode` / `JWT.decode` は subtle バックエンドのため async（caller が `.__await__`）、HS256 系は sync。 | ✅ shipped on `feature/phase8-jwt`. 43 jwt smoke + Workers self-test `/test/crypto` が 26 ケース（JWT 9 追加）+ dogfooding で全 7 alg のログイン→/api/me→refresh を実測。 |
 | **Phase 9** | Scheduled Workers (Cron Triggers) — `src/worker.mjs#scheduled` を経由して `globalThis.__HOMURABI_SCHEDULED_DISPATCH__` から Sinatra ディスパッチャに委譲。**`Sinatra::Scheduled` 拡張**で `schedule '*/5 * * * *' do \|event\| ... end` DSL（`db` / `kv` / `bucket` / `wait_until` ヘルパ込み）。ブロックは `define_method` 経由でコンパイルされるため `# await: true` の `__await__` がそのまま使え、D1 / KV へのリード・モディファイ・ライトが Workers ランタイムから正しく到達する。per-job 例外隔離 + `/test/scheduled` `/test/scheduled/run` 内省 API（`HOMURABI_ENABLE_SCHEDULED_DEMOS` で default deny）。 | ✅ shipped on `feature/phase9-cron`. 29 scheduled smoke + 実機 `wrangler dev --test-scheduled` で `/__scheduled?cron=...` 経由の D1 行追加と KV カウンタ increment を実測（4 連発で `count: 1→4`）。 |
+| **Phase 10** | Workers AI binding + Sinatra `/chat` UI + `/api/chat/*` JWT-gated endpoints（Gemma 4 + gpt-oss-120b、KV-backed 会話履歴、SSE streaming サポート）。 | ✅ shipped on `feature/phase10-ai`. |
+| **Phase 11B** | Cloudflare native bindings — **Durable Objects** (`Cloudflare::DurableObject.define` handler DSL + `DurableObjectNamespace` / `Stub` / `Storage` ラッパ)、**Cache API** (`Cloudflare::Cache` + `cache_get` helper、HIT/MISS 自動判定)、**Queues** (`Cloudflare::Queue#send` / `#send_batch` プロデューサ + `consume_queue 'q' do \|batch\| ... end` DSL + `queue(batch, env, ctx)` 配送)。`/test/bindings` セルフテストと 56 ケースの smoke suite。`HOMURABI_ENABLE_BINDING_DEMOS` で default deny。 | ✅ shipped on `feature/phase11b-cf-bindings`. DO カウンタ 1→2→3→4、Cache MISS(6ms)→HIT(1ms) 同一 `derived_hex`、Queue /api/enqueue → auto 消費 → KV 書き込み round-trip を実機で実測。 |
 
 ### Definition of Done (from PLAN.md §1.1)
 

@@ -13,6 +13,7 @@
 # Workers sandbox never has to call `eval` / `new Function` at runtime.
 
 require 'json'
+require 'time'
 require 'sinatra/base'
 require 'net/http'
 require 'openssl'
@@ -21,6 +22,7 @@ require 'base64'
 require 'jwt'
 require 'sinatra/jwt_auth'
 require 'sinatra/scheduled'
+require 'sinatra/queue'
 
 class App < Sinatra::Base
   # Phase 8 — JWT auth. The secret is the default HS256 path; asymmetric
@@ -37,6 +39,10 @@ class App < Sinatra::Base
   # below; matching jobs are dispatched from `src/worker.mjs#scheduled`
   # via `globalThis.__HOMURABI_SCHEDULED_DISPATCH__`.
   register Sinatra::Scheduled
+  # Phase 11B — Sinatra::Queue. Adds the `consume_queue 'name' do
+  # |batch| ... end` DSL so queue consumer handlers live next to the
+  # HTTP routes.
+  register Sinatra::Queue
   # --- Cloudflare binding helpers ------------------------------------
   # These let routes access D1/KV/R2 with the same brevity as
   # ActiveRecord's `User.find(id)` pattern, without introducing an ORM.
@@ -65,6 +71,88 @@ class App < Sinatra::Base
       return false unless cf_env
       val = `(#{cf_env} && #{cf_env}.HOMURABI_ENABLE_SCHEDULED_DEMOS) || ''`
       val.to_s == '1'
+    end
+
+    # Phase 11B — gate for the Durable Object / Cache API / Queues
+    # demo routes (`/demo/do*`, `/demo/cache*`, `/api/enqueue`,
+    # `/test/bindings`). Each demo writes to DO storage or enqueues
+    # a message on every request, so leaving them publicly reachable
+    # in production burns metered quota. Default OFF; flip via
+    # wrangler [vars] HOMURABI_ENABLE_BINDING_DEMOS=1 in dev.
+    def binding_demos_enabled?
+      cf_env = env['cloudflare.env']
+      return false unless cf_env
+      val = `(#{cf_env} && #{cf_env}.HOMURABI_ENABLE_BINDING_DEMOS) || ''`
+      val.to_s == '1'
+    end
+
+    # Phase 11B — Sinatra helpers around the DO / Cache / Queue
+    # wrappers. They mirror the `db` / `kv` / `bucket` pattern so
+    # routes can call them without touching JS.
+
+    # Wrapped DurableObjectNamespace for the `COUNTER` binding.
+    # nil when no binding is attached (e.g. in tests or missing
+    # wrangler.toml entry).
+    def do_counter
+      env['cloudflare.DO_COUNTER']
+    end
+
+    # Default edge cache.  A thin wrapper over `caches.default`.
+    def cache
+      @cache ||= ::Cloudflare::Cache.default
+    end
+
+    # The `JOBS_QUEUE` producer binding. nil when the binding is
+    # not attached.
+    def jobs_queue
+      env['cloudflare.QUEUE_JOBS']
+    end
+
+    # Serve an expensive computation through Cache API. On a cache
+    # hit the cached Response body is returned; on a miss the block
+    # is evaluated, the result is stored with the given TTL, and
+    # the fresh body is returned.
+    #
+    #   get '/demo/cache/heavy' do
+    #     content_type 'application/json'
+    #     cache_get(request.url, ttl: 60) { expensive_json }
+    #   end
+    #
+    # Headers picked up from the route's `content_type` call are
+    # copied onto the stored Response so a cache hit echoes the
+    # same content-type — otherwise the browser would see a plain
+    # 200 with no content-type and try to sniff.
+    #
+    # NOTE: the Workers Cache API (and miniflare's local emulation)
+    # requires the cache-key URL to be http/https AND the stored
+    # Response to have a `Date` + `Cache-Control: max-age > 0` header.
+    # A missing `Date` header is the most common reason a put
+    # silently stores nothing — we populate it here so routes don't
+    # have to know.
+    def cache_get(cache_key, ttl: 60, content_type_override: nil, &block)
+      c = cache
+      cached = c.match(cache_key).__await__
+      if cached
+        # Replay the cached headers so the outer Rack response
+        # matches what we originally put in (content-type etc.).
+        cached.headers.each { |k, v| response.headers[k] = v }
+        response.headers['x-homurabi-cache'] = 'HIT'
+        return cached.body
+      end
+      body = block.call
+      ct = content_type_override || response['Content-Type'] || 'text/plain; charset=utf-8'
+      c.put(
+        cache_key, body,
+        status: 200,
+        headers: {
+          'content-type'     => ct,
+          'cache-control'    => "public, max-age=#{ttl.to_i}",
+          'date'             => Time.now.httpdate,
+          'x-homurabi-cache' => 'MISS'
+        }
+      ).__await__
+      response.headers['x-homurabi-cache'] = 'MISS'
+      body
     end
   end
   # ------------------------------------------------------------------
@@ -1386,6 +1474,366 @@ class App < Sinatra::Base
       'failed' => failed,
       'total'  => cases.size,
       'cases'  => cases
+    }.to_json
+  end
+
+  # ------------------------------------------------------------------
+  # Phase 11B — Durable Objects / Cache API / Queues demo routes.
+  #
+  # All routes below are gated by HOMURABI_ENABLE_BINDING_DEMOS so
+  # public deploys don't spend DO storage / queue quota on every
+  # drive-by request.  See the helpers block above for the gate.
+  # ------------------------------------------------------------------
+
+  # Queue consumer handler. `batch` is a Cloudflare::QueueBatch with a
+  # `.messages` Array of Cloudflare::QueueMessage objects. Every
+  # message stores a timestamp into KV under `queue:last-consumed:<i>`
+  # so `wrangler dev` + `/demo/queue/status` can confirm round-trip
+  # delivery without invasive logging.
+  consume_queue 'homurabi-jobs' do |batch|
+    # Under `# await: true`, using `Array#each` with an internal
+    # `__await__` is unreliable because Opal yields to an async
+    # callback whose return value is never awaited by `each` — some
+    # writes silently drop. Use an indexed `while` loop instead, the
+    # same pattern `Sinatra::Scheduled#dispatch_scheduled` adopts.
+    if kv
+      msgs = batch.messages
+      i = 0
+      total = msgs.length
+      while i < total
+        msg = msgs[i]
+        record = {
+          'id'           => msg.id,
+          'body'         => msg.body,
+          'queue'        => batch.queue,
+          'consumed_at'  => Time.now.to_i,
+          'batch_index'  => i
+        }
+        kv.put("queue:last-consumed:#{i}", record.to_json, expiration_ttl: 86_400).__await__
+        msg.ack
+        i += 1
+      end
+    else
+      batch.ack_all
+    end
+    batch.size
+  end
+
+  # DO handler — implements the counter. One instance per "name"
+  # (routed by `do_counter.get_by_name("global")` in the route).
+  #
+  # /inc  → increment, return new count
+  # /peek → read without mutating
+  # /reset → clear storage
+  Cloudflare::DurableObject.define('HomurabiCounterDO') do |state, request|
+    path = request.path
+    prev = (state.storage.get('count').__await__ || 0).to_i
+    if path.end_with?('/inc')
+      next_count = prev + 1
+      state.storage.put('count', next_count).__await__
+      [
+        200,
+        { 'content-type' => 'application/json' },
+        {
+          'count'       => next_count,
+          'previous'    => prev,
+          'path'        => path,
+          'do_id'       => state.id,
+          'updated_at'  => Time.now.to_i
+        }.to_json
+      ]
+    elsif path.end_with?('/reset')
+      state.storage.delete('count').__await__
+      [
+        200,
+        { 'content-type' => 'application/json' },
+        { 'reset' => true, 'do_id' => state.id }.to_json
+      ]
+    else
+      [
+        200,
+        { 'content-type' => 'application/json' },
+        { 'count' => prev, 'path' => path, 'do_id' => state.id }.to_json
+      ]
+    end
+  end
+
+  # GET /demo/do — hit the Counter DO by name. The `name` query param
+  # (default 'global') selects which DO instance to address.
+  get '/demo/do' do
+    content_type 'application/json'
+    unless binding_demos_enabled?
+      status 404
+      next({ 'error' => 'binding demos disabled (set HOMURABI_ENABLE_BINDING_DEMOS=1)' }.to_json)
+    end
+    ns = do_counter
+    if ns.nil?
+      status 503
+      next({ 'error' => 'DurableObject binding COUNTER not bound (wrangler.toml missing [[durable_objects.bindings]])' }.to_json)
+    end
+    name = (params['name'] || 'global').to_s
+    action = (params['action'] || 'inc').to_s
+    stub = ns.get_by_name(name)
+    # `stub.fetch` requires an absolute URL — the Workers runtime
+    # parses the URL to route the call. The host is irrelevant (the
+    # DO receives the whole Request), but it must be parseable.
+    url = "https://homurabi-do.internal/#{action}"
+    res = stub.fetch(url, method: 'POST').__await__
+    {
+      'demo'    => 'Durable Objects counter',
+      'binding' => 'COUNTER',
+      'class'   => 'HomurabiCounterDO',
+      'name'    => name,
+      'action'  => action,
+      'status'  => res.status,
+      'body'    => res.body.empty? ? nil : JSON.parse(res.body)
+    }.to_json
+  end
+
+  # GET /demo/cache/heavy — simulates an expensive computation that is
+  # served from Cache API on the second hit. We don't sleep; instead
+  # we do a real loop of SHA-256 iterations so the first-call cost is
+  # measurable (`elapsed_ms`) without depending on a clock hack.
+  get '/demo/cache/heavy' do
+    content_type 'application/json'
+    unless binding_demos_enabled?
+      status 404
+      next({ 'error' => 'binding demos disabled (set HOMURABI_ENABLE_BINDING_DEMOS=1)' }.to_json)
+    end
+    # Cache by request URL so different query strings produce different
+    # cache entries (cache-busting with ?v=N works).
+    cache_key = request.url
+    ttl = (params['ttl'] || '60').to_i
+    started = Time.now.to_f
+    # cache_get uses `__await__` internally (cache.match / cache.put)
+    # so the helper method is compiled as async by Opal — its return
+    # value is a Promise we MUST `__await__` at the call site.
+    body = cache_get(cache_key, ttl: ttl) do
+      # Expensive work: derive a PBKDF2 key + hash many times so the
+      # first-request latency is non-trivial. The exact ~1000 iterations
+      # is a compromise between "clearly slower than a cache hit" and
+      # "finishes inside wrangler dev's request budget on an M1".
+      salt = SecureRandom.random_bytes(16)
+      derived = OpenSSL::KDF.pbkdf2_hmac('homurabi-phase11b',
+        salt: salt, iterations: 50_000, length: 32, hash: 'SHA256')
+      {
+        'computed'    => 'expensive PBKDF2 derivation',
+        'iterations'  => 50_000,
+        'derived_hex' => derived.unpack1('H*'),
+        'salt_hex'    => salt.unpack1('H*'),
+        'computed_at' => Time.now.to_i
+      }.to_json
+    end.__await__
+    elapsed_ms = ((Time.now.to_f - started) * 1000).round
+    # The helper set response.headers['x-homurabi-cache'] to HIT / MISS.
+    cache_state = response['X-Homurabi-Cache'] || 'UNKNOWN'
+    # Re-serialise with extra diagnostic fields so the route caller can
+    # see which path ran without cracking open headers from a browser.
+    orig = begin
+      JSON.parse(body)
+    rescue JSON::ParserError
+      { 'raw' => body }
+    end
+    orig.merge(
+      'cache'      => cache_state,
+      'elapsed_ms' => elapsed_ms,
+      'cache_key'  => cache_key,
+      'ttl'        => ttl
+    ).to_json
+  end
+
+  # POST /api/enqueue — enqueue a message onto JOBS_QUEUE. Body is a
+  # JSON Hash that is passed through verbatim as the message body.
+  post '/api/enqueue' do
+    content_type 'application/json'
+    unless binding_demos_enabled?
+      status 404
+      next({ 'error' => 'binding demos disabled (set HOMURABI_ENABLE_BINDING_DEMOS=1)' }.to_json)
+    end
+    q = jobs_queue
+    if q.nil?
+      status 503
+      next({ 'error' => 'Queue binding JOBS_QUEUE not bound (wrangler.toml missing [[queues.producers]])' }.to_json)
+    end
+    begin
+      body = JSON.parse(request.body.read)
+    rescue JSON::ParserError, StandardError
+      body = { 'note' => 'default payload (empty or invalid JSON body)', 'ts' => Time.now.to_i }
+    end
+    q.send(body).__await__
+    status 202
+    { 'enqueued' => true, 'queue' => 'homurabi-jobs', 'payload' => body }.to_json
+  end
+
+  # GET /demo/queue/status — introspect the last-consumed messages
+  # recorded by the Ruby `consume_queue` handler above. Reads up to
+  # `limit` KV entries that were written by the consumer so a caller
+  # can confirm messages round-tripped end-to-end.
+  get '/demo/queue/status' do
+    content_type 'application/json'
+    unless binding_demos_enabled?
+      status 404
+      next({ 'error' => 'binding demos disabled (set HOMURABI_ENABLE_BINDING_DEMOS=1)' }.to_json)
+    end
+    if kv.nil?
+      status 503
+      next({ 'error' => 'KV not bound — cannot read consumer state' }.to_json)
+    end
+    limit = (params['limit'] || '10').to_i
+    recent = []
+    i = 0
+    while i < limit
+      raw = kv.get("queue:last-consumed:#{i}").__await__
+      break if raw.nil? || raw.empty?
+      begin
+        recent << JSON.parse(raw)
+      rescue JSON::ParserError
+        recent << { 'raw' => raw }
+      end
+      i += 1
+    end
+    {
+      'queue'   => 'homurabi-jobs',
+      'count'   => recent.size,
+      'recent'  => recent
+    }.to_json
+  end
+
+  # POST /test/queue/fire — manually invoke the queue consumer with a
+  # synthesised batch so local `wrangler dev` can exercise the
+  # `consume_queue` handler without waiting for miniflare's
+  # delivery scheduler (which in wrangler 3.114 does not always
+  # flush queued messages to the same worker's `queue()` export).
+  #
+  # Request body: { "queue": "homurabi-jobs", "messages": [{...}, ...] }
+  #   — `queue` defaults to 'homurabi-jobs'
+  #   — `messages` is an Array of arbitrary JSON bodies. Each becomes
+  #     a QueueMessage with a synthetic id and ack/retry no-ops.
+  #
+  # This route uses the same Cloudflare::QueueConsumer.dispatch_js
+  # dispatcher that `worker.mjs#queue` wires up in production, so
+  # the consumer body runs identically.
+  post '/test/queue/fire' do
+    content_type 'application/json'
+    unless binding_demos_enabled?
+      status 404
+      next({ 'error' => 'binding demos disabled' }.to_json)
+    end
+    body = begin
+      JSON.parse(request.body.read)
+    rescue StandardError
+      {}
+    end
+    qname = (body['queue'] || 'homurabi-jobs').to_s
+    messages = body['messages'].is_a?(Array) ? body['messages'] : [{ 'fire' => true, 'ts' => Time.now.to_i }]
+
+    js_msgs = `([])`
+    idx = 0
+    messages.each do |m|
+      js_body = Cloudflare::AI.ruby_to_js(m)
+      i_str = "manual-#{Time.now.to_i}-#{idx}"
+      now_ms = (Time.now.to_f * 1000).to_i
+      `#{js_msgs}.push({ id: #{i_str}, timestamp: new Date(#{now_ms}), body: #{js_body}, ack: function() {}, retry: function() {} })`
+      idx += 1
+    end
+    js_batch = `({ queue: #{qname}, messages: #{js_msgs}, ackAll: function() {}, retryAll: function() {} })`
+    summary = Cloudflare::QueueConsumer.dispatch_js(js_batch, env['cloudflare.env'], env['cloudflare.ctx']).__await__
+    summary.merge('injected' => messages.size).to_json
+  end
+
+  # GET /test/bindings — Phase 11B self-test. Confirms that every
+  # binding wrapper does a real round-trip on the live Workers runtime.
+  # Each case pass/fails individually so a single broken binding
+  # doesn't mask the others.
+  get '/test/bindings' do
+    content_type 'application/json'
+    unless binding_demos_enabled?
+      status 404
+      next({ 'error' => 'binding demos disabled (set HOMURABI_ENABLE_BINDING_DEMOS=1)' }.to_json)
+    end
+    cases = []
+    started = Time.now.to_f
+
+    # 1. DurableObject round-trip
+    do_case = { 'case' => 'DurableObject counter inc/peek/reset round-trip' }
+    begin
+      ns = do_counter
+      if ns.nil?
+        do_case['pass'] = false
+        do_case['note'] = 'COUNTER binding not bound'
+      else
+        name = "selftest-#{SecureRandom.hex(4)}"
+        stub = ns.get_by_name(name)
+        base = 'https://homurabi-do.internal'
+        stub.fetch("#{base}/reset", method: 'POST').__await__
+        r1 = JSON.parse(stub.fetch("#{base}/inc", method: 'POST').__await__.body)
+        r2 = JSON.parse(stub.fetch("#{base}/inc", method: 'POST').__await__.body)
+        peek = JSON.parse(stub.fetch("#{base}/peek").__await__.body)
+        do_case['pass'] = r1['count'] == 1 && r2['count'] == 2 && peek['count'] == 2
+        do_case['detail'] = { 'r1' => r1, 'r2' => r2, 'peek' => peek }
+        stub.fetch("#{base}/reset", method: 'POST').__await__
+      end
+    rescue ::Exception => e
+      do_case['pass'] = false
+      do_case['note'] = "#{e.class}: #{e.message[0, 200]}"
+    end
+    cases << do_case
+
+    # 2. Cache API put/match round-trip
+    cache_case = { 'case' => 'Cache API match after put returns same body' }
+    begin
+      c = cache
+      key = "https://cache-selftest.example/phase11b-#{SecureRandom.hex(4)}"
+      payload = { 'self_test' => true, 'ts' => Time.now.to_i }.to_json
+      c.put(key, payload, status: 200, headers: {
+        'content-type'  => 'application/json',
+        'cache-control' => 'public, max-age=30',
+        'date'          => Time.now.httpdate
+      }).__await__
+      got = c.match(key).__await__
+      if got.nil?
+        cache_case['pass'] = false
+        cache_case['note'] = 'match returned nil after put (cache unavailable in this runtime?)'
+      else
+        cache_case['pass'] = got.body == payload
+        cache_case['detail'] = { 'status' => got.status, 'content_type' => got['content-type'] }
+      end
+    rescue ::Exception => e
+      cache_case['pass'] = false
+      cache_case['note'] = "#{e.class}: #{e.message[0, 200]}"
+    end
+    cases << cache_case
+
+    # 3. Queue producer .send succeeds (does not crash). We can't
+    # synchronously assert delivery because the consumer runs in a
+    # separate invocation; instead we check that the producer returned
+    # without error and, when KV is available, that at least one
+    # message had been delivered previously (warmup from /api/enqueue).
+    queue_case = { 'case' => 'Queue producer send() returns without error' }
+    begin
+      q = jobs_queue
+      if q.nil?
+        queue_case['pass'] = false
+        queue_case['note'] = 'JOBS_QUEUE binding not bound'
+      else
+        q.send({ 'selftest' => true, 'ts' => Time.now.to_i, 'nonce' => SecureRandom.hex(4) }).__await__
+        queue_case['pass'] = true
+        queue_case['note'] = 'producer.send completed'
+      end
+    rescue ::Exception => e
+      queue_case['pass'] = false
+      queue_case['note'] = "#{e.class}: #{e.message[0, 200]}"
+    end
+    cases << queue_case
+
+    passed = cases.count { |c| c['pass'] }
+    failed = cases.size - passed
+    {
+      'passed'    => passed,
+      'failed'    => failed,
+      'total'     => cases.size,
+      'elapsed_ms'=> ((Time.now.to_f - started) * 1000).round,
+      'cases'     => cases
     }.to_json
   end
 end

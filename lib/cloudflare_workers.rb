@@ -218,6 +218,18 @@ module Rack
           # model id and the binding explicitly.
           env['cloudflare.AI']     = js_ai if `#{js_ai} != null`
 
+          # Phase 11B: Durable Objects / Queues.
+          # env.COUNTER is a DurableObjectNamespace binding; wrap it into
+          # Cloudflare::DurableObjectNamespace so routes can call
+          # `do_counter.get_by_name("global").fetch('/inc').__await__`
+          # without a backtick. env.JOBS_QUEUE is a Queue producer binding.
+          js_do_counter = `#{js_env} && #{js_env}.COUNTER`
+          if `#{js_do_counter} != null`
+            env['cloudflare.DO_COUNTER'] = Cloudflare::DurableObjectNamespace.new(js_do_counter)
+          end
+          js_queue = `#{js_env} && #{js_env}.JOBS_QUEUE`
+          env['cloudflare.QUEUE_JOBS'] = Cloudflare::Queue.new(js_queue, 'JOBS_QUEUE') if `#{js_queue} != null`
+
           env
         end
 
@@ -653,3 +665,12 @@ require 'cloudflare_workers/scheduled'
 # Phase 10 — Workers AI binding wrapper. Loaded here so any Sinatra
 # route can call Cloudflare::AI.run(...) without an extra require.
 require 'cloudflare_workers/ai'
+
+# Phase 11B — Cloudflare native bindings (Durable Objects / Cache /
+# Queues). Each file registers its own globalThis dispatcher hook
+# where applicable (DO / Queue consumer). Loaded here so user code
+# just needs `require 'sinatra/base'` — no extra `require` per
+# binding.
+require 'cloudflare_workers/cache'
+require 'cloudflare_workers/queue'
+require 'cloudflare_workers/durable_object'

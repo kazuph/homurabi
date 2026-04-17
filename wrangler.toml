@@ -21,3 +21,10 @@ id = "64ee32f1c6c64f85af9591e827da7462"
 [[r2_buckets]]
 binding = "BUCKET"
 bucket_name = "homurabi-bucket"
+
+# Phase 7: gating for the educational crypto routes (`/test/crypto`,
+# `/demo/crypto`). Default OFF — those routes generate fresh RSA keys
+# and run PBKDF2 per request, so leaving them open in production is a
+# CPU-DoS vector. Set to "1" only in dev or behind a private route.
+[vars]
+HOMURABI_ENABLE_CRYPTO_DEMOS = "0"

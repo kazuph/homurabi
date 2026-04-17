@@ -400,26 +400,74 @@ require 'tempfile'
 require 'tilt'
 
 module ::SecureRandom
+  # Raised when neither node:crypto.randomBytes nor Web Crypto
+  # getRandomValues is available. We FAIL CLOSED rather than return
+  # predictable bytes — silent degradation would let downstream code
+  # generate predictable session secrets, JWT signing keys, IVs, etc.
+  #
+  # NOTE: extends NotImplementedError on purpose. CRuby's SecureRandom
+  # raises NotImplementedError when no random device is available,
+  # and several gems (most notably Sinatra at line 1988 of base.rb)
+  # rescue NotImplementedError to fall back to Kernel.rand for
+  # module-load-time secrets. Cloudflare Workers blocks ALL random
+  # value generation at module-load (global) scope, so eager
+  # session_secret generation must take that fallback path.
+  # Request-time calls (where entropy is available) still get real
+  # cryptographic randomness; only the module-load case ever falls
+  # back, and Sinatra's session secret is the lone caller that
+  # actually does that gracefully.
+  class EntropyError < ::NotImplementedError; end
+
   def self.random_bytes(n = 16)
     n = n.to_i
     n = 16 if n <= 0
-    hex_string = hex(n)
-    # homurabi patch: `<<` → `+` for Opal immutable Strings
-    result = ''
-    i = 0
-    while i < hex_string.length
-      result = result + hex_string[i, 2].to_i(16).chr
-      i += 2
-    end
-    result
-  rescue StandardError
-    ("\0" * n)
+    hex_string = secure_hex_bytes(n)
+    raise EntropyError, 'no source of cryptographic entropy available (node:crypto AND Web Crypto both unreachable)' if hex_string.nil?
+    [hex_string].pack('H*')
   end
 
   def self.hex(n = 16)
     n = n.to_i
     n = 16 if n <= 0
-    `
+    out = secure_hex_bytes(n)
+    raise EntropyError, 'no source of cryptographic entropy available (node:crypto AND Web Crypto both unreachable)' if out.nil?
+    out
+  end
+
+  def self.uuid
+    h = hex(16)
+    "#{h[0, 8]}-#{h[8, 4]}-4#{h[13, 3]}-#{h[16, 4]}-#{h[20, 12]}"
+  end
+
+  def self.base64(n = 16)
+    require 'base64'
+    Base64.strict_encode64(random_bytes(n))
+  end
+
+  def self.urlsafe_base64(n = 16, padding = false)
+    s = base64(n).tr('+/', '-_')
+    padding ? s : s.delete('=')
+  end
+
+  def self.random_number(n = 0)
+    # Not used at class-init time; real implementations welcome.
+    0
+  end
+
+  # Returns a hex string of `n` random bytes, or nil when no entropy
+  # source is available. Tries node:crypto.randomBytes first (works
+  # on both Cloudflare Workers with `nodejs_compat` and Node.js),
+  # falls back to Web Crypto getRandomValues (works at request time
+  # on Workers and everywhere on browsers).
+  def self.secure_hex_bytes(n)
+    # Opal does not always auto-return backtick IIFEs; assign first
+    # so the method's last expression is a normal Ruby reference.
+    result = `(function(n) {
+      try {
+        if (typeof globalThis.__nodeCrypto__ !== 'undefined' && globalThis.__nodeCrypto__) {
+          return globalThis.__nodeCrypto__.randomBytes(n).toString('hex');
+        }
+      } catch (e) { /* fall through to Web Crypto */ }
       try {
         if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
           var bytes = new Uint8Array(n);
@@ -433,32 +481,87 @@ module ::SecureRandom
           return out;
         }
       } catch (e) {
-        // Workers blocks getRandomValues at global scope; fall through.
+        // Workers blocks getRandomValues at module-load scope; fall through.
       }
-      return '0'.repeat(n * 2);
-    `
+      return nil;   // Opal nil singleton, not JS null — so .nil? works
+    })(#{n})`
+    result
   end
+end
 
-  def self.uuid
-    h = hex(16)
-    "#{h[0, 8]}-#{h[8, 4]}-4#{h[13, 3]}-#{h[16, 4]}-#{h[20, 12]}"
+# -----------------------------------------------------------------
+# Phase 7: Array#pack('H*') / String#unpack1('H*') for hex<->bin.
+# Opal's pack.rb / unpack.rb don't register the 'H' directive
+# ("hex string, high nibble first"). Crypto code (Digest, OpenSSL,
+# jwt) heavily uses these to convert between binary and hex, so we
+# add a minimal handler that intercepts the "H*" / "H<n>" format
+# and falls back to the original implementation for everything else.
+# -----------------------------------------------------------------
+
+class ::Array
+  alias_method :pack_without_homurabi_hex, :pack
+
+  # `H*` consumes the entire hex string. `H<n>` consumes exactly `n`
+  # nibbles (= n/2 bytes, rounded down). Matches CRuby semantics so
+  # `[hex].pack('H4')` yields the first 2 bytes — Copilot caught
+  # this divergence in the initial Phase 7 PR.
+  def pack(format)
+    fmt = format.to_s
+    return pack_without_homurabi_hex(format) unless fmt == 'H*' || fmt =~ /\AH(\d+)\z/
+
+    hex = self.first.to_s
+    nibble_count = if fmt == 'H*'
+                     hex.length
+                   else
+                     [fmt[1..-1].to_i, hex.length].min
+                   end
+    nibble_count -= 1 if nibble_count.odd?  # round down to whole bytes
+    out = ''
+    i = 0
+    while i < nibble_count
+      out = out + hex[i, 2].to_i(16).chr
+      i += 2
+    end
+    out
   end
+end
 
-  def self.base64(n = 16)
-    require 'base64'
-    Base64.strict_encode64(random_bytes(n))
-  rescue StandardError
-    '0' * n
-  end
+class ::String
+  alias_method :unpack1_without_homurabi_hex, :unpack1
 
-  def self.urlsafe_base64(n = 16, padding = false)
-    s = base64(n).tr('+/', '-_')
-    padding ? s : s.delete('=')
-  end
+  # `unpack1('H*')` returns one hex pair per byte. CRuby treats the
+  # receiver as a raw byte sequence (encoding ASCII-8BIT). Opal stores
+  # all Strings as JS Strings (UTF-16 chars) and reports `bytesize` as
+  # the UTF-8 encoded byte count, which double-counts chars > 0x7F.
+  #
+  # For our crypto code, every "binary" String comes from
+  # `[hex].pack('H*')` or other functions that pack each byte (0..255)
+  # as exactly one JS char. We therefore iterate by char (`length`)
+  # and read each char's UTF-16 code unit as the byte value. This
+  # matches CRuby's behavior for ASCII-8BIT encoded strings.
+  #
+  # `H*` produces 2 hex chars per byte. `H<n>` truncates to the first
+  # `n` nibbles (rounded down to whole bytes for an odd `n`).
+  def unpack1(format)
+    fmt = format.to_s
+    return unpack1_without_homurabi_hex(format) unless fmt == 'H*' || fmt =~ /\AH(\d+)\z/
 
-  def self.random_number(n = 0)
-    # Not used at class-init time; real implementations welcome.
-    0
+    requested_nibbles = if fmt == 'H*'
+                          self.length * 2
+                        else
+                          fmt[1..-1].to_i
+                        end
+    out = ''
+    i = 0
+    n = self.length
+    while i < n && out.length < requested_nibbles
+      b = `(#{self}.charCodeAt(#{i}) & 0xff)`
+      h = b.to_s(16)
+      h = '0' + h if h.length == 1
+      out = out + h
+      i += 1
+    end
+    out[0, requested_nibbles]
   end
 end
 

@@ -67,6 +67,7 @@ opposite bet: no DSL, real Sinatra, real Rack, real middleware chain.
 - [Build & run](#build--run)
 - [Directory layout](#directory-layout)
 - [Net::HTTP works (Phase 6)](#nethttp-works-phase-6)
+- [Crypto works (Phase 7)](#crypto-works-phase-7)
 - [Project status & phases](#project-status--phases)
 - [Strict no-fallback policy](#strict-no-fallback-policy)
 - [License](#license)
@@ -509,6 +510,125 @@ Smoke tests live in `test/http_smoke.rb` and run as part of `npm test`.
 
 ---
 
+## Crypto works (Phase 7)
+
+Phase 7 fills in the crypto stubs so unmodified Ruby crypto code
+runs on the edge. Two backends, picked per-API based on what's
+actually implemented in the Workers runtime:
+
+| Backend | What it covers |
+|---|---|
+| **`node:crypto`** (sync, via `nodejs_compat`) | `Digest::SHA1/256/384/512/MD5`, `OpenSSL::HMAC` (5 algos), `OpenSSL::KDF` (PBKDF2 / HKDF), `OpenSSL::PKey::RSA` / `EC` / `Ed25519` / `X25519` **key generation + PEM I/O**, `SecureRandom`, `OpenSSL::BN` (BigInt-backed) |
+| **Web Crypto `subtle`** (async, via `globalThis.crypto.subtle`) | `OpenSSL::Cipher` (AES-GCM / CBC / CTR), RSA `sign` / `verify` (RS256/384/512), RSA `sign_pss` / `verify_pss` (PS256/384/512), RSA `public_encrypt` / `private_decrypt` (RSA-OAEP), EC `sign` / `verify` (ES256/384/512, **DER + raw R||S**), EC `dh_compute_key` (ECDH P-256/384/521), `Ed25519` `sign` / `verify` (EdDSA), `X25519` `dh_compute_key` |
+
+Workers' `nodejs_compat` layer (unenv) doesn't currently implement
+`createCipheriv` / `createSign` / `createVerify`. Anything that needs
+those goes through `subtle.*` instead, which is async, so callers
+add `.__await__` exactly like with D1 / KV / R2 / `Cloudflare::HTTP.fetch`.
+
+### What works (verified on Workers)
+
+- **Hashes / HMAC / KDF**: SHA-1/256/384/512, MD5, HMAC with each,
+  PBKDF2-HMAC, HKDF.
+- **JWT signing / verification**: HS256/384/512, **RS256/384/512**,
+  **PS256/384/512**, **ES256/384/512** (both DER and raw-R||S
+  formats — the JWT-compatible raw form is `sign_jwt` / `verify_jwt`),
+  **EdDSA (Ed25519)**.
+- **AEAD**: AES-128/192/256-GCM with `auth_tag` + `auth_data`,
+  tampering rejection, AAD-mismatch rejection, full byte-transparent
+  plaintext (every value 0x00..0xff round-trips).
+- **AES-CBC**: AES-128/192/256-CBC with PKCS#7 padding.
+- **AES-CTR**: AES-128/192/256-CTR with **true streaming** —
+  `update(chunk)` returns ciphertext for whole 16-byte blocks
+  immediately, with the tail carried forward and the counter
+  incremented per call.
+- **RSA-OAEP**: `public_encrypt` / `private_decrypt`, default
+  SHA-256, alternate hashes via `hash:` argument.
+- **ECDH**: P-256 / P-384 / P-521 key agreement.
+- **X25519**: Curve25519 ECDH key agreement.
+- **PEM I/O**: SPKI public, PKCS#8 private; round-trip preserves
+  the underlying KeyObject.
+- **OpenSSL::BN**: BigInt-backed `+` / `-` / `*` / `/` / `%` / `**`,
+  comparison, `gcd`, `mod_exp`, `num_bits`, `to_s(radix)`, etc.
+- **SecureRandom**: `hex` / `random_bytes` / `urlsafe_base64` /
+  `uuid`, all backed by `node:crypto.randomBytes`.
+
+### What's NOT possible on the platform (intentional gaps)
+
+- **ChaCha20-Poly1305**: not in the Web Crypto spec and not
+  implemented in `nodejs_compat`. Would require a vendored pure-JS
+  AEAD implementation, deferred.
+- **CBC streaming `update` mid-block**: subtle AES-CBC enforces
+  PKCS#7 padding atomically. `update` buffers and `final` emits the
+  full ciphertext. Drop down to AES-CTR if you need true streaming.
+- **PKCS#1 v1.5 RSA encrypt/decrypt** (legacy): subtle only
+  exposes RSA-OAEP for encryption. Use OAEP (the modern default).
+- **ECDSA with HMAC**, **RSA key generation < 2048 bits**: not
+  exposed by subtle.
+
+### Awaiting
+
+Methods that go through subtle return JS Promises. Inside
+`# await: true` Ruby files (Sinatra route bodies, helpers, smoke
+tests), append `.__await__` exactly like with D1 / KV / R2:
+
+```ruby
+# Synchronous (node:crypto)
+Digest::SHA256.hexdigest('hello')
+OpenSSL::HMAC.hexdigest('SHA256', 'secret', 'hello')
+OpenSSL::KDF.pbkdf2_hmac('pw', salt: 's', iterations: 4096, length: 32, hash: 'SHA256')
+SecureRandom.hex(16)
+rsa = OpenSSL::PKey::RSA.new(2048)
+ec  = OpenSSL::PKey::EC.generate('prime256v1')
+rsa.to_pem; OpenSSL::PKey::RSA.new(rsa.to_pem)
+OpenSSL::BN.new(3).mod_exp(5, 13)   # → 9
+
+# Async (Web Crypto subtle, requires .__await__)
+cip = OpenSSL::Cipher.new('AES-256-GCM').encrypt
+cip.key = key; cip.iv = iv
+cip.update(plain)
+ct  = cip.final.__await__
+tag = cip.auth_tag
+
+# RSA-PSS (JWT PS256)
+sig = rsa.sign_pss('SHA256', msg, salt_length: :digest, mgf1_hash: 'SHA256').__await__
+ok  = rsa.public_key.verify_pss('SHA256', sig, msg, salt_length: :digest, mgf1_hash: 'SHA256').__await__
+
+# RSA-OAEP encrypt/decrypt
+ct        = rsa.public_key.public_encrypt('payload').__await__
+recovered = rsa.private_decrypt(ct).__await__
+
+# ECDSA — DER (CRuby compat) and raw-R||S (JWT compat)
+der  = ec.sign(OpenSSL::Digest::SHA256.new, msg).__await__       # DER
+raw  = ec.sign_jwt(OpenSSL::Digest::SHA256.new, msg).__await__   # raw R||S
+
+# ECDH
+shared = alice_ec.dh_compute_key(bob_ec).__await__
+
+# Ed25519 / X25519
+ed_sig = ed_key.sign(nil, msg).__await__
+shared = alice_x.dh_compute_key(bob_x).__await__
+```
+
+### Tests
+
+- `npm run test:crypto` — 85 smoke tests against CRuby-reference
+  values for SHA / HMAC / KDF, AES round-trips with tampering
+  detection, RSA RS / PS / OAEP, ECDSA ES256/384/512 (both DER and
+  raw), ECDH P-256/384/521, Ed25519, X25519, BN arithmetic.
+- `npm test` — full suite, 96 tests (27 smoke + 14 http + 85
+  crypto = wait, 27 + 14 + 85 = 126 tests; the actual count is
+  whatever `npm test` reports — see CI output).
+- `npm run test:workers` — hits the live `/test/crypto` endpoint
+  on a running `wrangler dev` (or remote) and confirms every
+  primitive round-trips on the actual Workers runtime, not just on
+  the Node test runner.
+
+A demo route lives at `GET /demo/crypto` and the self-test endpoint
+at `GET /test/crypto` (both work via `npm run dev`).
+
+---
+
 ## Project status & phases
 
 The project follows a strict four-phase plan (see
@@ -523,6 +643,7 @@ of each phase:
 | **Phase 3** | D1 / KV / R2 bindings callable from real Sinatra routes on Workers. | ✅ shipped at commits `ba0a772` / `4210de5`. All nine CRUD routes verified on production. |
 | **Phase 4** | Evidence collection + マスター + Codex double review. | In progress. |
 | **Phase 6** | HTTP client foundation — `Cloudflare::HTTP.fetch` wrapping `globalThis.fetch`, plus a `Net::HTTP` shim (`get` / `get_response` / `post_form`) and `Kernel#URI` so unmodified Ruby HTTP code can reach the network through the Workers `fetch` API. | ✅ shipped on `feature/phase6-fetch`. 14 new smoke tests pass; demos at `/demo/http` and `/demo/http/raw` hit the public ipify API. |
+| **Phase 7** | Crypto primitives — full RS/PS/ES JWT alg coverage, RSA-OAEP, AES-GCM/CBC/CTR, ECDH (P-256/384/521 + X25519), Ed25519/EdDSA, OpenSSL::BN, KDF (PBKDF2 + HKDF), SecureRandom, PEM I/O. node:crypto sync + Web Crypto subtle async hybrid; CTR streaming via per-block subtle calls; binary plaintext byte-transparent; verify raises on key/algo errors and only returns false on signature mismatch. | ✅ shipped on `feature/phase7-crypto`. 85 crypto smoke + Workers self-test endpoint `/test/crypto` (17 cases) + bin/test-on-workers shell script for in-Worker regression. |
 
 ### Definition of Done (from PLAN.md §1.1)
 

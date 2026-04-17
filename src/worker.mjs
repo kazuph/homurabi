@@ -201,9 +201,31 @@ export class HomurabiCounterDO {
         this.state.acceptWebSocket(pair[1], [tag]);
       } catch (_e) {
         // Runtimes without Hibernation API — fall back to accepting
-        // manually and proxying frames without hibernation. We DON'T
-        // silently 500 here; we still upgrade the client.
-        pair[1].accept();
+        // manually AND attaching event listeners that forward frames
+        // to the same Ruby-side dispatchers `webSocketMessage` /
+        // `webSocketClose` / `webSocketError` use. Without these the
+        // upgrade would succeed but messages would silently drop
+        // (Copilot review PR #9, fourth pass).
+        try { pair[1].accept(); } catch (_) {}
+        const self = this;
+        pair[1].addEventListener("message", async (ev) => {
+          const fn = globalThis.__HOMURABI_DO_WS_MESSAGE__;
+          if (typeof fn === "function") {
+            try { await fn("HomurabiCounterDO", pair[1], ev.data, self.state, self.env); } catch (_) {}
+          }
+        });
+        pair[1].addEventListener("close", async (ev) => {
+          const fn = globalThis.__HOMURABI_DO_WS_CLOSE__;
+          if (typeof fn === "function") {
+            try { await fn("HomurabiCounterDO", pair[1], ev.code, ev.reason, ev.wasClean, self.state, self.env); } catch (_) {}
+          }
+        });
+        pair[1].addEventListener("error", async (ev) => {
+          const fn = globalThis.__HOMURABI_DO_WS_ERROR__;
+          if (typeof fn === "function") {
+            try { await fn("HomurabiCounterDO", pair[1], ev, self.state, self.env); } catch (_) {}
+          }
+        });
       }
       return new Response(null, { status: 101, webSocket: pair[0] });
     }

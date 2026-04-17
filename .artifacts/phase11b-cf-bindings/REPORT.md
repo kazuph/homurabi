@@ -137,6 +137,54 @@ miniflare が自動で batch を切って `queue()` export を呼び出し、Rub
 ]}
 ```
 
+## Max-effort 追加パック (初回 PR 後)
+
+ユーザー指示「費用発生無し / 本家 PR 無しの制約で工数で潰せる妥協全部潰して」を受けて、
+初回 Phase 11B PR の self-review で挙げた 9 点の deferred item のうち **再現可能な 8 点を全部対処**。
+残 1 点（v2 migration）は「そもそも v2 クラスが無い」ため物理的に対処不能。
+
+### 追加実装
+
+- **DurableObject WebSocket (Hibernation API)**
+  - `Cloudflare::DurableObject.define_web_socket_handlers(class, on_message:, on_close:, on_error:)`
+  - `DurableObjectState#accept_web_socket` / `#web_sockets(tag:)`
+  - `globalThis.__HOMURABI_DO_WS_MESSAGE__` / `_CLOSE__` / `_ERROR__` dispatcher hooks
+  - `src/worker.mjs` の `HomurabiCounterDO` に `fetch(Upgrade: websocket)` → 101 + WebSocketPair、
+    `webSocketMessage/Close/Error` メソッドを生やし Ruby dispatcher に forward
+  - `Cloudflare::RawResponse` ラッパ追加 — Sinatra ルートが 101 upgrade Response を `.webSocket`
+    プロパティごとパススルーするためのブリッジ。`Rack::Handler::CloudflareWorkers#build_js_response`
+    の `$$class.$$name === 'RawResponse'` 検出 + 中身の JS Response 直接返却分岐。
+  - 実機検証: Node `ws` client × 3 frames → "echo:hello-N count=N" 3 件 echo + close 1000 + HTTP peek
+    で count=3 永続確認
+- **Named Cache** — `/demo/cache/named?namespace=X&key=Y` + 2 namespace 独立 smoke test
+- **Cache TTL expiry** — 時間制御可能な fake Cache で post-expiry MISS を assert
+- **DLQ local flow** — wrangler.toml に `dead_letter_queue` + DLQ 側 consumer、`/demo/queue/force-dlq`
+  + `/demo/queue/dlq-status`、miniflare local で `fail:true` → retry → DLQ 移動 → KV 記録を実機確認
+- **Queue send_batch 100 件** — 順序保存 + 件数一致 smoke test
+- **DO `blockConcurrencyWhile`** — fake mutex でシリアライズ動作の 3 ケース smoke test
+- **Copilot review 2 件 (round 2)** — `request_to_js` docstring-vs-impl 整合 + `cache_get` TTL > 0 validation
+- **#9 Opal multi-line backtick audit** — `http.rb` / `ai.rb` に guard-rail コメント追加
+
+### miniflare Queue stall root-cause (調査のみ)
+
+`node_modules/miniflare/dist/src/workers/queues/broker.worker.js` を直接読んだ結論:
+
+- `DEFAULT_BATCH_TIMEOUT = 1` 秒 (override で `max_batch_timeout` 秒)
+- `#ensurePendingFlush` が単一 `setTimeout` タイマーを立て、batch が満タンなら即 flush
+- 既に pendingFlush ありで `messages.length < batchSize` なら、新タイマーを立てず既存タイマーを待つ
+- QueueBroker 自体が Durable Object なので wrangler restart 直後は **DO cold-start 遅延** が
+  max_batch_timeout に上乗せされ、単一メッセージで 10+ 秒遅れることがある
+- ワークアラウンド: `max_batch_size=3` / `max_batch_timeout=2` に下げた + `POST /test/queue/fire`
+  で手動 dispatcher invoke の fallback 提供
+
+wrangler 本体のバグではなく、miniflare 3 の DO コールドスタート挙動。wrangler 4.83 にしても同じ
+はず (未検証、upgrade 指示なしのため)。
+
+### 残タスク (物理的に対処不能 1 点)
+
+- **DO migrations v2 リネーム** — 今 DO クラスが 1 個だけ (`HomurabiCounterDO`) なので `v1` 固定で
+  足りる。2 個目のクラスを追加するフェーズで自然に解決。
+
 ## 特記事項
 
 ### 1. Opal の multi-line backtick quirk (今回の最大のハマりどころ)

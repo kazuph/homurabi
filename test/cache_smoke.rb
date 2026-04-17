@@ -270,6 +270,120 @@ SmokeTest.assert('put accepts a Cloudflare::HTTPResponse as the cache key') do
   got && got.body == 'stored-through-httpresponse'
 end
 
+SmokeTest.assert('two named caches with the same logical key hold independent entries') do
+  # In the fake we install, `caches.open(name)` returns the SAME
+  # underlying Map for every name (the fake is a single cache shared
+  # by default + open). To prove the wrapper passes the name through
+  # we swap in a namespace-aware fake for this test and restore it
+  # after.
+  `(function() {
+    var orig = globalThis.caches;
+    var stores = new Map();
+    function makeCache(name) {
+      return {
+        match: function(req) {
+          var k = (typeof req === 'string') ? req : req.url;
+          var s = stores.get(name);
+          if (!s || !s.has(k)) return Promise.resolve(undefined);
+          return Promise.resolve(s.get(k).clone());
+        },
+        put: function(req, resp) {
+          var k = (typeof req === 'string') ? req : req.url;
+          if (!stores.has(name)) stores.set(name, new Map());
+          stores.get(name).set(k, resp.clone());
+          return Promise.resolve();
+        },
+        delete: function(req) {
+          var k = (typeof req === 'string') ? req : req.url;
+          var s = stores.get(name);
+          if (!s || !s.has(k)) return Promise.resolve(false);
+          s.delete(k);
+          return Promise.resolve(true);
+        }
+      };
+    }
+    globalThis.__homurabi_cache_named_orig = orig;
+    globalThis.caches = {
+      default: makeCache('default'),
+      open: function(n) { return Promise.resolve(makeCache(n)); }
+    };
+  })()`
+  begin
+    a = Cloudflare::Cache.open('partition-a').__await__
+    b = Cloudflare::Cache.open('partition-b').__await__
+    a.put('https://same-key.example/logical', 'from-A',
+      headers: { 'content-type' => 'text/plain' }).__await__
+    b.put('https://same-key.example/logical', 'from-B',
+      headers: { 'content-type' => 'text/plain' }).__await__
+    got_a = a.match('https://same-key.example/logical').__await__
+    got_b = b.match('https://same-key.example/logical').__await__
+    got_a.body == 'from-A' && got_b.body == 'from-B'
+  ensure
+    `(function() { globalThis.caches = globalThis.__homurabi_cache_named_orig; delete globalThis.__homurabi_cache_named_orig; })()`
+  end
+end
+
+SmokeTest.assert('TTL-expired cache entry returns nil from match (post-expiry MISS)') do
+  # Install a TTL-aware fake that honours the max-age from the stored
+  # Response's Cache-Control header PLUS a "clock" we can fast-forward.
+  # Real Workers/miniflare expiry is wall-clock-driven, but a
+  # deterministic fake lets us assert the Ruby wrapper returns nil on
+  # expiry without adding a 60-second sleep to CI.
+  `(function() {
+    var orig = globalThis.caches;
+    var entries = new Map();   // key => { resp, expiresAt }
+    var now = { ms: 1000 };
+    globalThis.__homurabi_cache_ttl_advance = function(ms) { now.ms += ms; };
+    globalThis.__homurabi_cache_ttl_orig = orig;
+    globalThis.caches = {
+      default: {
+        match: function(req) {
+          var k = (typeof req === 'string') ? req : req.url;
+          var e = entries.get(k);
+          if (!e) return Promise.resolve(undefined);
+          if (e.expiresAt != null && now.ms >= e.expiresAt) {
+            entries.delete(k);
+            return Promise.resolve(undefined);
+          }
+          return Promise.resolve(e.resp.clone());
+        },
+        put: function(req, resp) {
+          var k = (typeof req === 'string') ? req : req.url;
+          var cc = resp.headers.get('cache-control') || '';
+          var m = cc.match(/max-age=(\d+)/);
+          var ttlMs = m ? (parseInt(m[1], 10) * 1000) : null;
+          var expiresAt = (ttlMs != null) ? (now.ms + ttlMs) : null;
+          entries.set(k, { resp: resp.clone(), expiresAt: expiresAt });
+          return Promise.resolve();
+        },
+        delete: function(req) {
+          var k = (typeof req === 'string') ? req : req.url;
+          var had = entries.has(k); entries.delete(k);
+          return Promise.resolve(!!had);
+        }
+      }
+    };
+  })()`
+  begin
+    c = Cloudflare::Cache.default
+    url = 'https://ttl-example.com/r'
+    c.put(url, 'fresh-body', headers: {
+      'content-type' => 'text/plain',
+      'cache-control' => 'public, max-age=5'   # 5 seconds
+    }).__await__
+    # Before expiry — returns body.
+    got_before = c.match(url).__await__
+    # Advance fake clock 6 seconds past max-age.
+    `globalThis.__homurabi_cache_ttl_advance(6000)`
+    # After expiry — must return nil; also cleans up the stale entry.
+    got_after = c.match(url).__await__
+
+    got_before && got_before.body == 'fresh-body' && got_after.nil?
+  ensure
+    `(function() { globalThis.caches = globalThis.__homurabi_cache_ttl_orig; delete globalThis.__homurabi_cache_ttl_orig; delete globalThis.__homurabi_cache_ttl_advance; })()`
+  end
+end
+
 SmokeTest.assert('put rejects an unsupported input type with ArgumentError') do
   c = Cloudflare::Cache.default
   raised = false

@@ -124,6 +124,15 @@ new_sqlite_classes = ["HomurabiCounterDO"]
 binding    = "JOBS_QUEUE"
 queue      = "homurabi-jobs"
 
+# Phase 11B — DLQ producer (local emulator only; production deploy
+# requires `npx wrangler queues create homurabi-jobs-dlq` first).
+# Routes can call `jobs_dlq.send(payload)` to manually forward a
+# message to the dead-letter queue without going through the retry
+# path.
+[[queues.producers]]
+binding    = "JOBS_DLQ"
+queue      = "homurabi-jobs-dlq"
+
 [[queues.consumers]]
 queue              = "homurabi-jobs"
 # Small batches + short timeout so the consumer actually fires quickly
@@ -132,10 +141,18 @@ queue              = "homurabi-jobs"
 # the first message arrived.
 max_batch_size     = 3
 max_batch_timeout  = 2
-max_retries        = 3
-# DLQ intentionally omitted — miniflare's local queue emulator
-# treats an unknown DLQ name as a soft configuration error which can
-# silence consumer flushes (observed with wrangler 3.114 + miniflare
-# 3). Re-add on production deploy with
-#   npx wrangler queues create homurabi-jobs-dlq
-# and set `dead_letter_queue = "homurabi-jobs-dlq"` below.
+max_retries        = 2
+# max_retries deliberately set to 2 so a message that always calls
+# msg.retry() eventually rolls over into the DLQ after two retries —
+# visible via GET /demo/queue/dlq-status. miniflare wires the DLQ
+# local-only; no production queue is created by `wrangler dev`.
+dead_letter_queue  = "homurabi-jobs-dlq"
+
+# Phase 11B — DLQ consumer so we can observe messages that exceeded
+# max_retries land in the dead-letter queue. Same KV-logging pattern
+# as the main consumer, keyed under `queue:dlq:<i>`.
+[[queues.consumers]]
+queue              = "homurabi-jobs-dlq"
+max_batch_size     = 3
+max_batch_timeout  = 2
+max_retries        = 0

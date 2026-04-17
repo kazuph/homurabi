@@ -1,0 +1,6 @@
+open
+reply: echo:hello-1 count=1
+reply: echo:hello-2 count=2
+reply: echo:hello-3 count=3
+close: 1000 done
+total_replies: 3

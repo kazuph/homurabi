@@ -367,6 +367,61 @@ SmokeTest.assert('globalThis.__HOMURABI_DO_DISPATCH__ is installed') do
   `typeof globalThis.__HOMURABI_DO_DISPATCH__ === 'function'`
 end
 
+SmokeTest.assert('globalThis.__HOMURABI_DO_WS_MESSAGE__ is installed') do
+  `typeof globalThis.__HOMURABI_DO_WS_MESSAGE__ === 'function'`
+end
+
+SmokeTest.assert('globalThis.__HOMURABI_DO_WS_CLOSE__ is installed') do
+  `typeof globalThis.__HOMURABI_DO_WS_CLOSE__ === 'function'`
+end
+
+SmokeTest.assert('define_web_socket_handlers registers on_message + on_close handlers') do
+  Cloudflare::DurableObject.define_web_socket_handlers('WsSmoke',
+    on_message: ->(_ws, _msg, _state) { :msg },
+    on_close:   ->(_ws, _c, _r, _clean, _state) { :close }
+  )
+  h = Cloudflare::DurableObject.web_socket_handlers_for('WsSmoke')
+  h[:on_message].respond_to?(:call) && h[:on_close].respond_to?(:call) && h[:on_error].nil?
+end
+
+SmokeTest.assert('WS message dispatcher invokes the registered on_message lambda') do
+  received = {}
+  Cloudflare::DurableObject.define_web_socket_handlers('WsMsgSmoke',
+    on_message: ->(ws, msg, state) {
+      received[:ws]    = ws
+      received[:msg]   = msg
+      received[:state] = state
+    }
+  )
+  js_ws = `({ send: function(){} })`
+  js_state = `({ id: { toString: function() { return 'ws-id' } }, storage: #{fake_storage} })`
+  Cloudflare::DurableObject.dispatch_ws_message('WsMsgSmoke', js_ws, 'hello-inside', js_state, `({})`)
+  received[:msg] == 'hello-inside' && received[:state].is_a?(Cloudflare::DurableObjectState) &&
+    received[:state].id == 'ws-id'
+end
+
+SmokeTest.assert('WS close dispatcher invokes the registered on_close lambda with code + reason') do
+  captured = nil
+  Cloudflare::DurableObject.define_web_socket_handlers('WsCloseSmoke',
+    on_close: ->(_ws, code, reason, clean, _state) {
+      captured = { code: code, reason: reason, clean: clean }
+    }
+  )
+  js_ws = `({})`
+  js_state = `({ id: { toString: function() { return 'x' } }, storage: #{fake_storage} })`
+  Cloudflare::DurableObject.dispatch_ws_close('WsCloseSmoke', js_ws, 1001, 'going away', true, js_state, `({})`)
+  captured[:code] == 1001 && captured[:reason] == 'going away' && captured[:clean] == true
+end
+
+SmokeTest.assert('WS dispatch for an unregistered class is a no-op, returns nil') do
+  # No call to define_web_socket_handlers('WsMissing', …) — the
+  # dispatcher must silently return nil rather than raise.
+  js_ws = `({})`
+  js_state = `({ id: { toString: function() { return 'x' } }, storage: #{fake_storage} })`
+  result = Cloudflare::DurableObject.dispatch_ws_message('WsMissing', js_ws, 'anything', js_state, `({})`)
+  result.nil?
+end
+
 SmokeTest.assert('JS hook forwards through to the Ruby dispatcher') do
   Cloudflare::DurableObject.handlers.delete('JSHook')
   Cloudflare::DurableObject.define('JSHook') { |_state, req| [201, {}, req.method] }

@@ -229,6 +229,8 @@ module Rack
           end
           js_queue = `#{js_env} && #{js_env}.JOBS_QUEUE`
           env['cloudflare.QUEUE_JOBS'] = Cloudflare::Queue.new(js_queue, 'JOBS_QUEUE') if `#{js_queue} != null`
+          js_dlq = `#{js_env} && #{js_env}.JOBS_DLQ`
+          env['cloudflare.QUEUE_JOBS_DLQ'] = Cloudflare::Queue.new(js_dlq, 'JOBS_DLQ') if `#{js_dlq} != null`
 
           env
         end
@@ -264,6 +266,24 @@ module Rack
         # value we return, so both sync and async paths look the same on
         # the outside.
         def build_js_response(status, headers, body)
+          # Raw JS Response fast-path (Phase 11B): a route that needs
+          # to hand the Workers runtime a Response object that was
+          # constructed OUTSIDE our pipeline (e.g. a 101 upgrade
+          # Response carrying a `.webSocket` property from a DO
+          # stub.fetch) wraps it in Cloudflare::RawResponse. We pass
+          # the JS object through unchanged — any reconstruction
+          # would strip runtime-only properties the client depends on.
+          raw = nil
+          if body.is_a?(::Cloudflare::RawResponse)
+            raw = body
+          elsif body.respond_to?(:first) && body.first.is_a?(::Cloudflare::RawResponse)
+            raw = body.first
+          end
+          if raw
+            js_resp = raw.js_response
+            return js_resp
+          end
+
           # Binary body fast-path: pass the JS ReadableStream directly
           # to Response without touching Opal's String encoding.
           if body.is_a?(::Cloudflare::BinaryBody) || (body.respond_to?(:first) && body.first.is_a?(::Cloudflare::BinaryBody))
@@ -326,7 +346,15 @@ module Rack
             # post-await branch so it can express a non-200 status the
             # async-promise path of Sinatra::Base#invoke would otherwise
             # snapshot away. Single-line x-string per the file convention.
-            `Promise.all(#{js_chunks}).then(function(resolved) { for (var i = 0; i < resolved.length; i++) { var r = resolved[i]; if (r != null && r.stream != null && r.content_type != null) { var bh = {}; bh['content-type'] = r.content_type; if (r.cache_control) bh['cache-control'] = r.cache_control; return new Response(r.stream, { status: #{status_int}, headers: bh }); } } if (resolved.length === 1 && resolved[0] != null && Array.isArray(resolved[0]) && resolved[0].length === 2 && typeof resolved[0][0] === 'number') { var ov = resolved[0]; var ovs = ov[0]|0; var ovb = ov[1] == null ? '' : (typeof ov[1] === 'string' ? ov[1] : (ov[1].$$is_string ? ov[1].toString() : String(ov[1]))); return new Response(ovb, { status: ovs, headers: #{js_headers} }); } var parts = []; for (var i = 0; i < resolved.length; i++) { var r = resolved[i]; if (r == null) { parts.push(''); continue; } if (typeof r === 'string') { parts.push(r); continue; } if (r != null && r.$$is_string) { parts.push(r.toString()); continue; } try { parts.push(JSON.stringify(r)); } catch (e) { parts.push(String(r)); } } return new Response(parts.join(''), { status: #{status_int}, headers: #{js_headers} }); })`
+            #
+            # Phase 11B addendum: if any resolved chunk is a
+            # `Cloudflare::RawResponse` (`.$$is_raw_response` on the
+            # Opal side OR has `js_response` + `raw_response?` duck
+            # markers), return its underlying JS Response verbatim —
+            # used for 101 WebSocket upgrades where the Workers
+            # runtime's own Response carries runtime-only properties
+            # (`.webSocket`) that a reconstructed Response would lose.
+            `Promise.all(#{js_chunks}).then(function(resolved) { for (var i = 0; i < resolved.length; i++) { var r = resolved[i]; if (r != null && typeof r === 'object' && r.$$class && r.$$class.$$name === 'RawResponse' && typeof r['$js_response'] === 'function') { return r['$js_response'](); } } for (var i = 0; i < resolved.length; i++) { var r = resolved[i]; if (r != null && r.stream != null && r.content_type != null) { var bh = {}; bh['content-type'] = r.content_type; if (r.cache_control) bh['cache-control'] = r.cache_control; return new Response(r.stream, { status: #{status_int}, headers: bh }); } } if (resolved.length === 1 && resolved[0] != null && Array.isArray(resolved[0]) && resolved[0].length === 2 && typeof resolved[0][0] === 'number') { var ov = resolved[0]; var ovs = ov[0]|0; var ovb = ov[1] == null ? '' : (typeof ov[1] === 'string' ? ov[1] : (ov[1].$$is_string ? ov[1].toString() : String(ov[1]))); return new Response(ovb, { status: ovs, headers: #{js_headers} }); } var parts = []; for (var i = 0; i < resolved.length; i++) { var r = resolved[i]; if (r == null) { parts.push(''); continue; } if (typeof r === 'string') { parts.push(r); continue; } if (r != null && r.$$is_string) { parts.push(r.toString()); continue; } try { parts.push(JSON.stringify(r)); } catch (e) { parts.push(String(r)); } } return new Response(parts.join(''), { status: #{status_int}, headers: #{js_headers} }); })`
           else
             body_str = ''
             chunks.each { |c| body_str = body_str + c.to_s }
@@ -427,6 +455,31 @@ module Cloudflare
       i += 1
     end
     h
+  end
+
+  # RawResponse wraps an already-constructed JS `Response` so routes
+  # can return it through Sinatra and have `build_js_response` pass
+  # it through to the Workers runtime untouched. Needed when the
+  # Response carries runtime-only properties that would disappear if
+  # reconstructed — e.g. a 101 upgrade Response with `.webSocket`.
+  # Unlike `BinaryBody`, no new Response is constructed; the stored
+  # JS object is returned as-is.
+  class RawResponse
+    attr_reader :js_response
+
+    def initialize(js_response)
+      @js_response = js_response
+    end
+
+    # Rack body contract — yield nothing. The bytes never flow
+    # through Ruby; the JS Response goes straight to the runtime.
+    def each; end
+
+    def close; end
+
+    def raw_response?
+      true
+    end
   end
 
   # BinaryBody wraps a JS ReadableStream (from R2, fetch, etc.) so it can

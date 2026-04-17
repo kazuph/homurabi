@@ -34,6 +34,7 @@
     "clean": "rm -f build/hello.no-exit.mjs build/smoke-test.mjs build/http-smoke.mjs build/crypto-smoke.mjs build/jwt-smoke.mjs build/ai-smoke.mjs build/scheduled-smoke.mjs build/do-smoke.mjs build/cache-smoke.mjs build/queue-smoke.mjs build/homurabi_templates.rb build/homurabi_assets.rb build/opal.stderr.log"
   },
   "devDependencies": {
-    "wrangler": "^3.99.0"
+    "wrangler": "^3.99.0",
+    "ws": "^8.20.0"
   }
 }

@@ -10,10 +10,13 @@
     "build:opal": "OPAL_PREFORK_DISABLE=1 bundle exec opal -c -E --esm --no-source-map -I lib -I vendor -I build -r opal_patches -r cloudflare_workers -r homurabi_templates -r homurabi_assets -o build/hello.no-exit.mjs app/hello.rb 2>build/opal.stderr.log",
     "build": "npm run build:erb && npm run build:assets && npm run build:opal",
     "dev": "npm run build && wrangler dev --port 8787 --ip 127.0.0.1",
+    "d1:init": "bin/init-local-d1",
     "deploy": "npm run build && wrangler deploy",
     "build:test": "ruby bin/compile-erb && OPAL_PREFORK_DISABLE=1 bundle exec opal -c -E --esm --no-source-map -I lib -I vendor -I build -r opal_patches -r cloudflare_workers -r homurabi_templates -o build/smoke-test.mjs test/smoke.rb 2>build/opal.stderr.log",
-    "test": "npm run build:test && node build/smoke-test.mjs",
-    "clean": "rm -f build/hello.no-exit.mjs build/smoke-test.mjs build/homurabi_templates.rb build/homurabi_assets.rb build/opal.stderr.log"
+    "test": "npm run build:test && node build/smoke-test.mjs && npm run test:http",
+    "build:http-test": "OPAL_PREFORK_DISABLE=1 bundle exec opal -c -E --esm --no-source-map -I lib -I vendor -I build -r opal_patches -o build/http-smoke.mjs test/http_smoke.rb 2>build/opal.stderr.log",
+    "test:http": "npm run build:http-test && node build/http-smoke.mjs",
+    "clean": "rm -f build/hello.no-exit.mjs build/smoke-test.mjs build/http-smoke.mjs build/homurabi_templates.rb build/homurabi_assets.rb build/opal.stderr.log"
   },
   "devDependencies": {
     "wrangler": "^3.99.0"

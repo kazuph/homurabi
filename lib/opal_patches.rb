@@ -334,6 +334,25 @@ module ::URI
 
     Generic.new(host: host, scheme: scheme, port: port, path: path, query: query, fragment: frag)
   end
+
+  # Net::HTTP.get(URI('https://...')) is the canonical entry point in
+  # CRuby Ruby code. CRuby resolves `URI('...')` via Kernel#URI, which
+  # is defined in `uri/common.rb` as `URI.parse(arg)`. Opal's stdlib
+  # omits that; install it here so vendored gems (and our Net::HTTP
+  # shim) can use the idiomatic short form.
+  def self.HTTP_class_for(scheme)
+    HTTP if scheme == 'http'
+  end
+end
+
+# Kernel#URI(string) — CRuby alias for URI.parse(string). Phase 6
+# requires it for `Net::HTTP.get(URI('https://...'))` to work.
+module ::Kernel
+  def URI(arg)
+    return arg if arg.is_a?(::URI::Generic)
+    ::URI.parse(arg.to_s)
+  end
+  module_function :URI
 end
 
 # -----------------------------------------------------------------

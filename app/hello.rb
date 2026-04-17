@@ -27,6 +27,17 @@ class App < Sinatra::Base
     def db;     env['cloudflare.DB'];     end
     def kv;     env['cloudflare.KV'];     end
     def bucket; env['cloudflare.BUCKET']; end
+
+    # Crypto demo / self-test routes generate fresh RSA keys + run
+    # PBKDF2 per call. Leaving them publicly reachable in production
+    # is a CPU-DoS vector. Gate behind the wrangler [vars] flag
+    # `HOMURABI_ENABLE_CRYPTO_DEMOS`. Default-deny everywhere.
+    def crypto_demos_enabled?
+      cf_env = env['cloudflare.env']
+      return false unless cf_env
+      val = `(#{cf_env} && #{cf_env}.HOMURABI_ENABLE_CRYPTO_DEMOS) || ''`
+      val.to_s == '1'
+    end
   end
   # ------------------------------------------------------------------
   # HTML pages — each route sets a few `@ivars` then renders an ERB
@@ -230,6 +241,10 @@ class App < Sinatra::Base
   # ------------------------------------------------------------------
   get '/test/crypto' do
     content_type 'application/json'
+    unless crypto_demos_enabled?
+      status 404
+      next { 'error' => 'crypto demos disabled (set HOMURABI_ENABLE_CRYPTO_DEMOS=1 in wrangler vars)' }.to_json
+    end
     cases = []
     run = lambda { |label, &blk|
       result = begin
@@ -349,6 +364,10 @@ class App < Sinatra::Base
   # ------------------------------------------------------------------
   get '/demo/crypto' do
     content_type 'application/json'
+    unless crypto_demos_enabled?
+      status 404
+      next { 'error' => 'crypto demos disabled (set HOMURABI_ENABLE_CRYPTO_DEMOS=1 in wrangler vars)' }.to_json
+    end
 
     # 1) Digest one-shots
     sha256 = Digest::SHA256.hexdigest('hello, edge')

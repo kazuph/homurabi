@@ -268,12 +268,12 @@ module OpenSSL
     def run_ctr_subtle(data, block_offset)
       # Construct the 128-bit counter = iv (16 bytes) + block_offset.
       # We use a Subtle counter length of 64 bits (low 64 bits change).
-      key = @key
+      key_bytes = @key
       iv  = @iv
       offset = block_offset
       promise = `(async function() {
         var subtle = globalThis.crypto.subtle;
-        var keyObj = await subtle.importKey('raw', Opal.binstr_to_u8(#{key}), { name: 'AES-CTR' }, false, ['encrypt', 'decrypt']);
+        var keyObj = await subtle.importKey('raw', Opal.binstr_to_u8(#{key_bytes}), { name: 'AES-CTR' }, false, ['encrypt', 'decrypt']);
         var counter = Opal.binstr_to_u8(#{iv}).slice();
         // Add offset to the low-64 bits, big-endian
         var lo = BigInt(#{offset}) + ((BigInt(counter[8]) << 56n) | (BigInt(counter[9]) << 48n) | (BigInt(counter[10]) << 40n) | (BigInt(counter[11]) << 32n) | (BigInt(counter[12]) << 24n) | (BigInt(counter[13]) << 16n) | (BigInt(counter[14]) << 8n) | BigInt(counter[15]));
@@ -302,8 +302,8 @@ module OpenSSL
           var subtle = globalThis.crypto.subtle;
           var algo = { name: 'AES-GCM', iv: Opal.binstr_to_u8(#{iv}), tagLength: 128 };
           if (#{aad} !== nil && #{aad} != null) algo.additionalData = Opal.binstr_to_u8(#{aad});
-          var key = await subtle.importKey('raw', Opal.binstr_to_u8(#{key}), { name: 'AES-GCM' }, false, ['encrypt']);
-          var ct = await subtle.encrypt(algo, key, Opal.binstr_to_u8(#{buffer}));
+          var subtleKey = await subtle.importKey('raw', Opal.binstr_to_u8(#{key}), { name: 'AES-GCM' }, false, ['encrypt']);
+          var ct = await subtle.encrypt(algo, subtleKey, Opal.binstr_to_u8(#{buffer}));
           return new Uint8Array(ct);
         })()`
         ct_u8 = out_promise.__await__
@@ -318,8 +318,8 @@ module OpenSSL
             var subtle = globalThis.crypto.subtle;
             var algo = { name: 'AES-GCM', iv: Opal.binstr_to_u8(#{iv}), tagLength: 128 };
             if (#{aad} !== nil && #{aad} != null) algo.additionalData = Opal.binstr_to_u8(#{aad});
-            var key = await subtle.importKey('raw', Opal.binstr_to_u8(#{key}), { name: 'AES-GCM' }, false, ['decrypt']);
-            var pt = await subtle.decrypt(algo, key, Opal.binstr_to_u8(#{ct_in}));
+            var subtleKey = await subtle.importKey('raw', Opal.binstr_to_u8(#{key}), { name: 'AES-GCM' }, false, ['decrypt']);
+            var pt = await subtle.decrypt(algo, subtleKey, Opal.binstr_to_u8(#{ct_in}));
             return new Uint8Array(pt);
           } catch (e) { throw new Error('GCM decrypt: ' + (e.message || String(e))); }
         })()`
@@ -341,8 +341,8 @@ module OpenSSL
       if mode == :encrypt
         promise = `(async function() {
           var subtle = globalThis.crypto.subtle;
-          var key = await subtle.importKey('raw', Opal.binstr_to_u8(#{key}), { name: 'AES-CBC' }, false, ['encrypt']);
-          var ct = await subtle.encrypt({ name: 'AES-CBC', iv: Opal.binstr_to_u8(#{iv}) }, key, Opal.binstr_to_u8(#{buffer}));
+          var subtleKey = await subtle.importKey('raw', Opal.binstr_to_u8(#{key}), { name: 'AES-CBC' }, false, ['encrypt']);
+          var ct = await subtle.encrypt({ name: 'AES-CBC', iv: Opal.binstr_to_u8(#{iv}) }, subtleKey, Opal.binstr_to_u8(#{buffer}));
           return new Uint8Array(ct);
         })()`
         u8_to_binstr(promise.__await__)
@@ -350,8 +350,8 @@ module OpenSSL
         promise = `(async function() {
           try {
             var subtle = globalThis.crypto.subtle;
-            var key = await subtle.importKey('raw', Opal.binstr_to_u8(#{key}), { name: 'AES-CBC' }, false, ['decrypt']);
-            var pt = await subtle.decrypt({ name: 'AES-CBC', iv: Opal.binstr_to_u8(#{iv}) }, key, Opal.binstr_to_u8(#{buffer}));
+            var subtleKey = await subtle.importKey('raw', Opal.binstr_to_u8(#{key}), { name: 'AES-CBC' }, false, ['decrypt']);
+            var pt = await subtle.decrypt({ name: 'AES-CBC', iv: Opal.binstr_to_u8(#{iv}) }, subtleKey, Opal.binstr_to_u8(#{buffer}));
             return new Uint8Array(pt);
           } catch (e) { throw new Error('CBC decrypt: ' + (e.message || String(e))); }
         })()`

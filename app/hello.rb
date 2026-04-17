@@ -830,6 +830,19 @@ class App < Sinatra::Base
       {}
     end
 
+    # Allow only `[A-Za-z0-9_-]{1,64}` for session ids so a crafted
+    # `?session=` cannot inject HTML when echoed back to /chat, cannot
+    # generate exotic KV key names (which would also escape `chat:` and
+    # collide with other namespaces), and cannot create unbounded
+    # per-user key cardinality. Falls back to `'demo'` on rejection.
+    SESSION_ID_RE = /\A[A-Za-z0-9_-]{1,64}\z/.freeze
+
+    def normalize_session_id(raw)
+      s = raw.to_s
+      return 'demo' if s.empty?
+      SESSION_ID_RE.match?(s) ? s : 'demo'
+    end
+
     def chat_kv_key(session_id)
       "chat:#{session_id}"
     end
@@ -849,7 +862,11 @@ class App < Sinatra::Base
     def save_chat_history(session_id, history)
       return unless kv
       trimmed = history.last(CHAT_HISTORY_LIMIT)
-      kv.put(chat_kv_key(session_id), trimmed.to_json).__await__
+      # Pass CHAT_HISTORY_TTL through so KV expires the entry
+      # automatically and the namespace doesn't accumulate dead
+      # sessions forever (the constant was previously documented but
+      # unused — Copilot review #5).
+      kv.put(chat_kv_key(session_id), trimmed.to_json, expiration_ttl: CHAT_HISTORY_TTL).__await__
     end
 
     def clear_chat_history(session_id)
@@ -866,19 +883,21 @@ class App < Sinatra::Base
       msgs
     end
 
-    # Halt with the right error JSON if the AI demo is gated off.
-    def require_ai_demos!
-      unless ai_demos_enabled?
-        content_type 'application/json'
-        halt 404, { 'error' => 'AI demos disabled (set HOMURABI_ENABLE_AI_DEMOS=1 in wrangler vars)' }.to_json
-      end
+    # Both gates return either nil (= keep going) or a `[status, body]`
+    # tuple that the caller hands back via `next`. We deliberately do
+    # NOT use `halt` because the chat routes are `# await: true` async
+    # blocks; `halt` is implemented as `throw :halt`, and the throw
+    # escapes Sinatra's synchronous `catch :halt` wrapper through the
+    # async/await boundary (Copilot review #8/#9). Same root cause as
+    # the JWT auth helper rewrite.
+    def ai_demos_block_or_nil
+      return nil if ai_demos_enabled?
+      [404, { 'error' => 'AI demos disabled (set HOMURABI_ENABLE_AI_DEMOS=1 in wrangler vars)' }.to_json]
     end
 
-    def require_ai_binding!
-      unless ai_binding?
-        content_type 'application/json'
-        halt 503, { 'error' => 'AI binding not configured (wrangler.toml [ai] block missing or wrangler version too old)' }.to_json
-      end
+    def ai_binding_block_or_nil
+      return nil if ai_binding?
+      [503, { 'error' => 'AI binding not configured (wrangler.toml [ai] block missing or wrangler version too old)' }.to_json]
     end
 
     # Inline JWT verification tailored for the chat routes.
@@ -946,7 +965,7 @@ class App < Sinatra::Base
     @title = 'homurabi /chat — Workers AI'
     @primary_model  = CHAT_MODELS[:primary]
     @fallback_model = CHAT_MODELS[:fallback]
-    @session_id = (params['session'] && !params['session'].to_s.empty?) ? params['session'] : 'demo'
+    @session_id = normalize_session_id(params['session'])
     @history = ai_demos_enabled? ? load_chat_history(@session_id).__await__ : []
     @content = erb :chat
     erb :layout
@@ -970,7 +989,8 @@ class App < Sinatra::Base
   # Body: { "session": "...", "content": "...", "model": "@cf/.../...?" }
   post '/api/chat/messages' do
     content_type 'application/json'
-    require_ai_demos!
+    gate = ai_demos_block_or_nil
+    next gate if gate
     # Inline JWT verification — early-exit with explicit `status` and
     # `next` (the same pattern Phase 8's /api/me uses successfully).
     # We deliberately do NOT call `Sinatra::JwtAuth#authenticate!`
@@ -1013,11 +1033,11 @@ class App < Sinatra::Base
       err_msg = decode_err.to_s
       next [401, { 'error' => 'unauthorized', 'reason' => err_msg }.to_json]
     end
-    require_ai_binding!
+    bgate = ai_binding_block_or_nil
+    next bgate if bgate
 
     body = parse_json_body
-    session_id = body['session'].to_s
-    session_id = 'demo' if session_id.empty?
+    session_id = normalize_session_id(body['session'])
     user_text  = body['content'].to_s
     if user_text.strip.empty?
       status 400
@@ -1110,7 +1130,8 @@ class App < Sinatra::Base
   # GET /api/chat/messages — return the persisted history for a session.
   get '/api/chat/messages' do
     content_type 'application/json'
-    require_ai_demos!
+    gate = ai_demos_block_or_nil
+    next gate if gate
     auth = chat_verify_token!.__await__
     if auth['ok'] != true
       # See the long comment in POST /api/chat/messages for why we
@@ -1119,7 +1140,7 @@ class App < Sinatra::Base
       # so any later mutation is lost.
       next [auth['status'].to_i, auth['body']]
     end
-    session_id = (params['session'] && !params['session'].to_s.empty?) ? params['session'] : 'demo'
+    session_id = normalize_session_id(params['session'])
     {
       'session' => session_id,
       'history' => load_chat_history(session_id).__await__
@@ -1129,7 +1150,8 @@ class App < Sinatra::Base
   # DELETE /api/chat/messages?session=... — wipe history for a session.
   delete '/api/chat/messages' do
     content_type 'application/json'
-    require_ai_demos!
+    gate = ai_demos_block_or_nil
+    next gate if gate
     auth = chat_verify_token!.__await__
     if auth['ok'] != true
       # See the long comment in POST /api/chat/messages for why we
@@ -1138,7 +1160,7 @@ class App < Sinatra::Base
       # so any later mutation is lost.
       next [auth['status'].to_i, auth['body']]
     end
-    session_id = (params['session'] && !params['session'].to_s.empty?) ? params['session'] : 'demo'
+    session_id = normalize_session_id(params['session'])
     clear_chat_history(session_id).__await__
     { 'ok' => true, 'session' => session_id, 'cleared' => true }.to_json
   end

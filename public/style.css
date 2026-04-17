@@ -37,6 +37,7 @@ body:has(.chat-shell) { max-width: 56em; }
 .chat-msg-error     { background: #ffe5e5; border-color: #f7a3a3; }
 .chat-empty { color: var(--muted); text-align: center; padding: 2em; }
 .chat-suggest { background: #f4f4f4; border: 1px dashed #ccc; padding: .3em .8em; border-radius: 4px; cursor: pointer; }
+.chat-visually-hidden { position: absolute; left: -10000px; top: auto; width: 1px; height: 1px; overflow: hidden; }
 .chat-composer { display: flex; flex-direction: column; gap: .5em; }
 .chat-composer textarea { width: 100%; padding: .8em; border: 1px solid #ccc; border-radius: 6px; font: inherit; resize: vertical; }
 .chat-composer-actions { display: flex; gap: .8em; align-items: center; flex-wrap: wrap; }

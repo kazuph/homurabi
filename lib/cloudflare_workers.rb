@@ -569,11 +569,19 @@ module Cloudflare
       `#{js_kv}.get(#{key}, "text").then(function(v) { return v == null ? nil : v; }).catch(function(e) { #{Kernel}.$raise(#{err_cls}.$new(e.message || String(e), Opal.hash({binding_type: 'KV', operation: 'get'}))); })`
     end
 
-    # Put a value. Returns a JS Promise.
-    def put(key, value)
+    # Put a value. `expiration_ttl:` (seconds) maps to the Workers KV
+    # `expirationTtl` option so callers can set TTLs without reaching
+    # for backticks. Returns a JS Promise.
+    def put(key, value, expiration_ttl: nil)
       js_kv = @js
       err_cls = Cloudflare::KVError
-      `#{js_kv}.put(#{key}, #{value}).catch(function(e) { #{Kernel}.$raise(#{err_cls}.$new(e.message || String(e), Opal.hash({binding_type: 'KV', operation: 'put'}))); })`
+      ttl = expiration_ttl
+      if ttl.nil?
+        `#{js_kv}.put(#{key}, #{value}).catch(function(e) { #{Kernel}.$raise(#{err_cls}.$new(e.message || String(e), Opal.hash({binding_type: 'KV', operation: 'put'}))); })`
+      else
+        ttl_int = ttl.to_i
+        `#{js_kv}.put(#{key}, #{value}, { expirationTtl: #{ttl_int} }).catch(function(e) { #{Kernel}.$raise(#{err_cls}.$new(e.message || String(e), Opal.hash({binding_type: 'KV', operation: 'put'}))); })`
+      end
     end
 
     # Delete a key. Returns a JS Promise.

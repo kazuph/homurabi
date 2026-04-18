@@ -48,6 +48,13 @@ binding = "AI"
 [vars]
 HOMURABI_ENABLE_CRYPTO_DEMOS = "0"
 HOMURABI_ENABLE_AI_DEMOS = "0"
+# Phase 11B — gating for the DO / Cache / Queue demo routes
+# (`/demo/do*`, `/demo/cache*`, `/api/enqueue`, `/test/bindings`).
+# Default OFF: the DO counter writes to DO storage on every request
+# and the queue producer burns message quota — we never want those
+# publicly reachable in production by accident. Flip to "1" only in
+# dev: `wrangler dev --var HOMURABI_ENABLE_BINDING_DEMOS:1`.
+HOMURABI_ENABLE_BINDING_DEMOS = "0"
 # Phase 9: gating for the educational scheduled-introspection routes
 # (`/test/scheduled`, `/test/scheduled/run`). Default OFF — the run
 # endpoint manually fires every registered cron handler and could
@@ -84,3 +91,136 @@ crons = [
   "*/5 * * * *",   # heartbeat — writes a row to D1 every 5 minutes (gated)
   "0 */1 * * *",   # hourly housekeeping — KV counter demo (gated)
 ]
+
+# Phase 11B — Durable Objects.
+#
+# `HomurabiCounterDO` is a generic DO class exported from
+# `src/worker.mjs`; it forwards every fetch through the Ruby
+# dispatcher installed by `lib/cloudflare_workers/durable_object.rb`.
+# The Ruby handler registered for `HomurabiCounterDO` lives in
+# `app/hello.rb` and implements a simple counter (inc / peek / reset).
+#
+# In `wrangler dev --local` (default), DOs are simulated by miniflare
+# and no production deploy is required to exercise the /demo/do route.
+# For production deploys, the `[[migrations]]` block below declares the
+# new DO class; wrangler will prompt once to apply it on first deploy.
+[[durable_objects.bindings]]
+name       = "COUNTER"
+class_name = "HomurabiCounterDO"
+
+[[migrations]]
+tag              = "v1"
+new_sqlite_classes = ["HomurabiCounterDO"]
+
+# Phase 11B — Queues.
+#
+# One producer binding (`JOBS_QUEUE`) so Sinatra routes can post
+# messages with `Cloudflare::Queue#send`. One consumer subscribed
+# to the same queue — messages are routed into the Ruby handler
+# registered via `consume_queue 'homurabi-jobs' do |batch| ... end`.
+#
+# In `wrangler dev --local`, Queues are emulated by miniflare
+# (wrangler >= 3.32). No account-side queue is required for local
+# testing. Production deploy expects a Cloudflare Queue named
+# `homurabi-jobs` to exist; create it with:
+#   npx wrangler queues create homurabi-jobs
+[[queues.producers]]
+binding    = "JOBS_QUEUE"
+queue      = "homurabi-jobs"
+
+[[queues.consumers]]
+queue              = "homurabi-jobs"
+# Small batches + short timeout so the consumer actually fires quickly
+# in `wrangler dev`. Miniflare 3 fires a batch when either the
+# max_batch_size is reached OR max_batch_timeout seconds elapse since
+# the first message arrived.
+max_batch_size     = 3
+max_batch_timeout  = 2
+max_retries        = 3
+
+# ---------------------------------------------------------------------
+# Phase 11B — DLQ environment (`wrangler dev --env dlq-demo`).
+#
+# The dead-letter queue (`homurabi-jobs-dlq`) is intentionally NOT in
+# the default (top-level) config. Putting it there would make every
+# `wrangler deploy` fail until someone runs
+#   npx wrangler queues create homurabi-jobs-dlq
+# on the account — a foot-gun for anyone who inherits this repo and
+# tries to deploy (Copilot review PR #9, third pass).
+#
+# `[env.dlq-demo]` lives alongside the defaults so the DLQ flow can be
+# exercised in `wrangler dev` without breaking `wrangler deploy`:
+#
+#   npm run dev          # default config — no DLQ
+#   npm run dev:dlq      # [env.dlq-demo] — DLQ producer + consumer
+#                        #                  + `dead_letter_queue`
+#                        #                  wire-up on the main consumer
+#
+# wrangler 3.x environments do NOT inherit `[vars]`, `[[d1_databases]]`,
+# `[[kv_namespaces]]`, `[[r2_buckets]]`, `[[durable_objects.bindings]]`,
+# `[[queues.*]]`, `[[migrations]]`, `[triggers]`, or `[ai]` from the
+# top-level (verified empirically with `wrangler 3.114.17` — a bare
+# `[env.dlq-demo]` dropped KV/D1/R2). Every binding has to be
+# duplicated here to match default-env behaviour plus the DLQ extras.
+# ---------------------------------------------------------------------
+[env.dlq-demo]
+
+[env.dlq-demo.vars]
+HOMURABI_ENABLE_CRYPTO_DEMOS = "0"
+HOMURABI_ENABLE_AI_DEMOS = "0"
+HOMURABI_ENABLE_BINDING_DEMOS = "0"
+HOMURABI_ENABLE_SCHEDULED_DEMOS = "0"
+
+[[env.dlq-demo.d1_databases]]
+binding = "DB"
+database_name = "homurabi-db"
+database_id = "3a59c955-198e-478f-8f11-71d5f3eb7600"
+
+[[env.dlq-demo.kv_namespaces]]
+binding = "KV"
+id = "64ee32f1c6c64f85af9591e827da7462"
+
+[[env.dlq-demo.r2_buckets]]
+binding = "BUCKET"
+bucket_name = "homurabi-bucket"
+
+[env.dlq-demo.ai]
+binding = "AI"
+
+[[env.dlq-demo.durable_objects.bindings]]
+name       = "COUNTER"
+class_name = "HomurabiCounterDO"
+
+[[env.dlq-demo.migrations]]
+tag              = "v1"
+new_sqlite_classes = ["HomurabiCounterDO"]
+
+[env.dlq-demo.triggers]
+crons = [
+  "*/5 * * * *",
+  "0 */1 * * *",
+]
+
+[[env.dlq-demo.queues.producers]]
+binding = "JOBS_QUEUE"
+queue   = "homurabi-jobs"
+
+[[env.dlq-demo.queues.producers]]
+binding = "JOBS_DLQ"
+queue   = "homurabi-jobs-dlq"
+
+[[env.dlq-demo.queues.consumers]]
+queue              = "homurabi-jobs"
+max_batch_size     = 3
+max_batch_timeout  = 2
+max_retries        = 2
+# After 2 retries the Workers runtime forwards the message to the
+# DLQ. Visible via `GET /demo/queue/dlq-status` in the same dev
+# session.
+dead_letter_queue  = "homurabi-jobs-dlq"
+
+[[env.dlq-demo.queues.consumers]]
+queue              = "homurabi-jobs-dlq"
+max_batch_size     = 3
+max_batch_timeout  = 2
+max_retries        = 0

@@ -66,6 +66,13 @@ module Cloudflare
                   (options.is_a?(Hash) && (options[:stream] == true || options['stream'] == true))
       cf = Cloudflare
 
+      # NOTE: multi-line backtick → Promise works HERE because the
+      # value is assigned to `js_promise` (Opal emits the statement AND
+      # keeps the returned value alive through the local). Do NOT
+      # refactor this so the backtick is the method's last expression
+      # or the Promise will be silently dropped (same pitfall
+      # documented in lib/cloudflare_workers/{cache,queue}.rb —
+      # Phase 11B audit).
       js_promise = `
         (async function() {
           var out;

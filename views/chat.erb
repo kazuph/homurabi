@@ -32,10 +32,7 @@
     <% if @history && @history.any? %>
       <% @history.each do |msg| %>
         <% role = Rack::Utils.escape_html(msg['role'].to_s) %>
-        <article class="chat-msg chat-msg-<%= role %>">
-          <header class="chat-msg-role"><%= role %></header>
-          <div class="chat-msg-body"><%= Rack::Utils.escape_html(msg['content'].to_s) %></div>
-        </article>
+        <article class="chat-msg chat-msg-<%= role %>"><header class="chat-msg-role"><%= role %></header><div class="chat-msg-body"><% if msg['role'].to_s == 'assistant' %><%= HomurabiMarkdown.render(msg['content'].to_s) %><% else %><%= Rack::Utils.escape_html(msg['content'].to_s) %><% end %></div></article>
       <% end %>
     <% else %>
       <div class="chat-empty">
@@ -112,7 +109,14 @@
       return h;
     }
 
-    function appendMessage(role, content) {
+    // `content` is the raw text (user messages) — `.textContent` is
+    // used so any Markdown-looking characters are displayed literally.
+    // `contentHtml` is the server-rendered HTML (assistant replies)
+    // — when supplied, it replaces `.innerHTML` on the body so the
+    // bullet lists / bold / code fences render. The server-side
+    // `HomurabiMarkdown.render` HTML-escapes inputs before the
+    // Markdown rules fire, so trusting its output is safe.
+    function appendMessage(role, content, contentHtml) {
       var wrap = document.createElement('article');
       wrap.className = 'chat-msg chat-msg-' + role;
       var head = document.createElement('header');
@@ -120,7 +124,11 @@
       head.textContent = role;
       var body = document.createElement('div');
       body.className = 'chat-msg-body';
-      body.textContent = content;
+      if (typeof contentHtml === 'string' && contentHtml.length > 0) {
+        body.innerHTML = contentHtml;
+      } else {
+        body.textContent = content;
+      }
       wrap.appendChild(head);
       wrap.appendChild(body);
       // Drop the empty-state placeholder once a real message arrives.
@@ -167,11 +175,20 @@
       }
     });
 
+    // IME composition 中の Enter で誤送信しないようにフラグ管理。
+    // `ev.isComposing` / `ev.keyCode === 229` は Chromium で不安定
+    // (変換確定直後の Enter は keydown 時点で isComposing=false に
+    // なるため) — compositionstart/end を自前で追跡するのが確実。
+    var composing = false;
+    inputEl.addEventListener('compositionstart', function () { composing = true; });
+    inputEl.addEventListener('compositionend',   function () { composing = false; });
+
     inputEl.addEventListener('keydown', function (ev) {
-      if (ev.key === 'Enter' && !ev.shiftKey) {
-        ev.preventDefault();
-        formEl.requestSubmit();
-      }
+      if (ev.key !== 'Enter' || ev.shiftKey) return;
+      // IME 変換中 (または確定の直後に発火する Enter) は握り潰す。
+      if (composing || ev.isComposing || ev.keyCode === 229) return;
+      ev.preventDefault();
+      formEl.requestSubmit();
     });
 
     formEl.addEventListener('submit', async function (ev) {
@@ -198,7 +215,14 @@
         });
         var json = await resp.json();
         if (!resp.ok) throw new Error(json.error || ('http ' + resp.status));
-        pending.querySelector('.chat-msg-body').textContent = json.reply || '(no reply)';
+        var bodyEl = pending.querySelector('.chat-msg-body');
+        if (typeof json.reply_html === 'string' && json.reply_html.length > 0) {
+          // Server-rendered Markdown HTML — see appendMessage comment
+          // for why innerHTML is safe.
+          bodyEl.innerHTML = json.reply_html;
+        } else {
+          bodyEl.textContent = json.reply || '(no reply)';
+        }
         document.getElementById('chat-current-model').textContent = json.model;
       } catch (err) {
         pending.querySelector('.chat-msg-body').textContent = 'error: ' + err.message;

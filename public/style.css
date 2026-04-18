@@ -29,8 +29,28 @@ body:has(.chat-shell) { max-width: 56em; }
 .chat-banner-info { background: #fff8e1; border: 1px solid #f6c344; }
 .chat-banner-ok   { background: #e6f7ec; border: 1px solid #4caf7e; }
 .chat-thread { display: flex; flex-direction: column; gap: .8em; min-height: 16em; max-height: 28em; overflow: auto; padding: 1em; border: 1px solid #ddd; border-radius: 8px; background: #fafbfc; }
-.chat-msg { padding: .6em .9em; border-radius: 8px; max-width: 90%; white-space: pre-wrap; word-break: break-word; }
-.chat-msg-role { font-size: .7em; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); margin-bottom: .25em; }
+/* `white-space: pre-wrap` stays on `.chat-msg-body` only — applying
+   it to the outer `.chat-msg` made the ERB whitespace between
+   <header> and <div> render as a big vertical gap in every bubble. */
+.chat-msg { padding: .6em .9em; border-radius: 8px; max-width: 90%; word-break: break-word; }
+.chat-msg-role { font-size: .7em; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); margin: 0 0 .25em 0; }
+/* Phase 11B — Markdown rendering styles for chat bubbles. The server
+   converts assistant replies to a restricted HTML subset via
+   `lib/homurabi_markdown.rb`. Selectors are scoped to
+   `.chat-msg-body` so the app's global `<pre>` / `<code>` theme
+   is not affected. */
+.chat-msg-body { white-space: pre-wrap; }
+.chat-msg-body > p { margin: 0 0 .5em 0; }
+.chat-msg-body > p:last-child { margin-bottom: 0; }
+.chat-msg-body ul, .chat-msg-body ol { margin: .25em 0 .5em 1.4em; padding: 0; white-space: normal; }
+.chat-msg-body li { margin: .1em 0; }
+.chat-msg-body code { background: rgba(0,0,0,.06); padding: .08em .35em; border-radius: 3px; font-family: 'JetBrains Mono', Menlo, monospace; font-size: .92em; }
+.chat-msg-body pre { background: #1e1e1e; color: #f5f5f5; padding: .7em .9em; border-radius: 6px; overflow-x: auto; margin: .4em 0; white-space: pre; }
+.chat-msg-body pre code { background: transparent; padding: 0; color: inherit; }
+.chat-msg-body h1, .chat-msg-body h2, .chat-msg-body h3, .chat-msg-body h4 { margin: .6em 0 .3em 0; font-size: 1.05em; }
+.chat-msg-body a { color: var(--brand); text-decoration: underline; }
+.chat-msg-body strong { font-weight: 700; }
+.chat-msg-body em { font-style: italic; }
 .chat-msg-user      { align-self: flex-end; background: #d8ecff; border: 1px solid #a4ccef; }
 .chat-msg-assistant { align-self: flex-start; background: #fff; border: 1px solid #ddd; }
 .chat-msg-system    { align-self: stretch; background: #f4f4f4; border: 1px dashed #ccc; font-style: italic; }

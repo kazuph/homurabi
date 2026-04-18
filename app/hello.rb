@@ -1507,6 +1507,47 @@ class App < Sinatra::Base
     }.to_json
   end
 
+  # GET /phase11a/upload — HTML upload page for real-image dogfooding.
+  # Renders a vanilla multipart form + a gallery of previously uploaded
+  # images (listed from R2 under the `phase11a/uploads/` prefix).
+  #
+  # Hit this from a browser after `wrangler dev --var HOMURABI_ENABLE_FOUNDATIONS_DEMOS:1`,
+  # pick a PNG / JPG from disk, and the submit handler POSTs to
+  # /api/upload which stores it in R2. The page then reloads and the
+  # thumbnail comes back via /phase11a/download/<key>.
+  get '/phase11a/upload' do
+    @title = 'Phase 11A — image upload demo'
+    unless foundations_demos_enabled?
+      status 404
+      @content = '<p>foundations demos disabled (set HOMURABI_ENABLE_FOUNDATIONS_DEMOS=1).</p>'
+      next erb :layout
+    end
+    @images = []
+    if bucket
+      rows = bucket.list(prefix: 'phase11a/uploads/', limit: 50).__await__
+      # R2 list returns in key-ascending order. We prepend a random
+      # prefix at upload time, so order is effectively randomised —
+      # which is fine for a gallery. Compute a nice display URL per
+      # row here so the ERB template stays dumb.
+      @images = rows.map do |row|
+        filename = row['key'].to_s.split('/').last.to_s
+        # The "random hash-filename" pattern is `HEX-actualname.ext`
+        # produced by POST /api/upload. Strip the hash for a nicer label.
+        display_name = filename.sub(/\A[0-9a-f]+-/, '')
+        {
+          'key'          => row['key'],
+          'download_url' => "/phase11a/download/#{row['key']}",
+          'filename'     => display_name,
+          'content_type' => row['content_type'],
+          'size'         => row['size'],
+          'note'         => nil  # R2 doesn't preserve our custom note
+        }
+      end
+    end
+    @content = erb :phase11a_upload
+    erb :layout
+  end
+
   # GET /phase11a/download/* — binary round-trip endpoint for
   # /api/upload. Sinatra's bare `/r2/:key` captures stop at slashes,
   # so keys under `phase11a/uploads/xxxxx-y.bin` are unreachable via

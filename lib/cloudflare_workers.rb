@@ -657,12 +657,25 @@ module Cloudflare
     #     => [{ 'key' => 'phase11a/uploads/abc-cat.png',
     #           'size' => 31337, 'uploaded' => '2026-04-17T...',
     #           'content_type' => 'image/png' }, ...]
-    def list(prefix: nil, limit: 100, cursor: nil)
+    #
+    # NOTE: R2's `list()` returns bare objects by default — `httpMetadata`
+    # is ONLY populated when `include: ['httpMetadata']` is passed in
+    # the options. Without it, every row would come back with a
+    # fallback `application/octet-stream` content-type even for real
+    # PNG uploads. Always requesting httpMetadata is the right default
+    # for a gallery UI; callers that need the bytes-only fast path can
+    # fall back to listing raw keys + `get()` on-demand.
+    def list(prefix: nil, limit: 100, cursor: nil, include: %w[httpMetadata])
       js_bucket = @js
       opts = `({})`
       `#{opts}.prefix = #{prefix}` if prefix
       `#{opts}.limit  = #{limit.to_i}` if limit
       `#{opts}.cursor = #{cursor}` if cursor
+      if include && !include.empty?
+        js_include = `[]`
+        include.each { |v| vs = v.to_s; `#{js_include}.push(#{vs})` }
+        `#{opts}.include = #{js_include}`
+      end
       `#{js_bucket}.list(#{opts}).then(function(res) { var rows = []; var arr = res && res.objects ? res.objects : []; for (var i = 0; i < arr.length; i++) { var o = arr[i]; var ct = (o.httpMetadata && o.httpMetadata.contentType) || 'application/octet-stream'; var h = new Map(); h.set('key', o.key); h.set('size', o.size|0); h.set('uploaded', o.uploaded ? o.uploaded.toISOString() : null); h.set('content_type', ct); rows.push(h); } return rows; })`
     end
   end

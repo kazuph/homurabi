@@ -17,6 +17,29 @@
 
 ---
 
+## 🎯 Gem / ライブラリ採用の優先順位（2026-04-18 確立・マスター指示）
+
+homurabi の価値は「Cloudflare Workers で Ruby を動かす」に加えて
+**「既存 Ruby 資産をできる限りそのまま使える状態にする」** こと。自作ミニ実装は
+最終手段であり、先に既存 gem を試す。
+
+| 優先度 | 方針 | いつ選ぶ | 前例 |
+|---|---|---|---|
+| **① 既存 gem をそのまま `require`** | 何も vendor しない、Gemfile に書くだけ | `require 'json'` / `require 'securerandom'` 等、Opal 標準互換で通るもの | Phase 0-5 の大半 |
+| **② 既存 gem を vendor（無改変）** | `vendor/foo/` に gem 丸ごと置く、Opal バンドルに含める | pure Ruby・C拡張なし・Opal 非互換 API を踏まない | `mustermann`, 現 `rack/` |
+| **③ 既存 gem を vendor + 最小 Opal patch** | vendor した本家の挙動を、`lib/foo_opal_patches.rb` で必要箇所だけ override | Opal / Workers 制約に一部抵触するが中核ロジックは使える | `ruby-jwt` (v2.9.3 + async patch)、**Phase 13 Modern Sinatra** |
+| **④ 既存 gem の subset を fork rewrite** | vendor した本家から不要部分を物理削除、コアだけ残す | ②③で解けない eval まみれ・依存爆発を避けたい | （現状なし、避けるべき） |
+| **⑤ 自作 mini 実装** | スクラッチで書く | ①〜④で解けない / 本家が巨大すぎて比較の土俵にない | `lib/homurabi_markdown.rb`（kramdown 5k 行の代替）、`lib/cloudflare_workers/*.rb`（Cloudflare binding ラッパ） |
+
+**判断順**: ①から順に試す。`npm run build` で失敗 or smoke test が落ちたら次の優先度へ。
+自作 (⑤) は「本家を入れない方が明確に筋が良い」場合のみ選択（小粒な DSL ラッパ、
+プロジェクト固有の glue コード、kramdown のような過剰依存の代替）。
+
+関連: `.claude/skills/opal-workers-gem-adoption/SKILL.md` にも同原則を記載
+（Phase 11B マージ後にプロジェクトグローバル skill として発動する）。
+
+---
+
 ## 全体像
 
 ```
@@ -39,11 +62,27 @@
    │            with Gemma 4 + gpt-oss-120b、KV 履歴、JWT 保護)
    │            shipped 2026-04-17 (PR #5, commit 5f71953)
    ↓
-🚧 Phase 11 — 基礎固めパック（並列着手中）
-   ├─ 11A: HTTP foundations (Faraday / multipart / streaming SSE)
-   ├─ 11B: Cloudflare native bindings (Durable Objects / Cache API / Queues)
-   └─ 候補（未着手）— Vectorize (RAG) / Email / Service Bindings /
-                      ChaCha20 / JWE / Phase 10.3 streaming chat
+✅ Phase 11A ── HTTP foundations              (Faraday shim / multipart / SSE streaming)
+   │            shipped 2026-04-18 (PR #8)
+   │            34 smoke + /test/foundations 6/6 実機グリーン
+   ↓
+✅ Phase 11B ── Cloudflare native bindings    (Durable Objects / Cache API / Queues)
+   │            shipped 2026-04-18 (PR #9)
+   │            71 smoke + DO WebSocket Hibernation + DLQ 実機 round-trip
+   ↓
+🚧 Phase 12 — Sequel (vendored) + D1 adapter + migration
+   │          Sequel 本家 v5.x を `vendor/sequel/` に丸ごと、D1 Database adapter のみ自作
+   │          Sinatra × Sequel のゴールデンコンボが homurabi で成立する
+   │          Migration は Ruby DSL → SQL 書き出し → `wrangler d1 migrations apply`
+   ↓
+🚧 Phase 13 — Modern Sinatra migration（janbiedermann fork 離脱）
+   │          上流 `sinatra/sinatra` 4.x を `vendor/sinatra_upstream/` に固定
+   │          `lib/sinatra_opal_patches.rb` で 10-15 箇所だけ override
+   │          既存 341 smoke test 全緑を regression harness として使う
+   ↓
+🚧 Phase 11 候補残（未着手）
+   └─ Vectorize (RAG、metered コスト有) / Email Workers / Service Bindings /
+      ChaCha20-Poly1305 (Phase 7 deferred) / JWE / Phase 10.3 streaming chat
 ```
 
 依存関係:
@@ -292,20 +331,233 @@ Cloudflare Workers の `scheduled` ハンドラを Ruby 側から書けるよう
 
 ---
 
-## 🚧 Phase 11 候補（参考・未確定）
+## 🚧 Phase 12 — Sequel (vendored) + D1 adapter + Ruby migration DSL
 
-| 候補 | 概要 | 価値 |
+### 目的
+
+Ruby エコシステムの **「AR じゃない方の標準 ORM／クエリビルダ」** である Sequel
+（Jeremy Evans 氏メンテ・MIT・pure Ruby・2007〜現在活発）を homurabi に入れて、
+Sinatra × Sequel のゴールデンコンボが Cloudflare Workers 上で成立する状態にする。
+
+Phase 3 の生 SQL over `Cloudflare::D1Database#execute` は十分シンプルだが、複雑な
+クエリ（JOIN、サブクエリ、WHERE 動的組み立て）を書き始めると生 SQL の文字列結合が
+増えてテストしにくくなる。Sequel の DSL で書ければ可読性＋型安全＋ migration まで
+一気通貫になる。
+
+### 方針（採用優先順位 ③ = vendor + 最小 Opal patch）
+
+自作 mini 実装（⑤）は **明確に却下**。AR を不採用にしたのと同じ理由で「本家 gem を
+使う方が資産価値が高い」。Sequel は pure Ruby・依存ゼロ・eval 依存が AR より
+圧倒的に少ないので、vendor + 極小 patch で動く見込み。
+
+### スコープ
+
+1. **Sequel 本家を `vendor/sequel/` に丸ごと固定**（git submodule またはタグ打ちで tarball 展開）
+   - 対象: Sequel v5.x の最新安定版
+2. **D1 adapter 自作**（`lib/sequel/adapters/d1.rb`）
+   - `Sequel::Database` を継承し、10 個ほどのメソッド（`execute` / `execute_insert`
+     / `execute_ddl` / `tables` / `schema_parse_table` / etc.）を実装
+   - 内部は `Cloudflare::D1Database` を叩く。`__await__` で Promise 解決
+   - SQLite dialect 共有（D1 はバックエンドが sqlite3）
+3. **Opal patch**（必要箇所のみ `lib/sequel_opal_patches.rb`）
+   - `Sequel::Database::ConnectionPool` の Mutex / Thread 前提を no-op 化
+   - String mutation (`<<`) を reassignment に書き換え
+   - `class_eval(string)` 使用箇所を `define_method` へ（該当あれば）
+   - `autoload` の遅延ロード対象で Opal 非互換なものを手動 require に展開
+4. **Migration DSL（B 案・build-time only、runtime bundle には入れない）**
+   - Sequel の `Sequel.migration do; change do ... end; end` をそのまま使える
+   - `bin/homurabi-migrate compile` で Ruby migration を **SQL ファイルに書き出し**
+   - 出力を `wrangler d1 migrations apply homurabi-db` が適用
+   - migration スクリプト自体は CRuby で走らせる → Opal バンドル増加ゼロ
+5. **デモ: `/demo/sequel`**
+   - `DB[:users].where(active: true).order(:name).limit(10).all` 相当を返す route
+   - 既存 `GET /d1/users` と並置で比較できる
+6. **smoke test: `test/sequel_smoke.rb`**
+   - `Sequel::Database#execute` が D1 へ届く
+   - `dataset#all` / `#where` / `#order` / `#first` / `#insert`
+   - migration 生成が期待 SQL を出す（ゴールデンファイル比較）
+
+### 採用優先順位評価
+
+- ①（素 require）: ❌ — Sequel は Gemfile 経由で Bundler が要るが Opal は独自 require 系
+- ②（vendor 無改変）: △ — Mutex / `class_eval` で引っかかる箇所が数箇所ある見込み
+- **③（vendor + patch）: ✅** ← これを採る
+- ④⑤: 不要
+
+### 非スコープ
+
+- **ActiveRecord 互換の magic finder（`User.find_by_name`）は移植しない**
+  — Sequel::Model はオプトイン、homurabi はまず Sequel::Dataset DSL だけで十分
+- **schema.rb 自動生成は移植しない** — migration が source of truth（Sequel の既定挙動）
+- **Connection pool の multi-connection** — Workers は isolate 単一、プールは opt-out
+- PostgreSQL / MySQL adapter: D1 専用なので無関係
+
+### 検証手順
+
+1. `npm run build` が Opal エラー出さない
+2. `npm test` に `test:sequel` を足して全緑
+3. `wrangler dev` で `/demo/sequel` が 200 OK
+4. `bin/homurabi-migrate compile` が `.sql` を吐く
+5. `wrangler d1 migrations apply homurabi-db --local` で schema 適用
+6. 既存 341 テスト全緑維持（regression harness）
+
+### 完了条件
+
+- `vendor/sequel/` に固定バージョン置く
+- `lib/sequel/adapters/d1.rb` 実装、`Sequel.connect('d1://')` で接続可能
+- `lib/sequel_opal_patches.rb` の override 箇所を全て明示コメント
+- `/demo/sequel` 実機グリーン
+- `test/sequel_smoke.rb` 最低 10 ケース
+- README に Phase 12 節、ROADMAP の「不採用」から AR 項目の但し書きを更新
+
+### 想定リスク
+
+| リスク | 対処 |
+|---|---|
+| Sequel 内部で `eval(string)` が使われている | grep で発見次第 patch で override、patch 不可なら ④ に格下げ |
+| D1 adapter の schema introspection が PRAGMA 系未対応 | D1 が返すエラーを捕捉して fallback クエリへ |
+| bundle size 肥大化 | Sequel v5 は ~15k 行。Opal バンドル +500KB 見込み、許容内 |
+| migration の可逆性（`change do` の自動反転） | 複雑な ALTER は `up` / `down` を明示させる（Sequel の既定挙動） |
+
+### 想定工数
+
+- vendor 配置 + adapter skeleton: 0.5 日
+- D1 adapter 本実装 + Opal patch: 2-3 日
+- migration 生成 CLI: 1 日
+- smoke + dogfooding + README: 1 日
+- 合計目安: **1 週間以内 1 phase = 1 worktree**
+
+---
+
+## 🚧 Phase 13 — Modern Sinatra migration（janbiedermann fork 離脱）
+
+### 目的
+
+現在 homurabi が vendored している `janbiedermann/sinatra` は個人メンテの Opal 特化
+fork で、**上流 `sinatra/sinatra` (2024 〜 2026) からの乖離が 10 年近く積み上がって
+いる**。マスター指示により「知らない人のフォーク」を採用し続けるリスクを排除し、
+**上流 Sinatra 4.x を vendor + 最小 patch** する方式へ移行する。
+
+採用優先順位 ③（vendor + patch）の教科書的ケース。既存 gem の挙動を最大限活かし、
+Opal/Workers 制約に触れる箇所だけピンポイントで override。
+
+### 方針
+
+| 選択肢 | 採用？ | 理由 |
 |---|---|---|
-| Vectorize binding | RAG / セマンティック検索 | Phase 10 の AI チャットを KB 連携へ拡張 |
-| Durable Objects ラッパ | WebSocket / 永続セッション / アクター | リアルタイム機能、AI チャットのストリーム永続化 |
-| Queues binding | バックグラウンド job | 非同期処理、retry、Phase 9 と組み合わせ |
-| Cache API ラッパ | エッジキャッシュ | 低レイテンシ最適化 |
-| Email Workers | メール受信→ Ruby ハンドラ | Webhook 的にメール処理 |
-| Service Bindings | Worker→ Worker 間呼び出し | マイクロサービス分割 |
-| ChaCha20-Poly1305 | pure-JS AEAD 同梱 | Phase 7 で deferred、TLS 1.3 互換性 |
-| multipart/form-data 本格対応 | アップロード | ファイル受信、画像処理連携 |
-| Faraday アダプタ | Ruby HTTP gem 互換性 | Phase 6 の Net::HTTP に続く |
-| JWE（暗号化 JWT） | 機密 payload を含む JWT | Phase 8 の延長 |
+| A. 上流 vendored + monkey-patch | ✅ | 上流コード無改変、patch ファイル 1 箇所に集約 |
+| B. 上流 fork + 最小 diff 運用 | ❌ | fork リポジトリ管理コスト、rebase 負担 |
+| C. patch queue（kernel 式） | ❌ | 独自ツール必要 |
+| D. subset 自作（homurabi-sinatra） | ❌ | 既存資産活用の原則違反 |
+
+### スコープ
+
+1. **`vendor/sinatra_upstream/`** に上流 sinatra 4.x を固定
+   （git submodule with tag pin、初回は tarball 展開でも可）
+2. **`lib/sinatra_opal_patches.rb`** を作成、以下の 10-15 箇所を override
+3. **janbiedermann fork を `vendor/sinatra/` から削除**
+4. **既存 341 テストを regression harness として全緑維持**
+
+### Opal patch リスト（候補）
+
+上流 Sinatra 4.x の Opal/Workers 非互換箇所を棚卸し済み:
+
+| 項目 | 上流挙動 | Opal/Workers 問題 | patch 方針 |
+|---|---|---|---|
+| `Sinatra::Base.compile!` | route DSL を `class_eval("def #{name}...", __FILE__, __LINE__)` で動的メソッド化 | Workers 禁止: `Code generation disallowed` | `define_method(name, &block)` へ置換 |
+| `Sinatra::Base#render` (templates) | `Tilt.new(path).render` — file I/O + Tilt 内部 `eval` | FS なし・eval 禁止 | `HomurabiTemplates` dispatch アダプタに差し替え |
+| `Sinatra::Base#process_route` | 同期的に route body 呼ぶ | Opal `# await: true` body は Promise 返す → Sinatra は String 期待で死ぬ | body が Promise なら `__await__` してから戻す patch |
+| `throw :halt` / `catch(:halt)` | 同期 control flow | async boundary またぐと `UncaughtThrowError` | halt を `:halt_value` 返り値に変換するシム（Phase 10 `chat_verify_token!` で既知） |
+| `String#<<` / `String#replace` | Rack::Utils 等で `path << "/"` | Opal String immutable | 該当箇所のみ reassignment へ |
+| `ObjectSpace.each_object` | `Sinatra::Base.subclasses` 探索 | Opal に ObjectSpace なし | `inherited` hook + class 変数で代替 |
+| `autoload` の遅延 require 対象 | Tilt / ERB など | 対象 gem が Opal 非互換 | 手動 require を homurabi 版で override |
+| `Rack::Protection` の一部 middleware | `/proc/self/status` 読み取り | FS なし | 該当 middleware を `set :protection, ...` で無効化 |
+| `Mutex` / `Thread.current` | Rack::Session 周辺 | single isolate | Opal 側 Mutex no-op 既存 patch 流用 |
+| `File.read(template)` | static template loader | FS なし | `HomurabiTemplates` dispatch、404 fallback |
+
+**想定 override 箇所: 10-15 箇所、patch ファイル ~300-500 行**
+
+### 段階実装手順
+
+1. **調査フェーズ**（Phase 13.0 — Codex consult + dogfooding）
+   - 上流 Sinatra 4.x を `vendor/sinatra_upstream/` に置いて Opal ビルドさせる
+   - エラーを実際に列挙（上記「想定」は推測、実機 probe が正義）
+   - Phase 12 Sequel と順序前後入れ替えてもよい
+2. **patch 実装**（Phase 13.1）
+   - `lib/sinatra_opal_patches.rb` を書く
+   - override 箇所ごとに「上流該当行 → 置換後の挙動 → 理由」コメント明記
+3. **切り替え**（Phase 13.2）
+   - `require 'sinatra/base'` の読み込み順を upstream → patches に
+   - `vendor/sinatra/` (janbiedermann) を削除
+4. **regression 検証**（Phase 13.3）
+   - 既存 341 smoke test 全緑
+   - `/chat` / `/demo/*` / `/api/*` 全 route を dogfooding
+   - `/test/crypto` / `/test/jwt` / `/test/bindings` / `/test/foundations` 全緑
+5. **公開**
+   - README に Phase 13 節、janbiedermann fork 依存削除の旨記載
+   - CLAUDE.md / SKILL.md の「vendored gems」一覧を更新
+
+### 非スコープ
+
+- Sinatra 5.x 先取り（出たらその時）
+- Sinatra::Contrib の全拡張移植（必要になったら都度）
+- Padrino 互換（homurabi は Sinatra ベース限定）
+
+### 想定リスク
+
+| リスク | 対処 |
+|---|---|
+| 上流 Sinatra 4.x が想定外の eval / FS 依存を大量に持つ | Phase 13.0 調査フェーズでまず実機確認、想定超なら Phase 再分割 |
+| Rack 4 要求（今の homurabi は Rack 3 前提） | 必要なら Rack も同時 upgrade（サブ phase 化） |
+| janbiedermann fork 独自機能を既存コードが使っていた | `vendor/sinatra/` 削除前に grep で探索、依存があれば patch 側に移植 |
+| 既存 341 テストが上流 Sinatra では通らない箇所がある | regression は patch 側で吸収、無理なら上流へ PR 投げる可能性も（マスター許可必要） |
+
+### 完了条件
+
+- `vendor/sinatra/` (janbiedermann) 物理削除
+- `vendor/sinatra_upstream/` に上流タグ固定で配置
+- `lib/sinatra_opal_patches.rb` に全 override 集約
+- 既存 341 smoke test + `/test/*` self-test 全緑
+- README / ROADMAP / SKILL 更新
+
+### 想定工数
+
+- 調査（0.3 日）
+- patch 実装（3-5 日・未知数あり）
+- regression + dogfooding（1-2 日）
+- 合計目安: **1.5-2 週間**（Phase 12 より長い、未知数多いため）
+
+### 進行順
+
+**Phase 12 Sequel を先に完了させてから Phase 13 Sinatra 載せ替え** に入る。理由:
+
+- Sequel は新規機能追加（規模固定・壊れる範囲狭い）
+- Sinatra 載せ替えは全 route が regression 対象（harness が重要）
+- 先に Phase 12 で新 pattern 確立し、テストが増えた状態で Phase 13 の regression safety net を強化する
+
+---
+
+## 🚧 Phase 11 候補（残り・未着手）
+
+Phase 11A / 11B（shipped）と Phase 12 / 13（計画済）で消化されていないもののみ。
+
+| 候補 | 概要 | 価値 | コスト評価 |
+|---|---|---|---|
+| Vectorize binding | RAG / セマンティック検索 | Phase 10 の AI チャットを KB 連携へ拡張 | metered 課金あり — deploy 時コスト発生 |
+| Email Workers | メール受信→ Ruby ハンドラ | Webhook 的にメール処理 | 本番 Email Routing 必要、miniflare emulator 弱め |
+| Service Bindings | Worker→ Worker 間呼び出し | マイクロサービス分割 | miniflare 2 worker でローカル完結、コスト 0 |
+| ChaCha20-Poly1305 | pure-JS AEAD 同梱 | Phase 7 で deferred、TLS 1.3 互換性 | pure-JS、コスト 0 |
+| JWE（暗号化 JWT） | 機密 payload を含む JWT | Phase 8 の延長 | pure Ruby + Phase 7 crypto、コスト 0 |
+| Phase 10.3: Streaming chat | `/chat` 応答を SSE で逐次表示 | UX 改善 | Phase 11A の SSEStream + AI::Stream で部品はあり |
+| Phase 10.4: OpenAI 互換 API fallback | Workers AI が落ちた時の外部 API 経由 | 可用性・ vendor lock-in 回避 | Phase 11A Faraday 再利用可 |
+
+### 消化済み（Phase 11A / 11B）
+
+- ✅ Durable Objects ラッパ → Phase 11B
+- ✅ Queues binding → Phase 11B
+- ✅ Cache API ラッパ → Phase 11B
+- ✅ multipart/form-data → Phase 11A
+- ✅ Faraday アダプタ → Phase 11A
 
 ---
 
@@ -333,7 +585,7 @@ Cloudflare Workers の `scheduled` ハンドラを Ruby 側から書けるよう
 | PDF 生成 (prawn) | バンドルサイズ肥大・Worker CPU 制限・クライアントで PDF.js |
 | Liquid テンプレ | ERB プリコンパイルで足りる、二重持ち不要 |
 | シンタックスハイライタ (rouge) | クライアント側で highlight.js / shiki で十分 |
-| ActiveRecord | D1 用 adapter を書く工数 vs リターンが見合わない（Sequel の方がまだ筋が良いが Phase 11 以降） |
+| ActiveRecord | `class_eval(string)` による動的メソッド生成が Workers の `eval` 禁止に抵触、依存 80k 行超、adapter が C 拡張前提。物理的に動かせない。Sequel は Phase 12 で vendor 採用済 |
 | Nokogiri | libxml2 ネイティブ依存で物理的に不可 |
 | Llama 系モデル全般 | マスター指示により意図的不採用（Phase 10） |
 | RSA-PKCS1 v1.5 encrypt | subtle が OAEP のみ提供、OAEP がモダン推奨（Phase 7） |

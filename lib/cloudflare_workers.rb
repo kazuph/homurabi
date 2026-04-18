@@ -279,10 +279,23 @@ module Rack
           if stream_obj
             js_stream = stream_obj.js_stream
             js_headers = `({})`
+            # Order: Rack-response headers → stream-provided headers
+            # (SSE defaults + caller extras) → route-set hard wins. The
+            # old code hardcoded text/event-stream here, which silently
+            # dropped any `headers:` hash the caller passed to `sse`.
+            # Merge the stream's own response_headers if it exposes them
+            # (duck-type; non-SSE stream wrappers may not).
             headers.each { |k, v| ks = k.to_s; vs = v.to_s; `#{js_headers}[#{ks}] = #{vs}` }
-            `#{js_headers}['content-type'] = 'text/event-stream; charset=utf-8'`
-            `#{js_headers}['cache-control'] = 'no-cache, no-transform'`
-            `#{js_headers}['x-accel-buffering'] = 'no'`
+            if stream_obj.respond_to?(:response_headers)
+              stream_obj.response_headers.each { |k, v| ks = k.to_s; vs = v.to_s; `#{js_headers}[#{ks}] = #{vs}` }
+            else
+              # Legacy Cloudflare::AI::Stream (Phase 10.3) doesn't expose
+              # response_headers; keep the hardcoded SSE defaults for
+              # backwards compatibility in that case.
+              `#{js_headers}['content-type'] = 'text/event-stream; charset=utf-8'`
+              `#{js_headers}['cache-control'] = 'no-cache, no-transform'`
+              `#{js_headers}['x-accel-buffering'] = 'no'`
+            end
             return `new Response(#{js_stream}, { status: #{status.to_i}, headers: #{js_headers} })`
           end
 
@@ -634,6 +647,37 @@ module Cloudflare
       js_bucket = @js
       `#{js_bucket}.delete(#{key})`
     end
+
+    # List objects under a prefix. Returns a JS Promise that resolves
+    # to a Ruby Array of Hashes, one per object. Each Hash carries the
+    # common R2 metadata fields so callers can render a gallery view
+    # (key / size / uploaded / httpMetadata['contentType']).
+    #
+    #   bucket.list(prefix: 'phase11a/uploads/', limit: 50).__await__
+    #     => [{ 'key' => 'phase11a/uploads/abc-cat.png',
+    #           'size' => 31337, 'uploaded' => '2026-04-17T...',
+    #           'content_type' => 'image/png' }, ...]
+    #
+    # NOTE: R2's `list()` returns bare objects by default — `httpMetadata`
+    # is ONLY populated when `include: ['httpMetadata']` is passed in
+    # the options. Without it, every row would come back with a
+    # fallback `application/octet-stream` content-type even for real
+    # PNG uploads. Always requesting httpMetadata is the right default
+    # for a gallery UI; callers that need the bytes-only fast path can
+    # fall back to listing raw keys + `get()` on-demand.
+    def list(prefix: nil, limit: 100, cursor: nil, include: %w[httpMetadata])
+      js_bucket = @js
+      opts = `({})`
+      `#{opts}.prefix = #{prefix}` if prefix
+      `#{opts}.limit  = #{limit.to_i}` if limit
+      `#{opts}.cursor = #{cursor}` if cursor
+      if include && !include.empty?
+        js_include = `[]`
+        include.each { |v| vs = v.to_s; `#{js_include}.push(#{vs})` }
+        `#{opts}.include = #{js_include}`
+      end
+      `#{js_bucket}.list(#{opts}).then(function(res) { var rows = []; var arr = res && res.objects ? res.objects : []; for (var i = 0; i < arr.length; i++) { var o = arr[i]; var ct = (o.httpMetadata && o.httpMetadata.contentType) || 'application/octet-stream'; var h = new Map(); h.set('key', o.key); h.set('size', o.size|0); h.set('uploaded', o.uploaded ? o.uploaded.toISOString() : null); h.set('content_type', ct); rows.push(h); } return rows; })`
+    end
   end
 end
 
@@ -653,3 +697,13 @@ require 'cloudflare_workers/scheduled'
 # Phase 10 — Workers AI binding wrapper. Loaded here so any Sinatra
 # route can call Cloudflare::AI.run(...) without an extra require.
 require 'cloudflare_workers/ai'
+
+# Phase 11A — HTTP foundations.
+#
+# `multipart` installs a Rack::Request#POST override so Sinatra routes
+# can `params['file']` an uploaded file part without any ceremony.
+# `stream`    adds `Cloudflare::SSEStream` + `Sinatra::Streaming#sse`
+#             so a route can `sse do |out| ... end` and flush chunks
+#             through a Workers ReadableStream.
+require 'cloudflare_workers/multipart'
+require 'cloudflare_workers/stream'

@@ -14,6 +14,32 @@ import "./setup-node-crypto.mjs";
 
 import "../build/hello.no-exit.mjs";
 
+// Phase 11A — binary-safe body passthrough. Convert an ArrayBuffer of
+// request body bytes into a latin1 String (each code unit 0–255 is
+// exactly one byte). Opal Strings are JS Strings (UTF-16), but a
+// latin1-encoded string survives through StringIO / Ruby unchanged.
+// The Ruby side (`Cloudflare::Multipart`) reads those bytes and, for
+// file parts, converts them back to a real Uint8Array when passing
+// to R2.put / fetch body.
+//
+// Chunked to avoid the `Maximum call stack size exceeded` hazard of
+// `String.fromCharCode.apply(null, hugeArray)` — the ~0xFFFE arg cap
+// differs per engine, so we stay comfortably below at 0x8000.
+function binaryArrayBufferToLatin1String(arrayBuffer) {
+  const u8 = new Uint8Array(arrayBuffer);
+  const CHUNK = 0x8000;
+  // Accumulate into an array and join once at the end — in-loop
+  // String concatenation is O(n²) on V8 for large uploads. Each
+  // `chunk` here is already a small String (≤ 32768 chars), so
+  // join() can reuse rope structures efficiently.
+  const parts = [];
+  for (let i = 0; i < u8.length; i += CHUNK) {
+    const slice = u8.subarray(i, Math.min(i + CHUNK, u8.length));
+    parts.push(String.fromCharCode.apply(null, slice));
+  }
+  return parts.join("");
+}
+
 export default {
   async fetch(request, env, ctx) {
     const dispatch = globalThis.__HOMURABI_RACK_DISPATCH__;
@@ -29,11 +55,25 @@ export default {
     // the dispatcher. For methods that are defined to have no body
     // (GET, HEAD, OPTIONS by spec) we skip the read entirely to avoid
     // wasting a round-trip.
+    //
+    // Phase 11A: multipart/form-data bodies MUST be read as bytes, not
+    // as UTF-8 text, or file uploads get mangled the moment any byte
+    // outside the ASCII range appears. Use `arrayBuffer()` and convert
+    // to a latin1 String (1 char = 1 byte) so Opal keeps the bytes
+    // intact. `Cloudflare::Multipart.parse` decodes that back into an
+    // UploadedFile whose `#to_uint8_array` returns a real Uint8Array
+    // suitable for R2.put / fetch body.
     let bodyText = "";
     const method = request.method.toUpperCase();
     if (method !== "GET" && method !== "HEAD" && method !== "OPTIONS") {
       try {
-        bodyText = await request.text();
+        const contentType = request.headers.get("content-type") || "";
+        if (contentType.toLowerCase().includes("multipart/")) {
+          const buf = await request.arrayBuffer();
+          bodyText = binaryArrayBufferToLatin1String(buf);
+        } else {
+          bodyText = await request.text();
+        }
       } catch (err) {
         // Body read failure is a client error — surface it explicitly
         // instead of silently falling through with an empty string.

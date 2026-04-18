@@ -119,15 +119,37 @@ module Cloudflare
     # return this from a route body and `build_js_response` recognises
     # it via duck-typing (`#sse_stream?`) to pass the stream straight
     # into `new Response(stream, …)`.
+    #
+    # Phase 11A: unified with Cloudflare::SSEStream so both stream
+    # types go through the same `response_headers` path in
+    # `build_js_response`. The AI::Stream wraps a pre-existing JS
+    # ReadableStream (produced by env.AI.run), whereas SSEStream
+    # produces its own. The adapter doesn't need to care — it just
+    # calls `#js_stream` and `#response_headers`.
     class Stream
       attr_reader :js_stream
 
-      def initialize(js_stream)
+      def initialize(js_stream, headers: nil)
         @js_stream = js_stream
+        @extra_headers = headers || {}
       end
 
       def sse_stream?
         true
+      end
+
+      # Merged SSE headers — same shape as SSEStream#response_headers,
+      # so build_js_response can pass the stream through without a
+      # special AI branch. Reference Cloudflare::SSEStream lazily so
+      # this file still loads if stream.rb hasn't been required yet
+      # (Phase 11A load-order flip: ai.rb currently loads first).
+      def response_headers
+        defaults = defined?(::Cloudflare::SSEStream) ?
+          ::Cloudflare::SSEStream::DEFAULT_HEADERS :
+          { 'content-type' => 'text/event-stream; charset=utf-8',
+            'cache-control' => 'no-cache, no-transform',
+            'x-accel-buffering' => 'no' }
+        defaults.merge(@extra_headers)
       end
 
       def each; end

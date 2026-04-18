@@ -1484,6 +1484,20 @@ class App < Sinatra::Base
       next({ 'error' => 'missing "file" multipart part' }.to_json)
     end
 
+    # Only accept images — this is the /phase11a/upload demo's purpose.
+    # Rejecting non-image content types here stops the gallery ever
+    # accumulating bytes it can't render (the historical curl-smoke
+    # `.bin` payloads came in before this check existed).
+    ct = file_param.content_type.to_s
+    unless ct.start_with?('image/')
+      status 415  # Unsupported Media Type
+      next({
+        'error'         => 'only image/* content types are accepted',
+        'received_type' => ct.empty? ? '(missing)' : ct,
+        'filename'      => file_param.filename
+      }.to_json)
+    end
+
     if bucket.nil?
       status 503
       next({ 'error' => 'R2 binding not configured' }.to_json)
@@ -1523,29 +1537,63 @@ class App < Sinatra::Base
       next erb :layout
     end
     @images = []
+    @non_image_count = 0
     if bucket
       rows = bucket.list(prefix: 'phase11a/uploads/', limit: 50).__await__
-      # R2 list returns in key-ascending order. We prepend a random
-      # prefix at upload time, so order is effectively randomised —
-      # which is fine for a gallery. Compute a nice display URL per
-      # row here so the ERB template stays dumb.
-      @images = rows.map do |row|
-        filename = row['key'].to_s.split('/').last.to_s
-        # The "random hash-filename" pattern is `HEX-actualname.ext`
-        # produced by POST /api/upload. Strip the hash for a nicer label.
-        display_name = filename.sub(/\A[0-9a-f]+-/, '')
-        {
-          'key'          => row['key'],
-          'download_url' => "/phase11a/download/#{row['key']}",
-          'filename'     => display_name,
-          'content_type' => row['content_type'],
-          'size'         => row['size'],
-          'note'         => nil  # R2 doesn't preserve our custom note
-        }
+      # Partition into image rows (→ gallery) and non-image rows
+      # (legacy curl-smoke binary payloads that predate the MIME
+      # guard below). The gallery only renders real images so we
+      # never draw an `<img src=…>` pointing at bytes the browser
+      # can't decode.
+      rows.each do |row|
+        ct = row['content_type'].to_s
+        if ct.start_with?('image/')
+          filename = row['key'].to_s.split('/').last.to_s
+          display_name = filename.sub(/\A[0-9a-f]+-/, '')
+          @images << {
+            'key'          => row['key'],
+            'download_url' => "/phase11a/download/#{row['key']}",
+            'filename'     => display_name,
+            'content_type' => ct,
+            'size'         => row['size'],
+            'note'         => nil  # R2 doesn't preserve our custom note
+          }
+        else
+          @non_image_count += 1
+        end
       end
     end
     @content = erb :phase11a_upload
     erb :layout
+  end
+
+  # POST /phase11a/cleanup — delete every non-image entry under
+  # phase11a/uploads/. Lets the gallery scrub historical curl-smoke
+  # payloads (`.bin` files, 9-byte junk from an earlier test fetch)
+  # that slipped in before the MIME guard in /api/upload was added.
+  # Returns a summary of what got removed.
+  post '/phase11a/cleanup' do
+    content_type 'application/json'
+    unless foundations_demos_enabled?
+      status 404
+      next({ 'error' => 'foundations demos disabled (set HOMURABI_ENABLE_FOUNDATIONS_DEMOS=1)' }.to_json)
+    end
+    if bucket.nil?
+      status 503
+      next({ 'error' => 'R2 binding not configured' }.to_json)
+    end
+    rows = bucket.list(prefix: 'phase11a/uploads/', limit: 1000).__await__
+    deleted_keys = []
+    rows.each do |row|
+      ct = row['content_type'].to_s
+      next if ct.start_with?('image/')
+      k = row['key'].to_s
+      # Double-check we're still in our prefix before deleting.
+      next unless k.start_with?('phase11a/uploads/')
+      bucket.delete(k).__await__
+      deleted_keys << k
+    end
+    { 'deleted_count' => deleted_keys.length, 'deleted' => deleted_keys }.to_json
   end
 
   # DELETE /phase11a/uploads/* — delete a specific stored upload.

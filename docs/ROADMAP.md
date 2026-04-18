@@ -75,10 +75,19 @@ homurabi の価値は「Cloudflare Workers で Ruby を動かす」に加えて
    │          Sinatra × Sequel のゴールデンコンボが homurabi で成立する
    │          Migration は Ruby DSL → SQL 書き出し → `wrangler d1 migrations apply`
    ↓
+🚧 Phase 12.5 — Fiber ベース透過 await（「Ruby らしさ」回復パック）
+   │          `.__await__` をユーザーコードから消す。Fiber で Promise を sync-shaped
+   │          に見せる。`db[:users].all`（`.__await__` なし）が動くことが DoD
+   │          Phase 12 マスター指摘「Ruby らしくない点の筆頭」の潰し
+   │          ※ Phase 13 前に着手。Sinatra 載せ替えの移動部分を増やす前に
+   │             async semantics を先に安定化させる
+   ↓
 🚧 Phase 13 — Modern Sinatra migration（janbiedermann fork 離脱）
    │          上流 `sinatra/sinatra` 4.x を `vendor/sinatra_upstream/` に固定
    │          `lib/sinatra_opal_patches.rb` で 10-15 箇所だけ override
-   │          既存 341 smoke test 全緑を regression harness として使う
+   │          既存 smoke test 全緑を regression harness として使う
+   │          ※ Phase 12.5 完了後。Fiber 透過 await 済みなら上流 Sinatra の
+   │             同期想定 code path と衝突しにくい
    ↓
 🚧 Phase 11 候補残（未着手）
    └─ Vectorize (RAG、metered コスト有) / Email Workers / Service Bindings /
@@ -529,11 +538,115 @@ Opal/Workers 制約に触れる箇所だけピンポイントで override。
 
 ### 進行順
 
-**Phase 12 Sequel を先に完了させてから Phase 13 Sinatra 載せ替え** に入る。理由:
+**Phase 12 Sequel → Phase 12.5 Fiber 透過 await → Phase 13 Sinatra 載せ替え** の順。
+理由:
 
-- Sequel は新規機能追加（規模固定・壊れる範囲狭い）
-- Sinatra 載せ替えは全 route が regression 対象（harness が重要）
-- 先に Phase 12 で新 pattern 確立し、テストが増えた状態で Phase 13 の regression safety net を強化する
+- Phase 12 (Sequel) は新規機能追加（規模固定・壊れる範囲狭い）
+- Phase 12.5 で `.__await__` を消去して Ruby らしさを回復してから Phase 13 に入ると、
+  上流 Sinatra の sync 前提 code path と衝突しにくい
+- Phase 13 (Sinatra 載せ替え) は全 route が regression 対象、harness が重要なので
+  最後に持ってくる
+
+---
+
+## 🚧 Phase 12.5 — Fiber ベース透過 await（「Ruby らしさ」回復パック）
+
+### 目的
+
+Phase 12 マスター指摘「Ruby らしくない点の筆頭」を潰す。ユーザーコード
+（Sinatra ルート内）から `.__await__` を完全に消し去り、**CRuby Sequel / Net::HTTP
+/ JWT と同じ見た目**で書けるようにする。
+
+### 現状の問題（2026-04-18 Phase 12 shipped 時点）
+
+```ruby
+# 今:
+rows = seq_db[:users].where(active: true).order(:name).limit(10).all.__await__
+jwt  = JWT.encode(payload, secret, 'RS256').__await__
+res  = Net::HTTP.get_response(URI('...')).__await__
+```
+
+すべての Promise 返却 API に `.__await__` を付ける必要がある。CRuby との
+diff になり、サンプル・ドキュメント・既存 Ruby コードの ported 体験を壊す。
+
+### 目標
+
+```ruby
+# こうしたい:
+rows = seq_db[:users].where(active: true).order(:name).limit(10).all
+jwt  = JWT.encode(payload, secret, 'RS256')
+res  = Net::HTTP.get_response(URI('...'))
+```
+
+### アプローチ候補（要調査）
+
+#### A. Fiber + Promise.resolve（Opal stdlib 経由）
+
+- Opal 1.8.3.rc1 の Fiber 実装状況を確認する
+- Sinatra リクエストハンドラ全体を 1 本の Fiber 内で実行
+- `.__await__` を内部 DSL として隠し、`await_all` のような Fiber 自動 yield に包む
+- Promise 完了で Fiber resume、caller は sync な値を受け取る
+
+#### B. `# await: true` の伝播を "root async function" で吸収
+
+- Sinatra の root dispatch 関数を async にしておき、ネストした async メソッドの
+  Promise 返却を await で解決
+- 既に homurabi はこれを部分的にやっている（route body は `# await: true`）
+- `.__await__` を「呼ばれたら自動で await される特別マーカー」に昇格できるか？
+
+#### C. Opal 側に `# implicit_await: true` 追加
+
+- 本家 Opal に patch を当てて、一度 await-chain に入ったら以降の async method call を
+  自動的に await する機能を追加
+- 最も根本的だが Opal 本家 fork が必要、patch maintenance 重い
+
+### DoD（Definition of Done）
+
+1. `app/hello.rb` の既存 route から `.__await__` を可能な限り消す
+   - D1 / KV / R2 / Sequel / Net::HTTP / JWT.encode / JWT.decode / Cloudflare::AI.run
+   - 消せないものは物理的理由を明記（例: Fiber 内で spawn した background task 等）
+2. 既存全 smoke + Workers self-test 全緑（regression）
+3. `/demo/sequel` / `/chat` / `/api/login` 等の実機 dogfooding で挙動不変
+4. README に Ruby らしさ回復の Before/After 対比を載せる
+5. 新パターンに対応した 10 本以上の smoke test
+6. **Phase 13 (Sinatra 上流載せ替え) 前提の clean base** を作る —
+   上流 Sinatra が想定する sync code path を `.__await__` 消去で邪魔しない状態にする
+
+### 想定リスク
+
+| リスク | 対処 |
+|---|---|
+| Opal Fiber 実装が不完全 | Phase 12.5.0 調査フェーズで実機 probe、限界が見えたら B 案 / C 案へピボット |
+| Workers の event loop と Fiber の相性 | miniflare + production の両方で dogfooding |
+| 既存 `.__await__` 呼び出し総数が多すぎる | grep で enumeration、段階移行可能な順序を計画 |
+| エラー伝播（Promise reject → Fiber exception） | Fiber#raise ベースで stack trace を温存 |
+| 性能劣化 | Fiber 切替コストを bench、許容範囲確認 |
+| Phase 13 との順序逆転で Sinatra 上流化後に再調整が発生 | マスター指示で Phase 13 より先に実施、順序固定 |
+
+### 非スコープ
+
+- **Node.js 側の Thread へのマッピング** — Workers isolate 単一スレッド前提維持
+- **並列 fiber による真の並行処理** — Promise.all 相当の `parallel` DSL は別 Phase
+- **CRuby と完全同一の Fiber 挙動** — Opal の JS ベース Fiber の制約は受け入れる
+
+### 想定工数
+
+- Phase 12.5.0 調査 + Opal Fiber probe: 1-2 日（Opal stdlib 確認、PoC、制約洗い出し）
+- 本実装（A or B 案）: 3-5 日
+- 既存 `.__await__` call site 移行: 1-2 日
+- regression + dogfooding: 1 日
+- 合計目安: **1-1.5 週間**（Opal Fiber 次第で上振れ）
+
+### 進行順
+
+**Phase 13（Sinatra 上流載せ替え）より先に実施**（マスター指示 2026-04-19）。
+理由:
+- Phase 13 で動かす Sinatra 上流コードは CRuby 前提の sync code path を多用する。
+  `.__await__` が Sinatra 内部で必要になると patch が余計に膨らむ
+- Ruby らしさ（`.__await__` レス）を先に確立すれば、Phase 13 は純粋に
+  「Sinatra load-time incompat」の潰しに集中できる
+- Phase 12 で Sequel が新たな `.__await__` 発生源を追加したので、Phase 13 に
+  進む前に async semantics を一度リファクタする方が diff が小さくなる
 
 ---
 

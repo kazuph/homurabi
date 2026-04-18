@@ -1,0 +1,16 @@
+--- test summary ---
+27 tests, 27 passed, 0 failed
+14 tests, 14 passed, 0 failed
+85 tests, 85 passed, 0 failed
+43 tests, 43 passed, 0 failed
+30 tests, 30 passed, 0 failed
+10 tests, 10 passed, 0 failed
+19 tests, 19 passed, 0 failed
+15 tests, 15 passed, 0 failed
+14 tests, 14 passed, 0 failed
+13 tests, 13 passed, 0 failed
+31 tests, 31 passed, 0 failed
+18 tests, 18 passed, 0 failed
+22 tests, 22 passed, 0 failed
+12 tests, 12 passed, 0 failed
+total: 353

@@ -647,6 +647,24 @@ module Cloudflare
       js_bucket = @js
       `#{js_bucket}.delete(#{key})`
     end
+
+    # List objects under a prefix. Returns a JS Promise that resolves
+    # to a Ruby Array of Hashes, one per object. Each Hash carries the
+    # common R2 metadata fields so callers can render a gallery view
+    # (key / size / uploaded / httpMetadata['contentType']).
+    #
+    #   bucket.list(prefix: 'phase11a/uploads/', limit: 50).__await__
+    #     => [{ 'key' => 'phase11a/uploads/abc-cat.png',
+    #           'size' => 31337, 'uploaded' => '2026-04-17T...',
+    #           'content_type' => 'image/png' }, ...]
+    def list(prefix: nil, limit: 100, cursor: nil)
+      js_bucket = @js
+      opts = `({})`
+      `#{opts}.prefix = #{prefix}` if prefix
+      `#{opts}.limit  = #{limit.to_i}` if limit
+      `#{opts}.cursor = #{cursor}` if cursor
+      `#{js_bucket}.list(#{opts}).then(function(res) { var rows = []; var arr = res && res.objects ? res.objects : []; for (var i = 0; i < arr.length; i++) { var o = arr[i]; var ct = (o.httpMetadata && o.httpMetadata.contentType) || 'application/octet-stream'; var h = new Map(); h.set('key', o.key); h.set('size', o.size|0); h.set('uploaded', o.uploaded ? o.uploaded.toISOString() : null); h.set('content_type', ct); rows.push(h); } return rows; })`
+    end
   end
 end
 

@@ -1,0 +1,83 @@
+<h1>Phase 11A — image upload demo</h1>
+
+<p>
+  Phase 11A multipart/form-data パイプライン dogfooding page. Pick any image
+  from disk and submit; the byte stream goes through
+  <code>src/worker.mjs</code> → <code>Cloudflare::Multipart</code> →
+  <code>R2Bucket#put</code>, then comes back out via the splat route
+  <code>/phase11a/download/&lt;key&gt;</code> (R2 get_binary stream →
+  <code>Response(ReadableStream)</code>). If you see the image rendered
+  below after upload, every byte survived the JS ↔ Ruby ↔ R2 ↔ JS
+  round-trip.
+</p>
+
+<form id="upload-form"
+      method="POST"
+      action="/api/upload"
+      enctype="multipart/form-data"
+      style="margin:1em 0; padding:1em; border:1px solid #888; border-radius:6px;">
+  <label>
+    <b>Image file</b><br>
+    <input type="file" name="file" accept="image/*" required>
+  </label>
+  <br><br>
+  <label>
+    Note (optional):
+    <input type="text" name="note" maxlength="64" placeholder="e.g. my cat">
+  </label>
+  <br><br>
+  <button type="submit">Upload</button>
+</form>
+
+<div id="upload-status" role="status" aria-live="polite"></div>
+
+<h2>Gallery</h2>
+<p id="gallery-empty" <%= @images.any? ? 'hidden' : '' %>>
+  No uploads yet. Pick a file above and submit.
+</p>
+<ul id="gallery" style="list-style:none; padding:0; display:flex; flex-wrap:wrap; gap:16px;">
+  <% @images.each do |img| %>
+    <li class="gallery-item"
+        style="border:1px solid #ccc; padding:8px; border-radius:4px; max-width:260px;">
+      <a href="<%= img['download_url'] %>" target="_blank" rel="noopener">
+        <img src="<%= img['download_url'] %>"
+             alt="<%= img['note'] || img['filename'] %>"
+             style="max-width:240px; max-height:240px; display:block;">
+      </a>
+      <div style="font-size:12px; margin-top:4px;">
+        <div><b><%= img['filename'] %></b></div>
+        <div><%= img['content_type'] %> &middot; <%= img['size'] %> bytes</div>
+        <% if img['note'] && !img['note'].empty? %>
+          <div>"<%= img['note'] %>"</div>
+        <% end %>
+      </div>
+    </li>
+  <% end %>
+</ul>
+
+<script>
+(function(){
+  var form   = document.getElementById('upload-form');
+  var status = document.getElementById('upload-status');
+  form.addEventListener('submit', async function(ev) {
+    ev.preventDefault();
+    status.textContent = 'Uploading…';
+    var fd  = new FormData(form);
+    try {
+      var res = await fetch('/api/upload', { method: 'POST', body: fd });
+      var body = await res.json();
+      if (res.ok && body.stored) {
+        status.innerHTML = 'Stored as <code>' + body.key + '</code> (' +
+                           body.size + ' bytes, ' + body.content_type + ').';
+        // Reload so the gallery picks up the new image — simplest correct UX.
+        setTimeout(function(){ location.reload(); }, 300);
+      } else {
+        status.textContent = 'Upload failed: ' +
+          (body.error || ('HTTP ' + res.status));
+      }
+    } catch (e) {
+      status.textContent = 'Network error: ' + e.message;
+    }
+  });
+})();
+</script>

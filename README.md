@@ -1191,6 +1191,123 @@ $ npm run test:do && npm run test:cache && npm run test:queue
 22 tests, 22 passed, 0 failed
 ```
 
+## Sequel + D1 adapter (Phase 12)
+
+Phase 12 は **「Ruby 生まれの Dataset DSL で D1 を喋る」** パック。
+`Sequel.connect(adapter: :d1, d1: env['cloudflare.DB'])` で接続できて、
+`db[:users].where(active: true).order(:name).limit(10).all.__await__` が
+Cloudflare Workers 上で素直に動く。ハンドル済みの実機証跡は
+`/test/sequel`（8/8 緑）と `/demo/sequel` で確認できる。
+
+### 使い方 — Sinatra ルートから
+
+```ruby
+require 'sequel'
+
+class App < Sinatra::Base
+  get '/demo/sequel' do
+    seq_db = Sequel.connect(adapter: :d1, d1: env['cloudflare.DB'])
+    # そのまま Sequel の DSL:
+    rows = seq_db[:users].order(:id).limit(10).all.__await__
+    json rows
+  end
+end
+```
+
+Workers ランタイム上で Sequel の Dataset DSL が返す Promise を
+`.__await__` で unwrap する。Dataset#each / #all / #first / #count /
+#insert / #update / #delete / #transaction すべて async な D1 コールに
+透過的に繋がる（`vendor/sequel/dataset/actions.rb` に
+`# await: true` + 各 action に `.__await__` 差し込み済み）。
+
+### Migration CLI
+
+migration 本体は **build-time 一択**。CRuby 側で `Sequel.migration do;
+change do; create_table(:posts) ...; end; end` を評価して SQL 文字列に
+書き出し、`wrangler d1 migrations apply` が適用する。Opal バンドルには
+migration ランタイム（`File.directory?` / `Dir.new` / `load` / `Mutex`
+を踏む箇所）は入らない。
+
+```bash
+# db/migrations/0001_create_posts.rb を書く
+bin/homurabi-migrate compile db/migrations --out db/migrations
+wrangler d1 migrations apply homurabi-db --local
+```
+
+生成される SQL は SQLite 方言のため D1 が素で喰う：
+
+```sql
+CREATE TABLE `posts` (
+  `id` integer NOT NULL PRIMARY KEY AUTOINCREMENT,
+  `title` varchar(255) NOT NULL,
+  `body` varchar(255),
+  `created_at` timestamp DEFAULT (datetime(CURRENT_TIMESTAMP, 'localtime'))
+);
+```
+
+### 適用した主なパッチ
+
+ROADMAP の「vendor + 最小 Opal patch」方針に従い、Sequel v5.103.0 を
+`vendor/sequel/` 配下に丸ごと固定して homurabi 専用の patch を
+あてている。各 patch サイトは `# homurabi patch (Phase 12):` コメント付き：
+
+- **`class_eval(String)` / `module_eval(String)` → `define_method`** —
+  Workers の `Code generation disallowed` に抵触する 11 箇所
+  （`sql.rb` / `dataset/query.rb` / `dataset/sql.rb` / `timezones.rb`）
+- **`def_sql_method` の class_eval 生成を `define_method` + lambda 分岐に書き換え** —
+  シーケンス型 + 分岐型（SQLite version 依存）両対応の parser
+  （sqlite / postgres / mssql / opts[:values] 各条件パターン網羅）
+- **`to_s_method` の args 式 parser** — `'@op, @args'` / `'@table, @column'`
+  等を ivar 名カンマ区切りと解釈、`instance_variable_get` で解決
+- **`HomurabiSqlBuffer` 可変 SQL バッファ** — Opal の String は immutable
+  (`<<` が NotImplementedError) なので、Array-backed の shim を
+  `sql_string_origin` と `literal_append` の Symbol キャッシュで利用
+- **async Promise 貫通** — `vendor/sequel/dataset/actions.rb` に
+  `# await: true` + `Dataset#each` / `#_all` / `#with_sql_first` で
+  `.__await__` 差し込み。`break` / `return` / `next` が async 境界を
+  越えて LocalJumpError になる箇所は capture-then-drop 形式に書換
+- **`Module#class_eval` の `require_relative` hack** — Opal が
+  `require_relative "foo"` を `self.$require("/abs/path/foo")` に
+  書き換える挙動を吸収する path normalizer
+  (`__homurabi_normalize_path`)
+- **`[]` alias** — `class << self; alias_method :[], :expr; end` が
+  Opal の singleton extend 非対応で失敗するため `def self.[]` で
+  explicit forward
+- **Symbol は JS String と同一** — `Database#[](symbol)` が `is_a?(String)` 真
+  判定で `fetch` パスに流れる問題を `is_a?(Symbol)` 優先で救う
+- **`Mutex` / `Thread.current` / `BigDecimal` shim** —
+  `lib/sequel_opal_patches.rb` で no-op 相当を提供
+- **connection pool** — `SingleConnectionPool` と `ShardedSingleConnectionPool`
+  を eager require、`ThreadedConnectionPool` 系は `POOL_CLASS_MAP`
+  から明示的 error に
+
+### Workers self-test
+
+`/test/sequel` に 8 ケース（adapter wiring 3 + SQL 生成 3 + D1 実機
+round-trip 2）を配置。`wrangler dev` + `curl http://127.0.0.1:8787/test/sequel | jq`
+で即検証できる。
+
+### テスト
+
+- `test/sequel_smoke.rb` — Node.js 側 22 ケース（offline SQL 生成 +
+  adapter wiring + mock D1 round-trip + JOIN/GROUP BY/subquery +
+  transactions + 識別子/schema primitives）
+- `/test/sequel` Workers self-test — 実機 D1 round-trip 8 ケース
+- `bin/homurabi-migrate` CLI — migration → SQL 書き出し単体で
+  `db/migrations/0001_create_posts.rb` → `0001_create_posts.sql` 動作確認済
+
+### 非対応 (Phase 12 スコープ外)
+
+- **`Sequel::Model`** — AR 風の magic finder は移植しない。Phase 12 は
+  Dataset DSL に集中（ROADMAP `不採用` から AR 項目は Phase 12 以降
+  Sequel Dataset を代替として案内する）。
+- **Threaded / TimedQueue pool** — Workers isolate は単一スレッド、
+  Mutex/ConditionVariable/Thread.new を踏む pool は使えない
+- **PostgreSQL / MySQL adapter** — D1 (SQLite) 専用、他 adapter は非同梱
+- **schema.rb 自動生成** — migration が source of truth（Sequel 既定挙動）
+
+---
+
 ## HTTP foundations (Phase 11A)
 
 Phase 11A は「HTTP 周り 3 点パック」。既存の Phase 6 (Net::HTTP shim) /
@@ -1379,6 +1496,7 @@ of each phase:
 | **Phase 10** | Workers AI binding + Sinatra `/chat` UI + `/api/chat/*` JWT-gated endpoints（Gemma 4 + gpt-oss-120b、KV-backed 会話履歴、SSE streaming サポート）。 | ✅ shipped on `feature/phase10-ai`. |
 | **Phase 11A** | HTTP foundations 基礎固めパック — ① **Faraday 互換 shim** (`vendor/faraday.rb`) で `Faraday.new { \|c\| c.request :json; c.response :json, :raise_error }` 一式。② **multipart/form-data バイナリ受信** (`src/worker.mjs` + `lib/cloudflare_workers/multipart.rb`) + `Cloudflare::UploadedFile`（latin1 byte-str ↔ real Uint8Array）。③ **Sinatra streaming / SSE** (`Cloudflare::SSEStream` + `Sinatra::Streaming`) で `sse do \|out\| ... end` が Workers `ReadableStream` に直通し、`/demo/sse` で 5 秒かけて 5 tick 流れる。Workers self-test `/test/foundations` 6 ケース (`HOMURABI_ENABLE_FOUNDATIONS_DEMOS=1`)。 | ✅ shipped on `feature/phase11a-http-foundations`. 34 smoke (13 faraday + 10 multipart + 11 streaming) + `/test/foundations` 6/6 実機グリーン。 |
 | **Phase 11B** | Cloudflare native bindings — **Durable Objects** (`Cloudflare::DurableObject.define` handler DSL + `DurableObjectNamespace` / `Stub` / `Storage` ラッパ)、**Cache API** (`Cloudflare::Cache` + `cache_get` helper、HIT/MISS 自動判定)、**Queues** (`Cloudflare::Queue#send` / `#send_batch` プロデューサ + `consume_queue 'q' do \|batch\| ... end` DSL + `queue(batch, env, ctx)` 配送)。`/test/bindings` セルフテストと 56 ケースの smoke suite。`HOMURABI_ENABLE_BINDING_DEMOS` で default deny。 | ✅ shipped on `feature/phase11b-cf-bindings`. DO カウンタ 1→2→3→4、Cache MISS(6ms)→HIT(1ms) 同一 `derived_hex`、Queue /api/enqueue → auto 消費 → KV 書き込み round-trip を実機で実測。 |
+| **Phase 12** | **Sequel (vendored v5.103.0) + D1 adapter + migration CLI** — Sinatra ルートで `Sequel.connect(adapter: :d1, d1: env['cloudflare.DB'])` → `db[:users].where(...).order(...).limit(...).all.__await__` の完全な Dataset DSL が実機 D1 で動作。SQLite dialect 共有、SingleConnectionPool 強制、async Promise チェーン貫通（`vendor/sequel/dataset/actions.rb` に `# await: true` + 各 action に `.__await__` 差し込み）、`HomurabiSqlBuffer` による String immutability 回避。`bin/homurabi-migrate compile` で Ruby migration DSL を SQL に書き出し → `wrangler d1 migrations apply` で反映（Opal バンドル非同梱）。`/demo/sequel` / `/demo/sequel/sql` / `/test/sequel` (8/8) を実機で実測。Dataset#count / #first / #all / #insert / #update / #delete / #transaction / JOIN / GROUP BY / subquery が緑。 | ✅ shipped on `feature/phase12-sequel`. 22 sequel smoke + 既存 341 smoke 全緑で合計 **363 tests**、bundle +800KB uncompressed (+200KB gzipped、6.3MB/1.36MB)。 |
 
 ### Definition of Done (from PLAN.md §1.1)
 

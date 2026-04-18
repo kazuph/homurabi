@@ -29,6 +29,11 @@ require 'homurabi_markdown'
 # the rationale). The Cloudflare::Multipart parser and the SSEStream
 # helper are auto-required from lib/cloudflare_workers.rb.
 require 'faraday'
+# Phase 12 — Sequel (vendored v5.103.0) + D1 adapter. `Sequel.connect('d1://')`
+# resolves the D1 binding from Cloudflare::Bindings.current (wired
+# per-request by lib/cloudflare_workers.rb), and Dataset DSL compiles
+# to SQLite-dialect SQL which D1 speaks natively.
+require 'sequel'
 
 class App < Sinatra::Base
   # Phase 8 — JWT auth. The secret is the default HS256 path; asymmetric
@@ -273,6 +278,75 @@ class App < Sinatra::Base
       status 201
       row.to_json
     end
+  end
+
+  # Phase 12 — Sequel (vendored v5.103.0) + D1 adapter demo.
+  # Same `users` table as /d1/users above; same data. The difference
+  # is purely authoring style: this route expresses the query as a
+  # Sequel Dataset DSL (method chain, typed, composable) instead of
+  # hand-written SQL. Useful for complex WHERE / JOIN where string
+  # interpolation becomes error-prone.
+  get '/demo/sequel' do
+    content_type 'application/json'
+    seq_db = Sequel.connect(adapter: :d1, d1: db)
+    rows = seq_db[:users].order(:id).limit(10).all.__await__
+    { 'rows' => rows, 'adapter' => 'sequel-d1', 'dialect' => 'sqlite' }.to_json
+  end
+
+  # Show the Sequel-generated SQL for a representative query without
+  # hitting D1. Useful to verify the dialect emitter end-to-end.
+  get '/demo/sequel/sql' do
+    content_type 'application/json'
+    seq_db = Sequel.connect(adapter: :d1, d1: db)
+    ds = seq_db[:users].where(active: true).order(:name).limit(10)
+    { 'sql' => ds.sql.to_s, 'adapter' => 'sequel-d1' }.to_json
+  end
+
+  # Phase 12 — Workers self-test: run the offline SQL DSL assertions
+  # and a live-D1 fetch from *inside* the Worker isolate. Mirrors
+  # test/sequel_smoke.rb's DSL cases but hits the real D1 binding
+  # for the round-trip so we know the adapter works end-to-end
+  # under the wrangler dev runtime (not just under Node.js).
+  get '/test/sequel' do
+    content_type 'application/json'
+    cases = []
+    run = lambda { |label, &blk|
+      result = begin
+        v = blk.call
+        v == false ? { 'pass' => false, 'note' => 'returned false' } : { 'pass' => true }
+      rescue ::Exception => e
+        { 'pass' => false, 'note' => "#{e.class}: #{e.message[0, 200]}" }
+      end
+      cases << result.merge('case' => label)
+    }
+
+    seq_db = Sequel.connect(adapter: :d1, d1: db)
+
+    run.call('adapter_scheme is :d1') { seq_db.adapter_scheme == :d1 }
+    run.call('database_type is :sqlite') { seq_db.database_type == :sqlite }
+    run.call('SingleConnectionPool in use') { seq_db.pool.class.name == 'Sequel::SingleConnectionPool' }
+    run.call('DB[:users].sql emits SELECT * FROM users') {
+      seq_db[:users].sql.to_s == 'SELECT * FROM `users`'
+    }
+    run.call('DB[:users].where(id: 1).sql emits id = 1') {
+      seq_db[:users].where(id: 1).sql.to_s == 'SELECT * FROM `users` WHERE (`id` = 1)'
+    }
+    run.call('DB[:users].order(:id).limit(5) emits ORDER BY + LIMIT') {
+      sql = seq_db[:users].order(:id).limit(5).sql.to_s
+      sql.include?('ORDER BY `id`') && sql.include?('LIMIT 5')
+    }
+    run.call('DB[:users].all.__await__ hits D1 and returns rows') {
+      rows = seq_db[:users].all.__await__
+      rows.is_a?(Array) && rows.all? { |r| r.is_a?(Hash) && r['id'] && r['name'] }
+    }
+    run.call('DB[:users].where(id: 1).first.__await__ returns single row') {
+      row = seq_db[:users].where(id: 1).first.__await__
+      row.is_a?(Hash) && row['id'].to_i == 1
+    }
+
+    pass_count = cases.count { |c| c['pass'] }
+    { 'phase' => 12, 'total' => cases.size, 'passed' => pass_count,
+      'failed' => cases.size - pass_count, 'cases' => cases }.to_json
   end
 
   get '/kv/:key' do

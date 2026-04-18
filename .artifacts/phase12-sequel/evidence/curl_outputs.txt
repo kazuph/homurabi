@@ -1,0 +1,47 @@
+--- /demo/sequel ---
+{"rows":[{"id":1,"name":"Kazu"},{"id":2,"name":"Homurabi-chan"},{"id":3,"name":"Sinatra"},{"id":4,"name":"Opal"}],"adapter":"sequel-d1","dialect":"sqlite"}
+--- /demo/sequel/sql ---
+{"sql":"SELECT * FROM `users` WHERE (`active` = 't') ORDER BY `name` LIMIT 10","adapter":"sequel-d1"}
+--- /test/sequel ---
+{
+    "phase": 12,
+    "total": 8,
+    "passed": 8,
+    "failed": 0,
+    "cases": [
+        {
+            "pass": true,
+            "case": "adapter_scheme is :d1"
+        },
+        {
+            "pass": true,
+            "case": "database_type is :sqlite"
+        },
+        {
+            "pass": true,
+            "case": "SingleConnectionPool in use"
+        },
+        {
+            "pass": true,
+            "case": "DB[:users].sql emits SELECT * FROM users"
+        },
+        {
+            "pass": true,
+            "case": "DB[:users].where(id: 1).sql emits id = 1"
+        },
+        {
+            "pass": true,
+            "case": "DB[:users].order(:id).limit(5) emits ORDER BY + LIMIT"
+        },
+        {
+            "pass": true,
+            "case": "DB[:users].all.__await__ hits D1 and returns rows"
+        },
+        {
+            "pass": true,
+            "case": "DB[:users].where(id: 1).first.__await__ returns single row"
+        }
+    ]
+}
+--- /d1/users regression ---
+[{"id":1,"name":"Kazu"},{"id":2,"name":"Homurabi-chan"},{"id":3,"name":"Sinatra"},{"id":4,"name":"Opal"}]

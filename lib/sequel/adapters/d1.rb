@@ -126,12 +126,20 @@ module Sequel
       def execute(sql, opts = OPTS, &block)
         # Materialise rows via await. The inner synchronize block
         # awaits the D1 Promise; we await synchronize's Promise
-        # result here so callers see a plain Array.
+        # result here so callers see a plain Array. D1-side failures
+        # (Promise rejection / Cloudflare::D1Error / any JS exception
+        # bubbled via Opal) are caught and re-raised as Sequel::D1::Error
+        # with the offending SQL attached so Sequel's error handling
+        # path classifies them via database_error_classes.
         rows = synchronize(opts[:server]) do |conn|
           conn.query(sql, Array(opts[:arguments])).__await__
         end.__await__
         rows.each(&block) if block
         rows
+      rescue Error
+        raise
+      rescue ::Exception => e
+        raise wrap_d1_error(e, sql, 'execute')
       end
 
       def execute_insert(sql, opts = OPTS)
@@ -139,6 +147,10 @@ module Sequel
           raw = conn.run(sql, Array(opts[:arguments])).__await__
           d1_meta_value(raw, 'last_row_id')
         end.__await__
+      rescue Error
+        raise
+      rescue ::Exception => e
+        raise wrap_d1_error(e, sql, 'execute_insert')
       end
 
       def execute_dui(sql, opts = OPTS)
@@ -146,6 +158,10 @@ module Sequel
           raw = conn.run(sql, Array(opts[:arguments])).__await__
           d1_meta_value(raw, 'changes')
         end.__await__
+      rescue Error
+        raise
+      rescue ::Exception => e
+        raise wrap_d1_error(e, sql, 'execute_dui')
       end
 
       private
@@ -172,6 +188,20 @@ module Sequel
         value
       end
 
+      # Convert any non-Sequel failure raised from inside an D1 await
+      # site into a Sequel::D1::Error. `database_error_classes`
+      # returns [Error], so Sequel's upstream error-handling path
+      # recognises the wrapped failure and attaches the SQL for
+      # debuggability. Preserves the original message prefix so the
+      # underlying JS / Cloudflare::D1Error detail is not lost.
+      def wrap_d1_error(exc, sql, op)
+        Error.new(
+          "D1 #{op} failed: #{exc.class}: #{exc.message}",
+          sql: sql.to_s,
+          meta: (exc.respond_to?(:meta) ? exc.meta : nil)
+        )
+      end
+
       public
 
       def execute_ddl(sql, opts = OPTS)
@@ -179,6 +209,10 @@ module Sequel
           conn.exec(sql).__await__
         end.__await__
         nil
+      rescue Error
+        raise
+      rescue ::Exception => e
+        raise wrap_d1_error(e, sql, 'execute_ddl')
       end
 
       # -----------------------------------------------------------

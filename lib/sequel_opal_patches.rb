@@ -190,12 +190,20 @@ end
 # can `buf << 'SELECT '` without hitting Opal's immutable-string
 # NotImplementedError. Exposes the subset of String methods that
 # Sequel actually calls on the sql accumulator.
+#
+# freeze / frozen? follow Ruby semantics: after `freeze` returns,
+# every mutating method (`<<`, `concat`, `sub`, `gsub`, `chomp!`,
+# `slice!`, `clear`) raises FrozenError, matching what native
+# String does. This avoids silent mutation bugs if Sequel (or a
+# future patch) freezes a cached SQL buffer.
 class ::HomurabiSqlBuffer
   def initialize(init = '')
     @chunks = init.empty? ? [] : [init.to_s]
+    @frozen = false
   end
 
   def <<(other)
+    ensure_not_frozen!
     @chunks << other.to_s
     self
   end
@@ -228,12 +236,14 @@ class ::HomurabiSqlBuffer
   # against String literals still work because of `==` (delegates
   # to `to_s`).
   def sub(*args, &block)
+    ensure_not_frozen!
     s = to_s.sub(*args, &block)
     @chunks = [s]
     self
   end
 
   def gsub(*args, &block)
+    ensure_not_frozen!
     s = to_s.gsub(*args, &block)
     @chunks = [s]
     self
@@ -252,16 +262,24 @@ class ::HomurabiSqlBuffer
   end
 
   def chomp!(*args)
+    ensure_not_frozen!
     s = to_s.chomp(*args)
     @chunks = [s]
     self
   end
 
   def slice!(*args)
+    ensure_not_frozen!
     s = to_s
     removed = s.slice!(*args)
     @chunks = [s]
     removed
+  end
+
+  def clear
+    ensure_not_frozen!
+    @chunks = []
+    self
   end
 
   def freeze
@@ -288,6 +306,14 @@ class ::HomurabiSqlBuffer
   def eql?(other)
     to_s.eql?(other.respond_to?(:to_s) ? other.to_s : other)
   end
+
+  private
+
+  def ensure_not_frozen!
+    raise ::FrozenError, "can't modify frozen HomurabiSqlBuffer: #{to_s.inspect}" if @frozen
+  end
+
+  public
 
   def method_missing(name, *args, &block)
     s = to_s

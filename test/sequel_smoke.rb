@@ -7,7 +7,7 @@
 # adapter wiring (not the full Sequel feature matrix — Sequel's own
 # test suite covers that). Each case either generates offline SQL
 # using the SQLite dialect, or exercises a mock D1 binding so the
-# ctest suite remains hermetic (no real Cloudflare runtime required).
+# test suite remains hermetic (no real Cloudflare runtime required).
 
 require 'json'
 require 'sequel'

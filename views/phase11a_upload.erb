@@ -35,6 +35,19 @@
 <p id="gallery-empty" <%= @images.any? ? 'hidden' : '' %>>
   No uploads yet. Pick a file above and submit.
 </p>
+<% if (@non_image_count || 0) > 0 %>
+  <p id="cleanup-notice"
+     style="padding:8px; border:1px solid #d08; background:#fee; border-radius:4px; max-width:640px;">
+    <b><%= @non_image_count %></b> non-image legacy entr<%= @non_image_count == 1 ? 'y' : 'ies' %>
+    under <code>phase11a/uploads/</code> are hidden from the gallery
+    (they're stored bytes the browser can't decode as an image).
+    <button type="button"
+            id="cleanup-btn"
+            style="margin-left:8px; color:#a00;">
+      Clean up now
+    </button>
+  </p>
+<% end %>
 <ul id="gallery" style="list-style:none; padding:0; display:flex; flex-wrap:wrap; gap:16px;">
   <% @images.each do |img| %>
     <li class="gallery-item"
@@ -65,6 +78,23 @@
 (function(){
   var form   = document.getElementById('upload-form');
   var status = document.getElementById('upload-status');
+  // Cleanup button: POST /phase11a/cleanup to remove non-image junk
+  // under the phase11a/uploads/ prefix.
+  var cleanupBtn = document.getElementById('cleanup-btn');
+  if (cleanupBtn) {
+    cleanupBtn.addEventListener('click', async function() {
+      if (!confirm('Delete every non-image legacy entry?')) return;
+      var r = await fetch('/phase11a/cleanup', { method: 'POST' });
+      var body = await r.json();
+      if (r.ok) {
+        alert('Cleaned up ' + body.deleted_count + ' entries.');
+        location.reload();
+      } else {
+        alert('Cleanup failed: ' + (body.error || ('HTTP ' + r.status)));
+      }
+    });
+  }
+
   // Delete buttons: DELETE /phase11a/uploads/<key-suffix> then reload.
   document.querySelectorAll('.delete-btn').forEach(function(btn) {
     btn.addEventListener('click', async function() {

@@ -1,0 +1,85 @@
+=== Final E2E evidence ===
+
+## /test/bindings
+{
+    "passed": 3,
+    "failed": 0,
+    "total": 3,
+    "elapsed_ms": 8,
+    "cases": [
+        {
+            "case": "DurableObject counter inc/peek/reset round-trip",
+            "pass": true,
+            "detail": {
+                "r1": {
+                    "count": 1,
+                    "previous": 0,
+                    "path": "/inc",
+                    "do_id": "c7b7ba234c40e97ca2468c41818bdab11ca192111f340271a23f325c1ad215d1",
+                    "updated_at": 1776465973
+                },
+                "r2": {
+                    "count": 2,
+                    "previous": 1,
+                    "path": "/inc",
+                    "do_id": "c7b7ba234c40e97ca2468c41818bdab11ca192111f340271a23f325c1ad215d1",
+                    "updated_at": 1776465973
+                },
+                "peek": {
+                    "count": 2,
+                    "path": "/peek",
+                    "do_id": "c7b7ba234c40e97ca2468c41818bdab11ca192111f340271a23f325c1ad215d1"
+                }
+            }
+        },
+        {
+            "case": "Cache API match after put returns same body",
+            "pass": true,
+            "detail": {
+                "status": 200,
+                "content_type": "application/json"
+            }
+        },
+        {
+            "case": "Queue producer send() returns without error",
+            "pass": true,
+            "note": "producer.send completed"
+        }
+    ]
+}
+
+## Named cache demo (2 namespaces, independent)
+{"namespace":"news","key":"headlines","nonce":"ac699b446f31c98f","computed_at":1776465973,"cache":"MISS","elapsed_ms":3}
+{"namespace":"sports","key":"headlines","nonce":"ff5dda3ee0cbd8be","computed_at":1776465973,"cache":"MISS","elapsed_ms":1}
+
+## WebSocket DO (3 frames, hibernation + counter increment)
+open
+reply: echo:hello-1 count=1
+reply: echo:hello-2 count=2
+reply: echo:hello-3 count=3
+close: 1000 done
+total_replies: 3
+
+## Peek after WS session (confirms storage persisted)
+{"demo":"Durable Objects counter","binding":"COUNTER","class":"HomurabiCounterDO","name":"ws-e2e","action":"peek","status":200,"body":{"count":3,"path":"/peek","do_id":"f9a006b0a1449346e04620e5b9169bf706c732212fbd6ec88ee5a7ad10992804"}}
+
+## DLQ flow (fail:true → retry → DLQ)
+{"enqueued":true,"payload":{"fail":true,"reason":"force-dlq demo","ts":1776465973},"note":"main consumer will retry up to max_retries; then the runtime forwards the message to homurabi-jobs-dlq"}
+### dlq-status (after 30s)
+{
+    "queue": "homurabi-jobs-dlq",
+    "count": 1,
+    "recent": [
+        {
+            "id": "df93d4545119c9f1e2b281fa0f55d595",
+            "body": {
+                "fail": true,
+                "reason": "force-dlq demo",
+                "ts": 1776465973
+            },
+            "from_queue": "homurabi-jobs-dlq",
+            "dead_at": 1776465981,
+            "batch_index": 0
+        }
+    ]
+}

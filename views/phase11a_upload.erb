@@ -50,6 +50,12 @@
         <% if img['note'] && !img['note'].empty? %>
           <div>"<%= img['note'] %>"</div>
         <% end %>
+        <button type="button"
+                class="delete-btn"
+                data-key="<%= img['key'] %>"
+                style="margin-top:6px; font-size:11px; color:#a00;">
+          Delete
+        </button>
       </div>
     </li>
   <% end %>
@@ -59,6 +65,23 @@
 (function(){
   var form   = document.getElementById('upload-form');
   var status = document.getElementById('upload-status');
+  // Delete buttons: DELETE /phase11a/uploads/<key-suffix> then reload.
+  document.querySelectorAll('.delete-btn').forEach(function(btn) {
+    btn.addEventListener('click', async function() {
+      var key = btn.dataset.key;
+      if (!key) return;
+      if (!confirm('Delete ' + key + '?')) return;
+      // Strip the "phase11a/uploads/" prefix — that's baked into the route.
+      var sub = key.replace(/^phase11a\/uploads\//, '');
+      var r = await fetch('/phase11a/uploads/' + sub, { method: 'DELETE' });
+      if (r.ok) {
+        location.reload();
+      } else {
+        alert('delete failed: HTTP ' + r.status);
+      }
+    });
+  });
+
   form.addEventListener('submit', async function(ev) {
     ev.preventDefault();
     status.textContent = 'Uploading…';

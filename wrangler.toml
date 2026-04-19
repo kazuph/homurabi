@@ -13,6 +13,11 @@ compatibility_flags = ["nodejs_compat"]
 binding = "DB"
 database_name = "homurabi-db"
 database_id = "3a59c955-198e-478f-8f11-71d5f3eb7600"
+# Phase 13 follow-up: Sequel migrations compiled by `bin/homurabi-migrate
+# compile db/migrations` into `.sql` files under the same path. Point
+# `wrangler d1 migrations apply` at the same directory so both tools
+# share one source of truth.
+migrations_dir = "db/migrations"
 
 [[kv_namespaces]]
 binding = "KV"

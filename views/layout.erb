@@ -10,10 +10,22 @@
   <body>
     <nav>
       <a href="/">Home</a>
-      <a href="/hello/world">/hello/world</a>
       <a href="/about">About</a>
-      <a href="/d1/users">D1 users</a>
+      <a href="/d1/users">D1</a>
+      <a href="/demo/sequel">Sequel</a>
+      <a href="/posts">Posts</a>
+      <a href="/demo/http">HTTP</a>
       <a href="/chat" class="nav-chat">Chat ⚡</a>
+      <% if (sess_user = current_session_user) %>
+        <span style="margin-left:auto;color:#666;font-size:0.9em;">
+          <%= Rack::Utils.escape_html(sess_user.to_s) %> &middot;
+          <a href="/logout">Logout</a>
+        </span>
+      <% else %>
+        <span style="margin-left:auto;font-size:0.9em;">
+          <a href="/login">Login</a>
+        </span>
+      <% end %>
     </nav>
     <hr>
     <%= @content %>

@@ -195,9 +195,12 @@ module Sinatra
     # can detect and await. We can't rely on `respond_to? :then`
     # because Ruby's Kernel#then (alias of yield_self) matches every
     # object since 2.6.
+    #
+    # NOTE (copilot review #12): upstream declares `invoke` after a
+    # `private` visibility marker. Reopen the class under the same
+    # visibility by re-applying `private :invoke` right after the
+    # redefinition, so we don't expand Sinatra::Base's public surface.
     # -------------------------------------------------------------
-    public
-
     def invoke(&block)
       res = catch(:halt, &block)
 
@@ -214,6 +217,7 @@ module Sinatra
       end
       nil
     end
+    private :invoke
 
     # -------------------------------------------------------------
     # 9. Base.new! (upstream base.rb:1676)
@@ -307,6 +311,11 @@ module Sinatra
         define_method(method_name) do |*args, &block|
           Delegator.target.send(method_name, *args, &block)
         end
+        # Preserve upstream's ruby2_keywords semantics so classic-mode
+        # DSL methods that accept `**options` (before / after /
+        # configure / helpers / set / ...) forward keyword arguments
+        # correctly on Ruby 2.7+ (Copilot review on PR #12).
+        ruby2_keywords(method_name) if respond_to?(:ruby2_keywords, true)
         private method_name
       end
     end

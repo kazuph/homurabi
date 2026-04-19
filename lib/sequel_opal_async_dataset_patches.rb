@@ -56,30 +56,50 @@ module Sequel
       a
     end
 
+    # upstream: with_sql_each(sql){|r| yield r}; self (sync, but fetch_rows
+    # returns a Promise under the D1 adapter, so the block body doesn't
+    # run before the caller's sync flow resumes — the Promise is dropped).
+    # homurabi: reopen with `.__await__` so the async fetch_rows resolves
+    # before this method returns. Required for #first / #with_sql_first /
+    # #with_sql_single_value which expect the block to have fired.
+    def with_sql_each(sql)
+      if rp = row_proc
+        _with_sql_dataset.fetch_rows(sql){|r| yield rp.call(r)}.__await__
+      else
+        _with_sql_dataset.fetch_rows(sql){|r| yield r}.__await__
+      end
+      self
+    end
+
     # upstream: with_sql_each(sql){|r| return r}; nil
     # homurabi: capture first row without `return`; callers always
-    # clone with limit(1) so the no-break form is equivalent.
+    # clone with limit(1) so the no-break form is equivalent. Needs
+    # with_sql_each to actually await its fetch_rows (see above).
     def with_sql_first(sql)
       result = nil
-      with_sql_each(sql) do |r|
+      # with_sql_each is async now (awaits fetch_rows internally); we must
+      # await here so `result` is populated before returning.
+      (with_sql_each(sql) do |r|
         result = r if result.nil?
-      end
+      end).__await__
       result
     end
 
     # upstream: single_value_ds.each{|r| r.each{|_, v| return v}}; nil
-    # homurabi: capture first value using sentinel flag.
+    # homurabi: capture first value using sentinel flag. Relies on each
+    # awaiting the D1 Promise chain.
     def single_value
       value = nil
       found = false
-      single_value_ds.each do |r|
+      # each is async (patched in this file); must await.
+      (single_value_ds.each do |r|
         next if found
         r.each do |_, v|
           next if found
           value = v
           found = true
         end
-      end
+      end).__await__
       found ? value : nil
     end
 

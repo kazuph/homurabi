@@ -1,0 +1,22 @@
+=== / ===
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Hello from Sinatra</title>
+    <link rel="icon" type="image/png" href=...
+=== /d1/users ===
+[{"id":1,"name":"Kazu"},{"id":2,"name":"Homurabi-chan"},{"id":3,"name":"Sinatra"},{"id":4,"name":"Opal"}]
+=== /demo/sequel ===
+{"rows":[{"id":1,"name":"Kazu"},{"id":2,"name":"Homurabi-chan"},{"id":3,"name":"Sinatra"},{"id":4,"name":"Opal"}],"adapter":"sequel-d1","dialect":"sqlite"}
+=== /test/sequel ===
+p 8 / 8
+=== /api/me ===
+{"current_user":"demo","role":"user","alg":"HS256","claims":{"sub":"demo","role":"user","iat":1776557568,"exp":1776561168}}
+=== PUT /kv/foo ===
+{"key":"foo","value":"dogfood","stored":true}
+=== GET /kv/foo ===
+{"key":"foo","value":"dogfood"}
+=== PUT /r2/foo ===
+{"key":"foo","size":10,"stored":true}=== GET /r2/foo ===
+{"key":"foo","body":"r2-dogfood","etag":"05c3174af1c3a9d13296d3082843ad41","size":10}

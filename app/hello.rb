@@ -1,4 +1,4 @@
-# await: true
+# await: all, authenticate!, chat_verify_token!, clear_chat_history, decode, dh_compute_key, dispatch_js, dispatch_scheduled, encode, execute, execute_insert, fetch, fetch_raw, final, get_binary, get_first_row, get_response, list, load_chat_history, open, private_decrypt, public_encrypt, run, save_chat_history, send, sign, sign_pss, sleep, verify, verify_pss
 # frozen_string_literal: true
 #
 # A plain Sinatra application. Ported as faithfully as possible from
@@ -204,7 +204,7 @@ class App < Sinatra::Base
 
   get '/' do
     @title = 'Hello from Sinatra'
-    @users = db ? db.execute('SELECT id, name FROM users ORDER BY id').__await__ : []
+    @users = db ? db.execute('SELECT id, name FROM users ORDER BY id') : []
     @content = erb :index
     erb :layout
   end
@@ -246,13 +246,13 @@ class App < Sinatra::Base
 
   get '/d1/users' do
     content_type 'application/json'
-    db.execute('SELECT id, name FROM users ORDER BY id').__await__.to_json
+    db.execute('SELECT id, name FROM users ORDER BY id').to_json
   end
 
   get '/d1/users/:id' do
     content_type 'application/json'
     id = params['id'].to_i
-    row = db.get_first_row('SELECT id, name FROM users WHERE id = ?', [id]).__await__
+    row = db.get_first_row('SELECT id, name FROM users WHERE id = ?', [id])
     if row.nil?
       status 404
       { 'error' => 'not found', 'id' => id }.to_json
@@ -274,7 +274,7 @@ class App < Sinatra::Base
       status 400
       { 'error' => 'name required' }.to_json
     else
-      row = db.get_first_row('INSERT INTO users (name) VALUES (?) RETURNING id, name', [name]).__await__
+      row = db.get_first_row('INSERT INTO users (name) VALUES (?) RETURNING id, name', [name])
       status 201
       row.to_json
     end
@@ -289,7 +289,7 @@ class App < Sinatra::Base
   get '/demo/sequel' do
     content_type 'application/json'
     seq_db = Sequel.connect(adapter: :d1, d1: db)
-    rows = seq_db[:users].order(:id).limit(10).all.__await__
+    rows = seq_db[:users].order(:id).limit(10).all
     { 'rows' => rows, 'adapter' => 'sequel-d1', 'dialect' => 'sqlite' }.to_json
   end
 
@@ -335,8 +335,8 @@ class App < Sinatra::Base
       sql = seq_db[:users].order(:id).limit(5).sql.to_s
       sql.include?('ORDER BY `id`') && sql.include?('LIMIT 5')
     }
-    run.call('DB[:users].all.__await__ hits D1 and returns rows') {
-      rows = seq_db[:users].all.__await__
+    run.call('DB[:users].all hits D1 and returns rows') {
+      rows = seq_db[:users].all
       rows.is_a?(Array) && rows.all? { |r| r.is_a?(Hash) && r['id'] && r['name'] }
     }
     run.call('DB[:users].where(id: 1).first.__await__ returns single row') {
@@ -383,7 +383,7 @@ class App < Sinatra::Base
   # worker.mjs, no backtick here.
   get '/images/:key' do
     key    = params['key']
-    obj    = bucket.get_binary(key).__await__
+    obj    = bucket.get_binary(key)
     if obj.nil?
       status 404
       'not found'
@@ -433,7 +433,7 @@ class App < Sinatra::Base
   # ------------------------------------------------------------------
   get '/demo/http' do
     content_type 'application/json'
-    res = Net::HTTP.get_response(URI('https://api.ipify.org/?format=json')).__await__
+    res = Net::HTTP.get_response(URI('https://api.ipify.org/?format=json'))
     {
       'demo'    => 'Net::HTTP through Cloudflare fetch',
       'status'  => res.code,
@@ -446,7 +446,7 @@ class App < Sinatra::Base
   # Same demo using the lower-level Cloudflare::HTTP.fetch directly.
   get '/demo/http/raw' do
     content_type 'application/json'
-    res = Cloudflare::HTTP.fetch('https://api.ipify.org/?format=json').__await__
+    res = Cloudflare::HTTP.fetch('https://api.ipify.org/?format=json')
     {
       'demo'    => 'Cloudflare::HTTP.fetch (raw)',
       'status'  => res.status,
@@ -547,7 +547,7 @@ class App < Sinatra::Base
       'iat'  => Time.now.to_i,
       'exp'  => Time.now.to_i + JWT_ACCESS_TTL
     }
-    access_token = JWT.encode(payload, sign_key, alg).__await__
+    access_token = JWT.encode(payload, sign_key, alg)
 
     # Refresh token: opaque random string. Only minted when KV is bound
     # (otherwise the token would never round-trip through /api/login/refresh
@@ -608,7 +608,7 @@ class App < Sinatra::Base
     end
 
     begin
-      payload, header = JWT.decode(token, verify_key, true, algorithm: alg).__await__
+      payload, header = JWT.decode(token, verify_key, true, algorithm: alg)
     rescue JWT::ExpiredSignature
       status 401
       next { 'error' => 'token expired' }.to_json
@@ -676,7 +676,7 @@ class App < Sinatra::Base
       'iat'  => Time.now.to_i,
       'exp'  => Time.now.to_i + JWT_ACCESS_TTL
     }
-    access_token = JWT.encode(payload, sign_key, alg).__await__
+    access_token = JWT.encode(payload, sign_key, alg)
 
     {
       'access_token' => access_token,
@@ -722,9 +722,9 @@ class App < Sinatra::Base
     run.call('AES-256-GCM round-trip') {
       key = SecureRandom.random_bytes(32); iv = SecureRandom.random_bytes(12)
       e = OpenSSL::Cipher.new('AES-256-GCM').encrypt; e.key = key; e.iv = iv
-      e.update('payload-gcm'); ct = e.final.__await__; tag = e.auth_tag
+      e.update('payload-gcm'); ct = e.final; tag = e.auth_tag
       d = OpenSSL::Cipher.new('AES-256-GCM').decrypt; d.key = key; d.iv = iv; d.auth_tag = tag
-      d.update(ct); d.final.__await__ == 'payload-gcm'
+      d.update(ct); d.final == 'payload-gcm'
     }
     run.call('AES-256-CTR streaming') {
       key = SecureRandom.random_bytes(32); iv = SecureRandom.random_bytes(16)
@@ -735,61 +735,61 @@ class App < Sinatra::Base
       while i < plain.length
         ct = ct + e.update(plain[i, 13]).__await__; i += 13
       end
-      ct = ct + e.final.__await__
+      ct = ct + e.final
       d = OpenSSL::Cipher.new('AES-256-CTR').decrypt; d.key = key; d.iv = iv
-      d.update(ct).__await__ + d.final.__await__ == plain
+      d.update(ct).__await__ + d.final == plain
     }
     run.call('AES-128-CBC round-trip') {
       key = SecureRandom.random_bytes(16); iv = SecureRandom.random_bytes(16)
       e = OpenSSL::Cipher.new('AES-128-CBC').encrypt; e.key = key; e.iv = iv
-      e.update('cbc-test'); ct = e.final.__await__
+      e.update('cbc-test'); ct = e.final
       d = OpenSSL::Cipher.new('AES-128-CBC').decrypt; d.key = key; d.iv = iv
-      d.update(ct); d.final.__await__ == 'cbc-test'
+      d.update(ct); d.final == 'cbc-test'
     }
     run.call('RSA RS256 sign/verify') {
       r = OpenSSL::PKey::RSA.new(2048)
-      sig = r.sign(OpenSSL::Digest::SHA256.new, 'rs256').__await__
-      r.public_key.verify(OpenSSL::Digest::SHA256.new, sig, 'rs256').__await__
+      sig = r.sign(OpenSSL::Digest::SHA256.new, 'rs256')
+      r.public_key.verify(OpenSSL::Digest::SHA256.new, sig, 'rs256')
     }
     run.call('RSA PS256 sign/verify') {
       r = OpenSSL::PKey::RSA.new(2048)
-      sig = r.sign_pss('SHA256', 'ps256', salt_length: :digest, mgf1_hash: 'SHA256').__await__
-      r.public_key.verify_pss('SHA256', sig, 'ps256', salt_length: :digest, mgf1_hash: 'SHA256').__await__
+      sig = r.sign_pss('SHA256', 'ps256', salt_length: :digest, mgf1_hash: 'SHA256')
+      r.public_key.verify_pss('SHA256', sig, 'ps256', salt_length: :digest, mgf1_hash: 'SHA256')
     }
     run.call('RSA OAEP encrypt/decrypt') {
       r = OpenSSL::PKey::RSA.new(2048)
-      ct = r.public_key.public_encrypt('oaep-payload').__await__
-      r.private_decrypt(ct).__await__ == 'oaep-payload'
+      ct = r.public_key.public_encrypt('oaep-payload')
+      r.private_decrypt(ct) == 'oaep-payload'
     }
     run.call('ECDSA ES256 (DER) sign/verify') {
       ec = OpenSSL::PKey::EC.generate('prime256v1')
-      sig = ec.sign(OpenSSL::Digest::SHA256.new, 'es256').__await__
-      sig.bytes[0] == 0x30 && ec.verify(OpenSSL::Digest::SHA256.new, sig, 'es256').__await__
+      sig = ec.sign(OpenSSL::Digest::SHA256.new, 'es256')
+      sig.bytes[0] == 0x30 && ec.verify(OpenSSL::Digest::SHA256.new, sig, 'es256')
     }
     run.call('ECDSA ES384 sign/verify') {
       ec = OpenSSL::PKey::EC.generate('secp384r1')
-      sig = ec.sign(OpenSSL::Digest::SHA384.new, 'es384').__await__
-      ec.verify(OpenSSL::Digest::SHA384.new, sig, 'es384').__await__
+      sig = ec.sign(OpenSSL::Digest::SHA384.new, 'es384')
+      ec.verify(OpenSSL::Digest::SHA384.new, sig, 'es384')
     }
     run.call('ECDSA ES512 sign/verify') {
       ec = OpenSSL::PKey::EC.generate('secp521r1')
-      sig = ec.sign(OpenSSL::Digest::SHA512.new, 'es512').__await__
-      ec.verify(OpenSSL::Digest::SHA512.new, sig, 'es512').__await__
+      sig = ec.sign(OpenSSL::Digest::SHA512.new, 'es512')
+      ec.verify(OpenSSL::Digest::SHA512.new, sig, 'es512')
     }
     run.call('ECDH P-256 agreement') {
       a = OpenSSL::PKey::EC.generate('prime256v1')
       b = OpenSSL::PKey::EC.generate('prime256v1')
-      a.dh_compute_key(b).__await__ == b.dh_compute_key(a).__await__
+      a.dh_compute_key(b) == b.dh_compute_key(a)
     }
     run.call('Ed25519 sign/verify (EdDSA)') {
       ed = OpenSSL::PKey::Ed25519.generate
-      sig = ed.sign(nil, 'eddsa').__await__
-      ed.verify(nil, sig, 'eddsa').__await__
+      sig = ed.sign(nil, 'eddsa')
+      ed.verify(nil, sig, 'eddsa')
     }
     run.call('X25519 key agreement') {
       a = OpenSSL::PKey::X25519.generate
       b = OpenSSL::PKey::X25519.generate
-      a.dh_compute_key(b).__await__ == b.dh_compute_key(a).__await__
+      a.dh_compute_key(b) == b.dh_compute_key(a)
     }
     run.call('OpenSSL::BN arithmetic') {
       (OpenSSL::BN.new(123) + OpenSSL::BN.new(456)).to_s == '579' &&
@@ -807,17 +807,17 @@ class App < Sinatra::Base
     jwt_secret  = 'phase8-self-test-secret'
 
     run.call('JWT HS256 encode/decode round-trip') {
-      tok = JWT.encode(jwt_payload, jwt_secret, 'HS256').__await__
-      dec, = JWT.decode(tok, jwt_secret, true, algorithm: 'HS256').__await__
+      tok = JWT.encode(jwt_payload, jwt_secret, 'HS256')
+      dec, = JWT.decode(tok, jwt_secret, true, algorithm: 'HS256')
       dec['sub'] == 'self-test'
     }
     run.call('JWT HS256 tampered signature rejected') {
-      tok = JWT.encode(jwt_payload, jwt_secret, 'HS256').__await__
+      tok = JWT.encode(jwt_payload, jwt_secret, 'HS256')
       parts = tok.split('.')
       parts[2] = parts[2][0..-2] + (parts[2][-1] == 'A' ? 'B' : 'A')
       raised = false
       begin
-        JWT.decode(parts.join('.'), jwt_secret, true, algorithm: 'HS256').__await__
+        JWT.decode(parts.join('.'), jwt_secret, true, algorithm: 'HS256')
       rescue JWT::VerificationError
         raised = true
       end
@@ -826,22 +826,22 @@ class App < Sinatra::Base
 
     rsa = OpenSSL::PKey::RSA.new(2048)
     run.call('JWT RS256 encode/decode round-trip') {
-      tok = JWT.encode(jwt_payload, rsa, 'RS256').__await__
-      dec, = JWT.decode(tok, rsa.public_key, true, algorithm: 'RS256').__await__
+      tok = JWT.encode(jwt_payload, rsa, 'RS256')
+      dec, = JWT.decode(tok, rsa.public_key, true, algorithm: 'RS256')
       dec['sub'] == 'self-test'
     }
     run.call('JWT PS256 encode/decode round-trip') {
-      tok = JWT.encode(jwt_payload, rsa, 'PS256').__await__
-      dec, = JWT.decode(tok, rsa.public_key, true, algorithm: 'PS256').__await__
+      tok = JWT.encode(jwt_payload, rsa, 'PS256')
+      dec, = JWT.decode(tok, rsa.public_key, true, algorithm: 'PS256')
       dec['sub'] == 'self-test'
     }
     run.call('JWT RS256 tampered signature rejected') {
-      tok = JWT.encode(jwt_payload, rsa, 'RS256').__await__
+      tok = JWT.encode(jwt_payload, rsa, 'RS256')
       parts = tok.split('.')
       parts[2] = parts[2][0..-2] + (parts[2][-1] == 'A' ? 'B' : 'A')
       raised = false
       begin
-        JWT.decode(parts.join('.'), rsa.public_key, true, algorithm: 'RS256').__await__
+        JWT.decode(parts.join('.'), rsa.public_key, true, algorithm: 'RS256')
       rescue JWT::VerificationError
         raised = true
       end
@@ -850,30 +850,30 @@ class App < Sinatra::Base
 
     ec256 = OpenSSL::PKey::EC.generate('prime256v1')
     run.call('JWT ES256 encode/decode round-trip') {
-      tok = JWT.encode(jwt_payload, ec256, 'ES256').__await__
-      dec, = JWT.decode(tok, ec256, true, algorithm: 'ES256').__await__
+      tok = JWT.encode(jwt_payload, ec256, 'ES256')
+      dec, = JWT.decode(tok, ec256, true, algorithm: 'ES256')
       dec['sub'] == 'self-test'
     }
     ec384 = OpenSSL::PKey::EC.generate('secp384r1')
     run.call('JWT ES384 encode/decode round-trip') {
-      tok = JWT.encode(jwt_payload, ec384, 'ES384').__await__
-      dec, = JWT.decode(tok, ec384, true, algorithm: 'ES384').__await__
+      tok = JWT.encode(jwt_payload, ec384, 'ES384')
+      dec, = JWT.decode(tok, ec384, true, algorithm: 'ES384')
       dec['sub'] == 'self-test'
     }
 
     ed = OpenSSL::PKey::Ed25519.generate
     run.call('JWT EdDSA encode/decode round-trip') {
-      tok = JWT.encode(jwt_payload, ed, 'EdDSA').__await__
-      dec, = JWT.decode(tok, ed, true, algorithm: 'EdDSA').__await__
+      tok = JWT.encode(jwt_payload, ed, 'EdDSA')
+      dec, = JWT.decode(tok, ed, true, algorithm: 'EdDSA')
       dec['sub'] == 'self-test'
     }
     run.call('JWT EdDSA tampered signature rejected') {
-      tok = JWT.encode(jwt_payload, ed, 'EdDSA').__await__
+      tok = JWT.encode(jwt_payload, ed, 'EdDSA')
       parts = tok.split('.')
       parts[2] = parts[2][0..-2] + (parts[2][-1] == 'A' ? 'B' : 'A')
       raised = false
       begin
-        JWT.decode(parts.join('.'), ed, true, algorithm: 'EdDSA').__await__
+        JWT.decode(parts.join('.'), ed, true, algorithm: 'EdDSA')
       rescue JWT::VerificationError
         raised = true
       end
@@ -917,18 +917,18 @@ class App < Sinatra::Base
     enc = OpenSSL::Cipher.new('AES-256-GCM').encrypt
     enc.key = key; enc.iv = iv
     enc.update(plain)
-    ct  = enc.final.__await__
+    ct  = enc.final
     tag = enc.auth_tag
     dec = OpenSSL::Cipher.new('AES-256-GCM').decrypt
     dec.key = key; dec.iv = iv; dec.auth_tag = tag
     dec.update(ct)
-    recovered = dec.final.__await__
+    recovered = dec.final
 
     # 4) RSA sign + verify (Web Crypto subtle async)
     rsa = OpenSSL::PKey::RSA.new(2048)
     msg = 'phase 7 rsa payload'
-    sig = rsa.sign(OpenSSL::Digest::SHA256.new, msg).__await__
-    rsa_ok = rsa.public_key.verify(OpenSSL::Digest::SHA256.new, sig, msg).__await__
+    sig = rsa.sign(OpenSSL::Digest::SHA256.new, msg)
+    rsa_ok = rsa.public_key.verify(OpenSSL::Digest::SHA256.new, sig, msg)
 
     # 5) PBKDF2 derived key
     derived = OpenSSL::KDF.pbkdf2_hmac(
@@ -1000,7 +1000,7 @@ class App < Sinatra::Base
       db.execute_insert(
         'INSERT INTO heartbeats (cron, scheduled_at, fired_at, note) VALUES (?, ?, ?, ?)',
         [event.cron, event.scheduled_time.to_i, Time.now.to_i, 'phase9-heartbeat']
-      ).__await__
+      )
     end
   end
 
@@ -1081,7 +1081,7 @@ class App < Sinatra::Base
     # the HTTP response is sent. The literal `__await__` token is
     # what Opal scans for to emit a JS `await`.
     event  = Cloudflare::ScheduledEvent.new(cron: cron, scheduled_time: Time.now)
-    result = App.dispatch_scheduled(event, env['cloudflare.env'], env['cloudflare.ctx']).__await__
+    result = App.dispatch_scheduled(event, env['cloudflare.env'], env['cloudflare.ctx'])
     result.merge('cron' => cron, 'registered_crons' => App.scheduled_jobs.map(&:cron)).to_json
   end
 
@@ -1263,7 +1263,7 @@ class App < Sinatra::Base
       algorithm  = settings.jwt_algorithm
       reason = nil
       decoded = begin
-        JWT.decode(token, verify_key, true, algorithm: algorithm).__await__
+        JWT.decode(token, verify_key, true, algorithm: algorithm)
       rescue JWT::ExpiredSignature
         reason = 'token expired'
         nil
@@ -1297,7 +1297,7 @@ class App < Sinatra::Base
     @primary_model  = CHAT_MODELS[:primary]
     @fallback_model = CHAT_MODELS[:fallback]
     @session_id = normalize_session_id(params['session'])
-    @history = ai_demos_enabled? ? load_chat_history(@session_id).__await__ : []
+    @history = ai_demos_enabled? ? load_chat_history(@session_id) : []
     @content = erb :chat
     erb :layout
   end
@@ -1392,7 +1392,7 @@ class App < Sinatra::Base
     # returned Promise. Without the explicit await, `history` would
     # be a PromiseV2 and downstream `JSON.parse` / Array iteration
     # would crash with "undefined method `each` for PromiseV2".
-    history = load_chat_history(session_id).__await__
+    history = load_chat_history(session_id)
     messages = build_ai_messages(history, user_text)
 
     started_at = Time.now.to_f
@@ -1411,7 +1411,7 @@ class App < Sinatra::Base
         # still well under Workers' 30s wall-time budget.
         { messages: messages, max_tokens: 1024 },
         binding: ai_binding
-      ).__await__
+      )
       reply_text = App.extract_ai_text(result).strip
       raise Cloudflare::AIError.new('empty response', model: model) if reply_text.empty?
     rescue Cloudflare::AIError => e
@@ -1428,7 +1428,7 @@ class App < Sinatra::Base
           used_model,
           { messages: messages, max_tokens: 1024 },
           binding: ai_binding
-        ).__await__
+        )
         reply_text = App.extract_ai_text(result).strip
       rescue Cloudflare::AIError => e
         status 502
@@ -1445,7 +1445,7 @@ class App < Sinatra::Base
       { 'role' => 'user',      'content' => user_text },
       { 'role' => 'assistant', 'content' => reply_text }
     ]
-    save_chat_history(session_id, new_history).__await__
+    save_chat_history(session_id, new_history)
 
     {
       'ok'           => true,
@@ -1469,7 +1469,7 @@ class App < Sinatra::Base
     content_type 'application/json'
     gate = ai_demos_block_or_nil
     next gate if gate
-    auth = chat_verify_token!.__await__
+    auth = chat_verify_token!
     if auth['ok'] != true
       # See the long comment in POST /api/chat/messages for why we
       # return [status, body] instead of using `status N; next body`
@@ -1478,7 +1478,7 @@ class App < Sinatra::Base
       next [auth['status'].to_i, auth['body']]
     end
     session_id = normalize_session_id(params['session'])
-    history = load_chat_history(session_id).__await__
+    history = load_chat_history(session_id)
     # Include a pre-rendered HTML for each message so the client can
     # show Markdown-formatted history without re-running a JS parser.
     history_enriched = history.map do |m|
@@ -1501,7 +1501,7 @@ class App < Sinatra::Base
     content_type 'application/json'
     gate = ai_demos_block_or_nil
     next gate if gate
-    auth = chat_verify_token!.__await__
+    auth = chat_verify_token!
     if auth['ok'] != true
       # See the long comment in POST /api/chat/messages for why we
       # return [status, body] instead of using `status N; next body`
@@ -1510,7 +1510,7 @@ class App < Sinatra::Base
       next [auth['status'].to_i, auth['body']]
     end
     session_id = normalize_session_id(params['session'])
-    clear_chat_history(session_id).__await__
+    clear_chat_history(session_id)
     { 'ok' => true, 'session' => session_id, 'cleared' => true }.to_json
   end
 
@@ -1531,7 +1531,7 @@ class App < Sinatra::Base
         { role: 'user',   content: 'こんにちは' }
       ], max_tokens: 64 },
       binding: ai_binding
-    ).__await__
+    )
     {
       'model'    => model,
       'class'    => out.class.to_s,
@@ -1576,7 +1576,7 @@ class App < Sinatra::Base
             { role: 'user',   content: 'ping' }
           ], max_tokens: 64 },
           binding: ai_binding
-        ).__await__
+        )
         txt = App.extract_ai_text(out).strip
         if txt.empty?
           { 'pass' => false, 'note' => 'empty response from model' }
@@ -1758,7 +1758,7 @@ class App < Sinatra::Base
       "https://homurabi-do.internal/ws/#{name}",
       method: 'GET',
       headers: { 'upgrade' => 'websocket' }
-    ).__await__
+    )
     Cloudflare::RawResponse.new(js_resp)
   end
 
@@ -1821,7 +1821,7 @@ class App < Sinatra::Base
     # parses the URL to route the call. The host is irrelevant (the
     # DO receives the whole Request), but it must be parseable.
     url = "https://homurabi-do.internal/#{action}"
-    res = stub.fetch(url, method: 'POST').__await__
+    res = stub.fetch(url, method: 'POST')
     {
       'demo'    => 'Durable Objects counter',
       'binding' => 'COUNTER',
@@ -1903,7 +1903,7 @@ class App < Sinatra::Base
     rescue JSON::ParserError, StandardError
       body = { 'note' => 'default payload (empty or invalid JSON body)', 'ts' => Time.now.to_i }
     end
-    q.send(body).__await__
+    q.send(body)
     status 202
     { 'enqueued' => true, 'queue' => 'homurabi-jobs', 'payload' => body }.to_json
   end
@@ -1979,7 +1979,7 @@ class App < Sinatra::Base
     started = Time.now.to_f
     # Open the named partition fresh per request — the JS handle is
     # cached per-isolate internally but the Ruby wrapper is cheap.
-    named = ::Cloudflare::Cache.open(namespace).__await__
+    named = ::Cloudflare::Cache.open(namespace)
     cached = named.match(cache_key).__await__
     if cached
       state = 'HIT'
@@ -2052,7 +2052,7 @@ class App < Sinatra::Base
       idx += 1
     end
     js_batch = `({ queue: #{qname}, messages: #{js_msgs}, ackAll: function() {}, retryAll: function() {} })`
-    summary = Cloudflare::QueueConsumer.dispatch_js(js_batch, env['cloudflare.env'], env['cloudflare.ctx']).__await__
+    summary = Cloudflare::QueueConsumer.dispatch_js(js_batch, env['cloudflare.env'], env['cloudflare.ctx'])
     summary.merge('injected' => messages.size).to_json
   end
 
@@ -2108,7 +2108,7 @@ class App < Sinatra::Base
       next({ 'error' => 'Queue binding JOBS_QUEUE not bound' }.to_json)
     end
     payload = { 'fail' => true, 'reason' => 'force-dlq demo', 'ts' => Time.now.to_i }
-    q.send(payload).__await__
+    q.send(payload)
     status 202
     { 'enqueued' => true, 'payload' => payload, 'note' => 'main consumer will retry up to max_retries; then the runtime forwards the message to homurabi-jobs-dlq' }.to_json
   end
@@ -2137,13 +2137,13 @@ class App < Sinatra::Base
         name = "selftest-#{SecureRandom.hex(4)}"
         stub = ns.get_by_name(name)
         base = 'https://homurabi-do.internal'
-        stub.fetch("#{base}/reset", method: 'POST').__await__
-        r1 = JSON.parse(stub.fetch("#{base}/inc", method: 'POST').__await__.body)
-        r2 = JSON.parse(stub.fetch("#{base}/inc", method: 'POST').__await__.body)
-        peek = JSON.parse(stub.fetch("#{base}/peek").__await__.body)
+        stub.fetch("#{base}/reset", method: 'POST')
+        r1 = JSON.parse(stub.fetch("#{base}/inc", method: 'POST').body)
+        r2 = JSON.parse(stub.fetch("#{base}/inc", method: 'POST').body)
+        peek = JSON.parse(stub.fetch("#{base}/peek").body)
         do_case['pass'] = r1['count'] == 1 && r2['count'] == 2 && peek['count'] == 2
         do_case['detail'] = { 'r1' => r1, 'r2' => r2, 'peek' => peek }
-        stub.fetch("#{base}/reset", method: 'POST').__await__
+        stub.fetch("#{base}/reset", method: 'POST')
       end
     rescue ::Exception => e
       do_case['pass'] = false
@@ -2188,7 +2188,7 @@ class App < Sinatra::Base
         queue_case['pass'] = false
         queue_case['note'] = 'JOBS_QUEUE binding not bound'
       else
-        q.send({ 'selftest' => true, 'ts' => Time.now.to_i, 'nonce' => SecureRandom.hex(4) }).__await__
+        q.send({ 'selftest' => true, 'ts' => Time.now.to_i, 'nonce' => SecureRandom.hex(4) })
         queue_case['pass'] = true
         queue_case['note'] = 'producer.send completed'
       end
@@ -2350,7 +2350,7 @@ class App < Sinatra::Base
     @images = []
     @non_image_count = 0
     if bucket
-      rows = bucket.list(prefix: 'phase11a/uploads/', limit: 50).__await__
+      rows = bucket.list(prefix: 'phase11a/uploads/', limit: 50)
       # Partition into image rows (→ gallery) and non-image rows
       # (legacy curl-smoke binary payloads that predate the MIME
       # guard below). The gallery only renders real images so we
@@ -2393,7 +2393,7 @@ class App < Sinatra::Base
       status 503
       next({ 'error' => 'R2 binding not configured' }.to_json)
     end
-    rows = bucket.list(prefix: 'phase11a/uploads/', limit: 1000).__await__
+    rows = bucket.list(prefix: 'phase11a/uploads/', limit: 1000)
     deleted_keys = []
     rows.each do |row|
       ct = row['content_type'].to_s
@@ -2452,7 +2452,7 @@ class App < Sinatra::Base
       next({ 'error' => 'R2 binding not configured' }.to_json)
     end
     key = params['splat'].is_a?(Array) ? params['splat'].join('/') : params['splat'].to_s
-    obj = bucket.get_binary(key).__await__
+    obj = bucket.get_binary(key)
     if obj.nil?
       content_type 'application/json'
       status 404
@@ -2478,7 +2478,7 @@ class App < Sinatra::Base
       i = 0
       while i < 3
         out << "chunk #{i} @ #{Time.now.to_i}\n"
-        out.sleep(0.5).__await__
+        out.sleep(0.5)
         i += 1
       end
       out << "done\n"
@@ -2512,7 +2512,7 @@ class App < Sinatra::Base
           event: 'heartbeat',
           id: i.to_s
         )
-        out.sleep(1).__await__
+        out.sleep(1)
         i += 1
       end
       out.event('done', event: 'close')

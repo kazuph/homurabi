@@ -1,0 +1,33 @@
+<div style="max-width:420px;margin:2em auto;">
+  <h1>Login</h1>
+  <p style="color:#888;font-size:0.9em;">
+    Phase 13 follow-up demo: a username (any non-empty string, 1-64 chars)
+    mints a JWT (HS256) and stashes it in an <code>HttpOnly</code> cookie
+    named <code>homurabi_session</code>. <code>/chat</code> is gated on
+    that cookie.
+  </p>
+
+  <% if @login_error %>
+    <div style="background:#fee;border:1px solid #f99;padding:0.6em;border-radius:4px;margin-bottom:1em;color:#900;">
+      <%= Rack::Utils.escape_html(@login_error) %>
+    </div>
+  <% end %>
+
+  <form method="post" action="/login" style="display:flex;flex-direction:column;gap:0.8em;">
+    <label>
+      Username
+      <input type="text" name="username" required maxlength="64"
+             style="width:100%;padding:0.6em;box-sizing:border-box;"
+             autofocus placeholder="e.g. kazu">
+    </label>
+    <input type="hidden" name="return_to" value="<%= Rack::Utils.escape_html(params['return_to'] || '/chat') %>">
+    <button type="submit" style="padding:0.7em;background:#2a5ef4;color:white;border:0;border-radius:4px;cursor:pointer;">
+      Sign in
+    </button>
+  </form>
+
+  <p style="color:#888;font-size:0.85em;margin-top:2em;">
+    No password (yet) — this is a demo of the JWT-in-cookie flow, not an
+    identity provider. Logout at <a href="/logout">/logout</a>.
+  </p>
+</div>

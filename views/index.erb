@@ -14,12 +14,62 @@
    template, <em>exactly</em> like the Sinatra README recommends.</p>
 
 <h2>Live routes</h2>
+
+<h3>🌱 基本</h3>
 <ul>
   <li><a href="/hello/world">GET /hello/world</a> — classic <code>params</code> example</li>
   <li><a href="/about">GET /about</a> — another HTML page rendered by ERB</li>
-  <li><a href="/d1/users">GET /d1/users</a> — list rows from a D1 database</li>
-  <li><a href="/kv/hello">GET /kv/hello</a> — read a Workers KV key</li>
-  <li><a href="/r2/greeting">GET /r2/greeting</a> — read an R2 object</li>
+</ul>
+
+<h3>🗄️ D1 (SQLite) + Sequel ORM</h3>
+<ul>
+  <li><a href="/d1/users">GET /d1/users</a> — 生 SQL で D1 から一覧</li>
+  <li><a href="/demo/sequel">GET /demo/sequel</a> — Sequel Dataset DSL 経由で同じ結果</li>
+  <li><a href="/demo/sequel/sql">GET /demo/sequel/sql</a> — Sequel が生成する SQL を確認</li>
+  <li><a href="/posts">GET /posts</a> — <strong>Phase 13 follow-up</strong>:
+      <code>db/migrations/0001_create_posts.rb</code> の Sequel migration を
+      <code>wrangler d1 migrations apply --remote</code> で本番適用した新テーブル。
+      <code>POST /posts</code> に <code>{"title": "...", "body": "..."}</code> を投げると作成</li>
+</ul>
+
+<h3>🔑 KV / R2</h3>
+<ul>
+  <li><a href="/kv/hello">GET /kv/hello</a> — Workers KV read (PUT <code>/kv/:key</code> で書込)</li>
+  <li><a href="/r2/greeting">GET /r2/greeting</a> — R2 object read (PUT <code>/r2/:key</code> で書込)</li>
+</ul>
+
+<h3>🔐 JWT / Auth</h3>
+<ul>
+  <li><a href="/login">GET /login</a> — <strong>Phase 13 follow-up</strong>: ログインフォーム（cookie ベース）</li>
+  <li><code>POST /api/login</code> — JWT 発行 (HS256) &middot;
+      <code>GET /api/me</code> &middot; <code>POST /api/login/refresh</code></li>
+</ul>
+
+<h3>🌐 HTTP / Streaming</h3>
+<ul>
+  <li><a href="/demo/http">GET /demo/http</a> — <code>Net::HTTP.get_response</code> で外部 API 叩く</li>
+  <li><a href="/demo/http/raw">GET /demo/http/raw</a> — <code>Cloudflare::HTTP.fetch</code> 直叩き</li>
+  <li><a href="/demo/sse">GET /demo/sse</a> — Server-Sent Events stream</li>
+  <li><a href="/phase11a/upload">GET /phase11a/upload</a> — multipart/form-data + R2 uploads</li>
+</ul>
+
+<h3>🤖 Workers AI</h3>
+<ul>
+  <li><a href="/chat" class="nav-chat">GET /chat</a> — <strong>要ログイン</strong>。
+      Workers AI (Gemma 4) + Sinatra + KV history + JWT 認証で動く AI チャット UI</li>
+</ul>
+
+<h3>🧪 Self-tests (diagnostics)</h3>
+<ul>
+  <li><a href="/test/sequel">GET /test/sequel</a> — Sequel + D1 adapter の実機テスト (8/8)</li>
+  <li><a href="/test/crypto">GET /test/crypto</a> — OpenSSL primitives full suite
+      (<code>HOMURABI_ENABLE_CRYPTO_DEMOS=1</code> 必要)</li>
+  <li><a href="/test/scheduled">GET /test/scheduled</a> — cron job registry
+      (<code>HOMURABI_ENABLE_SCHEDULED_DEMOS=1</code> 必要)</li>
+  <li><a href="/test/foundations">GET /test/foundations</a> — HTTP foundations / Faraday / multipart
+      (<code>HOMURABI_ENABLE_FOUNDATIONS_DEMOS=1</code> 必要)</li>
+  <li><a href="/test/bindings">GET /test/bindings</a> — DO / Cache / Queue 実機
+      (<code>HOMURABI_ENABLE_BINDING_DEMOS=1</code> 必要)</li>
 </ul>
 
 <h2>D1 live data</h2>

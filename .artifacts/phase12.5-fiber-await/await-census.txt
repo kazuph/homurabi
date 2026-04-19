@@ -1,0 +1,64 @@
+=== __await__ occurrences ===
+Total in app/hello.rb (includes comments):
+54
+Non-comment (code only):
+42
+
+=== auto-await magic comment ===
+# await: all, authenticate!, chat_verify_token!, clear_chat_history, decode, dh_compute_key, dispatch_js, dispatch_scheduled, encode, execute, execute_insert, fetch, fetch_raw, final, get_binary, get_first_row, get_response, list, load_chat_history, open, private_decrypt, public_encrypt, run, save_chat_history, send, sign, sign_pss, sleep, verify, verify_pss
+
+=== Remaining .__await__ in code (by pattern) ===
+172:      cached = c.match(cache_key).__await__
+191:      ).__await__
+235:  # ceremony: capture params BEFORE the first `.__await__`, because
+342:    run.call('DB[:users].where(id: 1).first.__await__ returns single row') {
+343:      row = seq_db[:users].where(id: 1).first.__await__
+355:    value = kv.get(key).__await__
+368:    kv.put(key, body).__await__
+376:    kv.delete(key).__await__
+398:    obj    = bucket.get(key).__await__
+417:    bucket.put(key, body, content_type_in).__await__
+425:    bucket.delete(key).__await__
+566:      kv.put("refresh:#{refresh}", entry.to_json).__await__
+651:    raw = kv.get("refresh:#{refresh}").__await__
+665:      kv.delete("refresh:#{refresh}").__await__
+736:        ct = ct + e.update(plain[i, 13]).__await__; i += 13
+740:      d.update(ct).__await__ + d.final == plain
+1015:      raw  = kv.get('cron:hourly-counter').__await__
+1030:      kv.put('cron:hourly-counter', payload).__await__
+1078:    # dispatcher is async (it `__await__`s each job's body), so we
+1079:    # MUST `__await__` its return Promise before serialising the
+1081:    # the HTTP response is sent. The literal `__await__` token is
+1185:      raw = kv.get(chat_kv_key(session_id)).__await__
+1200:      kv.put(chat_kv_key(session_id), trimmed.to_json, expiration_ttl: CHAT_HISTORY_TTL).__await__
+1205:      kv.delete(chat_kv_key(session_id)).__await__
+1361:    })()`.__await__
+1389:    # Helper methods that internally call `__await__` on a binding
+1391:    # call must be `__await__`'d at the call site to unwrap the
+1564:    # NOTE: blocks-with-`__await__` compile to async functions in Opal
+1569:    # loop where each step is followed by an explicit `__await__`.
+1592:    cases << test_one.call(primary,  "primary model #{primary} responds").__await__
+1593:    cases << test_one.call(fallback, "fallback model #{fallback} responds").__await__
+1634:        kv.put("queue:dlq:#{i}", record.to_json, expiration_ttl: 86_400).__await__
+1646:    # `__await__` is unreliable because Opal yields to an async
+1672:          kv.put("queue:last-consumed:#{i}", record.to_json, expiration_ttl: 86_400).__await__
+1773:    prev = (state.storage.get('count').__await__ || 0).to_i
+1776:      state.storage.put('count', next_count).__await__
+1789:      state.storage.delete('count').__await__
+1851:    # cache_get uses `__await__` internally (cache.match / cache.put)
+1853:    # value is a Promise we MUST `__await__` at the call site.
+1869:    end.__await__
+1929:      raw = kv.get("queue:last-consumed:#{i}").__await__
+1983:    cached = named.match(cache_key).__await__
+2009:      }).__await__
+2076:      raw = kv.get("queue:dlq:#{i}").__await__
+2164:      }).__await__
+2165:      got = c.match(key).__await__
+2261:    res = client.get('/', { 'format' => 'json' }).__await__
+2321:    bucket.put(key, u8, file_param.content_type).__await__
+2404:      bucket.delete(k).__await__
+2431:    bucket.delete(full).__await__
+2553:      res = c.get('/', { 'format' => 'json' }).__await__
+2566:        c.get('/this-path-does-not-exist-11a').__await__
+2622:      # `loop do … __await__ … break` — which allocates a Promise per
+2626:      decoded = `(async function(r){ var rd=r.getReader(); var d=new TextDecoder(); var out=''; while(true){ var c=await rd.read(); if(c.done) return out; out += d.decode(c.value); } })(#{readable})`.__await__

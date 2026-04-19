@@ -3,7 +3,7 @@
 
 name = "homurabi"
 main = "src/worker.mjs"
-compatibility_date = "2026-04-15"
+compatibility_date = "2025-07-18"
 compatibility_flags = ["nodejs_compat"]
 
 # Phase 3: D1 / KV / R2 bindings reachable from Sinatra routes via

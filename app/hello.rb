@@ -1344,61 +1344,38 @@ class App < Sinatra::Base
   # logged-in users can reach the AI page.
   # ----------------------------------------------------------------
 
-  # Resolve the current user from the homurabi_session cookie
-  # (populated by POST /login). Sets @current_user for layout.erb
-  # to pick up. Returns nil if missing/invalid — callers decide
-  # what to do (redirect vs 401).
-  #
-  # We sign the cookie using HMAC-SHA256 over "username:exp" and
-  # base64url-encode the two halves. This keeps the whole session
-  # flow *synchronous* — JWT.encode/decode hit subtle (async) when
-  # used with asymmetric algos and even for HS256 the auto-await
-  # list marks them async, which collides with Sinatra's halt/
-  # redirect throws. Raw HMAC is `node:crypto.createHmac` sync in
-  # our Opal shim. This shape is strictly weaker than full JWT
-  # (no alg/kid rotation, no JSON payload), but it matches the
-  # browser-cookie usecase: we only store `sub`.
-  helpers do
-    SESSION_COOKIE_TTL = 86_400
-    SESSION_COOKIE_NAME = 'homurabi_session'
+  # HMAC-SHA256 signed cookie helpers (sync — avoids JWT.encode's
+  # auto-awaited Promise path colliding with Sinatra `redirect`'s
+  # :halt throw). Constants stay at top level rather than inside
+  # `helpers do ... end` so startup cost stays minimal — the
+  # previous `helpers` block form pushed the Cloudflare deploy
+  # startup past its CPU budget (code 10021).
+  SESSION_COOKIE_TTL  = 86_400
+  SESSION_COOKIE_NAME = 'homurabi_session'
 
-    def sign_session_payload(payload)
-      sig = OpenSSL::HMAC.hexdigest('SHA256', settings.jwt_secret, payload)
-      "#{payload}.#{sig}"
-    end
-
-    def verify_session_cookie(raw)
-      return nil unless raw.is_a?(String) && raw.include?('.')
-      payload, sig = raw.split('.', 2)
-      return nil if payload.nil? || sig.nil? || payload.empty? || sig.empty?
-      expected = OpenSSL::HMAC.hexdigest('SHA256', settings.jwt_secret, payload)
-      return nil unless Rack::Utils.secure_compare(expected, sig)
-      # payload is "b64url(username):exp"
-      decoded = Base64.urlsafe_decode64(payload) rescue nil
-      return nil if decoded.nil?
-      username, exp = decoded.split(':', 2)
-      return nil if username.nil? || exp.nil?
-      return nil if Time.now.to_i > exp.to_i
-      username
-    end
-
-    def mint_session_cookie(username)
-      exp = Time.now.to_i + SESSION_COOKIE_TTL
-      payload = Base64.urlsafe_encode64("#{username}:#{exp}", padding: false)
-      sign_session_payload(payload)
-    end
-
-    def homurabi_session_user
-      return @homurabi_session_user if defined?(@homurabi_session_user)
-      raw = request.cookies[SESSION_COOKIE_NAME].to_s
-      @homurabi_session_user = verify_session_cookie(raw)
-    end
+  def verify_session_cookie(raw)
+    return nil unless raw.is_a?(String) && raw.include?('.')
+    payload, sig = raw.split('.', 2)
+    return nil if payload.nil? || sig.nil? || payload.empty? || sig.empty?
+    expected = OpenSSL::HMAC.hexdigest('SHA256', settings.jwt_secret, payload)
+    return nil unless Rack::Utils.secure_compare(expected, sig)
+    decoded = Base64.urlsafe_decode64(payload) rescue nil
+    return nil if decoded.nil?
+    username, exp = decoded.split(':', 2)
+    return nil if username.nil? || exp.nil?
+    return nil if Time.now.to_i > exp.to_i
+    username
   end
 
-  # Populate @current_user for every HTML route so layout can show
-  # the login / logout link + greeting.
-  before do
-    @current_user = homurabi_session_user
+  def mint_session_cookie(username)
+    exp = Time.now.to_i + SESSION_COOKIE_TTL
+    payload = Base64.urlsafe_encode64("#{username}:#{exp}", padding: false)
+    sig = OpenSSL::HMAC.hexdigest('SHA256', settings.jwt_secret, payload)
+    "#{payload}.#{sig}"
+  end
+
+  def current_session_user
+    verify_session_cookie(request.cookies[SESSION_COOKIE_NAME].to_s)
   end
 
   # GET /login — simple demo login form. Any non-empty username
@@ -1465,7 +1442,7 @@ class App < Sinatra::Base
     # `js_headers` by build_js_response before any await), then
     # return a 2-element `[status, body]` tuple that the JS
     # override in `lib/cloudflare_workers.rb` recognises.
-    unless @current_user
+    unless current_session_user
       response['Location'] = "/login?return_to=#{Rack::Utils.escape('/chat')}"
       next [302, '']
     end

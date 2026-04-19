@@ -302,6 +302,50 @@ class App < Sinatra::Base
     { 'sql' => ds.sql.to_s, 'adapter' => 'sequel-d1' }.to_json
   end
 
+  # Phase 13 follow-up — exercise the Sequel migration pipeline end-to-end.
+  # The `posts` table is defined in `db/migrations/0001_create_posts.rb`
+  # (Sequel DSL) and compiled by `bin/homurabi-migrate compile db/migrations`
+  # into the `.sql` file that `wrangler d1 migrations apply` consumes.
+  # Production applied via `npx wrangler d1 migrations apply homurabi-db --remote`.
+  #
+  # Reads use the Sequel dataset DSL (demonstrates ORM round-trip).
+  # Writes go through raw `db.execute(sql, binds)` because Sequel's
+  # SQLite inline-literal emitter escapes differently from D1's
+  # parameterised-statement expectation, and D1 speaks ? placeholders
+  # natively.
+  get '/posts' do
+    content_type 'application/json'
+    seq_db = Sequel.connect(adapter: :d1, d1: db)
+    rows = seq_db[:posts].order(Sequel.desc(:id)).limit(20).all
+    { 'count' => rows.size, 'posts' => rows }.to_json
+  end
+
+  post '/posts' do
+    content_type 'application/json'
+    begin
+      payload = JSON.parse(request.body.read)
+    rescue JSON::ParserError, StandardError => e
+      status 400
+      next({ 'error' => "invalid JSON: #{e.message}" }.to_json)
+    end
+    title = payload['title'].to_s.strip
+    body_text = payload['body'].to_s.strip
+    if title.empty?
+      status 400
+      next({ 'error' => 'title is required' }.to_json)
+    end
+    # Use Cloudflare::D1Database directly for the insert + readback.
+    # D1's execute() accepts `?` placeholders and binds as an Array,
+    # matching sqlite3-ruby's idiom (same shape `/d1/users POST`
+    # route already relies on).
+    row = db.get_first_row(
+      'INSERT INTO posts (title, body) VALUES (?, ?) RETURNING id, title, body, created_at',
+      [title, body_text]
+    )
+    status 201
+    { 'ok' => true, 'post' => row }.to_json
+  end
+
   # Phase 12 — Workers self-test: run the offline SQL DSL assertions
   # and a live-D1 fetch from *inside* the Worker isolate. Mirrors
   # test/sequel_smoke.rb's DSL cases but hits the real D1 binding
@@ -1293,9 +1337,132 @@ class App < Sinatra::Base
     end
   end
 
-  # GET /chat — chat UI page. JWT-gated for API calls (the page itself
-  # is open so the user can mint a token from inside it).
+  # ----------------------------------------------------------------
+  # Phase 13 follow-up — cookie-based session login.
+  # Browser flow: /login form → POST /login → set homurabi_session
+  # cookie (base64url `username:exp` payload with HMAC-SHA256
+  # signature) → redirect to /chat. Guards /chat so only
+  # logged-in users can reach the AI page.
+  # ----------------------------------------------------------------
+
+  # Custom HMAC-SHA256 signed cookie helpers (sync, with a
+  # base64url-encoded `username:exp` payload — not a JWT). Going
+  # custom avoids JWT.encode's auto-awaited Promise path, which
+  # collides with Sinatra `redirect`'s :halt throw across Opal's
+  # async boundary. Constants stay at top level rather than inside
+  # `helpers do ... end` so startup cost stays minimal — the
+  # previous `helpers` block form pushed the Cloudflare deploy
+  # startup past its CPU budget (code 10021).
+  SESSION_COOKIE_TTL  = 86_400
+  SESSION_COOKIE_NAME = 'homurabi_session'
+
+  def verify_session_cookie(raw)
+    return nil unless raw.is_a?(String) && raw.include?('.')
+    payload, sig = raw.split('.', 2)
+    return nil if payload.nil? || sig.nil? || payload.empty? || sig.empty?
+    expected = OpenSSL::HMAC.hexdigest('SHA256', settings.jwt_secret, payload)
+    return nil unless Rack::Utils.secure_compare(expected, sig)
+    decoded = Base64.urlsafe_decode64(payload) rescue nil
+    return nil if decoded.nil?
+    username, exp = decoded.split(':', 2)
+    return nil if username.nil? || exp.nil?
+    return nil if Time.now.to_i > exp.to_i
+    username
+  end
+
+  def mint_session_cookie(username)
+    exp = Time.now.to_i + SESSION_COOKIE_TTL
+    payload = Base64.urlsafe_encode64("#{username}:#{exp}", padding: false)
+    sig = OpenSSL::HMAC.hexdigest('SHA256', settings.jwt_secret, payload)
+    "#{payload}.#{sig}"
+  end
+
+  def current_session_user
+    verify_session_cookie(request.cookies[SESSION_COOKIE_NAME].to_s)
+  end
+
+  # GET /login — simple demo login form. Any non-empty username
+  # mints an HMAC-signed session cookie carrying `username:exp`.
+  # No password check — this is a demo of the signed-cookie
+  # session flow, not an identity provider.
+  get '/login' do
+    @title = 'Login — homurabi'
+    @login_error = nil
+    @content = erb :login
+    erb :layout
+  end
+
+  # POST /login — accept username, mint an HMAC-SHA256 signed
+  # cookie (base64url `username:exp` + hex signature, split by
+  # `.`), stash it in an HttpOnly cookie, redirect back to the
+  # requested `return_to` (default /chat, 303 See Other).
+  #
+  # NOTE: Sinatra's `redirect` throws `:halt` under the hood, which
+  # doesn't cross Opal's async/await boundary cleanly (same issue
+  # documented around `chat_verify_token!`). This route body is
+  # kept synchronous (mint_session_cookie → OpenSSL::HMAC is sync
+  # via node:crypto), so `redirect` works normally here.
+  post '/login' do
+    username = params['username'].to_s.strip
+    return_to = params['return_to'].to_s
+    # Reject protocol-relative (`//evil.example`) and anything with
+    # whitespace/newlines so the Location: header stays strictly
+    # within-site. `\A/(?!/)\S*\z` → starts with single `/`, no `//`
+    # prefix, no whitespace.
+    return_to = '/chat' unless return_to.match?(%r{\A/(?!/)\S*\z})
+
+    # `:` is the session cookie payload delimiter (`username:exp`
+    # → base64url → HMAC). Allowing `:` in the username would
+    # truncate it on verification (split(':', 2)), so the
+    # displayed/stored user wouldn't match what was entered.
+    if username.empty? || username.length > 64 || username.include?(':')
+      @title = 'Login — homurabi'
+      @login_error = 'username is required (1-64 chars, no colon)'
+      @content = erb :login
+      next erb :layout
+    end
+
+    # mint_session_cookie is sync (HMAC-SHA256 via node:crypto).
+    # Keeping the route body sync lets `redirect` work normally.
+    token = mint_session_cookie(username)
+    response.set_cookie(SESSION_COOKIE_NAME, {
+      value: token,
+      path: '/',
+      httponly: true,
+      secure: request.scheme == 'https',
+      same_site: :lax,
+      max_age: SESSION_COOKIE_TTL
+    })
+    # 303 See Other — explicitly tells the client to follow up with
+    # GET, avoiding any ambiguous POST-replay semantics around 302.
+    redirect return_to, 303
+  end
+
+  # GET /logout — clear the session cookie. Always redirects home.
+  get '/logout' do
+    response.delete_cookie(SESSION_COOKIE_NAME, path: '/')
+    redirect '/'
+  end
+
+  # GET /chat — AI chat page. Phase 13 follow-up: gate on the
+  # homurabi_session cookie so only logged-in users reach the UI.
+  # API endpoints (/api/chat/*) continue to accept the legacy
+  # Bearer-token flow for backwards compatibility with the
+  # pre-cookie demo. See POST /login for why we can't use Sinatra's
+  # `redirect` helper here.
   get '/chat' do
+    # /chat's body is async (load_chat_history is auto-awaited), so
+    # `redirect` (which throws :halt) would surface as
+    # `UncaughtThrowError: uncaught throw "halt"` past the async
+    # boundary. Set Location on the response (captured into
+    # `js_headers` by build_js_response before any await), then
+    # return a 2-element `[status, body]` tuple that the JS
+    # override in `lib/cloudflare_workers.rb` recognises.
+    unless current_session_user
+      response['Location'] = "/login?return_to=#{Rack::Utils.escape('/chat')}"
+      next [302, '']
+    end
+
     @title = 'homurabi /chat — Workers AI'
     @primary_model  = CHAT_MODELS[:primary]
     @fallback_model = CHAT_MODELS[:fallback]

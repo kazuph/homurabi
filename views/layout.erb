@@ -16,9 +16,9 @@
       <a href="/posts">Posts</a>
       <a href="/demo/http">HTTP</a>
       <a href="/chat" class="nav-chat">Chat ⚡</a>
-      <% if @current_user %>
+      <% if (sess_user = current_session_user) %>
         <span style="margin-left:auto;color:#666;font-size:0.9em;">
-          <%= Rack::Utils.escape_html(@current_user.to_s) %> &middot;
+          <%= Rack::Utils.escape_html(sess_user.to_s) %> &middot;
           <a href="/logout">Logout</a>
         </span>
       <% else %>

@@ -255,25 +255,16 @@ module Sinatra
       end
 
       # -----------------------------------------------------------
-      # 11. Base.setup_null_logger / setup_custom_logger
-      #     (upstream base.rb:1867 / 1875)
-      #
-      # Upstream uses Sinatra::Middleware::Logger. homurabi does not
-      # vendor it (no Ruby Logger stdlib under Opal — would need
-      # another stub). Rack::NullLogger / Rack::Logger are already
-      # in vendor/rack and operate with minimal dependencies.
+      # 11. NOTE: previous drafts of this patch file replaced
+      # `setup_null_logger` / `setup_custom_logger` with Rack::Logger
+      # middleware, but homurabi's vendored Rack does not ship
+      # `Rack::Logger` (it ships `Rack::NullLogger` and
+      # `Rack::CommonLogger` only). Upstream Sinatra's original
+      # `Sinatra::Middleware::Logger` is vendored bit-identically
+      # under vendor/sinatra_upstream/middleware/logger.rb and works
+      # against Opal's stdlib Logger (vendor/opal-gem/stdlib/logger.rb).
+      # No override required — upstream's implementation is reused.
       # -----------------------------------------------------------
-      def setup_null_logger(builder)
-        builder.use(::Rack::NullLogger)
-      end
-
-      def setup_custom_logger(builder)
-        if logging.respond_to?(:to_int)
-          builder.use(::Rack::Logger, logging)
-        else
-          builder.use(::Rack::Logger)
-        end
-      end
 
       # -----------------------------------------------------------
       # 12. Base.force_encoding (upstream base.rb:1942)
@@ -320,6 +311,23 @@ module Sinatra
       end
     end
   end
+
+  # Upstream `Sinatra::Delegator.delegate(:get, :post, :enable, ...)` on
+  # base.rb:2117 runs BEFORE sinatra_opal_patches.rb loads, so those
+  # methods were defined by the ORIGINAL `delegate` body (which probes
+  # `return super(*args, &block) if respond_to?(method_name)`). In Opal
+  # `super` inside `define_method` resolves against the compile-time
+  # enclosing method name (`delegate`) — not the dynamically-defined
+  # target — and explodes when top-level `enable :inline_templates`
+  # triggers it on the `main` object ("super: no superclass method
+  # `enable'"). Re-delegate the canonical upstream list NOW so every
+  # instance method is regenerated with the patched body.
+  Delegator.delegate(
+    :get, :patch, :put, :post, :delete, :head, :options, :link, :unlink,
+    :template, :layout, :before, :after, :error, :not_found, :configure,
+    :set, :mime_type, :enable, :disable, :use, :development?, :test?,
+    :production?, :helpers, :settings, :register, :on_start, :on_stop
+  )
 end
 
 # ---------------------------------------------------------------

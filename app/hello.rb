@@ -324,7 +324,7 @@ class App < Sinatra::Base
     content_type 'application/json'
     begin
       payload = JSON.parse(request.body.read)
-    rescue ::Exception => e
+    rescue JSON::ParserError, StandardError => e
       status 400
       next({ 'error' => "invalid JSON: #{e.message}" }.to_json)
     end
@@ -1340,13 +1340,16 @@ class App < Sinatra::Base
   # ----------------------------------------------------------------
   # Phase 13 follow-up — cookie-based session login.
   # Browser flow: /login form → POST /login → set homurabi_session
-  # cookie (signed JWT) → redirect to /chat. Guards /chat so only
+  # cookie (base64url `username:exp` payload with HMAC-SHA256
+  # signature) → redirect to /chat. Guards /chat so only
   # logged-in users can reach the AI page.
   # ----------------------------------------------------------------
 
-  # HMAC-SHA256 signed cookie helpers (sync — avoids JWT.encode's
-  # auto-awaited Promise path colliding with Sinatra `redirect`'s
-  # :halt throw). Constants stay at top level rather than inside
+  # Custom HMAC-SHA256 signed cookie helpers (sync, with a
+  # base64url-encoded `username:exp` payload — not a JWT). Going
+  # custom avoids JWT.encode's auto-awaited Promise path, which
+  # collides with Sinatra `redirect`'s :halt throw across Opal's
+  # async boundary. Constants stay at top level rather than inside
   # `helpers do ... end` so startup cost stays minimal — the
   # previous `helpers` block form pushed the Cloudflare deploy
   # startup past its CPU budget (code 10021).
@@ -1379,8 +1382,9 @@ class App < Sinatra::Base
   end
 
   # GET /login — simple demo login form. Any non-empty username
-  # issues a JWT as `sub`. No password check — this is a demo of
-  # the JWT-in-cookie flow, not an identity provider.
+  # mints an HMAC-signed session cookie carrying `username:exp`.
+  # No password check — this is a demo of the signed-cookie
+  # session flow, not an identity provider.
   get '/login' do
     @title = 'Login — homurabi'
     @login_error = nil
@@ -1388,22 +1392,32 @@ class App < Sinatra::Base
     erb :layout
   end
 
-  # POST /login — accept username, mint a JWT (HS256), stash it in
-  # an HttpOnly cookie, redirect back to the requested `return_to`
-  # (default /chat).
+  # POST /login — accept username, mint an HMAC-SHA256 signed
+  # cookie (base64url `username:exp` + hex signature, split by
+  # `.`), stash it in an HttpOnly cookie, redirect back to the
+  # requested `return_to` (default /chat, 303 See Other).
   #
-  # NOTE: Sinatra's `redirect` throws `:halt` under the hood; that
-  # throw doesn't cross Opal's async/await boundary cleanly (same
-  # issue documented around `chat_verify_token!`). Return a plain
-  # [302, headers, ''] tuple via `next` instead.
+  # NOTE: Sinatra's `redirect` throws `:halt` under the hood, which
+  # doesn't cross Opal's async/await boundary cleanly (same issue
+  # documented around `chat_verify_token!`). This route body is
+  # kept synchronous (mint_session_cookie → OpenSSL::HMAC is sync
+  # via node:crypto), so `redirect` works normally here.
   post '/login' do
     username = params['username'].to_s.strip
     return_to = params['return_to'].to_s
-    return_to = '/chat' if return_to.empty? || !return_to.start_with?('/')
+    # Reject protocol-relative (`//evil.example`) and anything with
+    # whitespace/newlines so the Location: header stays strictly
+    # within-site. `\A/(?!/)\S*\z` → starts with single `/`, no `//`
+    # prefix, no whitespace.
+    return_to = '/chat' unless return_to.match?(%r{\A/(?!/)\S*\z})
 
-    if username.empty? || username.length > 64
+    # `:` is the session cookie payload delimiter (`username:exp`
+    # → base64url → HMAC). Allowing `:` in the username would
+    # truncate it on verification (split(':', 2)), so the
+    # displayed/stored user wouldn't match what was entered.
+    if username.empty? || username.length > 64 || username.include?(':')
       @title = 'Login — homurabi'
-      @login_error = 'username is required (1-64 chars)'
+      @login_error = 'username is required (1-64 chars, no colon)'
       @content = erb :login
       next erb :layout
     end
@@ -1419,7 +1433,9 @@ class App < Sinatra::Base
       same_site: :lax,
       max_age: SESSION_COOKIE_TTL
     })
-    redirect return_to
+    # 303 See Other — explicitly tells the client to follow up with
+    # GET, avoiding any ambiguous POST-replay semantics around 302.
+    redirect return_to, 303
   end
 
   # GET /logout — clear the session cookie. Always redirects home.

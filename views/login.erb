@@ -1,10 +1,12 @@
 <div style="max-width:420px;margin:2em auto;">
   <h1>Login</h1>
   <p style="color:#888;font-size:0.9em;">
-    Phase 13 follow-up demo: a username (any non-empty string, 1-64 chars)
-    mints a JWT (HS256) and stashes it in an <code>HttpOnly</code> cookie
-    named <code>homurabi_session</code>. <code>/chat</code> is gated on
-    that cookie.
+    Phase 13 follow-up demo: a username (any non-empty string, 1-64
+    chars, no <code>:</code>) mints an HMAC-SHA256 signed cookie
+    (base64url <code>username:exp</code> payload + hex signature,
+    joined by <code>.</code>) and stashes it in an
+    <code>HttpOnly</code> cookie named <code>homurabi_session</code>.
+    <code>/chat</code> is gated on that cookie.
   </p>
 
   <% if @login_error %>
@@ -27,7 +29,7 @@
   </form>
 
   <p style="color:#888;font-size:0.85em;margin-top:2em;">
-    No password (yet) — this is a demo of the JWT-in-cookie flow, not an
-    identity provider. Logout at <a href="/logout">/logout</a>.
+    No password (yet) — this is a demo of the signed-cookie session
+    flow, not an identity provider. Logout at <a href="/logout">/logout</a>.
   </p>
 </div>

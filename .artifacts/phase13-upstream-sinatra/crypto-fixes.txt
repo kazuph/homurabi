@@ -1,0 +1,43 @@
+Phase 13 follow-up: 4 pre-existing crypto bugs fixed
+(discovered by the honest run-lambda harness from PR #11)
+
+## Before fix (repeated 15 runs)
+- /test/crypto: 21-25/26 passing, flaky
+  FAIL: AES-256-CTR streaming (NoMethodError bytesize for nil)
+  FAIL: ECDSA ES256 (DER) sign/verify (invalid DER no INTEGER for s)
+  FAIL: ECDSA ES384 sign/verify (invalid DER no INTEGER for s)
+  FAIL: ECDSA ES512 sign/verify (invalid DER length form: 194)
+  INTERMITTENT: JWT RS256 / EdDSA tampered signature rejected (returned false)
+
+## After fix (20 consecutive runs)
+- /test/crypto: 26/26 green, 20/20 stable
+
+## Root cause
+
+1. AES-CTR + ECDSA: Opal's `String#bytesize`, `String#bytes`, and
+   `String#unpack('C*')` go through UTF-8 encoding. Our ciphertext /
+   signature binary strings are built via `u8_to_binstr` which stores
+   each byte as a JS String char at code point 0-255. For chars
+   >= 0x80 (roughly half of random crypto output), UTF-8 encoding
+   doubles the byte count — so `bytesize > length` and `.bytes`
+   produces twice as many entries as real bytes. This corrupted:
+
+   * ctr_update_stream's `@ctr_pending` slice
+   * raw_to_der's SEQUENCE length byte (became 2x actual inner length)
+   * der_to_raw's byte array (each 0x?? split into UTF-8 continuation)
+
+   Fix: use `str_to_codepoints(s)` helper (char-by-char `.ord`) for
+   byte extraction, and use `.length` instead of `.bytesize` for
+   byte-counting in our latin1 binstr context.
+
+2. JWT tampered signature test: flipped the LAST base64url char, but
+   the last char only holds ceil(bits/6)-align padding bits for
+   signatures whose bit count isn't a multiple of 6 (RS256 = 2048,
+   Ed25519 = 512). A lenient base64 decoder zeros those padding bits,
+   so tampering them leaves the decoded signature intact and verify
+   passes. Fix: tamper the MIDDLE char (`parts[2].length / 2`) so the
+   change lands on a real signature bit.
+
+Files: vendor/openssl.rb (ctr_update_stream, ctr_final, raw_to_der,
+der_to_raw, new str_to_codepoints helper), app/hello.rb (middle-char
+tamper in 3 tampered-sig test blocks).

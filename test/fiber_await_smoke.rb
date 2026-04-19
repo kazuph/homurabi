@@ -1,5 +1,5 @@
 # frozen_string_literal: true
-# await: all, decode, encode, execute, fetch, first, get_first_row, list, match, open, put, run, send, sign, verify
+# await: all, decode, encode, execute, fetch, first, get_first_row, list, match, open, run, send, sign, verify
 #
 # Phase 12.5 — auto-await smoke tests.
 #
@@ -13,10 +13,16 @@
 # not, the caller gets a raw Promise and the assertions fail.
 #
 # This file uses an explicit sub-list of the app/hello.rb auto-await
-# surface — it MUST include `first` because we want to exercise single-
-# row Sequel-like access without `.__await__` (the app-level magic
-# comment excludes `first` to avoid colliding with Opal's multi-assign
-# destructuring; here we test it in isolation).
+# surface:
+#   - it INCLUDES `first` because we want to exercise single-row
+#     Sequel-like access without `.__await__` (the app-level magic
+#     comment excludes `first` to avoid colliding with Opal's multi-
+#     assign destructuring; here we test it in isolation in single-assign
+#     form).
+#   - it EXCLUDES `put` mirroring app/hello.rb's decision. `put` is
+#     Sinatra's route DSL; the app keeps manual `.__await__` on
+#     `kv.put(...)` and this smoke asserts that manual path still works
+#     (regression guard for the DSL-collision exclusion policy).
 
 require 'json'
 require 'promise/v2'
@@ -148,9 +154,15 @@ ok 'ds.first returns Hash (auto-awaited)', one.is_a?(Hash) && one['id'] == 10
 section 'JWT encode / decode auto-await'
 tok = MockJWT.encode({ 'sub' => 'demo' }, 'sekrit', 'HS256')
 ok 'JWT.encode returns String (auto-awaited)', tok.is_a?(String) && tok.start_with?('HS256.')
-payload, header = MockJWT.decode(tok, 'sekrit', true, {}).__await__ # multi-assign still needs explicit await
-ok 'JWT.decode payload has sub', payload['sub'] == 'demo'
-ok 'JWT.decode header has alg', header['alg'] == 'HS256'
+# Multiple assignment against an auto-awaited call — this is the exact
+# shape used in app/hello.rb's `/api/me` route
+# (`payload, header = JWT.decode(...)` with `decode` in the auto-await
+# list). Keeping this exercised guards against regressions where a
+# future compiler change would make multi-assign stop unwrapping the
+# Promise correctly.
+payload, header = MockJWT.decode(tok, 'sekrit', true, {})
+ok 'JWT.decode payload has sub (auto-awaited + multi-assign)', payload.is_a?(Hash) && payload['sub'] == 'demo'
+ok 'JWT.decode header has alg (auto-awaited + multi-assign)', header.is_a?(Hash) && header['alg'] == 'HS256'
 
 section 'HTTP fetch auto-await'
 res = MockHTTP.fetch('https://example.invalid/ping')

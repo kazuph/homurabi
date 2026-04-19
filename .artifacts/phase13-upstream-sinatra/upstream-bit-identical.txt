@@ -1,0 +1,1 @@
+Only in /tmp/sinatra-upstream/sinatra-4.2.1/lib/sinatra: images

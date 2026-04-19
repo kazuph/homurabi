@@ -615,6 +615,20 @@ rescue NameError
   # File not available at this load point — ignore.
 end
 
+# Phase 13 (upstream Sinatra 4.2.1): Sinatra::IndifferentHash references
+# Gem::Version at class body eval to gate the `except` override. Opal
+# does not bundle RubyGems — pre-require our minimal stub so the
+# reference resolves before upstream Sinatra loads.
+require 'rubygems/version'
+
+# Phase 13: upstream Sinatra's `set` helper compiles setter methods
+# via `class_eval("def name() value; end")`. That string form needs
+# the Opal runtime parser (`opal-parser`) to be loaded — otherwise
+# Class#class_eval raises NoMethodError 'compile'. Runtime parsing
+# is already opt-in in production Workers (ROADMAP Phase 13 accepts
+# the bundle-size cost vs. 20+ extra patch sites).
+require 'opal-parser'
+
 [
   :ISO_2022_JP,
   :SHIFT_JIS, :Shift_JIS, :WINDOWS_31J, :CP932, :SJIS,

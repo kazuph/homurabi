@@ -242,16 +242,31 @@ module OpenSSL
     # complete 16-byte blocks immediately, deferring the tail.
     def ctr_update_stream(new_data)
       bytes = @ctr_pending + new_data
-      # Opal's `rb_divide` for two JS numbers returns the true float (0.8125),
-      # not Ruby's floored Integer-division result (0). Use `.div` explicitly
-      # so the block counter stays integer — BigInt() coercion below requires it.
-      full_size = bytes.bytesize.div(16) * 16
+      # homurabi Opal patch: use String#length (UTF-16 code units) instead
+      # of String#bytesize. Our ciphertext binstrs are built via
+      # `u8_to_binstr` / `pack('C*')` / `pack('H*')`, which stores each
+      # byte as a 1-unit JS String char (code point 0-255). Ruby's
+      # `.bytesize` in Opal returns the UTF-8 encoding byte count, which
+      # over-counts by 1 for every char >= 0x80 (e.g. for random AES
+      # ciphertext roughly half the chars fall in that range, so
+      # `bytesize` ≈ 1.5 × `length`). `String#[i, n]` slices by code
+      # units, so we'd read the wrong tail and leave `@ctr_pending`
+      # empty, later crashing in `ctr_final` with `nil.bytesize`.
+      #
+      # For these latin1 binstrs, `length == real byte count`, so
+      # using `.length` throughout keeps block_data / pending / counter
+      # arithmetic consistent.
+      # Opal's `rb_divide` on two JS numbers also returns true float
+      # division (13/16 = 0.8125), not Ruby's floored integer division;
+      # `.div(16)` forces the floor.
+      byte_len = bytes.length
+      full_size = byte_len.div(16) * 16
       if full_size == 0
         @ctr_pending = bytes
         return ''   # no full blocks yet
       end
       block_data = bytes[0, full_size]
-      @ctr_pending = bytes.bytesize > full_size ? bytes[full_size, bytes.bytesize - full_size] : ''
+      @ctr_pending = byte_len > full_size ? bytes[full_size, byte_len - full_size] : ''
       run_ctr_subtle(block_data, @ctr_block_count).tap {
         @ctr_block_count += full_size.div(16)
       }
@@ -261,9 +276,11 @@ module OpenSSL
       # XOR-encrypt remaining tail (if any). For AES-CTR, the last
       # partial block is just XORed against the last counter's
       # keystream — Subtle handles that when given a partial input.
-      if @ctr_pending.bytesize > 0
+      # See ctr_update_stream for the `.length` vs `.bytesize` rationale.
+      pending_len = @ctr_pending.length
+      if pending_len > 0
         out = run_ctr_subtle(@ctr_pending, @ctr_block_count)
-        @ctr_block_count += (@ctr_pending.bytesize + 15).div(16)
+        @ctr_block_count += (pending_len + 15).div(16)
         @ctr_pending = ''
         out
       else
@@ -1038,19 +1055,44 @@ module OpenSSL
       end
 
       # raw R||S → DER SEQUENCE { INTEGER r, INTEGER s }
+      # homurabi Opal patch: use `unpack('C*')` (byte-array from the
+      # latin1 binstr built by `u8_to_binstr`) instead of `.bytes`, and
+      # `inner.length` (JS UTF-16 code units = byte count for our latin1
+      # binstrs) instead of `.bytesize` (which returns UTF-8 byte count
+      # in Opal — see ctr_update_stream for the full rationale). With
+      # `.bytesize` over-counting by ~50 % for random signature bytes,
+      # the DER SEQUENCE length field ends up larger than the content
+      # and callers get "invalid DER length form" / "no INTEGER for s".
       def raw_to_der(raw, curve_byte_size)
-        bytes = raw.bytes
-        raise PKeyError, "raw signature wrong size: #{bytes.size}" if bytes.size != curve_byte_size * 2
-        r = trim_and_pad(bytes[0, curve_byte_size])
-        s = trim_and_pad(bytes[curve_byte_size, curve_byte_size])
+        byts = str_to_codepoints(raw)
+        raise PKeyError, "raw signature wrong size: #{byts.size}" if byts.size != curve_byte_size * 2
+        r = trim_and_pad(byts[0, curve_byte_size])
+        s = trim_and_pad(byts[curve_byte_size, curve_byte_size])
         inner = [0x02, r.size].pack('CC') + r.pack('C*') + [0x02, s.size].pack('CC') + s.pack('C*')
-        if inner.bytesize <= 127
-          [0x30, inner.bytesize].pack('CC') + inner
-        elsif inner.bytesize <= 255
-          [0x30, 0x81, inner.bytesize].pack('CCC') + inner
+        len = inner.length
+        if len <= 127
+          [0x30, len].pack('CC') + inner
+        elsif len <= 255
+          [0x30, 0x81, len].pack('CCC') + inner
         else
-          [0x30, 0x82, (inner.bytesize >> 8) & 0xff, inner.bytesize & 0xff].pack('CCCC') + inner
+          [0x30, 0x82, (len >> 8) & 0xff, len & 0xff].pack('CCCC') + inner
         end
+      end
+
+      # homurabi Opal helper: our binstrs store each byte as a JS String
+      # char (code point 0-255). `.unpack('C*')` and `.bytes` in Opal go
+      # through UTF-8 encoding — any char >= 0x80 is split into two
+      # continuation bytes. Use the char-by-char ord reading to recover
+      # the original byte values.
+      def str_to_codepoints(s)
+        n = s.length
+        arr = Array.new(n)
+        i = 0
+        while i < n
+          arr[i] = s[i].ord
+          i += 1
+        end
+        arr
       end
 
       # Strip leading 0x00 bytes; if high bit is set, prepend 0x00 so
@@ -1065,8 +1107,11 @@ module OpenSSL
       end
 
       # DER SEQUENCE { INTEGER r, INTEGER s } → raw R||S (curve_byte_size * 2)
+      # homurabi Opal patch: same `unpack('C*')` fix as raw_to_der —
+      # `.bytes` returns UTF-8 byte codes in Opal which over-counts for
+      # latin1 binstrs.
       def der_to_raw(der, curve_byte_size)
-        bytes = der.bytes
+        bytes = str_to_codepoints(der)
         i = 0
         raise PKeyError, 'invalid DER (no SEQUENCE)' unless bytes[i] == 0x30
         i += 1

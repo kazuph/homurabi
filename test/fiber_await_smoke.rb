@@ -1,5 +1,5 @@
 # frozen_string_literal: true
-# await: all, decode, encode, execute, fetch, first, get_first_row, list, match, open, run, send, sign, verify
+# await: all, decode, encode, execute, fetch, first, get_first_row, list, run, send
 #
 # Phase 12.5 — auto-await smoke tests.
 #
@@ -42,6 +42,20 @@ def ok(label, cond, note = nil)
     $failed += 1
     puts "  FAIL  #{label}#{note ? " — #{note}" : ''}"
   end
+end
+
+# Per-assertion exception trap (Copilot review on PR #11 L152):
+# a naive `ok '...', value.foo == x` will abort the whole smoke run
+# if `value` is not what we expected (e.g. auto-await disabled and
+# `value` is still a PromiseV2). Wrap the assertion body in a block
+# so a single failure reports as FAIL and the rest of the suite
+# continues to run.
+def ok_safe(label)
+  cond = yield
+  ok(label, cond)
+rescue ::Exception => e
+  $failed += 1
+  puts "  FAIL  #{label} — #{e.class}: #{e.message[0, 200]}"
 end
 
 def section(title)
@@ -136,20 +150,20 @@ run_it = proc { |label, value|
 section 'D1 execute / get_first_row auto-await'
 db = MockD1.new
 rows = db.execute('SELECT id, name FROM users')
-ok 'db.execute returns Array (auto-awaited PromiseV2)', rows.is_a?(Array)
-ok '  — first row is Hash with expected id', rows.first['id'] == 1
+ok_safe('db.execute returns Array (auto-awaited PromiseV2)') { rows.is_a?(Array) }
+ok_safe('  — first row is Hash with expected id') { rows.is_a?(Array) && rows.first.is_a?(Hash) && rows.first['id'] == 1 }
 row = db.get_first_row('SELECT ...', [42])
-ok 'db.get_first_row returns Hash (auto-awaited)', row.is_a?(Hash) && row['id'] == 42
+ok_safe('db.get_first_row returns Hash (auto-awaited)') { row.is_a?(Hash) && row['id'] == 42 }
 
 section 'Sequel-like Dataset#all auto-await'
 ds = MockDataset.new([{ 'id' => 10, 'n' => 'a' }, { 'id' => 20, 'n' => 'b' }])
 arr = ds.all
-ok 'ds.all returns Array (auto-awaited)', arr.is_a?(Array) && arr.size == 2
-ok '  — second row id is 20', arr[1]['id'] == 20
+ok_safe('ds.all returns Array (auto-awaited)') { arr.is_a?(Array) && arr.size == 2 }
+ok_safe('  — second row id is 20') { arr.is_a?(Array) && arr[1].is_a?(Hash) && arr[1]['id'] == 20 }
 
 section 'Sequel-like Dataset#first auto-await (PromiseV2)'
 one = ds.first
-ok 'ds.first returns Hash (auto-awaited)', one.is_a?(Hash) && one['id'] == 10
+ok_safe('ds.first returns Hash (auto-awaited)') { one.is_a?(Hash) && one['id'] == 10 }
 
 section 'JWT encode / decode auto-await'
 tok = MockJWT.encode({ 'sub' => 'demo' }, 'sekrit', 'HS256')

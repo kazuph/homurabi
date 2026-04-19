@@ -814,7 +814,8 @@ class App < Sinatra::Base
     run.call('JWT HS256 tampered signature rejected') {
       tok = JWT.encode(jwt_payload, jwt_secret, 'HS256')
       parts = tok.split('.')
-      parts[2] = parts[2][0..-2] + (parts[2][-1] == 'A' ? 'B' : 'A')
+      mid = parts[2].length / 2
+      parts[2] = parts[2][0, mid] + (parts[2][mid] == 'A' ? 'B' : 'A') + parts[2][mid + 1, parts[2].length - mid - 1]
       raised = false
       begin
         JWT.decode(parts.join('.'), jwt_secret, true, algorithm: 'HS256')
@@ -838,7 +839,8 @@ class App < Sinatra::Base
     run.call('JWT RS256 tampered signature rejected') {
       tok = JWT.encode(jwt_payload, rsa, 'RS256')
       parts = tok.split('.')
-      parts[2] = parts[2][0..-2] + (parts[2][-1] == 'A' ? 'B' : 'A')
+      mid = parts[2].length / 2
+      parts[2] = parts[2][0, mid] + (parts[2][mid] == 'A' ? 'B' : 'A') + parts[2][mid + 1, parts[2].length - mid - 1]
       raised = false
       begin
         JWT.decode(parts.join('.'), rsa.public_key, true, algorithm: 'RS256')
@@ -870,7 +872,8 @@ class App < Sinatra::Base
     run.call('JWT EdDSA tampered signature rejected') {
       tok = JWT.encode(jwt_payload, ed, 'EdDSA')
       parts = tok.split('.')
-      parts[2] = parts[2][0..-2] + (parts[2][-1] == 'A' ? 'B' : 'A')
+      mid = parts[2].length / 2
+      parts[2] = parts[2][0, mid] + (parts[2][mid] == 'A' ? 'B' : 'A') + parts[2][mid + 1, parts[2].length - mid - 1]
       raised = false
       begin
         JWT.decode(parts.join('.'), ed, true, algorithm: 'EdDSA')

@@ -77,9 +77,27 @@ status, headers, body = Sinatra::Application.call(
 )
 
 ok 'GET /classic returns 200', status == 200
+
+# Copilot (PR #12) pointed out that `body.each { |b| @out = b }.then { true }`
+# always evaluates truthy even if the block never fires. Collect the
+# chunks into a plain String and assert equality so a broken body
+# would actually fail this case.
+#
+# NOTE: intentionally do NOT call `body.close` — Sinatra's default
+# middleware stack wires Rack::CommonLogger whose close hook calls
+# `msg.gsub!` (`vendor/rack/common_logger.rb`), and Opal's Strings
+# are immutable so `gsub!` raises NotImplementedError. That's a
+# pre-existing gap unrelated to Phase 13 (the same logger is inert
+# in the modular-app flow because body.close is called after the
+# logger has already formatted the line — a race we avoid here).
+collected = ''
+if body.respond_to?(:each)
+  body.each { |chunk| collected = collected + chunk.to_s }
+end
 ok '  — response body is "classic hello"',
-   body.respond_to?(:each) ? body.each { |b| @out = b }.then { true } : false
-ok "  — Content-Type is text/plain*", (headers['content-type'] || '').start_with?('text/plain')
+   collected == 'classic hello',
+   "got #{collected.inspect}"
+ok '  — Content-Type is text/plain*', (headers['content-type'] || '').start_with?('text/plain')
 
 puts ''
 puts "#{$passed + $failed} tests, #{$passed} passed, #{$failed} failed"

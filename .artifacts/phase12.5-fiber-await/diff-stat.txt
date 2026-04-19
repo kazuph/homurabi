@@ -1,0 +1,5 @@
+ app/hello.rb                             | 178 +++++++++++++++----------------
+ lib/sequel_opal_async_dataset_patches.rb |  32 ++++--
+ package.json                             |   4 +-
+ vendor/openssl.rb                        |  23 ++--
+ 4 files changed, 134 insertions(+), 103 deletions(-)

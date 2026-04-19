@@ -242,12 +242,18 @@ module OpenSSL
     # complete 16-byte blocks immediately, deferring the tail.
     def ctr_update_stream(new_data)
       bytes = @ctr_pending + new_data
-      full_size = (bytes.bytesize / 16) * 16
-      return '' if full_size == 0 && (@ctr_pending = bytes) && true   # no full blocks yet
+      # Opal's `rb_divide` for two JS numbers returns the true float (0.8125),
+      # not Ruby's floored Integer-division result (0). Use `.div` explicitly
+      # so the block counter stays integer — BigInt() coercion below requires it.
+      full_size = bytes.bytesize.div(16) * 16
+      if full_size == 0
+        @ctr_pending = bytes
+        return ''   # no full blocks yet
+      end
       block_data = bytes[0, full_size]
       @ctr_pending = bytes.bytesize > full_size ? bytes[full_size, bytes.bytesize - full_size] : ''
       run_ctr_subtle(block_data, @ctr_block_count).tap {
-        @ctr_block_count += full_size / 16
+        @ctr_block_count += full_size.div(16)
       }
     end
 
@@ -257,7 +263,7 @@ module OpenSSL
       # keystream — Subtle handles that when given a partial input.
       if @ctr_pending.bytesize > 0
         out = run_ctr_subtle(@ctr_pending, @ctr_block_count)
-        @ctr_block_count += (@ctr_pending.bytesize + 15) / 16
+        @ctr_block_count += (@ctr_pending.bytesize + 15).div(16)
         @ctr_pending = ''
         out
       else
@@ -521,10 +527,13 @@ module OpenSSL
         [hex].pack('H*')
       end
 
-      # Convert "SHA256" / :sha256 / OpenSSL::Digest::SHA256.new to the
-      # subtle Web Crypto algorithm name "SHA-256".
+      # Convert "SHA256" / :sha256 / OpenSSL::Digest::SHA256.new / "SHA-256"
+      # to the subtle Web Crypto algorithm name "SHA-256". Accepts both
+      # dashed ("SHA-256") and undashed ("SHA256") input forms — Phase 12.5
+      # surfaced that default-kwarg `hash: 'SHA-256'` used to fail
+      # canonicalisation because normalize_digest keeps the dash.
       def canonical_hash(name)
-        case OpenSSL.normalize_digest(name).to_s
+        case OpenSSL.normalize_digest(name).to_s.gsub('-', '')
         when 'sha1'   then 'SHA-1'
         when 'sha256' then 'SHA-256'
         when 'sha384' then 'SHA-384'

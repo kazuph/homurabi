@@ -19,9 +19,19 @@ task 'build:opal' do
   out = ENV.fetch('HOMURABI_OPAL_OUTPUT', 'build/hello.no-exit.mjs')
   inp = ENV.fetch('HOMURABI_OPAL_INPUT', 'app/hello.rb')
   patch = ENV.fetch('HOMURABI_OPAL_PATCH_INPUT', out)
-  sh "OPAL_PREFORK_DISABLE=1 bundle exec opal -c -E --esm --no-source-map -I lib -I vendor -I build " \
-     "-r opal_patches -r cloudflare_workers -r homurabi_templates -r homurabi_assets " \
-     "-o #{out} #{inp} 2>build/opal.stderr.log"
+  # argv form avoids shell interpolation on paths that may contain spaces.
+  File.open('build/opal.stderr.log', 'w') do |err_io|
+    ok = system(
+      { 'OPAL_PREFORK_DISABLE' => '1' },
+      'bundle', 'exec', 'opal',
+      '-c', '-E', '--esm', '--no-source-map',
+      '-I', 'lib', '-I', 'vendor', '-I', 'build',
+      '-r', 'opal_patches', '-r', 'cloudflare_workers', '-r', 'homurabi_templates', '-r', 'homurabi_assets',
+      '-o', out, inp,
+      err: err_io
+    )
+    fail 'opal compile failed (see build/opal.stderr.log)' unless ok
+  end
   sh 'node', 'bin/patch-opal-evals.mjs', patch
 end
 

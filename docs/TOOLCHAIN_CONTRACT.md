@@ -57,8 +57,8 @@ Post-step: `node bin/patch-opal-evals.mjs [--input PATH]` rewrites direct
 
 ## 3. ERB precompile (`bin/compile-erb`)
 
-| Flag | Default | |
-|------|---------|--|
+| Flag | Default | Meaning |
+|------|---------|---------|
 | `--input` | `views` | Directory scanned for `*.erb` |
 | `--output` | `build/homurabi_templates.rb` | Generated Ruby module file |
 | `--namespace` | `HomurabiTemplates` | Ruby module name |

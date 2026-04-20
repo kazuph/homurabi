@@ -325,7 +325,11 @@ class App < Sinatra::Base
   # Gated on HOMURABI_ENABLE_FOUNDATIONS_DEMOS (default deny) because
   # the route makes outbound calls to an external service and shouldn't
   # be reachable by anonymous traffic in production.
-  require_relative 'routes/bootstrap'
+  #
+  # Routes are inlined into `build/routes_app_class_eval.rb` (App.class_eval)
+  # by `bin/inline-routes-for-opal` before Opal compile — plain `require` of
+  # route files would register on main, not App. Source: canonical_all.rb.
+  require 'routes_app_class_eval'
 end
 
 run App

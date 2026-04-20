@@ -1,3 +1,25 @@
+# =============================================================================
+# NOTE（日本語サマリー）— Copilot PR #14 指摘対応
+# ROUND 1（この NOTE の直後〜「=== ROUND 2:」の直前まで。旧ファイルでは line 1–72）:
+#   `npm run d1:init` は走っているが **`posts` テーブルはまだ schema に無い** 段階。
+# ROUND 2（「=== ROUND 2:」以降。旧ファイルでは line 73–）:
+#   `posts` を `bin/schema.sql` に足して `npm run d1:init` 再実行後に curl し直し、全 route 成功。
+#
+# NOTE — smoke log vs `npm run d1:init` (read this first)
+#
+# ROUND 1 (log body: ~lines 16–89 — from first “=== GET /” through just before “=== ROUND 2:”;
+#          same content as historical lines 1–72 before this NOTE block was added):
+#   captured **before** `posts` existed in local D1 — `bin/schema.sql` had not yet
+#   gained the `posts` table and `npm run d1:init` had not been re-run for that DDL.
+#   `/posts` returning `no such table: posts` here is **expected**, not contradictory
+#   with “d1:init was run”: only `users` (and other pre-`posts` objects) were present.
+#   The heading “GET / (after d1:init)” refers to an init pass **without** `posts`.
+#
+# ROUND 2 (from “=== ROUND 2: posts table present ===” onward, ~line 90–; was ~line 73– before NOTE):
+#   after `posts` was added to `bin/schema.sql` and `npm run d1:init` was applied
+#   again; curls re-run and `/posts` succeeds.
+# =============================================================================
+
 === GET / (after d1:init) ===
 HTTP/1.1 200 OK
 Transfer-Encoding: chunked
@@ -13,6 +35,7 @@ x-xss-protection: 1; mode=block
     <nav>
       <a href="/">Home</a>
 === GET /posts ===
+(NOTE: posts table not yet created in this round)
 Error: D1 execute failed: Cloudflare::D1Error: [Cloudflare::D1] all: D1_ERROR: no such table: posts: SQLITE_ERROR
     at Object.$$wrap_d1_error (file:///Users/kazuph/src/github.com/kazuph/homurabi/.worktree/feature/phase15-pre-cpu-budget/build/hello.no-exit.mjs:79443:30)
     at Object.$$execute (file:///Users/kazuph/src/github.com/kazuph/homurabi/.worktree/feature/phase15-pre-cpu-budget/build/hello.no-exit.mjs:79367:41)
@@ -60,6 +83,7 @@ x-xss-protection: 1; mode=block
 === GET /test/sequel ===
 {"phase":12,"total":8,"passed":8,"failed":0,"cases":[{"pass":true,"case":"adapter_scheme is :d1"},{"pass":true,"case":"database_type is :sqlite"},{"pass":true,"case":"SingleConnectionPool in use"},{"pass":true,"case":"DB[:users].sql emits SELECT * FROM users"},{"pass":true,"case":"DB[:users].where(id: 1).sql emits id = 1"},{"pass":true,"case":"DB[:users].order(:id).limit(5) emits ORDER BY + LIMIT"},{"pass":true,"case":"DB[:users].all hits D1 and returns rows"},{"pass":true,"case":"DB[:users].where(id: 1).first.__await__ returns single row"}]}
 === POST /posts JSON ok ===
+(NOTE: posts table not yet created in this round)
 D1Error: [Cloudflare::D1] first: D1_ERROR: no such table: posts: SQLITE_ERROR
     at null.<anonymous> (file:///Users/kazuph/src/github.com/kazuph/homurabi/.worktree/feature/phase15-pre-cpu-budget/build/hello.no-exit.mjs:37022:159)
     at async Object.$App$17 (file:///Users/kazuph/src/github.com/kazuph/homurabi/.worktree/feature/phase15-pre-cpu-budget/build/hello.no-exit.mjs:79824:14)

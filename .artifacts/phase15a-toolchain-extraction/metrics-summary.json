@@ -1,0 +1,10 @@
+{
+  "build_real_sec": 0.7,
+  "test_real_sec": 6.84,
+  "deploys": [
+    {"startup_ms": 657, "upload_sec": 7.18, "gzip_kib": 1070.58, "wall_sec": 26},
+    {"startup_ms": 574, "upload_sec": 6.03, "gzip_kib": 1070.58, "wall_sec": 8},
+    {"startup_ms": 666, "upload_sec": 6.15, "gzip_kib": 1070.58, "wall_sec": 8}
+  ],
+  "notes": "Build/test timings from /usr/bin/time -p. Deploy metrics parsed from wrangler stdout."
+}

@@ -1,0 +1,147 @@
+=== Phase 15-A B5: wrangler deploy x3 (2026-04-20T06:34:04Z) ===
+
+########## DEPLOY RUN 1 ##########
+✅ 3分間承認: bash --noprofile --norc -c cd '/Users/kazuph/src/github.com/kazuph/homurabi/.worktree/feature/phase15a-toolchain-extraction' && npx wrangler deploy (理由: 3分間承認)
+📁 feature/phase15a-toolchain-extraction
+/Users/kazuph/.ai_guard.zsh: line 231: ${cmd:l} ${(j: :)${(@)${(@)@}:l}}: bad substitution
+/Users/kazuph/.ai_guard.zsh: line 449: setopt: command not found
+✅ 3分間承認: npx wrangler deploy (理由: 3分間承認)
+📁 feature/phase15a-toolchain-extraction
+
+ ⛅️ wrangler 3.114.17 (update available 4.83.0)
+-----------------------------------------------
+
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mThe version of Wrangler you are using is now out-of-date.[0m
+
+  Please update to the latest version to prevent critical errors.
+  Run `npm install --save-dev wrangler@4` to update to the latest version.
+  After installation, run Wrangler with `npx wrangler`.
+
+
+Total Upload: 4426.03 KiB / gzip: 1070.58 KiB
+Worker Startup Time: 657 ms
+Your worker has access to the following bindings:
+- Durable Objects:
+  - COUNTER: HomurabiCounterDO
+- KV Namespaces:
+  - KV: 64ee32f1c6c64f85af9591e827da7462
+- Queues:
+  - JOBS_QUEUE: homurabi-jobs
+- D1 Databases:
+  - DB: homurabi-db (3a59c955-198e-478f-8f11-71d5f3eb7600)
+- R2 Buckets:
+  - BUCKET: homurabi-bucket
+- AI:
+  - Name: AI
+- Vars:
+  - HOMURABI_ENABLE_CRYPTO_DEMOS: "0"
+  - HOMURABI_ENABLE_AI_DEMOS: "0"
+  - HOMURABI_ENABLE_BINDING_DEMOS: "0"
+  - HOMURABI_ENABLE_SCHEDULED_DEMOS: "0"
+  - HOMURABI_ENABLE_FOUNDATIONS_DEMOS: "0"
+Uploaded homurabi (7.18 sec)
+Deployed homurabi triggers (1.23 sec)
+  https://homurabi.kazu-san.workers.dev
+  schedule: */5 * * * *
+  schedule: 0 */1 * * *
+  Producer for homurabi-jobs
+  Consumer for homurabi-jobs
+Current Version ID: 8c1ca4e8-e16c-4ef5-919c-cac35ebb7ade
+DEPLOY_RUN_1_WALL_SEC:26
+
+########## DEPLOY RUN 2 ##########
+/Users/kazuph/.ai_guard.zsh: line 231: ${cmd:l} ${(j: :)${(@)${(@)@}:l}}: bad substitution
+
+ ⛅️ wrangler 3.114.17 (update available 4.83.0)
+-----------------------------------------------
+
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mThe version of Wrangler you are using is now out-of-date.[0m
+
+  Please update to the latest version to prevent critical errors.
+  Run `npm install --save-dev wrangler@4` to update to the latest version.
+  After installation, run Wrangler with `npx wrangler`.
+
+
+Total Upload: 4426.03 KiB / gzip: 1070.58 KiB
+Worker Startup Time: 574 ms
+Your worker has access to the following bindings:
+- Durable Objects:
+  - COUNTER: HomurabiCounterDO
+- KV Namespaces:
+  - KV: 64ee32f1c6c64f85af9591e827da7462
+- Queues:
+  - JOBS_QUEUE: homurabi-jobs
+- D1 Databases:
+  - DB: homurabi-db (3a59c955-198e-478f-8f11-71d5f3eb7600)
+- R2 Buckets:
+  - BUCKET: homurabi-bucket
+- AI:
+  - Name: AI
+- Vars:
+  - HOMURABI_ENABLE_CRYPTO_DEMOS: "0"
+  - HOMURABI_ENABLE_AI_DEMOS: "0"
+  - HOMURABI_ENABLE_BINDING_DEMOS: "0"
+  - HOMURABI_ENABLE_SCHEDULED_DEMOS: "0"
+  - HOMURABI_ENABLE_FOUNDATIONS_DEMOS: "0"
+Uploaded homurabi (6.03 sec)
+Deployed homurabi triggers (1.06 sec)
+  https://homurabi.kazu-san.workers.dev
+  schedule: */5 * * * *
+  schedule: 0 */1 * * *
+  Producer for homurabi-jobs
+  Consumer for homurabi-jobs
+Current Version ID: 0fe56b0e-1d59-4547-98d8-97b0978c3d6b
+DEPLOY_RUN_2_WALL_SEC:8
+
+########## DEPLOY RUN 3 ##########
+/Users/kazuph/.ai_guard.zsh: line 231: ${cmd:l} ${(j: :)${(@)${(@)@}:l}}: bad substitution
+
+ ⛅️ wrangler 3.114.17 (update available 4.83.0)
+-----------------------------------------------
+
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mThe version of Wrangler you are using is now out-of-date.[0m
+
+  Please update to the latest version to prevent critical errors.
+  Run `npm install --save-dev wrangler@4` to update to the latest version.
+  After installation, run Wrangler with `npx wrangler`.
+
+
+Total Upload: 4426.03 KiB / gzip: 1070.58 KiB
+Worker Startup Time: 666 ms
+Your worker has access to the following bindings:
+- Durable Objects:
+  - COUNTER: HomurabiCounterDO
+- KV Namespaces:
+  - KV: 64ee32f1c6c64f85af9591e827da7462
+- Queues:
+  - JOBS_QUEUE: homurabi-jobs
+- D1 Databases:
+  - DB: homurabi-db (3a59c955-198e-478f-8f11-71d5f3eb7600)
+- R2 Buckets:
+  - BUCKET: homurabi-bucket
+- AI:
+  - Name: AI
+- Vars:
+  - HOMURABI_ENABLE_CRYPTO_DEMOS: "0"
+  - HOMURABI_ENABLE_AI_DEMOS: "0"
+  - HOMURABI_ENABLE_BINDING_DEMOS: "0"
+  - HOMURABI_ENABLE_SCHEDULED_DEMOS: "0"
+  - HOMURABI_ENABLE_FOUNDATIONS_DEMOS: "0"
+Uploaded homurabi (6.15 sec)
+Deployed homurabi triggers (1.08 sec)
+  https://homurabi.kazu-san.workers.dev
+  schedule: */5 * * * *
+  schedule: 0 */1 * * *
+  Producer for homurabi-jobs
+  Consumer for homurabi-jobs
+Current Version ID: de88aa1c-48c4-4900-b4fb-7d05a93c50b4
+DEPLOY_RUN_3_WALL_SEC:8
+
+=== grep code 10021 (expect 0 lines) ===
+140:=== grep code 10021 (expect 0 lines) ===
+GREP_10021_EXIT:0
+
+=== strict: Cloudflare error code 10021 (CPU limit) ===
+STRICT_10021_MATCH_LINES:0
+0
+NOTE: loose grep matched section header text; strict CPU error pattern count = 0 (see STRICT_10021_MATCH_LINES).

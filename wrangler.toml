@@ -2,7 +2,7 @@
 # Real Ruby + Rack + Sinatra on Cloudflare Workers via Opal.
 
 name = "homurabi"
-main = "src/worker.mjs"
+main = "gems/cloudflare-workers-runtime/runtime/worker.mjs"
 compatibility_date = "2026-04-15"
 compatibility_flags = ["nodejs_compat"]
 
@@ -100,8 +100,9 @@ crons = [
 # Phase 11B — Durable Objects.
 #
 # `HomurabiCounterDO` is a generic DO class exported from
-# `src/worker.mjs`; it forwards every fetch through the Ruby
-# dispatcher installed by `lib/cloudflare_workers/durable_object.rb`.
+# `gems/cloudflare-workers-runtime/runtime/worker.mjs`; it forwards every fetch through the Ruby
+# dispatcher installed by `gems/cloudflare-workers-runtime/lib/cloudflare_workers/durable_object.rb`
+# (require path: `cloudflare_workers/durable_object`).
 # The Ruby handler registered for `HomurabiCounterDO` lives in
 # `app/hello.rb` and implements a simple counter (inc / peek / reset).
 #

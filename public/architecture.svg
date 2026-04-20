@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 620" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="13">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 695" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="13">
   <defs>
     <linearGradient id="cfGrad" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0%" stop-color="#f6821f"/>
@@ -14,17 +14,20 @@
       <stop offset="100%" stop-color="#ec4899"/>
     </linearGradient>
     <filter id="shadow"><feDropShadow dx="1" dy="2" stdDeviation="3" flood-opacity="0.1"/></filter>
+    <marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+      <polygon points="0 0, 8 4, 0 8" fill="#999"/>
+    </marker>
   </defs>
 
   <!-- Background -->
-  <rect width="800" height="620" fill="#fafafa" rx="12"/>
+  <rect width="800" height="695" fill="#fafafa" rx="12"/>
 
   <!-- Title -->
   <text x="400" y="35" text-anchor="middle" font-size="20" font-weight="bold" fill="#222">homurabi Architecture</text>
   <text x="400" y="55" text-anchor="middle" font-size="12" fill="#888">Real Ruby + Real Sinatra on Cloudflare Workers via Opal</text>
 
   <!-- ===== Left column: Build time ===== -->
-  <rect x="20" y="75" width="230" height="530" rx="8" fill="#f0f4ff" stroke="#c4d4f0" stroke-width="1"/>
+  <rect x="20" y="75" width="230" height="565" rx="8" fill="#f0f4ff" stroke="#c4d4f0" stroke-width="1"/>
   <text x="135" y="97" text-anchor="middle" font-size="14" font-weight="bold" fill="#4a6fa5">Build Time (CRuby)</text>
 
   <!-- app/hello.rb -->
@@ -42,43 +45,45 @@
   <text x="135" y="253" text-anchor="middle" fill="#adf" font-size="9.5">opal_patches.rb + cloudflare_workers.rb</text>
 
   <!-- vendor/ -->
-  <rect x="40" y="280" width="190" height="70" rx="6" fill="#1a1a2e" filter="url(#shadow)"/>
+  <rect x="40" y="280" width="190" height="92" rx="6" fill="#1a1a2e" filter="url(#shadow)"/>
   <text x="135" y="299" text-anchor="middle" fill="#fff" font-weight="bold" font-size="11">vendor/</text>
-  <text x="135" y="314" text-anchor="middle" fill="#aaa" font-size="9.5">opal-gem (1.8.3.rc1 + 3 patches)</text>
-  <text x="135" y="328" text-anchor="middle" fill="#aaa" font-size="9.5">sinatra + rack + mustermann</text>
-  <text x="135" y="342" text-anchor="middle" fill="#aaa" font-size="9.5">(6+ patches each)</text>
+  <text x="135" y="314" text-anchor="middle" fill="#aaa" font-size="8.8">opal-gem (1.8.3.rc1 + Phase 15-Pre patches</text>
+  <text x="135" y="327" text-anchor="middle" fill="#aaa" font-size="8.8">incl. opal-parser drop / corelib/irb cut)</text>
+  <text x="135" y="342" text-anchor="middle" fill="#aaa" font-size="8.8">sinatra_upstream (sinatra/sinatra 4.x +</text>
+  <text x="135" y="355" text-anchor="middle" fill="#aaa" font-size="8.8">sinatra_opal_patches) + rack + mustermann</text>
 
   <!-- bin/ compile steps -->
-  <rect x="40" y="365" width="90" height="32" rx="5" fill="#059669" filter="url(#shadow)"/>
-  <text x="85" y="385" text-anchor="middle" fill="#fff" font-size="9.5">bin/compile-erb</text>
+  <rect x="40" y="382" width="90" height="32" rx="5" fill="#059669" filter="url(#shadow)"/>
+  <text x="85" y="402" text-anchor="middle" fill="#fff" font-size="9.5">bin/compile-erb</text>
 
-  <rect x="140" y="365" width="90" height="32" rx="5" fill="#059669" filter="url(#shadow)"/>
-  <text x="185" y="385" text-anchor="middle" fill="#fff" font-size="9.5">bin/compile-assets</text>
+  <rect x="140" y="382" width="90" height="32" rx="5" fill="#059669" filter="url(#shadow)"/>
+  <text x="185" y="402" text-anchor="middle" fill="#fff" font-size="9.5">bin/compile-assets</text>
 
   <!-- Opal compiler -->
-  <rect x="40" y="415" width="190" height="44" rx="6" fill="url(#opalGrad)" filter="url(#shadow)"/>
-  <text x="135" y="434" text-anchor="middle" fill="#fff" font-weight="bold" font-size="12">Opal Compiler</text>
-  <text x="135" y="449" text-anchor="middle" fill="#eee" font-size="10">Ruby → JavaScript (ESM)</text>
+  <rect x="40" y="424" width="190" height="44" rx="6" fill="url(#opalGrad)" filter="url(#shadow)"/>
+  <text x="135" y="443" text-anchor="middle" fill="#fff" font-weight="bold" font-size="12">Opal Compiler</text>
+  <text x="135" y="458" text-anchor="middle" fill="#eee" font-size="10">Ruby → JavaScript (ESM)</text>
 
   <!-- Build output -->
   <rect x="40" y="478" width="190" height="44" rx="6" fill="#374151" filter="url(#shadow)"/>
   <text x="135" y="497" text-anchor="middle" fill="#fff" font-weight="bold" font-size="11">build/hello.no-exit.mjs</text>
-  <text x="135" y="512" text-anchor="middle" fill="#9ca3af" font-size="10">~4 MiB raw / 586 KiB gzip</text>
+  <text x="135" y="512" text-anchor="middle" fill="#9ca3af" font-size="9.5">~4.4 MiB raw / 1.07 MiB gzip (Phase 15-Pre 後)</text>
 
   <!-- wrangler deploy -->
-  <rect x="40" y="540" width="190" height="36" rx="6" fill="url(#cfGrad)" filter="url(#shadow)"/>
-  <text x="135" y="563" text-anchor="middle" fill="#fff" font-weight="bold" font-size="12">wrangler deploy</text>
+  <rect x="40" y="534" width="190" height="36" rx="6" fill="url(#cfGrad)" filter="url(#shadow)"/>
+  <text x="135" y="557" text-anchor="middle" fill="#fff" font-weight="bold" font-size="12">wrangler deploy</text>
 
   <!-- Arrows (build time) -->
   <line x1="135" y1="159" x2="135" y2="170" stroke="#999" stroke-width="1.5" marker-end="url(#arr)"/>
   <line x1="135" y1="206" x2="135" y2="218" stroke="#999" stroke-width="1.5"/>
-  <line x1="135" y1="350" x2="135" y2="365" stroke="#999" stroke-width="1.5"/>
-  <line x1="135" y1="397" x2="135" y2="415" stroke="#999" stroke-width="1.5"/>
-  <line x1="135" y1="459" x2="135" y2="478" stroke="#999" stroke-width="1.5"/>
-  <line x1="135" y1="522" x2="135" y2="540" stroke="#999" stroke-width="1.5"/>
+  <line x1="135" y1="268" x2="135" y2="280" stroke="#999" stroke-width="1.5"/>
+  <line x1="135" y1="372" x2="135" y2="382" stroke="#999" stroke-width="1.5"/>
+  <line x1="135" y1="414" x2="135" y2="424" stroke="#999" stroke-width="1.5"/>
+  <line x1="135" y1="468" x2="135" y2="478" stroke="#999" stroke-width="1.5"/>
+  <line x1="135" y1="522" x2="135" y2="534" stroke="#999" stroke-width="1.5"/>
 
   <!-- ===== Right column: Runtime ===== -->
-  <rect x="280" y="75" width="500" height="530" rx="8" fill="#fff8f0" stroke="#f0d4a4" stroke-width="1"/>
+  <rect x="280" y="75" width="500" height="585" rx="8" fill="#fff8f0" stroke="#f0d4a4" stroke-width="1"/>
   <text x="530" y="97" text-anchor="middle" font-size="14" font-weight="bold" fill="#b45309">Runtime (Cloudflare Workers V8)</text>
 
   <!-- fetch event -->
@@ -111,14 +116,14 @@
   <!-- Sinatra middleware -->
   <rect x="330" y="335" width="400" height="105" rx="6" fill="#fdf2f8" stroke="#f9a8d4" stroke-width="1"/>
   <text x="530" y="355" text-anchor="middle" fill="#9d174d" font-weight="bold" font-size="12">Sinatra Middleware Stack</text>
-  <text x="530" y="375" text-anchor="middle" fill="#be185d" font-size="10">ExtendedRack → ShowExceptions → Head → NullLogger</text>
+  <text x="530" y="375" text-anchor="middle" fill="#be185d" font-size="9.5">ExtendedRack → ShowExceptions (stub since Phase 15-Pre) → Head → NullLogger</text>
   <text x="530" y="391" text-anchor="middle" fill="#be185d" font-size="10">→ Rack::Protection::* (FrameOptions, XSS, HttpOrigin, ...)</text>
 
   <!-- App route -->
   <rect x="370" y="405" width="320" height="28" rx="5" fill="url(#rubyGrad)"/>
   <text x="530" y="424" text-anchor="middle" fill="#fff" font-weight="bold" font-size="11">App &lt; Sinatra::Base  (user route blocks)</text>
 
-  <!-- Bindings row -->
+  <!-- Bindings row 1 -->
   <rect x="310" y="455" width="140" height="50" rx="6" fill="#dbeafe" stroke="#60a5fa" stroke-width="1"/>
   <text x="380" y="474" text-anchor="middle" fill="#1e40af" font-weight="bold" font-size="11">D1 (homurabi-db)</text>
   <text x="380" y="490" text-anchor="middle" fill="#1e40af" font-size="9.5">db.execute(sql, binds)</text>
@@ -131,16 +136,34 @@
   <text x="670" y="474" text-anchor="middle" fill="#9a3412" font-weight="bold" font-size="11">R2 (homurabi-bucket)</text>
   <text x="670" y="490" text-anchor="middle" fill="#9a3412" font-size="9.5">bucket.get / bucket.put</text>
 
-  <!-- ERB + Assets -->
-  <rect x="310" y="520" width="210" height="36" rx="5" fill="#7c3aed" filter="url(#shadow)"/>
-  <text x="415" y="543" text-anchor="middle" fill="#fff" font-size="11">HomurabiTemplates (precompiled ERB)</text>
+  <!-- Bindings row 2 -->
+  <rect x="310" y="515" width="105" height="50" rx="6" fill="#ede9fe" stroke="#a78bfa" stroke-width="1"/>
+  <text x="362" y="534" text-anchor="middle" fill="#5b21b6" font-weight="bold" font-size="10.5">AI</text>
+  <text x="362" y="550" text-anchor="middle" fill="#5b21b6" font-size="9">Workers AI binding</text>
 
-  <rect x="530" y="520" width="210" height="36" rx="5" fill="#059669" filter="url(#shadow)"/>
-  <text x="635" y="543" text-anchor="middle" fill="#fff" font-size="11">HomurabiAssets (embedded public/)</text>
+  <rect x="423" y="515" width="105" height="50" rx="6" fill="#fce7f3" stroke="#f472b6" stroke-width="1"/>
+  <text x="475" y="534" text-anchor="middle" fill="#9d174d" font-weight="bold" font-size="10.5">Queue</text>
+  <text x="475" y="550" text-anchor="middle" fill="#9d174d" font-size="9">send / consume</text>
+
+  <rect x="536" y="515" width="105" height="50" rx="6" fill="#e0e7ff" stroke="#6366f1" stroke-width="1"/>
+  <text x="588" y="534" text-anchor="middle" fill="#312e81" font-weight="bold" font-size="10.5">DurableObject</text>
+  <text x="588" y="550" text-anchor="middle" fill="#312e81" font-size="9">stub / id.fromName</text>
+
+  <rect x="649" y="515" width="101" height="50" rx="6" fill="#cffafe" stroke="#22d3ee" stroke-width="1"/>
+  <text x="699" y="534" text-anchor="middle" fill="#155e75" font-weight="bold" font-size="10.5">Cache</text>
+  <text x="699" y="550" text-anchor="middle" fill="#155e75" font-size="9">caches.default</text>
+
+  <!-- ERB + Assets -->
+  <rect x="310" y="578" width="210" height="36" rx="5" fill="#7c3aed" filter="url(#shadow)"/>
+  <text x="415" y="601" text-anchor="middle" fill="#fff" font-size="11">HomurabiTemplates (precompiled ERB)</text>
+
+  <rect x="530" y="578" width="210" height="36" rx="5" fill="#059669" filter="url(#shadow)"/>
+  <text x="635" y="601" text-anchor="middle" fill="#fff" font-size="11">HomurabiAssets (embedded public/)</text>
 
   <!-- Async label -->
-  <rect x="310" y="570" width="440" height="24" rx="4" fill="#fef9c3" stroke="#eab308"/>
-  <text x="530" y="587" text-anchor="middle" fill="#854d0e" font-size="10.5">D1/KV/R2 routes use # await: true + .__await__ (Opal async compilation)</text>
+  <rect x="310" y="628" width="440" height="36" rx="4" fill="#fef9c3" stroke="#eab308"/>
+  <text x="530" y="645" text-anchor="middle" fill="#854d0e" font-size="9.8">Most routes: Fiber-transparent await (Phase 12.5) — .__await__ mostly gone</text>
+  <text x="530" y="658" text-anchor="middle" fill="#854d0e" font-size="9.5">Legacy edge: # await: true + .__await__ where Workers I/O still requires it</text>
 
   <!-- Runtime arrows -->
   <line x1="530" y1="151" x2="530" y2="165" stroke="#b45309" stroke-width="1.5"/>
@@ -148,10 +171,12 @@
   <line x1="410" y1="262" x2="410" y2="276" stroke="#999" stroke-width="1.5"/>
   <line x1="530" y1="320" x2="530" y2="335" stroke="#999" stroke-width="1.5"/>
   <line x1="530" y1="440" x2="530" y2="455" stroke="#999" stroke-width="1.5"/>
+  <line x1="530" y1="505" x2="530" y2="515" stroke="#999" stroke-width="1" stroke-dasharray="3"/>
   <line x1="380" y1="440" x2="380" y2="455" stroke="#60a5fa" stroke-width="1" stroke-dasharray="4"/>
   <line x1="670" y1="440" x2="670" y2="455" stroke="#f97316" stroke-width="1" stroke-dasharray="4"/>
+  <line x1="530" y1="568" x2="530" y2="578" stroke="#999" stroke-width="1.2"/>
 
   <!-- Deploy arrow -->
-  <path d="M230,558 Q260,558 280,400" stroke="#f6821f" stroke-width="2" fill="none" stroke-dasharray="6"/>
+  <path d="M230,552 Q260,552 280,400" stroke="#f6821f" stroke-width="2" fill="none" stroke-dasharray="6"/>
   <polygon points="278,403 284,397 280,407" fill="#f6821f"/>
 </svg>

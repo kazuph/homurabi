@@ -2,7 +2,7 @@
 
 Created: 2026-04-20
 Branch: `feature/phase15b-cfw-runtime-gem`
-Status: Review（Step 8–9 検証・証跡まで完了 → Step 10–11 PR / Copilot）
+Status: Complete（PR #16 作成・Copilot 1 件対応・push 済み）
 Project-Type: backend (Cloudflare Workers / Opal-compiled Ruby) + gem packaging
 
 ### 進捗サマリー（簡潔版・2026-04-20）
@@ -10,7 +10,7 @@ Project-Type: backend (Cloudflare Workers / Opal-compiled Ruby) + gem packaging
 - Step 0–7: gem 切り出し・配線・README 完了（`git mv` 履歴温存、`path:` 依存、`-I` / `wrangler.toml` `main` 更新）。
 - Step 8: `mise exec -- npm test` 16/16 相当チェーン PASS、`d1:init` 後 `wrangler dev :8799` で主要 route スモーク OK、`wrangler deploy` 連続 3 回 exit=0・`10021` 0 件、本番 `/posts` 200。
 - Step 9: `.artifacts/phase15b-cfw-runtime-gem/REPORT.md` + 画像 3 枚 + 各種 `.log`/`.txt` 保存済み。
-- Step 10–11: PR 作成・Copilot 対応・部長 `%58` 報告（Cursor 実行中）。
+- Step 10–11: PR #16 作成、Copilot レビュー 1 件に `3fb1749` で対応、インライン返信 + PR サマリーコメント済み。
 
 ---
 
@@ -374,10 +374,10 @@ flowchart LR
 <!-- /reviw-plugin:done 相当の git diff 自己レビュー結果 + PR Copilot レビュー後に追記 -->
 
 ## PR 情報
-- PR 番号: (実装後追記)
-- URL: (実装後追記)
-- Copilot review 件数: (実装後追記)
-- 対応 commit hashes: (実装後追記)
+- PR 番号: #16
+- URL: https://github.com/kazuph/homurabi/pull/16
+- Copilot review 件数: 1（wrangler.toml コメントパス）
+- 対応 commit hashes: 3fb1749b36981c6ab044e54050d28e8ece6e270e
 
 ## 確認事項
 <ユーザーに確認してほしいことがあればここに>

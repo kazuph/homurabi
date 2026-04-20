@@ -1372,7 +1372,11 @@ module Sinatra
         when Proc
           getter = value
         when Symbol, Integer, FalseClass, TrueClass, NilClass
-          getter = value.inspect
+          # Phase 15-Pre: avoid `define_singleton(..., String)` which forces
+          # `class_eval("def ...")` and pulls the entire `opal-parser` tree into
+          # the Workers bundle. Capture the primitive in a Proc instead.
+          captured = value
+          getter = proc { captured }
         when Hash
           setter = proc do |val|
             val = value.merge val if Hash === val
@@ -1382,7 +1386,10 @@ module Sinatra
 
         define_singleton("#{option}=", setter)
         define_singleton(option, getter)
-        define_singleton("#{option}?", "!!#{option}") unless method_defined? "#{option}?"
+        unless method_defined? "#{option}?"
+          pred_option = option
+          define_singleton("#{option}?", proc { !!__send__(pred_option) })
+        end
         self
       end
 

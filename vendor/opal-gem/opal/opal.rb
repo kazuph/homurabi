@@ -21,4 +21,6 @@
 ::Object.require 'corelib/unsupported'
 
 ::Object.require 'corelib/binding'
-::Object.require 'corelib/irb'
+# Phase 15-Pre (CPU budget): IRB console support is unused on Workers; dropping this
+# require removes `corelib/irb` (+ nested repl/parser paths) from the Opal bundle.
+# ::Object.require 'corelib/irb'

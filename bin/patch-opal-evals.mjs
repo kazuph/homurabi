@@ -12,6 +12,9 @@
 // spec-blessed way to ask for indirect eval — which esbuild doesn't
 // warn about.
 //
+// Phase 15-A: generic CLI — pass bundle path as first positional or
+// `--input PATH` (defaults to build/hello.no-exit.mjs).
+//
 // This script is invoked as a post-opal step by `npm run build:opal`
 // (via the build pipeline). Runs fast (single regex pass) and is
 // idempotent (re-running on already-patched output is a no-op).
@@ -21,24 +24,38 @@
 // `self.$eval`, etc. — those are property accesses / method names,
 // not the global function.
 
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from "node:fs";
+import { parseArgs } from "node:util";
 
-const path = process.argv[2] || 'build/hello.no-exit.mjs';
-const src = readFileSync(path, 'utf8');
+const { values, positionals } = parseArgs({
+  args: process.argv.slice(2),
+  options: {
+    input: { type: "string", short: "i" },
+  },
+  allowPositionals: true,
+});
+
+const path =
+  values.input ||
+  positionals[0] ||
+  process.env.HOMURABI_OPAL_PATCH_INPUT ||
+  "build/hello.no-exit.mjs";
+
+const src = readFileSync(path, "utf8");
 
 // Boundary class: must not be [.$a-zA-Z0-9_]. We include
 // `\b(?<!globalThis\.)` negative lookbehind isn't supported everywhere,
 // so we instead do a two-step: first replace `(^|[^...])eval(` then
 // revert any accidental double-rewrite of `globalThis.eval(`.
 const before = /(^|[^.$a-zA-Z0-9_])eval\(/gm;
-const after  = '$1globalThis.eval(';
+const after = "$1globalThis.eval(";
 let out = src.replace(before, after);
 
 // Guard against accidental `globalThis.globalThis.eval(` if this script
 // is run twice (defensive — replace() above is already idempotent
 // because `.globalThis.eval(` starts with `.` which fails the
 // boundary, but belt-and-suspenders).
-out = out.replace(/globalThis\.globalThis\.eval\(/g, 'globalThis.eval(');
+out = out.replace(/globalThis\.globalThis\.eval\(/g, "globalThis.eval(");
 
 const changes = (out.match(/globalThis\.eval\(/g) || []).length;
 if (out === src) {

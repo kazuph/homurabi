@@ -15,19 +15,25 @@
 # concatenations per tag; no eval, no new Function, no surprises.
 #
 # Usage:
-#   bin/compile-erb views/*.erb > build/homurabi_templates.rb
-# or:
-#   bin/compile-erb        # scans views/*.erb, writes build/homurabi_templates.rb
+#   bin/compile-erb --input views --output build/homurabi_templates.rb --namespace HomurabiTemplates
+# or (legacy):
+#   bin/compile-erb views/foo.erb   # writes compiled templates + Sinatra hook to stdout
 #
 # The output registers each template with `HomurabiTemplates` and
 # monkey-patches `Sinatra::Templates#erb` to dispatch there.
 
 require 'fileutils'
+require 'optparse'
 
 HELP = <<~USAGE
   Usage:
-    bin/compile-erb                         # scan views/*.erb, write build/homurabi_templates.rb
-    bin/compile-erb views/index.erb [...]   # compile the given files, print to stdout
+    bin/compile-erb [--input DIR] [--output FILE] [--namespace ModuleName]
+                    [--stdout] [--] [template.erb ...]
+
+  Defaults (Phase 15-A homurabi):
+    --input views --output build/homurabi_templates.rb --namespace HomurabiTemplates
+
+  With positional .erb paths and no --output: print combined Ruby to stdout (legacy).
 USAGE
 
 # Very small ERB dialect tokenizer. ERB is simple enough to parse by
@@ -86,11 +92,11 @@ module HomurabiERB
     ruby
   end
 
-  # Wrap the compiled body in a `HomurabiTemplates.register` call.
-  def wrap(template_name, compiled_body)
+  # Wrap the compiled body in a `#{namespace}.register` call.
+  def wrap(template_name, compiled_body, namespace)
     indented = compiled_body.each_line.map { |l| "    #{l}" }.join
     <<~RUBY
-      HomurabiTemplates.register(:#{template_name}) do |locals = {}|
+      #{namespace}.register(:#{template_name}) do |locals = {}|
       #{indented.chomp}
       end
     RUBY
@@ -101,15 +107,15 @@ end
 # Driver
 # ---------------------------------------------------------------------------
 
-def default_inputs
-  Dir.glob('views/*.erb').sort
+def default_inputs_for(dir)
+  Dir.glob(File.join(dir, '*.erb')).sort
 end
 
 def template_name_for(path)
   File.basename(path, '.erb').to_sym
 end
 
-def emit_header(io)
+def emit_header(io, namespace)
   io.puts <<~RUBY
     # frozen_string_literal: true
     #
@@ -117,7 +123,7 @@ def emit_header(io)
     #
     # Run `bin/compile-erb` after modifying anything under views/ to
     # regenerate. The Opal build command picks this file up via
-    # `-I build -r homurabi_templates`.
+    # `-I build -r homurabi_templates` (or your chosen `--output` basename).
     #
     # Each registered template is a Proc that returns an HTML String.
     # The Proc is `instance_exec`'d on the current Sinatra instance so
@@ -128,7 +134,7 @@ def emit_header(io)
     # `erb :index` in user code dispatches here transparently. No
     # runtime eval, no `new Function`, no Workers sandbox complaints.
 
-    module HomurabiTemplates
+    module #{namespace}
       @templates = {}
 
       class << self
@@ -138,7 +144,7 @@ def emit_header(io)
 
         def render(name, instance, locals = {})
           body = @templates[name.to_sym]
-          raise "HomurabiTemplates: no template registered for \#{name.inspect}" unless body
+          raise "#{namespace}: no template registered for \#{name.inspect}" unless body
           instance.instance_exec(locals, &body)
         end
 
@@ -154,22 +160,22 @@ def emit_header(io)
   RUBY
 end
 
-def emit_templates(io, inputs)
+def emit_templates(io, inputs, namespace)
   inputs.each do |path|
     name = template_name_for(path)
     source = File.read(path)
     compiled = HomurabiERB.compile(source)
     io.puts
     io.puts "# ---- #{path} -> :#{name} --------------------------------------"
-    io.puts HomurabiERB.wrap(name, compiled)
+    io.puts HomurabiERB.wrap(name, compiled, namespace)
   end
 end
 
-def emit_sinatra_patch(io)
+def emit_sinatra_patch(io, namespace)
   io.puts <<~RUBY
 
     # ---------------------------------------------------------------------
-    # Sinatra hook: `erb :name` dispatches to HomurabiTemplates.render.
+    # Sinatra hook: `erb :name` dispatches to #{namespace}.render.
     # ---------------------------------------------------------------------
     #
     # This file is loaded by Opal via `-r homurabi_templates` before
@@ -186,9 +192,9 @@ def emit_sinatra_patch(io)
         # wandering into upstream Tilt, which would blow up on
         # Workers with "Code generation from strings disallowed".
         def erb(template, options = {}, locals = {}, &block)
-          if template.is_a?(::Symbol) && ::HomurabiTemplates.registered?(template)
+          if template.is_a?(::Symbol) && ::#{namespace}.registered?(template)
             locals ||= {}
-            ::HomurabiTemplates.render(template, self, locals)
+            ::#{namespace}.render(template, self, locals)
           else
             raise "homurabi: erb \#{template.inspect} not precompiled; run bin/compile-erb"
           end
@@ -207,32 +213,50 @@ if ARGV.include?('-h') || ARGV.include?('--help')
   exit 0
 end
 
+options = {
+  input_dir: 'views',
+  output: 'build/homurabi_templates.rb',
+  namespace: 'HomurabiTemplates',
+  stdout: false
+}
+
+parser = OptionParser.new do |op|
+  op.banner = 'Usage: bin/compile-erb [options] [--] [files...]'
+  op.on('--input DIR', 'Directory containing *.erb templates') { |d| options[:input_dir] = d }
+  op.on('--output PATH', 'Write generated Ruby to PATH') { |p| options[:output] = p }
+  op.on('--namespace NAME', 'Ruby module name for the registry') { |n| options[:namespace] = n }
+  op.on('--stdout', 'Write generated Ruby to stdout') { options[:stdout] = true }
+end
+parser.parse!
+
+positional = ARGV.dup
+namespace = options[:namespace]
+
 inputs =
-  if ARGV.empty?
-    default_inputs
+  if positional.any?
+    positional.flat_map { |a| File.directory?(a) ? Dir.glob(File.join(a, '*.erb')).sort : [a] }
   else
-    ARGV.flat_map { |a| File.directory?(a) ? Dir.glob(File.join(a, '*.erb')).sort : [a] }
+    default_inputs_for(options[:input_dir])
   end
 
 if inputs.empty?
-  warn 'bin/compile-erb: no .erb files found (scanned views/)'
+  warn "bin/compile-erb: no .erb files found (under #{options[:input_dir]}/ or from args)"
   exit 1
 end
 
-out_path = 'build/homurabi_templates.rb'
+write_file = !options[:stdout] && (positional.empty? || options[:output])
+out_path = options[:output]
 
-if ARGV.empty?
-  # Default mode: scan views/ and write to build/homurabi_templates.rb.
-  FileUtils.mkdir_p('build')
+if write_file
+  FileUtils.mkdir_p(File.dirname(out_path))
   File.open(out_path, 'w') do |io|
-    emit_header(io)
-    emit_templates(io, inputs)
-    emit_sinatra_patch(io)
+    emit_header(io, namespace)
+    emit_templates(io, inputs, namespace)
+    emit_sinatra_patch(io, namespace)
   end
   warn "compile-erb: wrote #{out_path} (#{inputs.size} templates)"
 else
-  # CLI mode: emit to stdout.
-  emit_header($stdout)
-  emit_templates($stdout, inputs)
-  emit_sinatra_patch($stdout)
+  emit_header($stdout, namespace)
+  emit_templates($stdout, inputs, namespace)
+  emit_sinatra_patch($stdout, namespace)
 end

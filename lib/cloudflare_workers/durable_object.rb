@@ -367,6 +367,7 @@ module Cloudflare
       `globalThis.__HOMURABI_DO_WS_MESSAGE__ = async function(class_name, ws, message, state, env) { try { await #{mod}.$dispatch_ws_message(class_name, ws, message, state, env); } catch (err) { try { globalThis.console.error('[Cloudflare::DurableObject] ws.message dispatch failed:', err && err.stack || err); } catch (e) {} } };`
       `globalThis.__HOMURABI_DO_WS_CLOSE__ = async function(class_name, ws, code, reason, wasClean, state, env) { try { await #{mod}.$dispatch_ws_close(class_name, ws, code, reason, wasClean, state, env); } catch (err) { try { globalThis.console.error('[Cloudflare::DurableObject] ws.close dispatch failed:', err && err.stack || err); } catch (e) {} } };`
       `globalThis.__HOMURABI_DO_WS_ERROR__ = async function(class_name, ws, err, state, env) { try { await #{mod}.$dispatch_ws_error(class_name, ws, err, state, env); } catch (e2) { try { globalThis.console.error('[Cloudflare::DurableObject] ws.error dispatch failed:', e2 && e2.stack || e2); } catch (_) {} } };`
+      `(function(){var g=globalThis;g.__OPAL_WORKERS__=g.__OPAL_WORKERS__||{};var d=g.__OPAL_WORKERS__.durableObject=g.__OPAL_WORKERS__.durableObject||{};d.dispatch=g.__HOMURABI_DO_DISPATCH__;d.wsMessage=g.__HOMURABI_DO_WS_MESSAGE__;d.wsClose=g.__HOMURABI_DO_WS_CLOSE__;d.wsError=g.__HOMURABI_DO_WS_ERROR__;})();`
     end
   end
 

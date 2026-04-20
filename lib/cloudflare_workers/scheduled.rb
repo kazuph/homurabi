@@ -107,7 +107,7 @@ module Cloudflare
     # crash the build. Single-line form sidesteps both pitfalls.
     def self.install_dispatcher
       mod = self
-      `globalThis.__HOMURABI_SCHEDULED_DISPATCH__ = async function(js_event, js_env, js_ctx) { try { return await #{mod}.$dispatch_js(js_event, js_env, js_ctx); } catch (err) { try { globalThis.console.error('[Cloudflare::Scheduled] dispatch failed:', err && err.stack || err); } catch (e) {} return { error: String(err && err.message || err) }; } };`
+      `globalThis.__HOMURABI_SCHEDULED_DISPATCH__ = async function(js_event, js_env, js_ctx) { try { return await #{mod}.$dispatch_js(js_event, js_env, js_ctx); } catch (err) { try { globalThis.console.error('[Cloudflare::Scheduled] dispatch failed:', err && err.stack || err); } catch (e) {} return { error: String(err && err.message || err) }; } };(function(){var g=globalThis;g.__OPAL_WORKERS__=g.__OPAL_WORKERS__||{};g.__OPAL_WORKERS__.scheduled=g.__HOMURABI_SCHEDULED_DISPATCH__;})();`
     end
 
     # Called from the JS hook. Resolves the Ruby app, builds a

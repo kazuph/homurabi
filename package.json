@@ -5,9 +5,9 @@
   "type": "module",
   "description": "Real Ruby + Sinatra on Cloudflare Workers via Opal",
   "scripts": {
-    "build:erb": "ruby bin/compile-erb",
-    "build:assets": "ruby bin/compile-assets",
-    "build:opal": "OPAL_PREFORK_DISABLE=1 bundle exec opal -c -E --esm --no-source-map -I lib -I vendor -I build -r opal_patches -r cloudflare_workers -r homurabi_templates -r homurabi_assets -o build/hello.no-exit.mjs app/hello.rb 2>build/opal.stderr.log && node bin/patch-opal-evals.mjs build/hello.no-exit.mjs",
+    "build:erb": "ruby bin/compile-erb --input views --output build/homurabi_templates.rb --namespace HomurabiTemplates",
+    "build:assets": "ruby bin/compile-assets --input public --output build/homurabi_assets.rb --namespace HomurabiAssets",
+    "build:opal": "OPAL_PREFORK_DISABLE=1 bundle exec opal -c -E --esm --no-source-map -I lib -I vendor -I build -r opal_patches -r cloudflare_workers -r homurabi_templates -r homurabi_assets -o \"${HOMURABI_OPAL_OUTPUT:-build/hello.no-exit.mjs}\" \"${HOMURABI_OPAL_INPUT:-app/hello.rb}\" 2>build/opal.stderr.log && node bin/patch-opal-evals.mjs \"${HOMURABI_OPAL_PATCH_INPUT:-${HOMURABI_OPAL_OUTPUT:-build/hello.no-exit.mjs}}\"",
     "build": "npm run build:erb && npm run build:assets && npm run build:opal",
     "dev": "npm run build && wrangler dev --port 8787 --ip 127.0.0.1",
     "dev:dlq": "npm run build && wrangler dev --env dlq-demo --port 8787 --ip 127.0.0.1",

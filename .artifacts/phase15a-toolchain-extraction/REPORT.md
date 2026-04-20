@@ -28,7 +28,7 @@ Project-Type: backend
 | B1 | 起動 CPU（Worker Startup Time が wrangler 出力で観測可能） | ✅ 3 回とも **574–657 ms** |
 | B2 | バンドル規模（gzip） | ✅ **~1070.58 KiB**（deploy ログの `Total Upload`） |
 | B3 | `wrangler deploy` **連続 3 回成功** | ✅ いずれも **exit 0**（`step5-deploy-3times.log`） |
-| B4 | ローカル smoke（wrangler dev + curl） | ✅ `step5-smoke-results.txt`（`/`, `/posts`, `/chat` 302→login→cookie→`/chat` 200、`/test/sequel`、`POST /posts`） |
+| B4 | ローカル smoke（wrangler dev + curl） | ✅ `step5-smoke-results.txt`（`/`, `/posts`, `/chat` 302→login→cookie→`/chat` 200、`/test/sequel`、`POST /posts` JSON `ok:true` ※Miniflare で **HTTP 200** 応答、本文は 201 相当） |
 | B5 | 本番 **連続 deploy 3 回** + `code 10021` なし | ✅ 同上 + **厳密 grep** `code: 10021` / `Script startup exceeded CPU` は **0 件**（`STRICT_10021_MATCH_LINES:0`） |
 
 ## 実装サマリー

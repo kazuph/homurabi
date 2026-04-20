@@ -20,8 +20,9 @@
 #     json users
 #   end
 #
-# The `:d1` option must be a `Cloudflare::D1Database` instance; it is
-# wired per-request from `env['cloudflare.DB']`. Workers isolates
+# The `:d1` option must be a duck-typed D1 binding (`#prepare` →
+# `#bind` → `#all` / `#run`); typically `env['cloudflare.DB']` from
+# cloudflare-workers-runtime. Workers isolates
 # hold the binding for the duration of the request, so one
 # Sequel::D1::Database per request is fine (SingleConnectionPool
 # keeps overhead minimal).
@@ -32,7 +33,12 @@
 # routes append `.__await__` to the Dataset call to resolve the
 # Promise, matching the D1/KV/R2 idiom already used in Phase 3-10.
 
-require 'cloudflare_workers'
+begin
+  require 'cloudflare_workers'
+rescue LoadError
+  # Workers / Opal builds compile this file with `-r cloudflare_workers`
+  # already applied; standalone specs may omit the runtime gem.
+end
 require 'sequel/adapters/shared/sqlite'
 
 module Sequel
@@ -52,7 +58,7 @@ module Sequel
 
     class MissingMetaError < Error; end
 
-    # Thin wrapper around a Cloudflare::D1Database. Backed by Opal
+    # Thin wrapper around a duck-typed D1 binding. Backed by Opal
     # `.__await__` resolution so Ruby callers see a synchronous
     # method signature. One instance per Sequel::D1::Database;
     # SingleConnectionPool keeps this at exactly one "connection"
@@ -112,7 +118,7 @@ module Sequel
       def connect(_server)
         d1_binding = @opts[:d1] || @opts[:database]
         unless d1_binding
-          raise Error, "Sequel D1 adapter requires a :d1 option pointing at a Cloudflare::D1Database. " \
+          raise Error, "Sequel D1 adapter requires a :d1 option (object responding to #prepare). " \
                        "Example: Sequel.connect(adapter: :d1, d1: env['cloudflare.DB'])"
         end
         Connection.new(d1_binding)

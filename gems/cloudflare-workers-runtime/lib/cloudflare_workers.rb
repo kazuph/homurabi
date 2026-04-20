@@ -2,7 +2,7 @@
 # await: true
 # Cloudflare Workers runtime adapter for Opal.
 #
-# This file is the only place in the homurabi codebase that knows the
+# This file is the primary place in the Workers runtime stack that knows the
 # underlying transport is Cloudflare Workers. Its job is to make CF Workers
 # look like any other Rack server (Puma, Unicorn, Falcon, WEBrick, ...).
 # User Ruby code is therefore a plain Rack application and would run

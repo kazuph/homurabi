@@ -7,7 +7,7 @@
 // itself ships node:crypto natively, so the same import works in:
 //
 //   - Production (Cloudflare Workers + nodejs_compat)
-//   - Test (Node.js, via `node --import ./src/setup-node-crypto.mjs`)
+//   - Test (Node.js, via `node --import ./gems/cloudflare-workers-runtime/runtime/setup-node-crypto.mjs`)
 //
 // Why globalThis: Opal-emitted ESM modules cannot easily declare new
 // `import` statements after the build. Setting a global lets every

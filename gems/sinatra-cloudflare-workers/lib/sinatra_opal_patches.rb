@@ -55,8 +55,7 @@ module Sinatra
       return false if headers['content-length']
       return false unless Array === body
       return false if defined?(::Cloudflare) &&
-                      body.any? { |c| ::Cloudflare.js_promise?(c) ||
-                                      (defined?(::Cloudflare::BinaryBody) && c.is_a?(::Cloudflare::BinaryBody)) }
+                      body.any? { |c| ::Cloudflare.js_promise?(c) || c.is_a?(::Cloudflare::BinaryBody) }
       true
     end
   end

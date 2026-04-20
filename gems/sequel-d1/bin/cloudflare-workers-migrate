@@ -1,111 +1,143 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 #
-# Phase 12 — Compile Sequel `migration do ... end` DSL files into
-# plain SQL `.sql` files that `wrangler d1 migrations apply` can
-# consume directly.
-#
-# This script runs under **CRuby** (never Opal / Workers) so it can
-# leverage the full Sequel migration runner against an in-memory
-# SQLite database, then capture the SQL that would have been sent.
+# cloudflare-workers-migrate — under CRuby, compile Sequel migration DSL
+# files into wrangler-ready `.sql`, and optionally shell out to wrangler
+# to apply them.
 #
 # Usage:
-#   bin/homurabi-migrate compile <migrations_dir> [--out <dir>]
-#   bin/homurabi-migrate compile db/migrations
-#   bin/homurabi-migrate compile db/migrations --out migrations
+#   cloudflare-workers-migrate compile <migrations_dir> [--out DIR]
+#   cloudflare-workers-migrate apply [--remote] [--database NAME]
 #
-# The produced .sql files live under <out>/ and are named
-# `NNNN_<migration-basename>.sql`, matching wrangler's expectation.
-#
-# Requirements:
-#   - A CRuby with `sequel` and `sqlite3` gems available
-#   - Run via `bundle exec bin/homurabi-migrate ...` if your Gemfile
-#     pins `sqlite3`; otherwise `gem install sequel sqlite3` first.
+# Environment:
+#   WRANGLER_BIN             wrangler executable (default: wrangler)
+#   CLOUDFLARE_D1_DATABASE   default D1 database name for `apply`
+#   WRANGLER_D1_DATABASE     alias for CLOUDFLARE_D1_DATABASE
 
 require 'fileutils'
 require 'optparse'
 require 'logger'
 
-cmd = ARGV.shift
-unless cmd == 'compile'
-  warn 'Usage: bin/homurabi-migrate compile <migrations_dir> [--out <dir>]'
+def wrangler_executable
+  bin = ENV['WRANGLER_BIN'].to_s.strip
+  bin.empty? ? 'wrangler' : bin
+end
+
+def usage!(msg = nil)
+  warn msg if msg
+  warn <<~USAGE
+    Usage:
+      cloudflare-workers-migrate compile <migrations_dir> [--out DIR]
+      cloudflare-workers-migrate apply [--remote] [--database NAME]
+
+    Environment:
+      WRANGLER_BIN              wrangler executable (default: wrangler)
+      CLOUDFLARE_D1_DATABASE    default database name for apply
+  USAGE
   exit 1
 end
 
-migrations_dir = ARGV.shift
-unless migrations_dir && File.directory?(migrations_dir)
-  warn "ERROR: migrations_dir '#{migrations_dir}' not found"
-  exit 1
+def require_sequel_sqlite!
+  begin
+    require 'sequel'
+    Sequel.extension :migration
+  rescue LoadError
+    warn 'ERROR: `sequel` gem is required.'
+    exit 1
+  end
+  begin
+    require 'sqlite3'
+  rescue LoadError
+    warn 'ERROR: `sqlite3` gem is required.'
+    exit 1
+  end
 end
 
-out_dir = migrations_dir
-OptionParser.new do |o|
-  o.on('--out DIR', 'Output directory for compiled SQL files') { |v| out_dir = v }
-end.parse!(ARGV)
-FileUtils.mkdir_p(out_dir)
-
-begin
-  require 'sequel'
-  Sequel.extension :migration
-rescue LoadError
-  warn 'ERROR: `sequel` gem is required. Install via `gem install sequel sqlite3`.'
-  exit 1
-end
-begin
-  require 'sqlite3'
-rescue LoadError
-  warn 'ERROR: `sqlite3` gem is required.'
-  exit 1
-end
-
-# Discover migrations. Sequel sorts by numeric prefix or timestamp.
-migration_files = Dir.glob(File.join(migrations_dir, '*.rb')).sort
-
-if migration_files.empty?
-  warn "ERROR: no .rb migration files found in #{migrations_dir}"
-  exit 1
-end
-
-# For each migration, run it against an in-memory SQLite database
-# with SQL logging enabled; capture the emitted SQL.
-# NOTE: migrations are run in isolation (one per fresh in-memory DB)
-# so that naive `change do ... end` definitions don't accidentally
-# rely on schema from earlier migrations in the same compile run.
-migration_files.each_with_index do |rb, idx|
-  base = File.basename(rb, '.rb')
-  number = (base =~ /\A(\d+)_/) ? Regexp.last_match(1) : format('%04d', idx + 1)
-
-  captured = []
-  db = Sequel.sqlite(logger: Logger.new(nil))
-  db.sql_log_level = :info
-
-  # Hook SQL capture. `define_singleton_method` allows yielding to
-  # the caller's block via `blk.call`; `yield` inside the proc
-  # body would refer to the outer scope's yield (there is none
-  # here), hence the explicit proc parameter.
-  sqls = captured
-  db.define_singleton_method(:log_connection_yield) do |sql, _conn, *, &blk|
-    sqls << sql unless sql.strip.start_with?('PRAGMA')
-    blk.call
+def run_compile
+  migrations_dir = ARGV.shift
+  unless migrations_dir && File.directory?(migrations_dir)
+    warn "ERROR: migrations_dir '#{migrations_dir}' not found"
+    exit 1
   end
 
-  # Seed: run all prior migrations so the target sees the up-to-date schema
-  migration_files[0...idx].each do |prev|
-    migration = eval(File.read(prev), binding, prev)
+  out_dir = migrations_dir
+  OptionParser.new do |o|
+    o.on('--out DIR', 'Output directory for compiled SQL files') { |v| out_dir = v }
+  end.parse!(ARGV)
+  FileUtils.mkdir_p(out_dir)
+
+  require_sequel_sqlite!
+
+  migration_files = Dir.glob(File.join(migrations_dir, '*.rb')).sort
+  if migration_files.empty?
+    warn "ERROR: no .rb migration files found in #{migrations_dir}"
+    exit 1
+  end
+
+  migration_files.each_with_index do |rb, idx|
+    base = File.basename(rb, '.rb')
+    number = (base =~ /\A(\d+)_/) ? Regexp.last_match(1) : format('%04d', idx + 1)
+
+    captured = []
+    db = Sequel.sqlite(logger: Logger.new(nil))
+    db.sql_log_level = :info
+
+    sqls = captured
+    db.define_singleton_method(:log_connection_yield) do |sql, _conn, *, &blk|
+      sqls << sql unless sql.strip.start_with?('PRAGMA')
+      blk.call
+    end
+
+    migration_files[0...idx].each do |prev|
+      migration = eval(File.read(prev), binding, prev)
+      migration.apply(db, :up)
+    end
+
+    sqls.clear
+
+    migration = eval(File.read(rb), binding, rb)
     migration.apply(db, :up)
+
+    out_path = File.join(out_dir, "#{number}_#{base.sub(/\A\d+_/, '')}.sql")
+    File.write(out_path, captured.map { |s| "#{s};" }.join("\n") + "\n")
+    puts "→ #{out_path} (#{captured.size} statement#{'s' if captured.size != 1})"
   end
 
-  # Re-seed capture (ignore prior-seed SQL)
-  sqls.clear
-
-  migration = eval(File.read(rb), binding, rb)
-  migration.apply(db, :up)
-
-  out_path = File.join(out_dir, "#{number}_#{base.sub(/\A\d+_/, '')}.sql")
-  File.write(out_path, captured.map { |s| "#{s};" }.join("\n") + "\n")
-  puts "→ #{out_path} (#{captured.size} statement#{'s' if captured.size != 1})"
+  puts
+  puts "✓ Compiled #{migration_files.size} migration(s) to #{out_dir}/"
+  dbname = ENV['CLOUDFLARE_D1_DATABASE'] || ENV['WRANGLER_D1_DATABASE'] || '<database>'
+  puts "  Apply with: #{wrangler_executable} d1 migrations apply #{dbname} --local"
+  puts "            or: #{wrangler_executable} d1 migrations apply #{dbname} --remote"
 end
 
-puts
-puts "✓ Compiled #{migration_files.size} migration(s) to #{out_dir}/"
-puts '  Apply with: wrangler d1 migrations apply homurabi-db [--local]'
+def run_apply
+  remote = false
+  database = nil
+  OptionParser.new do |o|
+    o.on('--remote', 'Apply migrations to remote D1') { remote = true }
+    o.on('--database NAME', 'D1 database name (as in wrangler.toml)') { |v| database = v }
+  end.parse!(ARGV)
+
+  database ||= ENV['CLOUDFLARE_D1_DATABASE'] || ENV['WRANGLER_D1_DATABASE']
+  unless database
+    warn 'ERROR: database name required (--database or CLOUDFLARE_D1_DATABASE)'
+    exit 1
+  end
+
+  wr = wrangler_executable
+  cmd = [wr, 'd1', 'migrations', 'apply', database]
+  cmd << (remote ? '--remote' : '--local')
+
+  warn "+ #{cmd.join(' ')}"
+  exec(*cmd)
+end
+
+cmd = ARGV.shift
+case cmd
+when 'compile'
+  run_compile
+when 'apply'
+  run_apply
+else
+  usage!(cmd ? "Unknown command: #{cmd}" : nil)
+end

@@ -1,0 +1,7 @@
+Step 8 — npx wrangler deploy x3 (sequential, exit 0 each)
+
+Run 1: Total Upload 4426 KiB / gzip 1071 KiB | Worker Startup 549 ms | exit_code=0 | code 10021: 0
+Run 2: Total Upload 4426 KiB / gzip 1071 KiB | Worker Startup 576 ms | exit_code=0 | code 10021: 0
+Run 3: Total Upload 4426 KiB / gzip 1071 KiB | Worker Startup 576 ms | exit_code=0 | code 10021: 0
+
+ALL_DEPLOY_OK — log: .artifacts/phase15b-cfw-runtime-gem/step8-deploy-3times.log

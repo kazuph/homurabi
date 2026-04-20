@@ -25,7 +25,7 @@ task 'build:opal' do
       { 'OPAL_PREFORK_DISABLE' => '1' },
       'bundle', 'exec', 'opal',
       '-c', '-E', '--esm', '--no-source-map',
-      '-I', 'gems/cloudflare-workers-runtime/lib', '-I', 'lib', '-I', 'vendor', '-I', 'build',
+      '-I', 'app', '-I', 'gems/cloudflare-workers-runtime/lib', '-I', 'gems/sinatra-cloudflare-workers/lib', '-I', 'lib', '-I', 'vendor', '-I', 'build',
       '-r', 'opal_patches', '-r', 'cloudflare_workers', '-r', 'homurabi_templates', '-r', 'homurabi_assets',
       '-o', out, inp,
       err: err_io

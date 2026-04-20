@@ -7,3 +7,4 @@ ruby '3.4.9'
 # Per PLAN.md §3.1, this pre-release usage is master-approved (2026-04-15).
 gem 'opal', path: 'vendor/opal-gem'
 gem 'cloudflare-workers-runtime', path: 'gems/cloudflare-workers-runtime'
+gem 'sinatra-cloudflare-workers', path: 'gems/sinatra-cloudflare-workers'

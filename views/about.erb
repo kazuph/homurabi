@@ -1,25 +1,46 @@
 <h1>About this Sinatra app</h1>
 
 <p>This is <code>app/hello.rb</code>, a real
-   <a href="https://github.com/janbiedermann/sinatra">janbiedermann/sinatra</a>
-   application running on Cloudflare Workers. The file would run
+   <a href="https://github.com/sinatra/sinatra">sinatra/sinatra</a> 4.x
+   application running on Cloudflare Workers. Phase 13 moved off the
+   old <code>janbiedermann/sinatra</code> fork; we now track upstream
+   Sinatra with Opal-specific patches in-repo. The file would run
    unchanged on any Rack server; the Cloudflare adapter lives entirely
-   in <code>lib/cloudflare_workers.rb</code> and doesn't leak through.</p>
+   in <code>lib/cloudflare_workers.rb</code> and does not leak through.</p>
 
 <h2>Architecture</h2>
 <img src="/architecture.svg" alt="homurabi architecture diagram" style="width:100%; max-width:800px; margin:1em 0;">
 
 <h2>How the pieces fit</h2>
 <ul>
-  <li>Sinatra DSL &rarr; Opal compiler &rarr; a 580 KiB gzipped ESM</li>
+  <li>Sinatra DSL &rarr; Opal compiler &rarr; a ~1.07 MiB gzipped ESM bundle
+      (~1068 KiB after Phase 15-Pre; previously ~580 KiB / ~1.3 MiB in older snapshots)</li>
   <li>ERB templates in <code>views/*.erb</code> &rarr; precompiled by
       <code>bin/compile-erb</code> &rarr; <code>HomurabiTemplates</code>
       registry &rarr; <code>erb :name</code> helper</li>
-  <li>Cloudflare bindings (<code>DB</code>, <code>KV</code>, <code>BUCKET</code>)
-      exposed as plain Ruby wrappers in <code>env['cloudflare.DB']</code> etc.</li>
-  <li>Routes that touch bindings use
-      <code># await: true</code> and <code>.__await__</code> to bridge
-      sync Sinatra to async Workers I/O</li>
+  <li>Cloudflare bindings cover D1, KV, R2, Workers AI, Queues, Durable Objects,
+      and the Workers Cache API. Ruby reaches D1/KV/R2/AI/queues/DO namespaces via
+      <code>env['cloudflare.DB']</code>, <code>env['cloudflare.KV']</code>,
+      <code>env['cloudflare.BUCKET']</code>, <code>env['cloudflare.AI']</code>,
+      <code>env['cloudflare.QUEUE_*']</code>, and <code>env['cloudflare.DO_*']</code>;
+      cache reads/writes use the <code>Cloudflare::Cache</code> wrapper over
+      <code>caches.default</code> / <code>caches.open</code>.</li>
+  <li>Phase 12.5 added Fiber-transparent <code>await</code>; most routes no
+      longer hand-roll <code>.__await__</code>. Edge cases that still need
+      explicit async can use <code># await: true</code> as before.</li>
 </ul>
+
+<h2>Posts, login, and chat (Phase 14)</h2>
+<p>The app now includes <a href="/posts"><code>/posts</code></a> backed by a
+   D1 <code>posts</code> table, <a href="/login"><code>/login</code></a> for
+   the session / OAuth-style login flow, and <a href="/chat"><code>/chat</code></a>
+   for the streaming assistant UI. Together they exercise bindings, templates,
+   and async paths beyond the original hello-world surface.</p>
+
+<h2>Recent improvements (Phase 15-Pre)</h2>
+<p>Deploy reliability improved: <code>wrangler deploy</code> succeeded three
+   times in a row on the tightening bundle. The worker JS shrank roughly 34%
+   in compressed size versus the pre-Phase-15 peak (including dropping much of
+   <code>opal-parser</code> and trimming corelib/IRB paths from the shipped gem).</p>
 
 <p><a href="/">&larr; back to home</a></p>

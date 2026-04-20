@@ -158,6 +158,11 @@ module Rack
             globalThis.__HOMURABI_RACK_DISPATCH__ = async function(req, env, ctx, body_text) {
               return await #{handler}.$call(req, env, ctx, body_text == null ? "" : body_text);
             };
+            (function () {
+              var g = globalThis;
+              g.__OPAL_WORKERS__ = g.__OPAL_WORKERS__ || {};
+              g.__OPAL_WORKERS__.rack = g.__HOMURABI_RACK_DISPATCH__;
+            })();
           `
         end
 

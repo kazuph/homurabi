@@ -101,7 +101,8 @@ crons = [
 #
 # `HomurabiCounterDO` is a generic DO class exported from
 # `gems/cloudflare-workers-runtime/runtime/worker.mjs`; it forwards every fetch through the Ruby
-# dispatcher installed by `lib/cloudflare_workers/durable_object.rb`.
+# dispatcher installed by `gems/cloudflare-workers-runtime/lib/cloudflare_workers/durable_object.rb`
+# (require path: `cloudflare_workers/durable_object`).
 # The Ruby handler registered for `HomurabiCounterDO` lives in
 # `app/hello.rb` and implements a simple counter (inc / peek / reset).
 #

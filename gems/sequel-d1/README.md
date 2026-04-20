@@ -12,7 +12,8 @@ DB = nil
 get '/users' do
   DB ||= Sequel.connect(adapter: :d1, d1: env['cloudflare.env'].DB)
   content_type 'application/json'
-  DB[:users].order(:id).all.to_json
+  # On Opal/Workers, Dataset#all returns a Promise — resolve before JSON.
+  DB[:users].order(:id).all.__await__.to_json
 end
 ```
 

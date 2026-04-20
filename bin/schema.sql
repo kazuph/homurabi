@@ -22,6 +22,15 @@ INSERT OR IGNORE INTO users (id, name) VALUES
   (3, 'Sinatra'),
   (4, 'Opal');
 
+-- Phase 15-Pre: local `wrangler dev` smoke for `/posts` (mirrors
+-- `db/migrations/0001_create_posts.sql` applied in remote D1).
+CREATE TABLE IF NOT EXISTS posts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  body TEXT,
+  created_at TIMESTAMP DEFAULT (datetime(CURRENT_TIMESTAMP, 'localtime'))
+);
+
 -- Phase 9 — Cron Trigger heartbeat demo. Each firing of the
 -- `*/5 * * * *` cron writes one row here. Verify the cron is
 -- actually wired by tailing this table in dev:

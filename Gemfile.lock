@@ -5,6 +5,13 @@ PATH
       opal (>= 1.8.3.rc1, < 2)
 
 PATH
+  remote: gems/sinatra-cloudflare-workers
+  specs:
+    sinatra-cloudflare-workers (0.1.0)
+      cloudflare-workers-runtime (>= 0.1)
+      opal (>= 1.8.3.rc1, < 2)
+
+PATH
   remote: vendor/opal-gem
   specs:
     opal (1.8.3.rc1)
@@ -29,6 +36,7 @@ PLATFORMS
 DEPENDENCIES
   cloudflare-workers-runtime!
   opal!
+  sinatra-cloudflare-workers!
 
 RUBY VERSION
    ruby 3.4.9p82

@@ -1,0 +1,18 @@
+# Example wrangler.toml for a minimal Sinatra Worker.
+# Copy and replace YOUR_* placeholders.
+
+name = "YOUR_WORKER_NAME"
+main = "src/worker.mjs"
+compatibility_date = "2024-01-01"
+
+# Point to the Opal bundle emitted by cloudflare_workers:opal (or npm script).
+# homurabi wires Ruby via `globalThis.__HOMURABI_RACK_DISPATCH__` — follow
+# gems/cloudflare-workers-runtime/runtime/worker.mjs as a template.
+
+[vars]
+# EXAMPLE = "1"
+
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "YOUR_DB"
+# database_id = "YOUR_ID"

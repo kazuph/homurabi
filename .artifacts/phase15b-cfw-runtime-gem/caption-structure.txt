@@ -1,0 +1,26 @@
+Phase 15-B — File layout Before / After (text)
+
+BEFORE (repo root)
+  lib/cloudflare_workers.rb
+  lib/cloudflare_workers/*.rb
+  lib/opal_patches.rb
+  src/worker.mjs
+  src/setup-node-crypto.mjs
+  wrangler.toml main = src/worker.mjs
+
+AFTER (monorepo gem)
+  gems/cloudflare-workers-runtime/lib/cloudflare_workers.rb
+  gems/cloudflare-workers-runtime/lib/cloudflare_workers/*.rb
+  gems/cloudflare-workers-runtime/lib/opal_patches.rb
+  gems/cloudflare-workers-runtime/runtime/worker.mjs
+  gems/cloudflare-workers-runtime/runtime/setup-node-crypto.mjs
+  gems/cloudflare-workers-runtime/cloudflare-workers-runtime.gemspec
+  gems/cloudflare-workers-runtime/README.md + CHANGELOG.md
+  wrangler.toml main = gems/cloudflare-workers-runtime/runtime/worker.mjs
+  Gemfile: gem "cloudflare-workers-runtime", path: "..."
+
+HOMURABI (unchanged on homurabi side)
+  lib/sinatra_* lib/sequel_* lib/sinatra/ lib/sequel/
+  lib/homurabi_markdown.rb  app/hello.rb  vendor/
+
+Move method: git mv (history preserved). Gem files under gem tree: 17 files.

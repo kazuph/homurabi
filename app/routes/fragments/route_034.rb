@@ -142,7 +142,7 @@
       # lists, bold, code fences, links). Safe to insert because
       # `HomurabiMarkdown.render` HTML-escapes the input first and
       # restricts link hrefs to http/https/mailto/relative.
-      'reply_html'   => HomurabiMarkdown.render(reply_text),
+      'reply_html'   => markdown_html(reply_text),
       'history_len'  => new_history.size
     }.to_json
   end

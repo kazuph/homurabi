@@ -621,13 +621,11 @@ end
 # reference resolves before upstream Sinatra loads.
 require 'rubygems/version'
 
-# Phase 13: upstream Sinatra's `set` helper compiles setter methods
-# via `class_eval("def name() value; end")`. That string form needs
-# the Opal runtime parser (`opal-parser`) to be loaded — otherwise
-# Class#class_eval raises NoMethodError 'compile'. Runtime parsing
-# is already opt-in in production Workers (ROADMAP Phase 13 accepts
-# the bundle-size cost vs. 20+ extra patch sites).
-require 'opal-parser'
+# Phase 13 originally required `opal-parser` because upstream Sinatra's
+# `set` helper used `class_eval("def ...")` for primitive option values.
+# Phase 15-Pre removes that string-eval path in `vendor/sinatra_upstream/base.rb`
+# (Proc-based getters / predicate) so the Workers bundle no longer needs the
+# full Opal compiler + whitequark parser at runtime.
 
 [
   :ISO_2022_JP,

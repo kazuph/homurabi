@@ -1,0 +1,35 @@
+Phase 15-Pre — baseline & final metrics (worktree feature/phase15-pre-cpu-budget)
+Date: 2026-04-20
+
+=== BEFORE (pre-change session baseline, first `npm run build` on this branch) ===
+build/hello.no-exit.mjs:
+  lines:     119609
+  raw bytes: 6692622
+  gzip -c:   1372535 bytes
+npx wrangler deploy --dry-run (baseline-wrangler-dry-run.log):
+  Total Upload: 6724.52 KiB / gzip: 1325.93 KiB
+  (Wrangler 3.x does not print startup_cpu_time in stdout; used upload/gzip as B1/B2 proxy.)
+Opal.modules[] distinct count (grep, excluding template noise): ~450
+npm test: 16/16 suites PASS (baseline-npm-test.log)
+
+=== AFTER (final tree: opal-parser removal + IRB require cut + ShowExceptions shim + local posts DDL) ===
+build/hello.no-exit.mjs:
+  lines:     81998
+  raw bytes: 4413116
+  gzip -c:   1116538 bytes
+npx wrangler deploy --dry-run (final-wrangler-dry-run.log):
+  Total Upload: 4419.57 KiB / gzip: 1068.84 KiB
+Opal.modules[] distinct count: 296
+npm test: 16/16 suites PASS (post-parser-cut-npm-test.log)
+
+Relative deltas (Before -> After):
+  raw bytes:   -34.0%
+  gzip bytes:  -18.7%
+  line count:  -31.4%
+  wrangler raw: -34.3%
+  wrangler gzip:-19.4%
+
+Major bundle removals (verified by absence in hello.no-exit.mjs):
+  - opal/compiler + whitequark parser/* (previously pulled via require 'opal-parser' in lib/opal_patches.rb)
+  - corelib/irb subtree (vendor/opal-gem/opal/opal.rb)
+  - sinatra_upstream/show_exceptions + most of upstream HTML stack (vendor/sinatra/show_exceptions.rb stub)

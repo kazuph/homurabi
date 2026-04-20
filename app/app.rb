@@ -26,9 +26,9 @@ require 'homurabi_markdown'
 # the rationale). The Cloudflare::Multipart parser and the SSEStream
 # helper are auto-required from lib/cloudflare_workers.rb.
 require 'faraday'
-# Phase 12 — Sequel (vendored v5.103.0) + D1 adapter. `Sequel.connect('d1://')`
-# resolves the D1 binding from Cloudflare::Bindings.current (wired
-# per-request by lib/cloudflare_workers.rb), and Dataset DSL compiles
+# Phase 12 — Sequel (vendored v5.103.0) + D1 adapter (`sequel-d1` gem).
+# `Sequel.connect(adapter: :d1, d1: …)` uses the per-request D1 binding
+# from `env['cloudflare.DB']` (wired by cloudflare-workers-runtime), and Dataset DSL compiles
 # to SQLite-dialect SQL which D1 speaks natively.
 require 'sequel'
 

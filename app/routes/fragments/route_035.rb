@@ -23,7 +23,7 @@
       item = { 'role' => role, 'content' => content }
       # Only assistant replies are converted — user messages are
       # authored text and stay as-is to preserve the exact payload.
-      item['content_html'] = HomurabiMarkdown.render(content) if role == 'assistant'
+      item['content_html'] = markdown_html(content) if role == 'assistant'
       item
     end
     {

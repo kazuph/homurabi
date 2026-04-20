@@ -32,6 +32,10 @@ require 'faraday'
 # to SQLite-dialect SQL which D1 speaks natively.
 require 'sequel'
 
+require_relative 'helpers/session_cookie'
+require_relative 'helpers/chat_history'
+require_relative 'helpers/markdown_render'
+
 class App < Sinatra::Base
   # Phase 8 — JWT auth. The secret is the default HS256 path; asymmetric
   # algo demos generate their own keys on first use and cache them in
@@ -55,141 +59,8 @@ class App < Sinatra::Base
   # |batch| ... end` DSL so queue consumer handlers live next to the
   # HTTP routes.
   register Sinatra::Queue
-  # --- Cloudflare binding helpers ------------------------------------
-  # These let routes access D1/KV/R2 with the same brevity as
-  # ActiveRecord's `User.find(id)` pattern, without introducing an ORM.
-  helpers do
-    def db;     env['cloudflare.DB'];     end
-    def kv;     env['cloudflare.KV'];     end
-    def bucket; env['cloudflare.BUCKET']; end
-
-    # Crypto demo / self-test routes generate fresh RSA keys + run
-    # PBKDF2 per call. Leaving them publicly reachable in production
-    # is a CPU-DoS vector. Gate behind the wrangler [vars] flag
-    # `HOMURABI_ENABLE_CRYPTO_DEMOS`. Default-deny everywhere.
-    def crypto_demos_enabled?
-      cf_env = env['cloudflare.env']
-      return false unless cf_env
-      val = `(#{cf_env} && #{cf_env}.HOMURABI_ENABLE_CRYPTO_DEMOS) || ''`
-      val.to_s == '1'
-    end
-
-    # Phase 9 — gate for the scheduled introspection / manual-fire
-    # routes. `/test/scheduled/run` writes to D1 + KV without auth, so
-    # leaving it open in production lets any caller burn binding quota.
-    # Default OFF; flip via wrangler [vars] HOMURABI_ENABLE_SCHEDULED_DEMOS=1.
-    def scheduled_demos_enabled?
-      cf_env = env['cloudflare.env']
-      return false unless cf_env
-      val = `(#{cf_env} && #{cf_env}.HOMURABI_ENABLE_SCHEDULED_DEMOS) || ''`
-      val.to_s == '1'
-    end
-
-    # Phase 11B — gate for the Durable Object / Cache API / Queues
-    # demo routes (`/demo/do*`, `/demo/cache*`, `/api/enqueue`,
-    # `/test/bindings`). Each demo writes to DO storage or enqueues
-    # a message on every request, so leaving them publicly reachable
-    # in production burns metered quota. Default OFF; flip via
-    # wrangler [vars] HOMURABI_ENABLE_BINDING_DEMOS=1 in dev.
-    def binding_demos_enabled?
-      cf_env = env['cloudflare.env']
-      return false unless cf_env
-      val = `(#{cf_env} && #{cf_env}.HOMURABI_ENABLE_BINDING_DEMOS) || ''`
-      val.to_s == '1'
-    end
-
-    # Phase 11B — Sinatra helpers around the DO / Cache / Queue
-    # wrappers. They mirror the `db` / `kv` / `bucket` pattern so
-    # routes can call them without touching JS.
-
-    # Wrapped DurableObjectNamespace for the `COUNTER` binding.
-    # nil when no binding is attached (e.g. in tests or missing
-    # wrangler.toml entry).
-    def do_counter
-      env['cloudflare.DO_COUNTER']
-    end
-
-    # Default edge cache.  A thin wrapper over `caches.default`.
-    def cache
-      @cache ||= ::Cloudflare::Cache.default
-    end
-
-    # The `JOBS_QUEUE` producer binding. nil when the binding is
-    # not attached.
-    def jobs_queue
-      env['cloudflare.QUEUE_JOBS']
-    end
-
-    # The `JOBS_DLQ` dead-letter-queue producer. Routes can post to
-    # this directly when the caller already knows a message should not
-    # go through the main retry loop.
-    def jobs_dlq
-      env['cloudflare.QUEUE_JOBS_DLQ']
-    end
-
-    # Serve an expensive computation through Cache API. On a cache
-    # hit the cached Response body is returned; on a miss the block
-    # is evaluated, the result is stored with the given TTL, and
-    # the fresh body is returned.
-    #
-    #   get '/demo/cache/heavy' do
-    #     content_type 'application/json'
-    #     cache_get(request.url, ttl: 60) { expensive_json }
-    #   end
-    #
-    # Headers picked up from the route's `content_type` call are
-    # copied onto the stored Response so a cache hit echoes the
-    # same content-type — otherwise the browser would see a plain
-    # 200 with no content-type and try to sniff.
-    #
-    # NOTE: the Workers Cache API (and miniflare's local emulation)
-    # requires the cache-key URL to be http/https AND the stored
-    # Response to have a `Date` + `Cache-Control: max-age > 0` header.
-    # A missing `Date` header is the most common reason a put
-    # silently stores nothing — we populate it here so routes don't
-    # have to know.
-    def cache_get(cache_key, ttl: 60, content_type_override: nil, &block)
-      # Copilot review PR #9: fail loudly when no block is given
-      # instead of NoMethodError on nil.call later. Same pattern
-      # `consume_queue` / `DurableObject.define` use at registration
-      # time.
-      raise ArgumentError, 'cache_get requires a block' unless block
-      # Copilot review PR #9 (additional): the Workers Cache API
-      # silently refuses to store a Response whose Cache-Control
-      # max-age is 0 or negative, so a caller asking for `ttl: 0` or
-      # a bad `params['ttl']` would compute the body, skip storage,
-      # and still claim it was cached. Make the contract explicit:
-      # ttl must be a positive integer; clamp to at least 1 second to
-      # protect the cache from being poisoned with unstorable entries.
-      cache_ttl = ttl.to_i
-      if cache_ttl <= 0
-        raise ArgumentError, "cache_get ttl must be > 0 (got #{ttl.inspect}); Workers refuses to store max-age=0"
-      end
-      c = cache
-      cached = c.match(cache_key).__await__
-      if cached
-        # Replay the cached headers so the outer Rack response
-        # matches what we originally put in (content-type etc.).
-        cached.headers.each { |k, v| response.headers[k] = v }
-        response.headers['x-homurabi-cache'] = 'HIT'
-        return cached.body
-      end
-      body = block.call
-      ct = content_type_override || response['Content-Type'] || 'text/plain; charset=utf-8'
-      c.put(
-        cache_key, body,
-        status: 200,
-        headers: {
-          'content-type'     => ct,
-          'cache-control'    => "public, max-age=#{cache_ttl}",
-          'date'             => Time.now.httpdate,
-          'x-homurabi-cache' => 'MISS'
-        }
-      ).__await__
-      response.headers['x-homurabi-cache'] = 'MISS'
-      body
-    end
-  end
+  # --- Cloudflare binding helpers (see app/helpers/chat_history.rb) ---
+  helpers Homurabi::CloudflareBindingHelpers
   # ------------------------------------------------------------------
   # HTML pages — each route sets a few `@ivars` then renders an ERB
   # template from `views/`. Exactly like Sinatra's README example:
@@ -202,55 +73,11 @@ class App < Sinatra::Base
   JWT_ACCESS_TTL  = 3600          # 1 hour
   JWT_REFRESH_TTL = 86_400 * 30   # 30 days
 
-  helpers do
-    # Returns the signing key + verification key pair for the given alg.
-    # Keys are lazily generated and cached on the App class so repeat
-    # requests skip the 2048-bit RSA generation.
-    def jwt_keys_for(alg)
-      case alg
-      when 'HS256', 'HS384', 'HS512'
-        [settings.jwt_secret, settings.jwt_secret]
-      when 'RS256', 'RS384', 'RS512', 'PS256', 'PS384', 'PS512'
-        App.class_variable_set(:@@rsa_key, OpenSSL::PKey::RSA.new(2048)) unless App.class_variable_defined?(:@@rsa_key)
-        rsa = App.class_variable_get(:@@rsa_key)
-        [rsa, rsa.public_key]
-      when 'ES256'
-        App.class_variable_set(:@@ec256_key, OpenSSL::PKey::EC.generate('prime256v1')) unless App.class_variable_defined?(:@@ec256_key)
-        ec = App.class_variable_get(:@@ec256_key)
-        [ec, ec]
-      when 'ES384'
-        App.class_variable_set(:@@ec384_key, OpenSSL::PKey::EC.generate('secp384r1')) unless App.class_variable_defined?(:@@ec384_key)
-        ec = App.class_variable_get(:@@ec384_key)
-        [ec, ec]
-      when 'ES512'
-        App.class_variable_set(:@@ec521_key, OpenSSL::PKey::EC.generate('secp521r1')) unless App.class_variable_defined?(:@@ec521_key)
-        ec = App.class_variable_get(:@@ec521_key)
-        [ec, ec]
-      when 'EdDSA', 'ED25519'
-        App.class_variable_set(:@@ed_key, OpenSSL::PKey::Ed25519.generate) unless App.class_variable_defined?(:@@ed_key)
-        ed = App.class_variable_get(:@@ed_key)
-        [ed, ed]
-      else
-        raise ArgumentError, "unsupported alg: #{alg.inspect}"
-      end
-    end
+  helpers Homurabi::JwtKeyHelpers
 
-    # Inspect a JWT header without verifying so we can pick the right
-    # verification key. Safe to do because we always re-verify the
-    # signature with the detected alg.
-    def alg_from_token(token)
-      header_seg = token.to_s.split('.').first.to_s
-      padded     = header_seg + ('=' * ((4 - header_seg.length % 4) % 4))
-      json       = Base64.urlsafe_decode64(padded)
-      JSON.parse(json)['alg']
-    rescue StandardError
-      nil
-    end
-  end
-
-  # POST /api/login — issues access + refresh tokens.
-  # Body (JSON): { "username": "..." }
-  # Query: ?alg=HS256|RS256|PS256|ES256|ES384|ES512|EdDSA (default HS256)
+  # ------------------------------------------------------------------
+  # Phase 9 — Cron Trigger handlers (see also /test/scheduled* routes).
+  # ------------------------------------------------------------------
   schedule '*/5 * * * *', name: 'heartbeat' do |event|
     cf_env = env['cloudflare.env']
     enabled = cf_env && `(#{cf_env}.HOMURABI_ENABLE_SCHEDULED_DEMOS || '')`.to_s == '1'
@@ -313,191 +140,10 @@ class App < Sinatra::Base
   CHAT_HISTORY_TTL   = 86_400 * 7  # 1 week
   CHAT_SYSTEM_PROMPT = 'You are homurabi, a friendly Sinatra-on-Cloudflare-Workers assistant. Reply concisely. If the user writes Japanese, reply in Japanese. If the user writes English, reply in English.'
 
-  # Workers AI returns one of two response shapes depending on the model:
-  # 1. legacy `{ response: "..." }`            (e.g. older llama, mistral)
-  # 2. OpenAI-style `{ choices: [{ message: { content: "..." } }] }`
-  #    (Gemma 4, gpt-oss-* and any other "chat completions"-shaped model)
-  # Helper that tolerates both so the route doesn't have to branch.
-  def self.extract_ai_text(out)
-    return out.to_s unless out.is_a?(Hash)
-    # OpenAI-style choices[].message.content
-    if out['choices'].is_a?(Array) && !out['choices'].empty?
-      msg = out['choices'][0].is_a?(Hash) ? out['choices'][0]['message'] : nil
-      if msg.is_a?(Hash)
-        c = msg['content']
-        return c.to_s if c.is_a?(String) && !c.empty?
-        # Some models put the visible answer in `reasoning` when the
-        # response is truncated by max_tokens. Surface it as a fallback
-        # so the user still sees something useful.
-        r = msg['reasoning']
-        return r.to_s if r.is_a?(String) && !r.empty?
-      end
-    end
-    # Legacy `{ response: "..." }` / generic fallbacks.
-    %w[response result output text].each do |k|
-      v = out[k]
-      return v.to_s if v.is_a?(String) && !v.empty?
-    end
-    ''
-  end
-
-  helpers do
-    def ai_demos_enabled?
-      cf_env = env['cloudflare.env']
-      return false unless cf_env
-      val = `(#{cf_env} && #{cf_env}.HOMURABI_ENABLE_AI_DEMOS) || ''`
-      val.to_s == '1'
-    end
-
-    def ai_binding
-      env['cloudflare.AI']
-    end
-
-    # JS-aware "is the binding present?" — env.AI is a raw JS object
-    # without a Ruby `.nil?` method, so `binding.nil?` would explode at
-    # runtime. This helper checks the JS-level null/undefined directly.
-    def ai_binding?
-      v = env['cloudflare.AI']
-      `(#{v} != null)`
-    end
-
-    # JSON body parse with a graceful default.
-    def parse_json_body
-      raw = request.body.read.to_s
-      return {} if raw.empty?
-      JSON.parse(raw)
-    rescue JSON::ParserError, StandardError
-      {}
-    end
-
-    # Allow only `[A-Za-z0-9_-]{1,64}` for session ids so a crafted
-    # `?session=` cannot inject HTML when echoed back to /chat, cannot
-    # generate exotic KV key names (which would also escape `chat:` and
-    # collide with other namespaces), and cannot create unbounded
-    # per-user key cardinality. Falls back to `'demo'` on rejection.
-    SESSION_ID_RE = /\A[A-Za-z0-9_-]{1,64}\z/.freeze
-
-    def normalize_session_id(raw)
-      s = raw.to_s
-      return 'demo' if s.empty?
-      SESSION_ID_RE.match?(s) ? s : 'demo'
-    end
-
-    def chat_kv_key(session_id)
-      "chat:#{session_id}"
-    end
-
-    # Returns the array of {role, content} message Hashes for a session,
-    # or [] if KV has nothing (or no KV is bound).
-    def load_chat_history(session_id)
-      return [] unless kv
-      raw = kv.get(chat_kv_key(session_id)).__await__
-      return [] if raw.nil? || raw.empty?
-      arr = JSON.parse(raw)
-      arr.is_a?(Array) ? arr : []
-    rescue JSON::ParserError
-      []
-    end
-
-    def save_chat_history(session_id, history)
-      return unless kv
-      trimmed = history.last(CHAT_HISTORY_LIMIT)
-      # Pass CHAT_HISTORY_TTL through so KV expires the entry
-      # automatically and the namespace doesn't accumulate dead
-      # sessions forever (the constant was previously documented but
-      # unused — Copilot review #5).
-      kv.put(chat_kv_key(session_id), trimmed.to_json, expiration_ttl: CHAT_HISTORY_TTL).__await__
-    end
-
-    def clear_chat_history(session_id)
-      return unless kv
-      kv.delete(chat_kv_key(session_id)).__await__
-    end
-
-    # Convert chat history to the messages array Workers AI expects.
-    # Always prepends a system prompt so the model has consistent persona.
-    def build_ai_messages(history, latest_user_text)
-      msgs = [{ 'role' => 'system', 'content' => CHAT_SYSTEM_PROMPT }]
-      history.each { |m| msgs << { 'role' => m['role'], 'content' => m['content'] } }
-      msgs << { 'role' => 'user', 'content' => latest_user_text }
-      msgs
-    end
-
-    # Both gates return either nil (= keep going) or a `[status, body]`
-    # tuple that the caller hands back via `next`. We deliberately do
-    # NOT use `halt` because the chat routes are `# await: true` async
-    # blocks; `halt` is implemented as `throw :halt`, and the throw
-    # escapes Sinatra's synchronous `catch :halt` wrapper through the
-    # async/await boundary (Copilot review #8/#9). Same root cause as
-    # the JWT auth helper rewrite.
-    def ai_demos_block_or_nil
-      return nil if ai_demos_enabled?
-      [404, { 'error' => 'AI demos disabled (set HOMURABI_ENABLE_AI_DEMOS=1 in wrangler vars)' }.to_json]
-    end
-
-    def ai_binding_block_or_nil
-      return nil if ai_binding?
-      [503, { 'error' => 'AI binding not configured (wrangler.toml [ai] block missing or wrangler version too old)' }.to_json]
-    end
-
-    # Inline JWT verification tailored for the chat routes.
-    #
-    # Sinatra's `Sinatra::JwtAuth#authenticate!` helper relies on `halt`,
-    # which is implemented via `throw :halt`. When the helper itself is
-    # `# await: true` (because JWT.decode awaits Web Crypto subtle), the
-    # `throw` escapes the async boundary before Sinatra's
-    # `catch :halt do ... end` wrapper can see it, and the route crashes
-    # with `UncaughtThrowError: "halt"`. Same root cause as the
-    # `each: undefined method for PromiseV2` issue — async Sinatra needs
-    # values, not control-flow exceptions, across the await boundary.
-    #
-    # `chat_verify_token!` returns either:
-    #   - a Hash with `{ ok: true, payload: <decoded> }` on success, or
-    #   - a Hash with `{ ok: false, status: 401, body: <json> }` on
-    #     failure (so the route can `next body` after a status set).
-    # The route is responsible for halting / returning early.
-    def chat_verify_token!
-      header = request.env['HTTP_AUTHORIZATION'].to_s
-      parts = header.split(' ', 2)
-      if parts.length != 2 || parts[0].downcase != 'bearer'
-        return { 'ok' => false, 'status' => 401,
-                 'body' => { 'error' => 'unauthorized', 'reason' => 'missing bearer token' }.to_json }
-      end
-      token = parts[1].strip
-      if token.empty?
-        return { 'ok' => false, 'status' => 401,
-                 'body' => { 'error' => 'unauthorized', 'reason' => 'missing bearer token' }.to_json }
-      end
-      verify_key = settings.jwt_secret
-      algorithm  = settings.jwt_algorithm
-      reason = nil
-      decoded = begin
-        JWT.decode(token, verify_key, true, algorithm: algorithm)
-      rescue JWT::ExpiredSignature
-        reason = 'token expired'
-        nil
-      rescue JWT::VerificationError
-        reason = 'signature verification failed'
-        nil
-      rescue JWT::IncorrectAlgorithm
-        reason = 'algorithm mismatch'
-        nil
-      rescue JWT::DecodeError => e
-        reason = "invalid token: #{e.message}"
-        nil
-      rescue StandardError => e
-        reason = "auth error: #{e.message}"
-        nil
-      end
-      if decoded.nil?
-        return { 'ok' => false, 'status' => 401,
-                 'body' => { 'error' => 'unauthorized', 'reason' => reason || 'token verification failed' }.to_json }
-      end
-      payload, _header = decoded
-      @jwt_payload = payload
-      { 'ok' => true, 'payload' => payload }
-    end
-  end
+  # Workers AI response shaping lives in `Homurabi::ChatHistoryClassMethods#extract_ai_text`.
+  extend Homurabi::ChatHistoryClassMethods
+  helpers Homurabi::ChatHistoryHelpers
+  helpers Homurabi::MarkdownRenderHelpers
 
   # ----------------------------------------------------------------
   # Phase 13 follow-up — cookie-based session login.
@@ -518,30 +164,7 @@ class App < Sinatra::Base
   SESSION_COOKIE_TTL  = 86_400
   SESSION_COOKIE_NAME = 'homurabi_session'
 
-  def verify_session_cookie(raw)
-    return nil unless raw.is_a?(String) && raw.include?('.')
-    payload, sig = raw.split('.', 2)
-    return nil if payload.nil? || sig.nil? || payload.empty? || sig.empty?
-    expected = OpenSSL::HMAC.hexdigest('SHA256', settings.jwt_secret, payload)
-    return nil unless Rack::Utils.secure_compare(expected, sig)
-    decoded = Base64.urlsafe_decode64(payload) rescue nil
-    return nil if decoded.nil?
-    username, exp = decoded.split(':', 2)
-    return nil if username.nil? || exp.nil?
-    return nil if Time.now.to_i > exp.to_i
-    username
-  end
-
-  def mint_session_cookie(username)
-    exp = Time.now.to_i + SESSION_COOKIE_TTL
-    payload = Base64.urlsafe_encode64("#{username}:#{exp}", padding: false)
-    sig = OpenSSL::HMAC.hexdigest('SHA256', settings.jwt_secret, payload)
-    "#{payload}.#{sig}"
-  end
-
-  def current_session_user
-    verify_session_cookie(request.cookies[SESSION_COOKIE_NAME].to_s)
-  end
+  include Homurabi::SessionCookieInstanceMethods
 
   # GET /login — simple demo login form. Any non-empty username
   # mints an HMAC-signed session cookie carrying `username:exp`.

@@ -1,7 +1,7 @@
 # Toolchain contract (Phase 15-A)
 
 This document is the **interface specification** between the Cloudflare
-Workers module worker (`src/worker.mjs`), the Opal compile flags, and the
+Workers module worker (`gems/cloudflare-workers-runtime/runtime/worker.mjs`), the Opal compile flags, and the
 build artifacts. Downstream gem splits (Phase 15-B/C) should preserve these
 contracts unless explicitly versioned.
 
@@ -9,7 +9,7 @@ contracts unless explicitly versioned.
 
 ### 1.1 Legacy hooks (still installed — backward compatible)
 
-| Global | Producer (Ruby) | Consumer (`src/worker.mjs`) |
+| Global | Producer (Ruby) | Consumer (`gems/cloudflare-workers-runtime/runtime/worker.mjs`) |
 |--------|-----------------|------------------------------|
 | `__HOMURABI_RACK_DISPATCH__` | `Rack::Handler::CloudflareWorkers.install_dispatcher` | `fetch()` |
 | `__HOMURABI_SCHEDULED_DISPATCH__` | `Cloudflare::Scheduled.install_dispatcher` | `scheduled()` |
@@ -39,7 +39,7 @@ globals so older smoke bundles and gradual migrations keep working.
 
 Homurabi’s production bundle is built with:
 
-- `-I lib -I vendor -I build`
+- `-I gems/cloudflare-workers-runtime/lib -I lib -I vendor -I build`
 - `-r opal_patches -r cloudflare_workers -r homurabi_templates -r homurabi_assets`
 - Entry: `app/hello.rb` (overridable)
 - Output: `build/hello.no-exit.mjs` (overridable)

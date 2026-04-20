@@ -27,3 +27,6 @@ dist/
 
 # mise local config (per-machine)
 .mise.local.toml
+
+# Local task artifacts (report/evidence, do not version)
+/.artifacts/

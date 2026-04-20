@@ -4,7 +4,7 @@
 // adapter on the JavaScript side.
 //
 // The imported bundle (build/hello.no-exit.mjs) installs
-// `globalThis.__HOMURABI_RACK_DISPATCH__` via lib/cloudflare_workers.rb's
+// `globalThis.__HOMURABI_RACK_DISPATCH__` via cloudflare_workers.rb's
 // Rack::Handler::CloudflareWorkers, and mirrors the same function onto
 // `globalThis.__OPAL_WORKERS__.rack` (Phase 15-A toolchain namespace).
 // This worker prefers `__OPAL_WORKERS__` and falls back to the legacy
@@ -14,7 +14,9 @@
 // loads so Digest / OpenSSL / SecureRandom can use synchronous APIs.
 import "./setup-node-crypto.mjs";
 
-import "../build/hello.no-exit.mjs";
+// Monorepo layout: this file lives under gems/cloudflare-workers-runtime/runtime/
+// and the Opal bundle is emitted at the repository root.
+import "../../../build/hello.no-exit.mjs";
 
 // ---------------------------------------------------------------------------
 // Phase 15-A — dispatch resolution: prefer __OPAL_WORKERS__, alias legacy

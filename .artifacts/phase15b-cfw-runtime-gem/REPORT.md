@@ -73,8 +73,10 @@ Status: Awaiting Review
 - **Cursor `/reviw-plugin:done`**: 本セッションではスキル直接起動なし。**`git diff main...HEAD --stat` ベースの自己レビュー**で代替（下記）。
 
 ```
-# PR 作成後に main との差分統計を貼り付け予定（コミット完了後に更新）
+35 files changed, 2453 insertions(+), 43 deletions(-)
 ```
+
+（`.artifacts/` の証跡・ログが行数を押し上げている。アプリ本体変更は Gemfile / lock / Rakefile / package.json / wrangler.toml / TOOLCHAIN_CONTRACT と gem ツリーへの移動が中心。）
 
 - **Copilot PR レビュー**: Step 11 完了後に件数・対応コミットを本節へ追記する。
 

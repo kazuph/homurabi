@@ -5,14 +5,62 @@
 //
 // The imported bundle (build/hello.no-exit.mjs) installs
 // `globalThis.__HOMURABI_RACK_DISPATCH__` via lib/cloudflare_workers.rb's
-// Rack::Handler::CloudflareWorkers. We forward every fetch event through
-// it and return whatever JS Response the Ruby Rack app produced.
+// Rack::Handler::CloudflareWorkers, and mirrors the same function onto
+// `globalThis.__OPAL_WORKERS__.rack` (Phase 15-A toolchain namespace).
+// This worker prefers `__OPAL_WORKERS__` and falls back to the legacy
+// `__HOMURABI_*` globals for older bundles / smoke tests.
 
 // Phase 7: expose node:crypto on globalThis BEFORE the Opal bundle
 // loads so Digest / OpenSSL / SecureRandom can use synchronous APIs.
 import "./setup-node-crypto.mjs";
 
 import "../build/hello.no-exit.mjs";
+
+// ---------------------------------------------------------------------------
+// Phase 15-A — dispatch resolution: prefer __OPAL_WORKERS__, alias legacy
+// ---------------------------------------------------------------------------
+
+function rackDispatch() {
+  const ow = globalThis.__OPAL_WORKERS__;
+  const fn = ow && typeof ow.rack === "function" ? ow.rack : undefined;
+  return fn || globalThis.__HOMURABI_RACK_DISPATCH__;
+}
+
+function scheduledDispatch() {
+  const ow = globalThis.__OPAL_WORKERS__;
+  const fn = ow && typeof ow.scheduled === "function" ? ow.scheduled : undefined;
+  return fn || globalThis.__HOMURABI_SCHEDULED_DISPATCH__;
+}
+
+function queueDispatch() {
+  const ow = globalThis.__OPAL_WORKERS__;
+  const fn = ow && typeof ow.queue === "function" ? ow.queue : undefined;
+  return fn || globalThis.__HOMURABI_QUEUE_DISPATCH__;
+}
+
+function durableObjectDispatch() {
+  const d = globalThis.__OPAL_WORKERS__ && globalThis.__OPAL_WORKERS__.durableObject;
+  const fn = d && typeof d.dispatch === "function" ? d.dispatch : undefined;
+  return fn || globalThis.__HOMURABI_DO_DISPATCH__;
+}
+
+function durableObjectWsMessage() {
+  const d = globalThis.__OPAL_WORKERS__ && globalThis.__OPAL_WORKERS__.durableObject;
+  const fn = d && typeof d.wsMessage === "function" ? d.wsMessage : undefined;
+  return fn || globalThis.__HOMURABI_DO_WS_MESSAGE__;
+}
+
+function durableObjectWsClose() {
+  const d = globalThis.__OPAL_WORKERS__ && globalThis.__OPAL_WORKERS__.durableObject;
+  const fn = d && typeof d.wsClose === "function" ? d.wsClose : undefined;
+  return fn || globalThis.__HOMURABI_DO_WS_CLOSE__;
+}
+
+function durableObjectWsError() {
+  const d = globalThis.__OPAL_WORKERS__ && globalThis.__OPAL_WORKERS__.durableObject;
+  const fn = d && typeof d.wsError === "function" ? d.wsError : undefined;
+  return fn || globalThis.__HOMURABI_DO_WS_ERROR__;
+}
 
 // Phase 11A — binary-safe body passthrough. Convert an ArrayBuffer of
 // request body bytes into a latin1 String (each code unit 0–255 is
@@ -42,7 +90,7 @@ function binaryArrayBufferToLatin1String(arrayBuffer) {
 
 export default {
   async fetch(request, env, ctx) {
-    const dispatch = globalThis.__HOMURABI_RACK_DISPATCH__;
+    const dispatch = rackDispatch();
     if (typeof dispatch !== "function") {
       return new Response(
         "homurabi: Rack dispatcher not installed (Rack::Handler::CloudflareWorkers.run never called)\n",
@@ -108,7 +156,7 @@ export default {
   // synchronous return. The Ruby helper `wait_until(promise)` does
   // exactly that.
   async scheduled(event, env, ctx) {
-    const dispatch = globalThis.__HOMURABI_SCHEDULED_DISPATCH__;
+    const dispatch = scheduledDispatch();
     if (typeof dispatch !== "function") {
       // No Ruby dispatcher installed — the Opal bundle didn't
       // require 'cloudflare_workers/scheduled'. Log loudly so this
@@ -154,7 +202,7 @@ export default {
   // doesn't crash the consumer — errors are caught and logged so
   // sibling handlers still run.
   async queue(batch, env, ctx) {
-    const dispatch = globalThis.__HOMURABI_QUEUE_DISPATCH__;
+    const dispatch = queueDispatch();
     if (typeof dispatch !== "function") {
       try {
         globalThis.console.error(
@@ -208,7 +256,7 @@ async function __homurabiForwardDO(class_name, state, env, request) {
   if (m !== "GET" && m !== "HEAD" && m !== "OPTIONS") {
     try { bodyText = await request.text(); } catch (_e) { bodyText = ""; }
   }
-  const dispatch = globalThis.__HOMURABI_DO_DISPATCH__;
+  const dispatch = durableObjectDispatch();
   if (typeof dispatch !== "function") {
     return new Response(
       JSON.stringify({ error: "homurabi: DO dispatcher not installed" }),
@@ -249,19 +297,19 @@ export class HomurabiCounterDO {
         try { pair[1].accept(); } catch (_) {}
         const self = this;
         pair[1].addEventListener("message", async (ev) => {
-          const fn = globalThis.__HOMURABI_DO_WS_MESSAGE__;
+          const fn = durableObjectWsMessage();
           if (typeof fn === "function") {
             try { await fn("HomurabiCounterDO", pair[1], ev.data, self.state, self.env); } catch (_) {}
           }
         });
         pair[1].addEventListener("close", async (ev) => {
-          const fn = globalThis.__HOMURABI_DO_WS_CLOSE__;
+          const fn = durableObjectWsClose();
           if (typeof fn === "function") {
             try { await fn("HomurabiCounterDO", pair[1], ev.code, ev.reason, ev.wasClean, self.state, self.env); } catch (_) {}
           }
         });
         pair[1].addEventListener("error", async (ev) => {
-          const fn = globalThis.__HOMURABI_DO_WS_ERROR__;
+          const fn = durableObjectWsError();
           if (typeof fn === "function") {
             try { await fn("HomurabiCounterDO", pair[1], ev, self.state, self.env); } catch (_) {}
           }
@@ -276,19 +324,19 @@ export class HomurabiCounterDO {
   // installed by `lib/cloudflare_workers/durable_object.rb`. Each
   // hook is optional on the Ruby side; missing hooks are a no-op.
   async webSocketMessage(ws, message) {
-    const fn = globalThis.__HOMURABI_DO_WS_MESSAGE__;
+    const fn = durableObjectWsMessage();
     if (typeof fn === "function") {
       return fn("HomurabiCounterDO", ws, message, this.state, this.env);
     }
   }
   async webSocketClose(ws, code, reason, wasClean) {
-    const fn = globalThis.__HOMURABI_DO_WS_CLOSE__;
+    const fn = durableObjectWsClose();
     if (typeof fn === "function") {
       return fn("HomurabiCounterDO", ws, code, reason, wasClean, this.state, this.env);
     }
   }
   async webSocketError(ws, err) {
-    const fn = globalThis.__HOMURABI_DO_WS_ERROR__;
+    const fn = durableObjectWsError();
     if (typeof fn === "function") {
       return fn("HomurabiCounterDO", ws, err, this.state, this.env);
     }

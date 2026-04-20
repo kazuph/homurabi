@@ -78,12 +78,12 @@ Status: Awaiting Review
 
 （`.artifacts/` の証跡・ログが行数を押し上げている。アプリ本体変更は Gemfile / lock / Rakefile / package.json / wrangler.toml / TOOLCHAIN_CONTRACT と gem ツリーへの移動が中心。）
 
-- **Copilot PR レビュー**: Step 11 完了後に件数・対応コミットを本節へ追記する。
+- **Copilot PR レビュー**: 1 件 → `wrangler.toml` の DO 節コメントを gem 実パスに更新（`3fb1749`）。
 
 ---
 
 ## PR 情報
 
-- PR 番号: （Step 11 後に記入）
-- URL: （同上）
-- Copilot 指摘: 件数・対応コミット（同上）
+- PR 番号: **#16**
+- URL: https://github.com/kazuph/homurabi/pull/16
+- Copilot 指摘: **1 件**（`wrangler.toml` コメントの旧 `lib/` パス）→ **対応コミット** `3fb1749b36981c6ab044e54050d28e8ece6e270e`、インライン返信済み

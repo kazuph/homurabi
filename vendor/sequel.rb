@@ -16,8 +16,8 @@
 #   4. D1 adapter is loaded on demand via Sequel.connect('d1://')
 #      → vendor/sequel/database/connecting.rb calls
 #      `require "sequel/adapters/d1"` which resolves to our custom
-#      lib/sequel/adapters/d1.rb (Opal build -I lib -I vendor resolves
-#      lib/ first).
+#      gems/sequel-d1/lib/sequel/adapters/d1.rb (Opal build -I
+#      gems/sequel-d1/lib -I lib -I vendor resolves gem lib first).
 #
 # Phase 12 scope: Dataset DSL only. Sequel::Model, plugins, and most
 # extensions are deliberately NOT required.

@@ -5,6 +5,15 @@ PATH
       opal (>= 1.8.3.rc1, < 2)
 
 PATH
+  remote: gems/sequel-d1
+  specs:
+    sequel-d1 (0.1.0)
+      cloudflare-workers-runtime (>= 0.1)
+      opal (>= 1.8.3.rc1, < 2)
+      sequel (~> 5.0)
+      sqlite3 (>= 2.0)
+
+PATH
   remote: gems/sinatra-cloudflare-workers
   specs:
     sinatra-cloudflare-workers (0.1.0)
@@ -24,18 +33,22 @@ GEM
   specs:
     ast (2.4.3)
     base64 (0.3.0)
+    bigdecimal (4.1.2)
     parser (3.3.11.1)
       ast (~> 2.4.1)
       racc
     racc (1.8.1)
+    sequel (5.103.0)
+      bigdecimal
+    sqlite3 (2.9.3-arm64-darwin)
 
 PLATFORMS
   arm64-darwin-25
-  ruby
 
 DEPENDENCIES
   cloudflare-workers-runtime!
   opal!
+  sequel-d1!
   sinatra-cloudflare-workers!
 
 RUBY VERSION

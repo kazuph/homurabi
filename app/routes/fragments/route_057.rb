@@ -119,7 +119,8 @@
     }.to_json
   end
   # Phase 16 — self-hosted docs (Cloudflare-style /docs/*)
-  get %r{\A/docs/?\z} do
+  # Note: Mustermann on Opal rejects regex anchors (^ / $); use two paths for /docs and /docs/.
+  docs_index_route = lambda do
     @title = 'ドキュメント — homurabi'
     @docs_page = 'index'
     @docs_section = :getting_started

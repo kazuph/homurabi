@@ -172,6 +172,8 @@ module Rack
           method  = `#{js_req}.method`
           url_obj = `new URL(#{js_req}.url)`
           path    = `#{url_obj}.pathname`
+          # Phase 16 docs: Sinatra + Opal builds responses with String#<< and raises on PATH_INFO `/docs/`.
+          path    = '/docs' if path == '/docs/'
           raw_qs  = `#{url_obj}.search`  # includes leading '?' or empty string
           qs      = raw_qs && raw_qs.length > 0 ? raw_qs[1..-1] : ''
           scheme  = `#{url_obj}.protocol`.sub(/:\z/, '')

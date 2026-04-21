@@ -1898,7 +1898,9 @@
   end
   # Phase 17 — Cloudflare Email Service (SEND_EMAIL) manual test
   get '/debug/mail' do
-    debug_mail_require_kazuph!
+    gate = debug_mail_gate_response
+    next gate if gate
+
     @title = 'Debug — mail'
     @mail_from = homurabi_mail_from
     @form_to = (params['to'] || 'kazu.homma@gmail.com').to_s
@@ -1908,7 +1910,9 @@
   end
 
   post '/debug/mail' do
-    debug_mail_require_kazuph!
+    gate = debug_mail_gate_response
+    next gate if gate
+
     content_type 'text/html; charset=utf-8'
 
     @title = 'Debug — mail'

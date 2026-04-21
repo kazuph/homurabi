@@ -20,7 +20,7 @@ Gem::Specification.new do |spec|
   spec.metadata['source_code_uri'] = "#{spec.homepage}/tree/main/gems/cloudflare-workers-runtime"
 
   spec.files = Dir.chdir(__dir__) do
-    Dir['lib/**/*', 'runtime/**/*', 'exe/**/*', 'bin/*', 'docs/**/*', 'README.md', 'CHANGELOG.md'].select { |f| File.file?(f) }
+    Dir['lib/**/*', 'runtime/**/*', 'exe/**/*', 'bin/*', 'docs/**/*', 'templates/**/*', 'README.md', 'CHANGELOG.md'].select { |f| File.file?(f) }
   end
   spec.require_paths = ['lib']
   spec.bindir = 'bin'

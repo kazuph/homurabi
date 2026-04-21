@@ -3,36 +3,36 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title><%= @title %></title>
+  <title><%= Rack::Utils.escape_html(@title.to_s) %></title>
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-  <h1><%= @title %></h1>
+  <h1><%= Rack::Utils.escape_html(@title.to_s) %></h1>
   <p>Cloudflare Email Service（<code>SEND_EMAIL</code>）経由の送信テスト。from は <code>HOMURABI_MAIL_FROM</code>（verified）、ローカルでは認証免除。</p>
   <% if @mail_from && !@mail_from.empty? %>
-    <p><strong>現在の From（vars）</strong>: <code><%= @mail_from %></code></p>
+    <p><strong>現在の From（vars）</strong>: <code><%= Rack::Utils.escape_html(@mail_from.to_s) %></code></p>
   <% else %>
     <p><strong>HOMURABI_MAIL_FROM</strong>: 未設定（ドメイン onboarding と wrangler vars が必要）</p>
   <% end %>
   <% if @error %>
-    <p role="alert" style="color:#b91c1c;"><strong>エラー:</strong> <%= @error %></p>
+    <p role="alert" style="color:#b91c1c;"><strong>エラー:</strong> <%= Rack::Utils.escape_html(@error.to_s) %></p>
   <% end %>
   <% if @success_json %>
     <h2>送信結果（JSON）</h2>
-    <pre style="white-space:pre-wrap;background:#f3f4f6;padding:1rem;border-radius:6px;"><%= @success_json %></pre>
+    <pre style="white-space:pre-wrap;background:#f3f4f6;padding:1rem;border-radius:6px;"><%= Rack::Utils.escape_html(@success_json.to_s) %></pre>
   <% end %>
   <form method="post" action="/debug/mail" style="max-width:36rem;">
     <p>
       <label for="to">To</label><br>
-      <input id="to" name="to" type="email" value="<%= @form_to %>" style="width:100%;box-sizing:border-box;" required>
+      <input id="to" name="to" type="email" value="<%= Rack::Utils.escape_html(@form_to.to_s) %>" style="width:100%;box-sizing:border-box;" required>
     </p>
     <p>
       <label for="subject">Subject（空なら自動で Phase 17 テスト件名）</label><br>
-      <input id="subject" name="subject" type="text" value="<%= @form_subject %>" style="width:100%;box-sizing:border-box;">
+      <input id="subject" name="subject" type="text" value="<%= Rack::Utils.escape_html(@form_subject.to_s) %>" style="width:100%;box-sizing:border-box;">
     </p>
     <p>
       <label for="text">本文（空ならデフォルト英文）</label><br>
-      <textarea id="text" name="text" rows="8" style="width:100%;box-sizing:border-box;"><%= @form_text %></textarea>
+      <textarea id="text" name="text" rows="8" style="width:100%;box-sizing:border-box;"><%= Rack::Utils.escape_html(@form_text.to_s) %></textarea>
     </p>
     <p><button type="submit">送信</button></p>
   </form>

@@ -36,8 +36,9 @@ module Cloudflare
     end
 
     # Workers `env.SEND_EMAIL.send({ to, from, subject, text?, html?, replyTo? })`.
-    # `to` / `from` / `reply_to` accept String, Hash ({ email:, name: }), or Arrays.
-    # At least one of `text:` or `html:` is required.
+    # `to`: String, Array (nested), or Hash with `:email` / `'email'` (display `name` on `to`
+    # recipients is not preserved — only the address string is sent). `from` / `reply_to`:
+    # String or `{ email:, name: }`. At least one of `text:` or `html:` is required.
     def send(to:, from:, subject:, text: nil, html: nil, reply_to: nil)
       js = @js
       err_klass = Cloudflare::Email::Error
@@ -51,18 +52,20 @@ module Cloudflare
 
       payload = build_send_payload(to: to, from: from, subject: subject.to_s, text: text, html: html, reply_to: reply_to)
 
-      `(async function(binding, payload, Kernel, Err) {
+      cf = Cloudflare
+      `(async function(binding, payload, Kernel, Err, cf) {
         try {
           var r = await binding.send(payload);
           if (r == null) return nil;
           var mid = r.messageId != null ? String(r.messageId) : '';
-          return { message_id: mid };
+          var o = {}; o['message_id'] = mid;
+          return cf.$js_object_to_hash(o);
         } catch (e) {
           var code = (e && e.code != null) ? String(e.code) : '';
           var msg = (e && e.message) ? String(e.message) : String(e);
           Kernel.$raise(Err.$new(msg, Opal.hash({ code: code })));
         }
-      })(#{js}, #{payload}, #{Kernel}, #{err_klass})`
+      })(#{js}, #{payload}, #{Kernel}, #{err_klass}, #{cf})`
     end
 
     private

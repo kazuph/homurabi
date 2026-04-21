@@ -2,7 +2,9 @@
 # frozen_string_literal: true
 # Route fragment 66 — demo /debug/mail
   post '/debug/mail' do
-    debug_mail_require_kazuph!
+    gate = debug_mail_gate_response
+    next gate if gate
+
     content_type 'text/html; charset=utf-8'
 
     @title = 'Debug — mail'

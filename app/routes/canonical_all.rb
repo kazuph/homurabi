@@ -1784,10 +1784,6 @@
     erb :layout_docs
   end
   get '/docs', &docs_index_route
-  # Trailing slash: duplicate handler hit Opal/Sinatra edge (1101); canonicalize to /docs
-  get '/docs/' do
-    redirect '/docs', 301
-  end
   get '/docs/quick-start' do
     @title = 'クイックスタート — homurabi Docs'
     @docs_page = 'quick-start'

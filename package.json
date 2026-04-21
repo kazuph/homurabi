@@ -8,7 +8,7 @@
     "build:erb": "ruby gems/cloudflare-workers-runtime/exe/compile-erb --input views --output build/homurabi_templates.rb --namespace HomurabiTemplates",
     "build:assets": "ruby gems/cloudflare-workers-runtime/exe/compile-assets --input public --output build/homurabi_assets.rb --namespace HomurabiAssets",
     "build:opal": "bundle exec cloudflare-workers-build",
-    "build": "bundle exec cloudflare-workers-build",
+    "build": "ruby bin/generate-docs-search-index && bundle exec cloudflare-workers-build",
     "dev": "npm run build && wrangler dev --port 8787 --ip 127.0.0.1",
     "dev:dlq": "npm run build && wrangler dev --env dlq-demo --port 8787 --ip 127.0.0.1",
     "d1:init": "bin/init-local-d1",

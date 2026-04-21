@@ -1,0 +1,34 @@
+<h1>sequel-d1</h1>
+<p>Sequel の <code>:d1</code> アダプタと、Opal / Workers 向けの接続層です。</p>
+
+<h2 id="connect">接続</h2>
+<pre><code>require 'sequel'
+
+DB = nil
+
+get '/users' do
+  DB ||= Sequel.connect(adapter: :d1, d1: env['cloudflare.env'].DB)
+  content_type 'application/json'
+  DB[:users].order(:id).all.__await__.to_json
+end</code></pre>
+<p><code>d1:</code> には <code>prepare(sql)</code> 可能なオブジェクト（D1 の Ruby ラッパ）を渡します。homurabi の <code>/demo/sequel</code> や <code>/posts</code> が実コード例です。</p>
+
+<h2 id="migrate">マイグレーション</h2>
+<pre><code>bundle exec cloudflare-workers-migrate compile db/migrations
+bundle exec cloudflare-workers-migrate apply --database homurabi-db
+bundle exec cloudflare-workers-migrate apply --remote --database homurabi-db</code></pre>
+<p>データベース名は <code>--database</code> または環境変数 <code>CLOUDFLARE_D1_DATABASE</code>。Wrangler バイナリは <code>WRANGLER_BIN</code> または PATH の <code>wrangler</code>。</p>
+
+<h2 id="opal">Opal ビルドパス</h2>
+<p>gem の <code>lib</code> を Opal の <code>-I</code> で <strong>vendor より前</strong>に置く（<code>sequel.rb</code> が vendored 版へフォールバックする順序）。</p>
+<pre><code>-I gems/sequel-d1/lib -I lib -I vendor</code></pre>
+
+<h2 id="matrix">できること / できないこと</h2>
+<table>
+  <thead><tr><th></th><th>できること</th><th>できないこと</th></tr></thead>
+  <tbody>
+    <tr><td>SQL</td><td>SQLite 方言で D1 に送る（<code>Dataset#sql</code> で確認可能）</td><td>PostgreSQL 専用方言をそのまま</td></tr>
+    <tr><td>非同期</td><td><code>Dataset#all</code> 等は Promise → <code>__await__</code> で解決</td><td>同期 MRI と同じ「常に Array」前提</td></tr>
+    <tr><td>マイグレーション</td><td>Ruby マイグレーションを SQL にコンパイルして apply</td><td>AR の schema.rb をそのまま流用</td></tr>
+  </tbody>
+</table>

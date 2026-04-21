@@ -1765,3 +1765,134 @@
       'cases'  => cases
     }.to_json
   end
+  # Phase 16 — self-hosted docs (Cloudflare-style /docs/*)
+  # Mustermann on Opal rejects `^`/`$` in regex routes. Trailing `/docs/` is normalized
+  # to `/docs` in Rack::Handler::CloudflareWorkers.build_rack_env (runtime gem).
+  docs_index_route = lambda do
+    @title = 'ドキュメント — homurabi'
+    @docs_page = 'index'
+    @docs_section = :getting_started
+    @docs_breadcrumb = [
+      ['Docs', '/docs'],
+      ['概要', nil]
+    ]
+    @docs_toc = [
+      %w[hero このサイトについて],
+      %w[gems 3つの gem],
+      %w[next 次のステップ]
+    ]
+    @docs_inner = erb :docs_index
+    erb :layout_docs
+  end
+  get '/docs', &docs_index_route
+  get '/docs/quick-start' do
+    @title = 'クイックスタート — homurabi Docs'
+    @docs_page = 'quick-start'
+    @docs_section = :getting_started
+    @docs_breadcrumb = [
+      ['Docs', '/docs'],
+      ['Getting Started', '/docs'],
+      ['Quick Start', nil]
+    ]
+    @docs_toc = [
+      %w[prereq 前提],
+      %w[scaffold 新規プロジェクト],
+      %w[run-local ローカルで動かす],
+      %w[deploy デプロイ],
+      %w[limits 現在の制限]
+    ]
+    @docs_inner = erb :docs_quick_start
+    erb :layout_docs
+  end
+  get '/docs/migration' do
+    @title = '移行ガイド — homurabi Docs'
+    @docs_page = 'migration'
+    @docs_section = :guides
+    @docs_breadcrumb = [
+      ['Docs', '/docs'],
+      ['Migration Guide', nil]
+    ]
+    @docs_toc = [
+      %w[scope 対象と非対象],
+      %w[steps 6 ステップ],
+      %w[gotchas よくあるハマり],
+      %w[blockers 移行が難しい例]
+    ]
+    @docs_inner = erb :docs_migration
+    erb :layout_docs
+  end
+  get '/docs/sinatra' do
+    @title = 'sinatra-cloudflare-workers — homurabi Docs'
+    @docs_page = 'sinatra'
+    @docs_section = :reference
+    @docs_breadcrumb = [
+      ['Docs', '/docs'],
+      ['API Reference', '/docs/runtime'],
+      ['sinatra-cloudflare-workers', nil]
+    ]
+    @docs_toc = [
+      %w[overview 概要],
+      %w[register 登録と require],
+      %w[erb ERB プリコンパイル],
+      %w[jwt JWT],
+      %w[scheduled Cron],
+      %w[queue Queues],
+      %w[matrix できること / できないこと]
+    ]
+    @docs_inner = erb :docs_sinatra
+    erb :layout_docs
+  end
+  get '/docs/sequel-d1' do
+    @title = 'sequel-d1 — homurabi Docs'
+    @docs_page = 'sequel-d1'
+    @docs_section = :reference
+    @docs_breadcrumb = [
+      ['Docs', '/docs'],
+      ['API Reference', '/docs/runtime'],
+      ['sequel-d1', nil]
+    ]
+    @docs_toc = [
+      %w[connect 接続],
+      %w[migrate マイグレーション],
+      %w[opal Opal ビルドパス],
+      %w[matrix できること / できないこと]
+    ]
+    @docs_inner = erb :docs_sequel_d1
+    erb :layout_docs
+  end
+  get '/docs/runtime' do
+    @title = 'cloudflare-workers-runtime — homurabi Docs'
+    @docs_page = 'runtime'
+    @docs_section = :reference
+    @docs_breadcrumb = [
+      ['Docs', '/docs'],
+      ['API Reference', '/docs/runtime'],
+      ['cloudflare-workers-runtime', nil]
+    ]
+    @docs_toc = [
+      %w[role 役割],
+      %w[build ビルド CLI],
+      %w[entrypoint worker.entrypoint.mjs],
+      %w[matrix できること / できないこと]
+    ]
+    @docs_inner = erb :docs_runtime
+    erb :layout_docs
+  end
+  get '/docs/architecture' do
+    @title = 'アーキテクチャ — homurabi Docs'
+    @docs_page = 'architecture'
+    @docs_section = :architecture
+    @docs_breadcrumb = [
+      ['Docs', '/docs'],
+      ['Architecture', nil]
+    ]
+    @docs_toc = [
+      %w[self-host セルフホスト],
+      %w[gems 3 gem の関係],
+      %w[pipeline ビルドパイプライン],
+      %w[history Phase 15 の整理],
+      %w[diagram 依存関係 (Mermaid)]
+    ]
+    @docs_inner = erb :docs_architecture
+    erb :layout_docs
+  end

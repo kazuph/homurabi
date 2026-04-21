@@ -2,3 +2,4 @@
 # frozen_string_literal: true
 # Route fragment 58 — demo /docs
   get '/docs', &docs_index_route
+  # Trailing slash: duplicate handler hit Opal/Sinatra edge (1101); canonicalize to /docs

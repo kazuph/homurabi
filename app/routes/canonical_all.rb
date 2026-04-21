@@ -1896,3 +1896,91 @@
     @docs_inner = erb :docs_architecture
     erb :layout_docs
   end
+  # Phase 17 — Cloudflare Email Service (SEND_EMAIL) manual test
+  get '/debug/mail' do
+    debug_mail_require_kazuph!
+    @title = 'Debug — mail'
+    @mail_from = homurabi_mail_from
+    @form_to = (params['to'] || 'kazu.homma@gmail.com').to_s
+    @form_subject = params['subject'].to_s
+    @form_text = params['text'].to_s
+    erb :debug_mail
+  end
+
+  post '/debug/mail' do
+    debug_mail_require_kazuph!
+    content_type 'text/html; charset=utf-8'
+
+    @title = 'Debug — mail'
+    @mail_from = homurabi_mail_from
+    @form_to = params['to'].to_s.strip
+    @form_subject = params['subject'].to_s.strip
+    @form_text = params['text'].to_s
+
+    final_to = @form_to.empty? ? 'kazu.homma@gmail.com' : @form_to
+
+    if homurabi_mail_from.empty?
+      @error = 'HOMURABI_MAIL_FROM が未設定です。ドメイン onboarding 後に wrangler [vars] で verified の送信元アドレスを設定してください。'
+      return erb :debug_mail
+    end
+
+    mail = send_email
+    unless mail&.available?
+      @error = 'SEND_EMAIL バインディングが利用できません（wrangler.toml の [[send_email]] を確認）。'
+      return erb :debug_mail
+    end
+
+    vid = env['HTTP_CF_RAY'].to_s.split('-').first
+    vid = Time.now.to_i.to_s if vid.nil? || vid.empty?
+    subject_line =
+      if @form_subject.empty?
+        "homurabi Phase 17 test — #{vid}"
+      else
+        "#{@form_subject} — #{vid}"
+      end
+
+    body_text =
+      if @form_text.strip.empty?
+        'This is a test mail from homurabi'
+      else
+        @form_text
+      end
+
+    begin
+      result = mail.send(to: final_to, from: homurabi_mail_from, subject: subject_line, text: body_text).__await__
+      rid = result && (result[:message_id] || result['message_id'])
+      @success_json = JSON.pretty_generate({
+        'ok'           => true,
+        'message_id'   => rid,
+        'to'           => final_to,
+        'from'         => homurabi_mail_from,
+        'subject'      => subject_line
+      })
+    rescue Cloudflare::Email::Error => e
+      code = e.code.to_s
+      @error = "#{code}: #{e.message}".strip
+    end
+
+    erb :debug_mail
+  end
+
+  get '/docs/email' do
+    @title = 'Cloudflare Email Service — homurabi Docs'
+    @docs_page = 'email'
+    @docs_section = :reference
+    @docs_breadcrumb = [
+      ['Docs', '/docs'],
+      ['API Reference', '/docs/runtime'],
+      ['Email Service', nil]
+    ]
+    @docs_toc = [
+      %w[overview 概要],
+      %w[setup domain onboarding],
+      %w[wrapper Cloudflare::Email],
+      %w[matrix できること / できないこと],
+      %w[debug /debug/mail],
+      %w[links 公式リンク]
+    ]
+    @docs_inner = erb :docs_email
+    erb :layout_docs
+  end

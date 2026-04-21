@@ -34,6 +34,7 @@ require 'sequel'
 
 require_relative 'helpers/session_cookie'
 require_relative 'helpers/chat_history'
+require_relative 'helpers/debug_mail'
 require_relative 'helpers/markdown_render'
 
 class App < Sinatra::Base
@@ -164,7 +165,11 @@ class App < Sinatra::Base
   SESSION_COOKIE_TTL  = 86_400
   SESSION_COOKIE_NAME = 'homurabi_session'
 
+  # Phase 17 — production /debug/mail gate (session username must match).
+  DEBUG_MAIL_ADMIN_USERNAME = 'kazuph'
+
   include Homurabi::SessionCookieInstanceMethods
+  helpers Homurabi::DebugMailHelpers
 
   # GET /login — simple demo login form. Any non-empty username
   # mints an HMAC-signed session cookie carrying `username:exp`.

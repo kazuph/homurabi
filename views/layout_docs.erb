@@ -11,8 +11,19 @@
 @media (prefers-color-scheme: dark) {
   :root { --docs-border: #374151; --docs-muted: #9ca3af; --docs-bg: #111827; --docs-text: #f3f4f6; }
 }
-body.docs-body { margin: 0; width: 100%; box-sizing: border-box; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: var(--docs-bg); color: var(--docs-text); line-height: 1.6; }
-.docs-topbar { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; padding: 0.6rem clamp(1rem, 4vw, 3rem); border-bottom: 1px solid var(--docs-border); background: var(--docs-bg); position: sticky; top: 0; z-index: 30; width: 100%; box-sizing: border-box; }
+/* public/style.css の `body { max-width: 42em; margin: 3em auto; }` を docs だけ無効化（詳細度・上書き漏れ防止に !important） */
+body.docs-body {
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 100%;
+  box-sizing: border-box;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  background: var(--docs-bg);
+  color: var(--docs-text);
+  line-height: 1.6;
+}
+.docs-topbar { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; padding: 0.6rem 1rem; border-bottom: 1px solid var(--docs-border); background: var(--docs-bg); position: sticky; top: 0; z-index: 30; width: 100%; max-width: 1440px; margin: 0 auto; box-sizing: border-box; }
 .docs-brand { font-weight: 700; color: var(--cf-orange); text-decoration: none; }
 .docs-brand small { color: var(--docs-muted); font-weight: 400; margin-left: 0.35rem; }
 .docs-topbar a { color: inherit; text-decoration: none; }
@@ -20,15 +31,14 @@ body.docs-body { margin: 0; width: 100%; box-sizing: border-box; font-family: sy
 .docs-search-wrap { flex: 1; min-width: 140px; max-width: 320px; display: flex; align-items: center; gap: 0.35rem; }
 .docs-search-wrap input { flex: 1; padding: 0.35rem 0.5rem; border: 1px solid var(--docs-border); border-radius: 6px; background: transparent; color: inherit; font-size: 0.9rem; }
 .docs-kbd { font-size: 0.7rem; color: var(--docs-muted); border: 1px solid var(--docs-border); border-radius: 4px; padding: 0.1rem 0.35rem; }
-.docs-shell { display: grid; grid-template-columns: minmax(200px, 240px) minmax(0, 1fr) minmax(160px, 220px); gap: 0 1.5rem; width: 100%; max-width: 100%; margin: 0 auto; min-height: calc(100vh - 52px); padding: 0 clamp(1rem, 4vw, 3rem); box-sizing: border-box; }
+.docs-shell { display: grid; grid-template-columns: minmax(200px, 240px) minmax(0, 1fr) minmax(160px, 220px); gap: 0 1.5rem; width: 100%; max-width: 1440px; margin: 0 auto; min-height: calc(100vh - 52px); padding: 0 1rem; box-sizing: border-box; }
 .docs-nav { border-right: 1px solid var(--docs-border); padding: 1rem 0.75rem; position: sticky; top: 52px; align-self: start; max-height: calc(100vh - 52px); overflow-y: auto; background: var(--docs-bg); }
 .docs-nav h3 { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--docs-muted); margin: 1rem 0 0.4rem; }
 .docs-nav h3:first-child { margin-top: 0; }
 .docs-nav a { display: block; padding: 0.25rem 0.5rem; border-radius: 4px; color: inherit; text-decoration: none; font-size: 0.9rem; }
 .docs-nav a:hover { background: rgba(246, 130, 31, 0.08); }
 .docs-nav a.docs-nav-active { color: var(--cf-orange); font-weight: 600; }
-/* 中央列いっぱいに使う（旧 720px + center で右に無駄なデッドゾーンが出ないように） */
-.docs-main { padding: 1.25rem 0 3rem; width: 100%; min-width: 0; justify-self: stretch; max-width: min(56rem, 100%); margin-right: auto; }
+.docs-main { padding: 1.25rem 0 3rem; width: 100%; min-width: 0; justify-self: center; max-width: min(1000px, 100%); box-sizing: border-box; }
 .docs-main h1 { font-size: 1.75rem; margin-top: 0; line-height: 1.25; }
 .docs-main h2 { font-size: 1.2rem; margin-top: 2rem; padding-top: 0.5rem; border-top: 1px solid var(--docs-border); }
 .docs-main h2:first-of-type { border-top: 0; margin-top: 0.5rem; }

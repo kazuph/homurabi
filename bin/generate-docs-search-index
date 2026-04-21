@@ -1,0 +1,37 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+# Builds public/docs-search-index.json from views/docs_*.erb headings (h2/h3 id=).
+
+require 'json'
+require 'pathname'
+
+ROOT = Pathname.new(__dir__).join('..').expand_path
+VIEWS = ROOT.join('views')
+OUT = ROOT.join('public', 'docs-search-index.json')
+
+PAGES = [
+  { file: 'docs_index.erb', path: '/docs', title: '概要' },
+  { file: 'docs_quick_start.erb', path: '/docs/quick-start', title: 'Quick Start' },
+  { file: 'docs_migration.erb', path: '/docs/migration', title: 'Migration' },
+  { file: 'docs_sinatra.erb', path: '/docs/sinatra', title: 'sinatra-cloudflare-workers' },
+  { file: 'docs_sequel_d1.erb', path: '/docs/sequel-d1', title: 'sequel-d1' },
+  { file: 'docs_runtime.erb', path: '/docs/runtime', title: 'cloudflare-workers-runtime' },
+  { file: 'docs_architecture.erb', path: '/docs/architecture', title: 'Architecture' }
+].freeze
+
+entries = []
+PAGES.each do |meta|
+  src = VIEWS.join(meta[:file])
+  next unless src.file?
+
+  text = File.read(src)
+  text.scan(/<h[23][^>]*\sid="([^"]+)"[^>]*>\s*([^<]+)/) do |id, title|
+    t = title.strip.gsub(/\s+/, ' ')
+    kw = "#{meta[:title]} #{t}"
+    entries << { 't' => "#{meta[:title]} — #{t}", 'h' => "#{meta[:path]}##{id}", 'k' => kw }
+  end
+end
+
+OUT.dirname.mkpath
+File.write(OUT, JSON.pretty_generate(entries) + "\n")
+puts "Wrote #{OUT} (#{entries.size} anchors)"

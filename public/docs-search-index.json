@@ -1,0 +1,157 @@
+[
+  {
+    "t": "概要 — 3 つの gem",
+    "h": "/docs#gems",
+    "k": "概要 3 つの gem"
+  },
+  {
+    "t": "概要 — 次のステップ",
+    "h": "/docs#next",
+    "k": "概要 次のステップ"
+  },
+  {
+    "t": "Quick Start — 前提",
+    "h": "/docs/quick-start#prereq",
+    "k": "Quick Start 前提"
+  },
+  {
+    "t": "Quick Start — 新規プロジェクト",
+    "h": "/docs/quick-start#scaffold",
+    "k": "Quick Start 新規プロジェクト"
+  },
+  {
+    "t": "Quick Start — ローカルで動かす",
+    "h": "/docs/quick-start#run-local",
+    "k": "Quick Start ローカルで動かす"
+  },
+  {
+    "t": "Quick Start — デプロイ",
+    "h": "/docs/quick-start#deploy",
+    "k": "Quick Start デプロイ"
+  },
+  {
+    "t": "Quick Start — 現在の制限",
+    "h": "/docs/quick-start#limits",
+    "k": "Quick Start 現在の制限"
+  },
+  {
+    "t": "Migration — 対象と非対象",
+    "h": "/docs/migration#scope",
+    "k": "Migration 対象と非対象"
+  },
+  {
+    "t": "Migration — 6 ステップ（推奨順）",
+    "h": "/docs/migration#steps",
+    "k": "Migration 6 ステップ（推奨順）"
+  },
+  {
+    "t": "Migration — よくあるハマりポイント",
+    "h": "/docs/migration#gotchas",
+    "k": "Migration よくあるハマりポイント"
+  },
+  {
+    "t": "Migration — 動かない・優先度を下げる例",
+    "h": "/docs/migration#blockers",
+    "k": "Migration 動かない・優先度を下げる例"
+  },
+  {
+    "t": "sinatra-cloudflare-workers — 概要",
+    "h": "/docs/sinatra#overview",
+    "k": "sinatra-cloudflare-workers 概要"
+  },
+  {
+    "t": "sinatra-cloudflare-workers — 登録と require",
+    "h": "/docs/sinatra#register",
+    "k": "sinatra-cloudflare-workers 登録と require"
+  },
+  {
+    "t": "sinatra-cloudflare-workers — ERB プリコンパイル",
+    "h": "/docs/sinatra#erb",
+    "k": "sinatra-cloudflare-workers ERB プリコンパイル"
+  },
+  {
+    "t": "sinatra-cloudflare-workers — JWT（Sinatra::JwtAuth）",
+    "h": "/docs/sinatra#jwt",
+    "k": "sinatra-cloudflare-workers JWT（Sinatra::JwtAuth）"
+  },
+  {
+    "t": "sinatra-cloudflare-workers — Cron（Sinatra::Scheduled）",
+    "h": "/docs/sinatra#scheduled",
+    "k": "sinatra-cloudflare-workers Cron（Sinatra::Scheduled）"
+  },
+  {
+    "t": "sinatra-cloudflare-workers — Queues（Sinatra::Queue）",
+    "h": "/docs/sinatra#queue",
+    "k": "sinatra-cloudflare-workers Queues（Sinatra::Queue）"
+  },
+  {
+    "t": "sinatra-cloudflare-workers — できること / できないこと",
+    "h": "/docs/sinatra#matrix",
+    "k": "sinatra-cloudflare-workers できること / できないこと"
+  },
+  {
+    "t": "sequel-d1 — 接続",
+    "h": "/docs/sequel-d1#connect",
+    "k": "sequel-d1 接続"
+  },
+  {
+    "t": "sequel-d1 — マイグレーション",
+    "h": "/docs/sequel-d1#migrate",
+    "k": "sequel-d1 マイグレーション"
+  },
+  {
+    "t": "sequel-d1 — Opal ビルドパス",
+    "h": "/docs/sequel-d1#opal",
+    "k": "sequel-d1 Opal ビルドパス"
+  },
+  {
+    "t": "sequel-d1 — できること / できないこと",
+    "h": "/docs/sequel-d1#matrix",
+    "k": "sequel-d1 できること / できないこと"
+  },
+  {
+    "t": "cloudflare-workers-runtime — 役割",
+    "h": "/docs/runtime#role",
+    "k": "cloudflare-workers-runtime 役割"
+  },
+  {
+    "t": "cloudflare-workers-runtime — ビルド CLI",
+    "h": "/docs/runtime#build",
+    "k": "cloudflare-workers-runtime ビルド CLI"
+  },
+  {
+    "t": "cloudflare-workers-runtime — worker.entrypoint.mjs",
+    "h": "/docs/runtime#entrypoint",
+    "k": "cloudflare-workers-runtime worker.entrypoint.mjs"
+  },
+  {
+    "t": "cloudflare-workers-runtime — できること / できないこと",
+    "h": "/docs/runtime#matrix",
+    "k": "cloudflare-workers-runtime できること / できないこと"
+  },
+  {
+    "t": "Architecture — セルフホスト",
+    "h": "/docs/architecture#self-host",
+    "k": "Architecture セルフホスト"
+  },
+  {
+    "t": "Architecture — 3 gem の関係",
+    "h": "/docs/architecture#gems",
+    "k": "Architecture 3 gem の関係"
+  },
+  {
+    "t": "Architecture — ビルドパイプライン",
+    "h": "/docs/architecture#pipeline",
+    "k": "Architecture ビルドパイプライン"
+  },
+  {
+    "t": "Architecture — Phase 15 の整理",
+    "h": "/docs/architecture#history",
+    "k": "Architecture Phase 15 の整理"
+  },
+  {
+    "t": "Architecture — 依存関係（Mermaid）",
+    "h": "/docs/architecture#diagram",
+    "k": "Architecture 依存関係（Mermaid）"
+  }
+]

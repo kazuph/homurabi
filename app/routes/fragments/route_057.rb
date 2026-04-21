@@ -118,3 +118,22 @@
       'cases'  => cases
     }.to_json
   end
+  # Phase 16 — self-hosted docs (Cloudflare-style /docs/*)
+  # Mustermann on Opal rejects `^`/`$` in regex routes. Trailing `/docs/` is normalized
+  # to `/docs` in Rack::Handler::CloudflareWorkers.build_rack_env (runtime gem).
+  docs_index_route = lambda do
+    @title = 'ドキュメント — homurabi'
+    @docs_page = 'index'
+    @docs_section = :getting_started
+    @docs_breadcrumb = [
+      ['Docs', '/docs'],
+      ['概要', nil]
+    ]
+    @docs_toc = [
+      %w[hero このサイトについて],
+      %w[gems 3つの gem],
+      %w[next 次のステップ]
+    ]
+    @docs_inner = erb :docs_index
+    erb :layout_docs
+  end

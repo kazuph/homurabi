@@ -1,0 +1,28 @@
+<section class="docs-hero" id="hero">
+  <span class="docs-badge">Self-hosted — このサイトがそのままデモです</span>
+  <h1>Run plain Sinatra on Cloudflare Workers</h1>
+  <p>homurabi は Opal でコンパイルした <strong>素の Sinatra</strong> を Cloudflare Workers 上で動かすデモ兼ドキュメントです。あなたが今読んでいるページも、リポジトリの <code>app/</code> と 3 つの gem でホストされています。</p>
+</section>
+
+<h2 id="gems">3 つの gem</h2>
+<div class="docs-cards">
+  <div class="docs-card">
+    <h3>cloudflare-workers-runtime</h3>
+    <p>Opal ビルド、<code>worker.entrypoint.mjs</code> 生成、Rack／バインディングの土台。</p>
+  </div>
+  <div class="docs-card">
+    <h3>sinatra-cloudflare-workers</h3>
+    <p>Sinatra 向けパッチ、JWT / Cron / Queue 拡張、ERB プリコンパイル連携。</p>
+  </div>
+  <div class="docs-card">
+    <h3>sequel-d1</h3>
+    <p><code>Sequel.connect(adapter: :d1, …)</code> と <code>cloudflare-workers-migrate</code>。</p>
+  </div>
+</div>
+
+<h2 id="next">次のステップ</h2>
+<p>新規プロジェクトなら Quick Start、既存 Sinatra からの移行なら Migration Guide を参照してください。</p>
+<div class="docs-cta-row">
+  <a class="docs-cta" href="/docs/quick-start">5 min Quick Start →</a>
+  <a class="docs-cta secondary" href="/docs/migration">Migrate existing app →</a>
+</div>

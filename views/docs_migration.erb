@@ -1,0 +1,42 @@
+<h1>既存 Sinatra → Cloudflare Workers 移行</h1>
+<p>homurabi 本体（<code>app/app.rb</code> + <code>app/routes/canonical_all.rb</code>）が実際に踏んでいるパターンに基づきます。誇張せず、<strong>このスタックで動作確認済みの範囲</strong>だけを書きます。</p>
+
+<h2 id="scope">対象と非対象</h2>
+<h3>向いているもの</h3>
+<ul>
+  <li>Sinatra 4.2 系で、ルートが DSL（<code>get</code> / <code>post</code> 等）中心のアプリ。</li>
+  <li>DB を D1 + Sequel に寄せられる（または API のみで D1 不要）。</li>
+  <li>テンプレートを ERB のままビルド時プリコンパイルできる。</li>
+</ul>
+<h3>厳しいもの（早期に見送り判断）</h3>
+<ul>
+  <li>ActiveRecord 前提の複雑なモデル層、多数の Rack ミドルウェア、サーバー側 <code>File.read</code> 前提のテンプレート運用。</li>
+  <li>Puma / Unicorn 専用に深く依存した起動フック。</li>
+</ul>
+
+<h2 id="steps">6 ステップ（推奨順）</h2>
+<ol>
+  <li><strong>Gemfile</strong>: <code>opal</code>（path 固定）、<code>cloudflare-workers-runtime</code>、<code>sinatra-cloudflare-workers</code> を追加。D1 を使うなら <code>sequel-d1</code> と vendored <code>sequel</code> パスを README どおりに。</li>
+  <li><strong>エントリ</strong>: <code>app.rb</code>（またはメイン定義ファイル）の先頭付近に <code># await:</code> マジックコメントを付与（JWT / D1 / fetch など非同期が混ざるファイルは必須。Phase 15-C 教訓）。続けて <code>require 'sinatra/cloudflare_workers'</code>。</li>
+  <li><strong>ルート</strong>: 既存の <code>get</code> / <code>post</code> を可能な限りそのまま移植。Sinatra の DSL は互換パッチ側で吸収。</li>
+  <li><strong>DB</strong>: <code>Sequel.connect(adapter: :d1, d1: env['cloudflare.env'].DB)</code> の形へ。マイグレーションは <code>bundle exec cloudflare-workers-migrate compile db/migrations</code> → <code>apply</code>（<code>sequel-d1</code> README 参照）。</li>
+  <li><strong>ビュー</strong>: <code>bundle exec cloudflare-workers-erb-compile --input views --output build/templates.rb --namespace …</code>（プロジェクトの Rake / npm に合わせる）。</li>
+  <li><strong>Workers 向けビルド</strong>: <code>bundle exec cloudflare-workers-build</code>（または <code>--standalone</code>）で <code>build/worker.entrypoint.mjs</code> を生成し、<code>wrangler.toml</code> の <code>main</code> と一致させて <code>wrangler deploy</code>。</li>
+</ol>
+
+<h2 id="gotchas">よくあるハマりポイント</h2>
+<ul>
+  <li><strong><code># await:</code></strong>: ルート内で <code>__await__</code> が必要なのにマジックコメントが無いと、Promise がそのまま残って 1101 等で落ちます。</li>
+  <li><strong>同期 FS</strong>: Workers ではリクエスト処理中の <code>File.read</code> は使えません。ERB／アセットはビルド時に埋め込み。</li>
+  <li><strong>require パス</strong>: <code>vendor/</code> や gem <code>lib</code> を Opal の <code>-I</code> に載せる順序が重要（<code>sequel-d1</code> README のとおり <code>gems/sequel-d1/lib</code> を <code>vendor</code> より前）。</li>
+  <li><strong>direct eval</strong>: Opal の制約へはビルド後 <code>patch-opal-evals.mjs</code> が自動適用（<code>cloudflare-workers-build</code> パイプライン）。</li>
+  <li><strong>起動 CPU</strong>: 重い定数初期化はリクエストをまたぐとタイムアウトしやすい。homurabi では分割・遅延初期化で対処済みの箇所あり（具体値は本番計測に依存）。</li>
+  <li><strong>Cookie セッション</strong>: 本リポジトリの <code>/login</code> は署名クッキー方式。JWT も別ルートで利用可能。</li>
+</ul>
+
+<h2 id="blockers">動かない・優先度を下げる例</h2>
+<ul>
+  <li>リクエスト中にローカルファイルキャッシュへ何度も読みに行く設計。</li>
+  <li>巨大な gem をそのまま <code>require</code> し、Opal 未対応のネイティブ拡張に依存している。</li>
+  <li>WebSocket やストリーミングが必須だが、Workers 側の制約と握れていない（別途検証が必要）。</li>
+</ul>

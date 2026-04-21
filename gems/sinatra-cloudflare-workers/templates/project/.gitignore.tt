@@ -1,0 +1,6 @@
+/vendor/bundle
+/node_modules
+/build
+/.wrangler
+.env
+*.log

@@ -21,8 +21,8 @@ Gem::Specification.new do |spec|
   end
   spec.require_paths = ['lib']
   spec.bindir = 'bin'
-  spec.executables = ['cloudflare-workers-erb-compile']
+  spec.executables = %w[cloudflare-workers-erb-compile cloudflare-workers-new]
 
   spec.add_runtime_dependency 'cloudflare-workers-runtime', '>= 0.1'
-  spec.add_runtime_dependency 'opal', '>= 1.8.3.rc1', '< 2'
+  spec.add_runtime_dependency 'opal', '= 1.8.3.rc1'
 end

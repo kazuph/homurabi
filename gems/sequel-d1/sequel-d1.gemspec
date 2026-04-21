@@ -26,7 +26,7 @@ Gem::Specification.new do |spec|
   spec.executables = ['cloudflare-workers-migrate']
 
   spec.add_runtime_dependency 'cloudflare-workers-runtime', '>= 0.1'
-  spec.add_runtime_dependency 'opal', '>= 1.8.3.rc1', '< 2'
+  spec.add_runtime_dependency 'opal', '= 1.8.3.rc1'
   spec.add_runtime_dependency 'sequel', '~> 5.0'
   spec.add_runtime_dependency 'sqlite3', '>= 2.0'
 end

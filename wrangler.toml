@@ -37,6 +37,11 @@ bucket_name = "homurabi-bucket"
 [ai]
 binding = "AI"
 
+# Phase 17 — Cloudflare Email Service (Agents Week 2026 public beta).
+# Routes use `env['cloudflare.SEND_EMAIL']` → Cloudflare::Email wrapping `env.SEND_EMAIL`.
+[[send_email]]
+name = "SEND_EMAIL"
+
 # Phase 7: gating for the educational crypto routes (`/test/crypto`,
 # `/demo/crypto`). Default OFF — those routes generate fresh RSA keys
 # and run PBKDF2 per request, so leaving them open in production is a
@@ -70,6 +75,8 @@ HOMURABI_ENABLE_SCHEDULED_DEMOS = "0"
 # external JSON API (ipify) and writes to R2 under phase11a/, so we
 # keep the pattern: default OFF, flip to "1" only in dev.
 HOMURABI_ENABLE_FOUNDATIONS_DEMOS = "0"
+# Phase 17 — verified From address after Email Service domain onboarding (`HOMURABI_MAIL_FROM`).
+HOMURABI_MAIL_FROM = ""
 
 # Phase 9 — Cloudflare Workers Cron Triggers.
 #
@@ -176,6 +183,7 @@ HOMURABI_ENABLE_CRYPTO_DEMOS = "0"
 HOMURABI_ENABLE_AI_DEMOS = "0"
 HOMURABI_ENABLE_BINDING_DEMOS = "0"
 HOMURABI_ENABLE_SCHEDULED_DEMOS = "0"
+HOMURABI_MAIL_FROM = ""
 
 [[env.dlq-demo.d1_databases]]
 binding = "DB"
@@ -192,6 +200,9 @@ bucket_name = "homurabi-bucket"
 
 [env.dlq-demo.ai]
 binding = "AI"
+
+[[env.dlq-demo.send_email]]
+name = "SEND_EMAIL"
 
 [[env.dlq-demo.durable_objects.bindings]]
 name       = "COUNTER"

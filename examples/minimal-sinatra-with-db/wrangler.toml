@@ -2,7 +2,7 @@
 # Replace database_id with your D1 UUID from `wrangler d1 create`.
 
 name = "minimal-sinatra-with-db-example"
-main = "../../gems/cloudflare-workers-runtime/runtime/worker.mjs"
+main = "../../build/worker.entrypoint.mjs"
 compatibility_date = "2026-04-15"
 compatibility_flags = ["nodejs_compat"]
 

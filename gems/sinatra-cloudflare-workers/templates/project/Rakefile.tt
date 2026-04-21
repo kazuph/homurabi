@@ -1,0 +1,8 @@
+# frozen_string_literal: true
+task default: :build
+
+desc 'Opal + Workers bundle'
+task :build do
+  ok = system('bundle', 'exec', 'cloudflare-workers-build', '--standalone')
+  exit 1 unless ok
+end

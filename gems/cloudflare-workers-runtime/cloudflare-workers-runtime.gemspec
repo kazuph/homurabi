@@ -20,10 +20,12 @@ Gem::Specification.new do |spec|
   spec.metadata['source_code_uri'] = "#{spec.homepage}/tree/main/gems/cloudflare-workers-runtime"
 
   spec.files = Dir.chdir(__dir__) do
-    Dir['lib/**/*', 'runtime/**/*', 'README.md', 'CHANGELOG.md'].select { |f| File.file?(f) }
+    Dir['lib/**/*', 'runtime/**/*', 'exe/**/*', 'bin/*', 'docs/**/*', 'README.md', 'CHANGELOG.md'].select { |f| File.file?(f) }
   end
   spec.require_paths = ['lib']
+  spec.bindir = 'bin'
+  spec.executables = ['cloudflare-workers-build']
 
-  # Consumers compile with Opal; keep a lower bound aligned with homurabi (1.8.3.rc1).
-  spec.add_runtime_dependency 'opal', '>= 1.8.3.rc1', '< 2'
+  # Exact pin: homurabi verifies against vendor/opal-gem 1.8.3.rc1 (Ruby 3.4); rubygems.org lists 1.8.2 only.
+  spec.add_runtime_dependency 'opal', '= 1.8.3.rc1'
 end

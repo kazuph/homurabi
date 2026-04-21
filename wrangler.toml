@@ -2,7 +2,7 @@
 # Real Ruby + Rack + Sinatra on Cloudflare Workers via Opal.
 
 name = "homurabi"
-main = "gems/cloudflare-workers-runtime/runtime/worker.mjs"
+main = "build/worker.entrypoint.mjs"
 compatibility_date = "2026-04-15"
 compatibility_flags = ["nodejs_compat"]
 

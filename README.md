@@ -8,6 +8,8 @@
 
 Live demo: **<https://homurabi.kazu-san.workers.dev>**
 
+**Phase 15-E** — The three gems (`cloudflare-workers-runtime`, `sinatra-cloudflare-workers`, `sequel-d1`) are **push-ready** as `gem build` artifacts; consumer flow is `gem install --local` (order: opal → runtime → sinatra → sequel-d1), then plain `cloudflare-workers-new myapp` and `bundle exec cloudflare-workers-build`. Entry topology is documented in [`gems/cloudflare-workers-runtime/docs/ARCHITECTURE.md`](gems/cloudflare-workers-runtime/docs/ARCHITECTURE.md). `wrangler.toml` `main` points at **`build/worker.entrypoint.mjs`**.
+
 ---
 
 ## Phase 10 hero — Sinatra `/chat` × Workers AI (Gemma 4 + gpt-oss-120b)

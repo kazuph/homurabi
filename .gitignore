@@ -9,8 +9,9 @@ node_modules/
 .wrangler/
 .dev.vars
 
-# Opal build outputs
-build/
+# Opal build outputs (keep generated Workers entry tracked for wrangler main)
+build/**
+!build/worker.entrypoint.mjs
 dist/
 *.opal.js
 *.opal.mjs

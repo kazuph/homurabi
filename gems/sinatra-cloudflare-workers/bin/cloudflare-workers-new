@@ -47,13 +47,14 @@ abort "cloudflare-workers-new: missing #{sin}" unless sin.directory?
 abort "cloudflare-workers-new: missing #{seq}" if options[:with_db] && !seq.directory?
 
 target = Pathname(app_name).expand_path
+app_slug = target.basename.to_s
 abort "cloudflare-workers-new: #{target} already exists" if target.exist?
 
 tpl_root = sinatra_gem_dir.join('templates/project')
 abort "cloudflare-workers-new: templates missing #{tpl_root}" unless tpl_root.directory?
 
 locals = {
-  app_name: app_name,
+  app_name: app_slug,
   opal_path: opal.to_s,
   runtime_path: rt.to_s,
   sinatra_path: sin.to_s,

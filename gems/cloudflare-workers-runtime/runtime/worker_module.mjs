@@ -75,6 +75,30 @@ function binaryArrayBufferToLatin1String(arrayBuffer) {
   return parts.join("");
 }
 
+// Module Worker `fetch` and Durable Object HTTP `fetch` must use the same body
+// semantics: multipart/form-data uses arrayBuffer + latin1 (Phase 11A), not UTF-8 text().
+async function readBodyTextForRubyDispatcher(request) {
+  const method = (request && request.method ? request.method : "GET").toUpperCase();
+  if (method === "GET" || method === "HEAD" || method === "OPTIONS") {
+    return { bodyText: "" };
+  }
+  try {
+    const contentType = request.headers.get("content-type") || "";
+    if (contentType.toLowerCase().includes("multipart/")) {
+      const buf = await request.arrayBuffer();
+      return { bodyText: binaryArrayBufferToLatin1String(buf) };
+    }
+    return { bodyText: await request.text() };
+  } catch (err) {
+    return {
+      bodyReadError: new Response(
+        JSON.stringify({ error: "failed to read request body", detail: err.message }),
+        { status: 400, headers: { "content-type": "application/json" } },
+      ),
+    };
+  }
+}
+
 export default {
   async fetch(request, env, ctx) {
     const dispatch = rackDispatch();
@@ -91,35 +115,12 @@ export default {
     // (GET, HEAD, OPTIONS by spec) we skip the read entirely to avoid
     // wasting a round-trip.
     //
-    // Phase 11A: multipart/form-data bodies MUST be read as bytes, not
-    // as UTF-8 text, or file uploads get mangled the moment any byte
-    // outside the ASCII range appears. Use `arrayBuffer()` and convert
-    // to a latin1 String (1 char = 1 byte) so Opal keeps the bytes
-    // intact. `Cloudflare::Multipart.parse` decodes that back into an
-    // UploadedFile whose `#to_uint8_array` returns a real Uint8Array
-    // suitable for R2.put / fetch body.
-    let bodyText = "";
-    const method = request.method.toUpperCase();
-    if (method !== "GET" && method !== "HEAD" && method !== "OPTIONS") {
-      try {
-        const contentType = request.headers.get("content-type") || "";
-        if (contentType.toLowerCase().includes("multipart/")) {
-          const buf = await request.arrayBuffer();
-          bodyText = binaryArrayBufferToLatin1String(buf);
-        } else {
-          bodyText = await request.text();
-        }
-      } catch (err) {
-        // Body read failure is a client error — surface it explicitly
-        // instead of silently falling through with an empty string.
-        return new Response(
-          JSON.stringify({ error: "failed to read request body", detail: err.message }),
-          { status: 400, headers: { "content-type": "application/json" } },
-        );
-      }
+    const bodyResult = await readBodyTextForRubyDispatcher(request);
+    if (bodyResult.bodyReadError) {
+      return bodyResult.bodyReadError;
     }
 
-    return dispatch(request, env, ctx, bodyText);
+    return dispatch(request, env, ctx, bodyResult.bodyText);
   },
 
   // Phase 9 — Cloudflare Workers Cron Triggers entry point.
@@ -236,13 +237,13 @@ export default {
 
 async function __homurabiForwardDO(class_name, state, env, request) {
   // Pre-await the request body so the Ruby dispatcher (which runs
-  // synchronously under Opal) can read it without its own await. Keep
-  // the read cheap — skip for bodyless methods.
-  const m = (request && request.method ? request.method.toUpperCase() : "GET");
-  let bodyText = "";
-  if (m !== "GET" && m !== "HEAD" && m !== "OPTIONS") {
-    try { bodyText = await request.text(); } catch (_e) { bodyText = ""; }
+  // synchronously under Opal) can read it without its own await.
+  // Multipart uses the same byte-preserving path as Module Worker fetch (Phase 11A).
+  const bodyResult = await readBodyTextForRubyDispatcher(request);
+  if (bodyResult.bodyReadError) {
+    return bodyResult.bodyReadError;
   }
+  const bodyText = bodyResult.bodyText;
   const dispatch = durableObjectDispatch();
   if (typeof dispatch !== "function") {
     return new Response(

@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title><%= @title || 'homurabi Docs' %></title>
+    <link rel="icon" type="image/png" href="/images/favicon.png" sizes="32x32">
+    <link rel="stylesheet" href="/style.css">
+    <style>
+:root { color-scheme: light dark; --cf-orange: #f6821f; --docs-border: #e5e7eb; --docs-muted: #6b7280; --docs-bg: #fff; --docs-text: #111827; }
+@media (prefers-color-scheme: dark) {
+  :root { --docs-border: #374151; --docs-muted: #9ca3af; --docs-bg: #111827; --docs-text: #f3f4f6; }
+}
+body.docs-body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: var(--docs-bg); color: var(--docs-text); line-height: 1.6; }
+.docs-topbar { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; padding: 0.6rem 1rem; border-bottom: 1px solid var(--docs-border); background: var(--docs-bg); position: sticky; top: 0; z-index: 30; }
+.docs-brand { font-weight: 700; color: var(--cf-orange); text-decoration: none; }
+.docs-brand small { color: var(--docs-muted); font-weight: 400; margin-left: 0.35rem; }
+.docs-topbar a { color: inherit; text-decoration: none; }
+.docs-topbar a:hover { text-decoration: underline; }
+.docs-search-wrap { flex: 1; min-width: 140px; max-width: 320px; display: flex; align-items: center; gap: 0.35rem; }
+.docs-search-wrap input { flex: 1; padding: 0.35rem 0.5rem; border: 1px solid var(--docs-border); border-radius: 6px; background: transparent; color: inherit; font-size: 0.9rem; }
+.docs-kbd { font-size: 0.7rem; color: var(--docs-muted); border: 1px solid var(--docs-border); border-radius: 4px; padding: 0.1rem 0.35rem; }
+.docs-shell { display: grid; grid-template-columns: 240px minmax(0, 1fr) 200px; gap: 0; max-width: 1280px; margin: 0 auto; min-height: calc(100vh - 52px); }
+.docs-nav { border-right: 1px solid var(--docs-border); padding: 1rem 0.75rem; position: sticky; top: 52px; align-self: start; max-height: calc(100vh - 52px); overflow-y: auto; background: var(--docs-bg); }
+.docs-nav h3 { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--docs-muted); margin: 1rem 0 0.4rem; }
+.docs-nav h3:first-child { margin-top: 0; }
+.docs-nav a { display: block; padding: 0.25rem 0.5rem; border-radius: 4px; color: inherit; text-decoration: none; font-size: 0.9rem; }
+.docs-nav a:hover { background: rgba(246, 130, 31, 0.08); }
+.docs-nav a.docs-nav-active { color: var(--cf-orange); font-weight: 600; }
+.docs-main { padding: 1.25rem 1.5rem 3rem; max-width: 720px; width: 100%; justify-self: center; }
+.docs-main h1 { font-size: 1.75rem; margin-top: 0; line-height: 1.25; }
+.docs-main h2 { font-size: 1.2rem; margin-top: 2rem; padding-top: 0.5rem; border-top: 1px solid var(--docs-border); }
+.docs-main h2:first-of-type { border-top: 0; margin-top: 0.5rem; }
+.docs-main h3 { font-size: 1.05rem; margin-top: 1.25rem; }
+.docs-main pre, .docs-main code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.85em; }
+.docs-main pre { background: rgba(0,0,0,0.04); padding: 0.75rem 1rem; border-radius: 6px; overflow-x: auto; border: 1px solid var(--docs-border); }
+@media (prefers-color-scheme: dark) { .docs-main pre { background: rgba(255,255,255,0.06); } }
+.docs-main code { background: rgba(0,0,0,0.06); padding: 0.1rem 0.35rem; border-radius: 4px; }
+.docs-main pre code { background: none; padding: 0; }
+.docs-main table { width: 100%; border-collapse: collapse; font-size: 0.9rem; margin: 1rem 0; }
+.docs-main th, .docs-main td { border: 1px solid var(--docs-border); padding: 0.45rem 0.6rem; text-align: left; vertical-align: top; }
+.docs-main .docs-prose a { color: var(--cf-orange); }
+.docs-breadcrumb { font-size: 0.85rem; color: var(--docs-muted); margin-bottom: 0.75rem; }
+.docs-breadcrumb a { color: var(--cf-orange); text-decoration: none; }
+.docs-breadcrumb a:hover { text-decoration: underline; }
+.docs-bc-sep { margin: 0 0.35rem; color: var(--docs-muted); }
+.docs-toc { border-left: 1px solid var(--docs-border); padding: 1rem 0.75rem; position: sticky; top: 52px; align-self: start; max-height: calc(100vh - 52px); overflow-y: auto; font-size: 0.85rem; }
+.docs-toc-title { font-size: 0.7rem; text-transform: uppercase; color: var(--docs-muted); margin: 0 0 0.5rem; }
+.docs-toc ul { list-style: none; padding: 0; margin: 0; }
+.docs-toc li { margin: 0.25rem 0; }
+.docs-toc a { color: inherit; text-decoration: none; }
+.docs-toc a:hover { color: var(--cf-orange); }
+.docs-hero { padding: 1.5rem 0 0.5rem; }
+.docs-badge { display: inline-block; font-size: 0.8rem; background: rgba(246, 130, 31, 0.12); color: var(--cf-orange); padding: 0.25rem 0.6rem; border-radius: 999px; margin-bottom: 0.75rem; }
+.docs-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; margin: 1.25rem 0; }
+.docs-card { border: 1px solid var(--docs-border); border-radius: 8px; padding: 1rem; }
+.docs-card h3 { margin: 0 0 0.35rem; font-size: 1rem; }
+.docs-card p { margin: 0; font-size: 0.9rem; color: var(--docs-muted); }
+.docs-cta-row { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1rem; }
+.docs-cta { display: inline-block; padding: 0.5rem 1rem; border-radius: 6px; background: var(--cf-orange); color: #fff !important; text-decoration: none; font-weight: 600; font-size: 0.95rem; }
+.docs-cta.secondary { background: transparent; color: var(--cf-orange) !important; border: 1px solid var(--cf-orange); }
+.docs-nav-toggle { display: none; margin-right: 0.5rem; padding: 0.35rem 0.6rem; border: 1px solid var(--docs-border); border-radius: 6px; background: var(--docs-bg); cursor: pointer; font-size: 0.9rem; }
+#docs-search-backdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 90; }
+#docs-search-backdrop.open { display: block; }
+#docs-search-modal { display: none; position: fixed; left: 50%; top: 20%; transform: translateX(-50%); width: min(520px, 94vw); max-height: 70vh; overflow: auto; background: var(--docs-bg); border: 1px solid var(--docs-border); border-radius: 8px; z-index: 100; box-shadow: 0 10px 40px rgba(0,0,0,0.15); padding: 0.75rem; }
+#docs-search-modal.open { display: block; }
+#docs-search-modal ul { list-style: none; padding: 0; margin: 0.5rem 0 0; }
+#docs-search-modal li a { display: block; padding: 0.4rem 0.25rem; color: inherit; text-decoration: none; border-radius: 4px; }
+#docs-search-modal li a:hover { background: rgba(246, 130, 31, 0.1); }
+#docs-search-empty { color: var(--docs-muted); font-size: 0.9rem; padding: 0.5rem; }
+@media (max-width: 960px) {
+  .docs-shell { grid-template-columns: 1fr; }
+  .docs-nav-toggle { display: inline-block; }
+  .docs-nav { position: fixed; left: 0; top: 52px; bottom: 0; width: min(280px, 86vw); z-index: 40; transform: translateX(-100%); transition: transform 0.2s ease; box-shadow: 2px 0 12px rgba(0,0,0,0.12); }
+  .docs-nav.open { transform: translateX(0); }
+  .docs-toc { display: none; }
+}
+    </style>
+  </head>
+  <body class="docs-body">
+    <header class="docs-topbar">
+      <button type="button" class="docs-nav-toggle" id="docs-nav-toggle" aria-expanded="false" aria-controls="docs-nav">☰</button>
+      <a class="docs-brand" href="/docs">homurabi <small>Docs</small></a>
+      <a href="/">App</a>
+      <span class="docs-muted" style="color:var(--docs-muted);">|</span>
+      <a href="/posts">Posts</a>
+      <a href="/about">About</a>
+      <a href="/login">Login</a>
+      <div class="docs-search-wrap">
+        <input type="search" id="docs-search-input" placeholder="検索… (Ctrl+K)" autocomplete="off" aria-label="ドキュメント検索">
+        <span class="docs-kbd">Ctrl+K</span>
+      </div>
+    </header>
+    <div id="docs-search-backdrop" aria-hidden="true"></div>
+    <div id="docs-search-modal" role="dialog" aria-modal="true" aria-labelledby="docs-search-modal-title">
+      <div id="docs-search-modal-title" style="font-weight:600;">ドキュメント検索</div>
+      <input type="search" id="docs-search-modal-input" style="width:100%;margin-top:0.5rem;padding:0.4rem;" placeholder="キーワード" autocomplete="off">
+      <ul id="docs-search-results"></ul>
+      <p id="docs-search-empty" style="display:none;">一致なし</p>
+    </div>
+    <div class="docs-shell">
+      <%= erb :_docs_nav %>
+      <main class="docs-main docs-prose">
+        <nav class="docs-breadcrumb" aria-label="breadcrumb">
+          <% (@docs_breadcrumb || []).each_with_index do |(label, href), i| %>
+            <% if i > 0 %><span class="docs-bc-sep">›</span><% end %>
+            <% if href && i < (@docs_breadcrumb || []).length - 1 %>
+              <a href="<%= href %>"><%= Rack::Utils.escape_html(label) %></a>
+            <% else %>
+              <span><%= Rack::Utils.escape_html(label) %></span>
+            <% end %>
+          <% end %>
+        </nav>
+        <%= @docs_inner %>
+      </main>
+      <aside class="docs-toc" aria-label="Table of contents">
+        <p class="docs-toc-title">このページ</p>
+        <ul>
+          <% (@docs_toc || []).each do |id, label| %>
+            <li><a href="#<%= Rack::Utils.escape_html(id) %>"><%= Rack::Utils.escape_html(label) %></a></li>
+          <% end %>
+        </ul>
+      </aside>
+    </div>
+    <%= erb :_docs_scripts %>
+  </body>
+</html>

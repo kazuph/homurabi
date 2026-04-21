@@ -43,4 +43,9 @@ task :build do
   sh 'bundle', 'exec', 'cloudflare-workers-build'
 end
 
+desc 'Regenerate docs search index (public/docs-search-index.json)'
+task 'docs:search_index' do
+  sh 'ruby', 'bin/generate-docs-search-index'
+end
+
 task default: :build

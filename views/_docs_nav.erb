@@ -1,0 +1,14 @@
+<% p = (@docs_page || '').to_s %>
+<aside class="docs-nav" id="docs-nav">
+  <h3>Getting Started</h3>
+  <a href="/docs" class="<%= p == 'index' ? 'docs-nav-active' : '' %>">概要</a>
+  <a href="/docs/quick-start" class="<%= p == 'quick-start' ? 'docs-nav-active' : '' %>">Quick Start</a>
+  <h3>Guides</h3>
+  <a href="/docs/migration" class="<%= p == 'migration' ? 'docs-nav-active' : '' %>">Migration Guide</a>
+  <h3>API Reference</h3>
+  <a href="/docs/sinatra" class="<%= p == 'sinatra' ? 'docs-nav-active' : '' %>">sinatra-cloudflare-workers</a>
+  <a href="/docs/sequel-d1" class="<%= p == 'sequel-d1' ? 'docs-nav-active' : '' %>">sequel-d1</a>
+  <a href="/docs/runtime" class="<%= p == 'runtime' ? 'docs-nav-active' : '' %>">cloudflare-workers-runtime</a>
+  <h3>Architecture</h3>
+  <a href="/docs/architecture" class="<%= p == 'architecture' ? 'docs-nav-active' : '' %>">3 gem 構造</a>
+</aside>

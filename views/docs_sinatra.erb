@@ -1,0 +1,49 @@
+<h1>sinatra-cloudflare-workers</h1>
+<p>Sinatra を Opal / Workers 向けに補正するパッチと、JWT・Cron・Queues の拡張を提供します（gem 同梱 README の要約）。</p>
+
+<h2 id="overview">概要</h2>
+<pre><code>require 'sinatra/cloudflare_workers'
+
+class App &lt; Sinatra::Base
+  register Sinatra::JwtAuth
+  # ...
+end</code></pre>
+
+<h2 id="register">登録と require</h2>
+<p>アプリクラス内で <code>register</code> し、homurabi と同様に <code>require 'sequel'</code> 等はルート定義より前に置きます。</p>
+
+<h2 id="erb">ERB プリコンパイル</h2>
+<pre><code>bundle exec cloudflare-workers-erb-compile --input views --output build/templates.rb --namespace MyTemplates</code></pre>
+<p>Rake 連携例は <code>gems/sinatra-cloudflare-workers/templates/Rakefile.example</code> を参照。</p>
+
+<h2 id="jwt">JWT（Sinatra::JwtAuth）</h2>
+<p>ヘッダ <code>Authorization: Bearer …</code> を検証し、<code>authenticate!</code> で 401 を返せます。トークン検証内部は <code>JWT.decode(...).__await__</code> を利用（<code>sinatra/jwt_auth.rb</code>）。</p>
+
+<h2 id="scheduled">Cron（Sinatra::Scheduled）</h2>
+<pre><code>register Sinatra::Scheduled
+
+schedule '*/5 * * * *', name: 'heartbeat' do |event|
+  db = env['cloudflare.DB']
+  db.execute_insert('INSERT INTO heartbeats (cron, scheduled_at) VALUES (?, ?)',
+    [event.cron, event.scheduled_time.to_i]).__await__
+end</code></pre>
+
+<h2 id="queue">Queues（Sinatra::Queue）</h2>
+<pre><code>register Sinatra::Queue
+
+consume_queue 'jobs' do |batch|
+  batch.messages.each do |msg|
+    # msg.body, msg.ack, msg.retry
+    msg.ack
+  end
+end</code></pre>
+
+<h2 id="matrix">できること / できないこと</h2>
+<table>
+  <thead><tr><th></th><th>できること</th><th>できないこと</th></tr></thead>
+  <tbody>
+    <tr><td>HTTP</td><td>Sinatra DSL でルート定義、homurabi と同じパッチ経由で Rack 応答</td><td>MRI 固有のネイティブ拡張 gem をそのまま追加</td></tr>
+    <tr><td>認証</td><td>JWT 拡張、Bearer 検証</td><td>未検証の一般 OAuth フローをそのまま流用（要独自実装）</td></tr>
+    <tr><td>バックグラウンド</td><td>Cron / Queues の登録 DSL</td><td>Unix シグナルや別 OS プロセス前提のジョブ</td></tr>
+  </tbody>
+</table>

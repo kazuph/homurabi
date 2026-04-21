@@ -38,6 +38,14 @@ flowchart LR
 - `cf-runtime/` に `setup-node-crypto.mjs` と `worker_module.mjs` をコピー（gem から）。
 - `bundle exec cloudflare-workers-build --standalone` が consumer 向けパイプラインを実行し、`Gemfile` の `path:` から homurabi の `vendor/` を追加ロードパスへ取り込み（digest / zlib 等の Workers 向け補助ファイル）。
 
+## Phase 17 — Email Service（`SEND_EMAIL`）
+
+| 項目 | 内容 |
+|------|------|
+| Wrangler | `[[send_email]]` に `name = "SEND_EMAIL"`（Cloudflare Email Service · Agents Week 2026）。 |
+| Rack env | `env['cloudflare.SEND_EMAIL']` は `Cloudflare::Email`（JS `env.SEND_EMAIL.send(...)` を Ruby 側で `await`）。 |
+| 備考 | consumer アプリ側で verified sender を wrangler `[vars]` などに載せ、アプリから `from` に渡す。 |
+
 ## wrangler.json について
 
 - **生成・サポート対象は `wrangler.toml` のみ**。`wrangler.json` / `wrangler.jsonc` は手動変換可だが、本ツールチェーンの前提外。

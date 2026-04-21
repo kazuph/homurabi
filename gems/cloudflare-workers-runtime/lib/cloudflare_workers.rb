@@ -239,6 +239,9 @@ module Rack
           js_dlq = `#{js_env} && #{js_env}.JOBS_DLQ`
           env['cloudflare.QUEUE_JOBS_DLQ'] = Cloudflare::Queue.new(js_dlq, 'JOBS_DLQ') if `#{js_dlq} != null`
 
+          js_send_email = `#{js_env} && #{js_env}.SEND_EMAIL`
+          env['cloudflare.SEND_EMAIL'] = Cloudflare::Email.new(js_send_email) if `#{js_send_email} != null`
+
           env
         end
 
@@ -787,4 +790,5 @@ require 'cloudflare_workers/stream'
 # binding.
 require 'cloudflare_workers/cache'
 require 'cloudflare_workers/queue'
+require 'cloudflare_workers/email'
 require 'cloudflare_workers/durable_object'

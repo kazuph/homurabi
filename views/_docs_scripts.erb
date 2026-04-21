@@ -15,9 +15,6 @@
   var inpModal = document.getElementById('docs-search-modal-input');
   var ul = document.getElementById('docs-search-results');
   var empty = document.getElementById('docs-search-empty');
-  function esc(s) {
-    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
-  }
   function render(q) {
     q = (q || '').trim().toLowerCase();
     ul.innerHTML = '';

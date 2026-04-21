@@ -79,7 +79,7 @@ body.docs-body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Rob
   </head>
   <body class="docs-body">
     <header class="docs-topbar">
-      <button type="button" class="docs-nav-toggle" id="docs-nav-toggle" aria-expanded="false" aria-controls="docs-nav">☰</button>
+      <button type="button" class="docs-nav-toggle" id="docs-nav-toggle" aria-expanded="false" aria-controls="docs-nav" aria-label="Toggle navigation">☰</button>
       <a class="docs-brand" href="/docs">homurabi <small>Docs</small></a>
       <a href="/">App</a>
       <span class="docs-muted" style="color:var(--docs-muted);">|</span>
@@ -94,7 +94,7 @@ body.docs-body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Rob
     <div id="docs-search-backdrop" aria-hidden="true"></div>
     <div id="docs-search-modal" role="dialog" aria-modal="true" aria-labelledby="docs-search-modal-title">
       <div id="docs-search-modal-title" style="font-weight:600;">ドキュメント検索</div>
-      <input type="search" id="docs-search-modal-input" style="width:100%;margin-top:0.5rem;padding:0.4rem;" placeholder="キーワード" autocomplete="off">
+      <input type="search" id="docs-search-modal-input" style="width:100%;margin-top:0.5rem;padding:0.4rem;" placeholder="キーワード" autocomplete="off" aria-label="ドキュメント検索キーワード">
       <ul id="docs-search-results"></ul>
       <p id="docs-search-empty" style="display:none;">一致なし</p>
     </div>

@@ -3,6 +3,11 @@ source 'https://rubygems.org'
 
 ruby '>= 3.4.0'
 
+# Mode A — monorepo dev (this example lives under homurabi `examples/`).
 gem 'opal', path: '../../vendor/opal-gem'
 gem 'cloudflare-workers-runtime', path: '../../gems/cloudflare-workers-runtime'
 gem 'sinatra-cloudflare-workers', path: '../../gems/sinatra-cloudflare-workers'
+
+# Mode B — standalone: `gem build` each gem, then `gem install --local` in a clean dir (order: opal → runtime → sinatra),
+# or keep `path:` pointing at a git worktree that contains `vendor/opal-gem` and `gems/*` (remove stray `*.gem` under
+# `vendor/opal-gem` before `bundle install` — a built `.gem` must not sit inside the path gem tree).

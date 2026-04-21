@@ -1,0 +1,13 @@
+# frozen_string_literal: true
+source 'https://rubygems.org'
+
+ruby '>= 3.4.0'
+
+gem 'opal', path: <%= opal_path.inspect %>
+gem 'cloudflare-workers-runtime', path: <%= runtime_path.inspect %>
+gem 'sinatra-cloudflare-workers', path: <%= sinatra_path.inspect %>
+<% if with_db -%>
+gem 'sequel-d1', path: <%= sequel_path.inspect %>
+gem 'sequel', '~> 5.0'
+gem 'sqlite3', '>= 2.0'
+<% end -%>

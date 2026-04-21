@@ -2,14 +2,14 @@ PATH
   remote: gems/cloudflare-workers-runtime
   specs:
     cloudflare-workers-runtime (0.1.0)
-      opal (>= 1.8.3.rc1, < 2)
+      opal (= 1.8.3.rc1)
 
 PATH
   remote: gems/sequel-d1
   specs:
     sequel-d1 (0.1.0)
       cloudflare-workers-runtime (>= 0.1)
-      opal (>= 1.8.3.rc1, < 2)
+      opal (= 1.8.3.rc1)
       sequel (~> 5.0)
       sqlite3 (>= 2.0)
 
@@ -18,7 +18,7 @@ PATH
   specs:
     sinatra-cloudflare-workers (0.1.0)
       cloudflare-workers-runtime (>= 0.1)
-      opal (>= 1.8.3.rc1, < 2)
+      opal (= 1.8.3.rc1)
 
 PATH
   remote: vendor/opal-gem

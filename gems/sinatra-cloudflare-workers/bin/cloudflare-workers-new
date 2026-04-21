@@ -1,0 +1,91 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Scaffolds a minimal Sinatra-on-Workers project (Phase 15-E).
+# Usage: cloudflare-workers-new myapp --gem-root /path/to/homurabi/worktree
+
+require 'erb'
+require 'fileutils'
+require 'optparse'
+require 'pathname'
+
+options = { with_db: false, gem_root: nil }
+
+OptionParser.new do |o|
+  o.banner = 'usage: cloudflare-workers-new APP_NAME [--gem-root PATH] [--with-db]'
+  o.on('--gem-root PATH', 'homurabi worktree (contains gems/ and vendor/opal-gem)') { |p| options[:gem_root] = p }
+  o.on('--with-db', 'Add sequel-d1 + sample migration') { options[:with_db] = true }
+end.parse!
+
+app_name = ARGV[0] or abort('cloudflare-workers-new: APP_NAME required')
+
+def sinatra_gem_dir
+  spec = Gem.loaded_specs['sinatra-cloudflare-workers']
+  return Pathname(spec.full_gem_path) if spec
+  Pathname(__FILE__).expand_path.join('..', '..')
+end
+
+groot =
+  if options[:gem_root]
+    Pathname(options[:gem_root]).expand_path
+  else
+    sg = sinatra_gem_dir
+    cand = sg.join('..', '..').expand_path
+    cand.join('gems/cloudflare-workers-runtime').directory? ? cand : nil
+  end
+
+abort 'cloudflare-workers-new: could not resolve homurabi root; pass --gem-root' unless groot
+
+opal = groot.join('vendor/opal-gem')
+rt = groot.join('gems/cloudflare-workers-runtime')
+sin = groot.join('gems/sinatra-cloudflare-workers')
+seq = groot.join('gems/sequel-d1')
+
+abort "cloudflare-workers-new: missing #{opal}" unless opal.directory?
+abort "cloudflare-workers-new: missing #{rt}" unless rt.directory?
+abort "cloudflare-workers-new: missing #{sin}" unless sin.directory?
+abort "cloudflare-workers-new: missing #{seq}" if options[:with_db] && !seq.directory?
+
+target = Pathname(app_name).expand_path
+app_slug = target.basename.to_s
+abort "cloudflare-workers-new: #{target} already exists" if target.exist?
+
+tpl_root = sinatra_gem_dir.join('templates/project')
+abort "cloudflare-workers-new: templates missing #{tpl_root}" unless tpl_root.directory?
+
+locals = {
+  app_name: app_slug,
+  opal_path: opal.to_s,
+  runtime_path: rt.to_s,
+  sinatra_path: sin.to_s,
+  sequel_path: seq.to_s,
+  with_db: options[:with_db],
+  compat_date: Time.now.utc.strftime('%Y-%m-%d')
+}
+
+FileUtils.mkdir_p(target)
+
+Dir.glob(tpl_root.join('**', '*'), File::FNM_DOTMATCH).sort.each do |src|
+  rel = Pathname(src).relative_path_from(tpl_root)
+  next if rel.to_s == '.'
+
+  dest = target.join(rel)
+  if File.directory?(src)
+    FileUtils.mkdir_p(dest)
+  elsif src.end_with?('.tt')
+    dest = dest.sub(/\.tt\z/, '')
+    FileUtils.mkdir_p(dest.dirname)
+    erb = ERB.new(File.read(src), trim_mode: '-')
+    File.write(dest, erb.result_with_hash(locals))
+  else
+    FileUtils.mkdir_p(dest.dirname)
+    FileUtils.cp(src, dest)
+  end
+end
+
+FileUtils.mkdir_p(target.join('cf-runtime'))
+%w[setup-node-crypto.mjs worker_module.mjs].each do |f|
+  FileUtils.cp(rt.join('runtime', f), target.join('cf-runtime', f))
+end
+
+puts "cloudflare-workers-new: wrote #{target} (gem-root=#{groot})"

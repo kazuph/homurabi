@@ -1,0 +1,16 @@
+{
+  "name": "<%= app_name %>",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "bundle exec cloudflare-workers-build --standalone",
+    "dev": "npm run build && npx wrangler dev --local --port 8787 --ip 127.0.0.1",
+    "deploy": "npm run build && npx wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^3.99.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

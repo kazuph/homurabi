@@ -1150,3 +1150,195 @@ Phase 15-D (sequel-d1 gem)                  ← 1.5 週間
 | サンプルアプリ | 別リポジトリ | **monorepo `examples/` 同居** | Codex: CI 漂流防止、release cadence 分かれてからで十分 |
 | 外部 dogfooder | 探す | **自己 Sinatra アプリ移植** | Codex: 現実的に外部探すより自分で 1 本やる方が早い |
 | jwt/http の扱い | Phase 15-D で gem 化 | **Phase 15-Future 候補へ降格** | Codex: 境界が立ってから |
+
+---
+
+## Phase 15 以降の実績 (2026-04-20〜22)
+
+計画段階では想定してなかったが、Phase 15-D 完了後に「gem consumer independence」「セルフホスト docs」「Email 送信」の 3 軸が連続発生して実装完了した。
+
+| Phase | 成果 | PR |
+|---|---|---|
+| 15-E | `gem build + gem install --local` で independent repo から動く証明 (scaffolder, build CLI, worker.entrypoint codegen) | #19 |
+| 16 | `homurabi.kazu-san.workers.dev/docs/` に Cloudflare-style self-hosted docs site (7 ページ) | #20 |
+| 17 | Cloudflare Email Service (`SEND_EMAIL` binding) + `Cloudflare::Email` wrapper + `/debug/mail` + `/docs/email` + 本番実送信 (text + HTML 両方) | #21 |
+
+---
+
+## Phase 17.5 — Auto-Await 構文解析 (ゴミ積み禁止・本命設計)
+
+Created: 2026-04-22
+Status: Planning (設計フェーズのみ、実装は別 PR)
+Scope: **大規模**（Opal compile pipeline への恒久改修。暫定対応 gem default list 方式は採用しない）
+
+### 背景・動機
+
+現状、Opal 上で Promise を返す呼び出し（Cloudflare bindings 全般、JWT, Sequel, fetch 等）は `.__await__` または ファイル先頭の `# await: method1, method2, ...` magic comment による自動挿入で対応している。
+
+問題:
+
+1. **ユーザーが async メソッド名を知ってリストに書かないといけない**（gem 境界を越えた知識要求）
+2. **同名 sync メソッドも誤って await 化される** (`String#sub`, `Array#first` など)
+3. **ユーザー定義 async メソッドが毎回 magic comment に追加必要**
+4. **homurabi 内レガシー `__await__` 呼び出しが 51 箇所残存**（`app/app.rb` 8 / `app/helpers/chat_history.rb` 5 / `app/routes/canonical_all.rb` 38）
+5. Phase 17 で起きた **`__await__` を route 表に出さざるを得ない問題** も同じ根 (scope 単位で有効になる Opal async の制約)
+
+### ゴール
+
+**ユーザーが `.__await__` も `# await:` magic comment も一切書かず、Cloudflare binding 由来の async chain だけが自動的に async として扱われる** 状態。
+
+同名 sync メソッド（`String#sub`, `Array#first`）には**一切 await が挿入されない**（型推論が receiver の origin で区別する）。
+
+### 非ゴール
+
+- gem default list 方式 (**ゴミ積み、不採用**)。同名 sync 誤検知解消にならないため
+- Opal upstream への PR (別 phase、Phase 15-Future)
+- 非 Cloudflare async source のサポート (`fiber`, `concurrent-ruby` 等) は後続 phase
+- metaprogramming (`env.send(binding_name)` 等) 由来の動的 source 検出
+
+### 設計方針: AST + Flow Analysis
+
+Ruby ソースを Opal に渡す前に **`parser` gem で AST を取得 → Cloudflare binding 起点のデータフロー解析 → 該当 call node にのみ `.__await__` 自動挿入** した Ruby ソースを再出力し、それを Opal に食わせる。
+
+#### Async Source の登録仕組み
+
+gem 側で「これは async source」を `register_async_source` で宣言:
+
+```ruby
+# gems/cloudflare-workers-runtime/lib/cloudflare_workers/async_registry.rb
+CloudflareWorkers::AsyncRegistry.register_async_source do
+  # Class/Module whose public instance methods are all async
+  async_class 'Cloudflare::Email'
+  async_class 'Cloudflare::D1Database'
+  async_class 'Cloudflare::KV'
+  async_class 'Cloudflare::R2'
+  async_class 'Cloudflare::Queue'
+  async_class 'Cloudflare::AI'
+  async_class 'Cloudflare::Cache'
+
+  # Factory methods that return async-tainted objects
+  async_factory 'Cloudflare::Email', :new
+  async_factory 'Sequel', :connect, when_kwarg: { adapter: :d1 }
+
+  # Accessor chains: env['cloudflare.env'].DB, env.SEND_EMAIL, etc.
+  async_accessor /^env(\[.+?\])?\.[A-Z_][A-Z0-9_]*$/
+end
+```
+
+`sinatra-cloudflare-workers` や `sequel-d1` も同様に自身の async source を登録する。
+
+#### Flow Analysis アルゴリズム
+
+1. Ruby ソース parse → AST
+2. **tainting pass**: 各変数/式に `async-tainted` フラグを計算
+   - `Cloudflare::Email.new(...)` の戻り値 → tainted
+   - `env.SEND_EMAIL` → tainted
+   - tainted オブジェクトの method call 戻り値 → tainted
+   - tainted 変数の代入先 → tainted
+   - tainted chain (`a.b.c.d`) 全ノード → tainted
+3. **insertion pass**: tainted な call node の直後に `.__await__` を AST レベルで挿入
+4. **unparse pass**: AST を Ruby ソースに書き戻す（`unparser` gem or 独自 visitor）
+
+#### パイプライン位置
+
+```
+app/app.rb (ユーザーコード、__await__ 無し)
+  │
+  ▼  bundle exec cloudflare-workers-build 内で
+  ▼  1. parse → AST
+  ▼  2. Async Registry ロード (全 gem の register_async_source 収集)
+  ▼  3. flow analysis → tainted node 集合
+  ▼  4. __await__ 自動挿入
+  ▼  5. unparse → 変換後 Ruby ソース (build/app.opal.rb)
+  │
+  ▼  Opal コンパイル (変換後ソースを食わせる)
+  ▼
+build/app.opal.mjs
+```
+
+### 既存 `# await:` magic comment との互換性
+
+- magic comment が書いてあるファイルは **override として尊重**（ユーザーが明示的に指定したものは消さない）
+- 書いてなくても flow analysis が推論する
+- 診断モード (`CLOUDFLARE_WORKERS_AUTO_AWAIT_DEBUG=1`) で「どの call に await を入れたか」を build log に出力
+
+### 期待される振る舞い (B1-B10)
+
+- [ ] **B1**: `gems/cloudflare-workers-runtime/lib/cloudflare_workers/async_registry.rb` 実装（`register_async_source` DSL）
+- [ ] **B2**: `gems/cloudflare-workers-runtime/lib/cloudflare_workers/auto_await/analyzer.rb` 実装
+  - `parser` gem 依存（build-time only、runtime には乗らない）
+  - tainting pass + insertion pass + unparse pass
+- [ ] **B3**: `bin/cloudflare-workers-build` 内で auto-await 変換を opal compile 前段に挿入
+- [ ] **B4**: `sinatra-cloudflare-workers` の `register_async_source` に Sinatra::Base の async extension (JWT / Scheduled / Queue) を登録
+- [ ] **B5**: `sequel-d1` の `register_async_source` に `Sequel::D1::Database` の dataset chain を登録
+- [ ] **B6**: homurabi 既存 51 箇所の `__await__` を削除 (auto 挿入に切替)、`# await:` magic comment もユーザー指定以外は削除
+- [ ] **B7**: 既存全動作不変 (本番 deploy x1 + 全 12 ルート 200 + 実メール送信再確認)
+- [ ] **B8**: **ユーザーが `.__await__` 一切書かずに** `examples/minimal-sinatra-with-email/` で新しい Sinatra アプリを動かせる新 example 追加
+- [ ] **B9**: 診断モードで insertion 箇所を可視化（開発者デバッグ用）
+- [ ] **B10**: `/docs/auto-await` ページ追加（設計思想 + 使い方 + magic comment との関係）
+
+### リスク & 対策
+
+| リスク | 対策 |
+|---|---|
+| `parser` gem の build time 増加 | Ruby ファイル単位で cache、差分のみ再解析 |
+| AST→Ruby 逆変換の副作用 (コメント消失、空白変化) | `unparser` 採用 or source_rewriter で元ソースに挿入のみ行う（非破壊パッチ方式） |
+| metaprogramming で動的に binding 取り出すユーザー | 推論不能な場合は従来の `.__await__` / `# await:` フォールバックを許容、診断で警告 |
+| 誤 taint propagation (`x = env.DB; x = 'foo'` 後の `x.length`) | 変数再代入で taint クリア、SSA ライクな解析に寄せる |
+| Opal 側の対応が将来変わる | `async_registry.rb` に Opal version 互換層を置く |
+
+### 想定工数
+
+| Step | 内容 | 工数 |
+|------|------|------|
+| 0 | 起動準備 + baseline | 0.2d |
+| 1 | `parser` gem を build dependency に追加、POC で sample AST 解析 | 1d |
+| 2 | AsyncRegistry DSL 設計 + 3 gem への実装 | 2d |
+| 3 | Analyzer (tainting + insertion + unparse) | 3d |
+| 4 | cloudflare-workers-build への統合 | 1d |
+| 5 | homurabi 51 箇所 `__await__` 削除 + `# await:` magic 削除 | 1d |
+| 6 | 回帰検証 (npm test + deploy + 全ルート 200 + Email 実送信) | 1d |
+| 7 | 診断モード + build log | 0.5d |
+| 8 | `examples/minimal-sinatra-with-email/` 新 example | 0.5d |
+| 9 | `/docs/auto-await` 新ページ | 0.5d |
+| 10 | REPORT + PR + Copilot 対応 | 1d |
+| **合計** | | **約 12 営業日 (2.5 週間)** |
+
+### Phase 17.5 完了後のユーザー体験
+
+Before (現状):
+```ruby
+# await: get, put, execute, fetch, send, decode, ...
+
+post '/users' do
+  db = Sequel.connect(adapter: :d1, d1: env['cloudflare.env'].DB)
+  result = db[:users].insert(name: 'foo').__await__
+  Cloudflare::Email.new(env.SEND_EMAIL).send(
+    to: '...', subject: '...', text: '...'
+  ).__await__
+  'ok'
+end
+```
+
+After (Phase 17.5 完了後):
+```ruby
+post '/users' do
+  db = Sequel.connect(adapter: :d1, d1: env['cloudflare.env'].DB)
+  result = db[:users].insert(name: 'foo')
+  Cloudflare::Email.new(env.SEND_EMAIL).send(
+    to: '...', subject: '...', text: '...'
+  )
+  'ok'
+end
+```
+
+**素の Sinatra とほぼ同じ見た目**になる。これが「既存 Sinatra ユーザーが違和感なく Workers 化できる」最後のピース。
+
+---
+
+## Phase 18 候補 (未確定)
+
+- **Email 受信** (`email()` handler + `/inbound-mail` route) — Phase 17 の cdn-cgi pass-through が伏線
+- **15-F** rubygems.org 公開 (3 gem + opal fork ?)
+
+---

@@ -95,3 +95,41 @@ curl -sS -b /tmp/p17-cookie.txt -X POST https://homurabi.kazu-san.workers.dev/de
 ---
 
 **マスターへ（HTML メール）**: Gmail でマルチパート（plain + HTML）の表示を確認してください。件名キーワード `Phase 17 HTML test`。
+
+---
+
+## HTML CONFIRMATION 送信（明示的な件名・スタイル確認用）
+
+**ドキュメント準拠**: `to` は **素の `@`**（`-d "to=..."`）。`html` / `text` / `subject` は **`--data-urlencode`** または **`--data-urlencode html@ファイル`**（長い HTML をシェルで壊さない）。
+
+- **送信時刻（UTC 概算）**: 実実行直後（Cloudflare 応答 HTTP 200）
+- **件名（意図）**: `homurabi Phase 17 HTML CONFIRMATION (太字+リスト+リンク表示確認)`  
+  ※ form-urlencoded により Cloudflare 応答 JSON 上は `+` が `%2B` 表記になることがある（受信側は通常デコードされる）。
+
+### レスポンス JSON（復元）
+
+```json
+{
+  "ok": true,
+  "message_id": "<3bKVIsJnguzE9gjQt0BXP51yKwGwWRggFS33@kazuph-info.ai-work.uk>",
+  "cf_send_result_json": "{\"messageId\":\"<3bKVIsJnguzE9gjQt0BXP51yKwGwWRggFS33@kazuph-info.ai-work.uk>\"}",
+  "to": "kazu.homma@gmail.com",
+  "from": "noreply@kazuph-info.ai-work.uk",
+  "subject": "homurabi Phase 17 HTML CONFIRMATION (太字+リスト+リンク表示確認) — <CF-Ray suffix>"
+}
+```
+
+- **text**: `これは HTML メールの fallback 文字列です`
+- **html**: スタイル付き `<h1>` / `<strong>` / `<em>` / `<ul>` / `<a href="https://homurabi.kazu-san.workers.dev/docs/email">` 等（長文は `/tmp/homurabi-html-confirmation.txt` に保存して `html@` で POST）。
+
+### curl 例
+
+```bash
+curl -sS -b /tmp/p17-cookie.txt -X POST https://homurabi.kazu-san.workers.dev/debug/mail \
+  -d "to=kazu.homma@gmail.com" \
+  --data-urlencode "subject=homurabi Phase 17 HTML CONFIRMATION (太字+リスト+リンク表示確認)" \
+  --data-urlencode "text=これは HTML メールの fallback 文字列です" \
+  --data-urlencode "html@/tmp/homurabi-html-confirmation.txt"
+```
+
+**マスターへ**: 件名に **HTML CONFIRMATION** と **太字+リスト+リンク** が含まれるメールで、Gmail でリッチ表示を確認してください。

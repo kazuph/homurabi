@@ -41,7 +41,7 @@ post '/api/chat/messages' do
       var msg = (e && e.$message) ? e.$message() : (e && e.message) ? e.message : String(e);
       return 'invalid token: ' + String(msg);
     }
-  })()`
+  })()`.__await__
   is_failure = `(#{decode_err} != null && #{decode_err} !== undefined)`
   if is_failure
     err_msg = decode_err.to_s

@@ -31,6 +31,6 @@ Gem::Specification.new do |spec|
   # Exact pin: homurabi verifies against vendor/opal-gem 1.8.3.rc1 (Ruby 3.4); rubygems.org lists 1.8.2 only.
   spec.add_runtime_dependency 'opal', '= 1.8.3.rc1'
 
-  # parser is build-time only (auto-await analyzer). Not needed at Workers runtime.
-  spec.add_development_dependency 'parser', '~> 3.3'
+  # parser is required by the build pipeline (auto-await analyzer).
+  spec.add_runtime_dependency 'parser', '~> 3.3'
 end

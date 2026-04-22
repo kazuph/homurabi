@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require 'parser/source/tree_rewriter'
+
 module CloudflareWorkers
   module AutoAwait
     class Transformer

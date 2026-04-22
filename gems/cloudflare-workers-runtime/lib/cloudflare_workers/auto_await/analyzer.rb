@@ -17,7 +17,8 @@ module CloudflareWorkers
       def process(source, filename = '(auto-await)')
         buffer = Parser::Source::Buffer.new(filename)
         buffer.source = source
-        ast = Parser::CurrentRuby.parse(source)
+        parser = Parser::CurrentRuby.new
+        ast = parser.parse(buffer)
         @await_nodes = []
         @env = {}
         process_node(ast)

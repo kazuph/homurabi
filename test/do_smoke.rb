@@ -19,7 +19,7 @@
 #      Calling the dispatcher with a registered class name runs the
 #      handler and returns a JS Response wrapping its result.
 #   5. The JS dispatcher hook
-#      (`globalThis.__HOMURABI_DO_DISPATCH__`) is installed on load.
+#      (`globalThis.__HOMURA_DO_DISPATCH__`) is installed on load.
 #   6. normalise_response handles Array triple / Hash / plain String.
 #
 # Usage:
@@ -69,19 +69,19 @@ end
 # expressions, so the returned value would be dropped.)
 # ---------------------------------------------------------------------
 
-`globalThis.__homurabi_do_fake_namespace = function() { var ns = { _calls: { idFromName: [], newUniqueId: 0, get: [] }, idFromName: function(name) { ns._calls.idFromName.push(name); var captured = name; return { kind: 'named', name: captured, toString: function() { return 'id::' + captured; } }; }, newUniqueId: function() { ns._calls.newUniqueId += 1; var n = ns._calls.newUniqueId; return { kind: 'unique', n: n, toString: function() { return 'uid::' + n; } }; }, idFromString: function(s) { var captured = s; return { kind: 'parsed', hex: captured, toString: function() { return captured; } }; }, get: function(id) { ns._calls.get.push(id); return { _lastInit: null, fetch: function(url, init) { this._lastInit = { url: url, init: init }; return Promise.resolve(new Response(JSON.stringify({ url: url, method: (init && init.method) || 'GET', id: (id && id.toString && id.toString()) }), { status: 200, headers: { 'content-type': 'application/json', 'x-homurabi-test': 'yes' } })); } }; } }; return ns; };`
+`globalThis.__homura_do_fake_namespace = function() { var ns = { _calls: { idFromName: [], newUniqueId: 0, get: [] }, idFromName: function(name) { ns._calls.idFromName.push(name); var captured = name; return { kind: 'named', name: captured, toString: function() { return 'id::' + captured; } }; }, newUniqueId: function() { ns._calls.newUniqueId += 1; var n = ns._calls.newUniqueId; return { kind: 'unique', n: n, toString: function() { return 'uid::' + n; } }; }, idFromString: function(s) { var captured = s; return { kind: 'parsed', hex: captured, toString: function() { return captured; } }; }, get: function(id) { ns._calls.get.push(id); return { _lastInit: null, fetch: function(url, init) { this._lastInit = { url: url, init: init }; return Promise.resolve(new Response(JSON.stringify({ url: url, method: (init && init.method) || 'GET', id: (id && id.toString && id.toString()) }), { status: 200, headers: { 'content-type': 'application/json', 'x-homura-test': 'yes' } })); } }; } }; return ns; };`
 
-`globalThis.__homurabi_do_fake_storage = function() { var m = new Map(); return { _map: m, get: function(k) { return Promise.resolve(m.has(k) ? m.get(k) : null); }, put: function(k, v) { m.set(k, v); return Promise.resolve(); }, delete: function(k) { var had = m.has(k); m.delete(k); return Promise.resolve(had); }, deleteAll: function() { m.clear(); return Promise.resolve(); }, list: function(_opts) { var out = new Map(); m.forEach(function(v, k) { out.set(k, v); }); return Promise.resolve(out); } }; };`
+`globalThis.__homura_do_fake_storage = function() { var m = new Map(); return { _map: m, get: function(k) { return Promise.resolve(m.has(k) ? m.get(k) : null); }, put: function(k, v) { m.set(k, v); return Promise.resolve(); }, delete: function(k) { var had = m.has(k); m.delete(k); return Promise.resolve(had); }, deleteAll: function() { m.clear(); return Promise.resolve(); }, list: function(_opts) { var out = new Map(); m.forEach(function(v, k) { out.set(k, v); }); return Promise.resolve(out); } }; };`
 
 def fake_namespace
-  `globalThis.__homurabi_do_fake_namespace()`
+  `globalThis.__homura_do_fake_namespace()`
 end
 
 def fake_storage
-  `globalThis.__homurabi_do_fake_storage()`
+  `globalThis.__homura_do_fake_storage()`
 end
 
-$stdout.puts '=== homurabi Phase 11B — DurableObject smoke ==='
+$stdout.puts '=== homura Phase 11B — DurableObject smoke ==='
 $stdout.puts ''
 
 # ---------------------------------------------------------------------
@@ -139,7 +139,7 @@ SmokeTest.assert('fetch returns Cloudflare::HTTPResponse with status + headers')
   stub = ns.get_by_name('a')
   res = stub.fetch('/peek').__await__
   res.is_a?(Cloudflare::HTTPResponse) && res.status == 200 &&
-    res['x-homurabi-test'] == 'yes' && res['content-type'] == 'application/json'
+    res['x-homura-test'] == 'yes' && res['content-type'] == 'application/json'
 end
 
 SmokeTest.assert('fetch with method: POST includes POST in the init object') do
@@ -306,8 +306,8 @@ $stdout.puts '--- DurableObjectState#block_concurrency_while ---'
 SmokeTest.assert('block_concurrency_while forwards to state.blockConcurrencyWhile and resolves') do
   # Fake state that records whether blockConcurrencyWhile was called
   # and resolves the supplied async function's promise.
-  `globalThis.__homurabi_do_fake_state_with_bcw = function() { var calls = 0; return { id: { toString: function() { return 'xyz'; } }, blockConcurrencyWhile: function(fn) { calls += 1; return fn(); }, storage: {}, __calls: function() { return calls; } }; };`
-  js_state = `globalThis.__homurabi_do_fake_state_with_bcw()`
+  `globalThis.__homura_do_fake_state_with_bcw = function() { var calls = 0; return { id: { toString: function() { return 'xyz'; } }, blockConcurrencyWhile: function(fn) { calls += 1; return fn(); }, storage: {}, __calls: function() { return calls; } }; };`
+  js_state = `globalThis.__homura_do_fake_state_with_bcw()`
   state = Cloudflare::DurableObjectState.new(js_state)
   resolved = state.block_concurrency_while(`Promise.resolve('locked-value')`).__await__
   resolved == 'locked-value' && `#{js_state}.__calls()` == 1
@@ -332,8 +332,8 @@ SmokeTest.assert('block_concurrency_while serialises two reads of a shared count
   #
   # The fake state implements blockConcurrencyWhile with a shared
   # async mutex — identical semantics to the Workers runtime.
-  `globalThis.__homurabi_do_fake_bcw_serialising = function() { var currentMutex = Promise.resolve(); return { id: { toString: function() { return 's'; } }, storage: (function() { var m = 0; return { get: function() { return new Promise(function(r) { setTimeout(function() { r(m); }, 5); }); }, put: function(_k, v) { m = v; return Promise.resolve(); } }; })(), blockConcurrencyWhile: function(fn) { var next = currentMutex.then(function() { return fn(); }); currentMutex = next.catch(function() {}); return next; } }; };`
-  js_state = `globalThis.__homurabi_do_fake_bcw_serialising()`
+  `globalThis.__homura_do_fake_bcw_serialising = function() { var currentMutex = Promise.resolve(); return { id: { toString: function() { return 's'; } }, storage: (function() { var m = 0; return { get: function() { return new Promise(function(r) { setTimeout(function() { r(m); }, 5); }); }, put: function(_k, v) { m = v; return Promise.resolve(); } }; })(), blockConcurrencyWhile: function(fn) { var next = currentMutex.then(function() { return fn(); }); currentMutex = next.catch(function() {}); return next; } }; };`
+  js_state = `globalThis.__homura_do_fake_bcw_serialising()`
   state = Cloudflare::DurableObjectState.new(js_state)
   # Schedule two concurrent increments, both protected by BCW.
   p1 = state.block_concurrency_while(`
@@ -363,16 +363,16 @@ end
 $stdout.puts ''
 $stdout.puts '--- JS dispatcher hook ---'
 
-SmokeTest.assert('globalThis.__HOMURABI_DO_DISPATCH__ is installed') do
-  `typeof globalThis.__HOMURABI_DO_DISPATCH__ === 'function'`
+SmokeTest.assert('globalThis.__HOMURA_DO_DISPATCH__ is installed') do
+  `typeof globalThis.__HOMURA_DO_DISPATCH__ === 'function'`
 end
 
-SmokeTest.assert('globalThis.__HOMURABI_DO_WS_MESSAGE__ is installed') do
-  `typeof globalThis.__HOMURABI_DO_WS_MESSAGE__ === 'function'`
+SmokeTest.assert('globalThis.__HOMURA_DO_WS_MESSAGE__ is installed') do
+  `typeof globalThis.__HOMURA_DO_WS_MESSAGE__ === 'function'`
 end
 
-SmokeTest.assert('globalThis.__HOMURABI_DO_WS_CLOSE__ is installed') do
-  `typeof globalThis.__HOMURABI_DO_WS_CLOSE__ === 'function'`
+SmokeTest.assert('globalThis.__HOMURA_DO_WS_CLOSE__ is installed') do
+  `typeof globalThis.__HOMURA_DO_WS_CLOSE__ === 'function'`
 end
 
 SmokeTest.assert('define_web_socket_handlers registers on_message + on_close handlers') do
@@ -427,7 +427,7 @@ SmokeTest.assert('JS hook forwards through to the Ruby dispatcher') do
   Cloudflare::DurableObject.define('JSHook') { |_state, req| [201, {}, req.method] }
   js_state = `({ id: { toString: function() { return 'x' } }, storage: #{fake_storage} })`
   js_req = `new Request('https://do/h', { method: 'PUT' })`
-  promise = `globalThis.__HOMURABI_DO_DISPATCH__('JSHook', #{js_state}, ({}), #{js_req}, '')`
+  promise = `globalThis.__HOMURA_DO_DISPATCH__('JSHook', #{js_state}, ({}), #{js_req}, '')`
   js_resp = promise.__await__
   status = `#{js_resp}.status`
   text = `#{js_resp}.text()`.__await__

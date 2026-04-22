@@ -51,7 +51,7 @@ class Sequel::ConnectionPool
     
     private
     
-    # homurabi patch (Phase 12, LOAD-TIME required): Opal cannot
+    # homura patch (Phase 12, LOAD-TIME required): Opal cannot
     # statically resolve `require_relative "connection_pool/#{pc}"` —
     # the build-time analyser trips on the interpolated path. Pool
     # classes are eagerly required from vendor/sequel.rb; threaded
@@ -65,7 +65,7 @@ class Sequel::ConnectionPool
           end
           unless Sequel.const_defined?(name)
             raise Sequel::Error,
-              "pool class #{name} is not bundled in this homurabi build. " \
+              "pool class #{name} is not bundled in this homura build. " \
               "Only single-threaded pools work on Cloudflare Workers. " \
               "Available: #{POOL_CLASS_MAP.keys.select { |k| k.to_s.include?('single') }.inspect}"
           end

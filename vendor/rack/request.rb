@@ -45,7 +45,7 @@ module Rack
 
     valid_ipv4_octet = /\.(25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])/
 
-    # homurabi patch: Opal compiles to JS regex, which cannot mix
+    # homura patch: Opal compiles to JS regex, which cannot mix
     # case-insensitive (`i`) and case-sensitive members in a Regexp.union.
     # The two `i`-flagged literals are rewritten with explicit character
     # classes so the union is uniform.
@@ -697,7 +697,7 @@ module Rack
         value ? value.strip.split(/[, \t]+/) : []
       end
 
-      # homurabi patch: the upstream ipv6 / AUTHORITY regexes use Ruby's
+      # homura patch: the upstream ipv6 / AUTHORITY regexes use Ruby's
       # `x` (extended) flag and POSIX character classes (`[:graph:]`),
       # neither of which Opal's JS regex backend supports. We collapse
       # the IPv6 alternation into a single whitespace-free regex and
@@ -713,7 +713,7 @@ module Rack
         /[Ff][Ee]80:(?:(?:[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4})*)?::(?:[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4})*)?|:(?:[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4})*)?)?:[0-9A-Fa-f]{1,4}%[\-0-9A-Za-z._~]+/
       ).freeze
 
-      # homurabi patch: JS regex disallows duplicate named capture groups,
+      # homura patch: JS regex disallows duplicate named capture groups,
       # so we collapse the two `(?<address>...)` alternatives into a
       # single `(?<host>...)` and re-derive `address` from `host` in
       # `split_authority` below.
@@ -725,7 +725,7 @@ module Rack
         return [] if authority.nil?
         return [] unless match = AUTHORITY.match(authority)
         host = match[:host]
-        # homurabi patch: re-derive `address` from `host`. Bracketed
+        # homura patch: re-derive `address` from `host`. Bracketed
         # hosts (`[ipv6]`) yield the inner address, anything else uses
         # the host verbatim.
         address = host && host.start_with?('[') && host.end_with?(']') ? host[1..-2] : host

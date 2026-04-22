@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 # Route fragment 63 — demo /docs/runtime
 get '/docs/runtime' do
-  @title = 'cloudflare-workers-runtime — homurabi Docs'
+  @title = 'cloudflare-workers-runtime — homura Docs'
   @docs_page = 'runtime'
   @docs_section = :reference
   @docs_breadcrumb = [

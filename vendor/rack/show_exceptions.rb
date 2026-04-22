@@ -72,13 +72,13 @@ module Rack
         message = exception.message
       # :nocov:
       end
-      # homurabi patch: Opal strings are immutable.
+      # homura patch: Opal strings are immutable.
       string = "#{exception.class}: #{message}\n".dup
       string += exception.backtrace.map { |l| "\t#{l}" }.join("\n") if exception.backtrace
       string
     end
 
-    # homurabi patch: the upstream implementation uses
+    # homura patch: the upstream implementation uses
     # `template.result(binding)`, and the ERB template compiles at render
     # time to a Ruby fragment that Opal in turn hands off to
     # `Opal.Binding.$new(function($code) { return eval($code); }, ...)`.

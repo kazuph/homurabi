@@ -4,7 +4,7 @@ delete '/phase11a/uploads/*' do
   content_type 'application/json'
   unless foundations_demos_enabled?
     status 404
-    next({ 'error' => 'foundations demos disabled (set HOMURABI_ENABLE_FOUNDATIONS_DEMOS=1)' }.to_json)
+    next({ 'error' => 'foundations demos disabled (set HOMURA_ENABLE_FOUNDATIONS_DEMOS=1)' }.to_json)
   end
   if bucket.nil?
     status 503

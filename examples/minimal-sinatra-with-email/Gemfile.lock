@@ -1,20 +1,21 @@
 PATH
-  remote: ../../gems/cloudflare-workers-runtime
+  remote: ../../gems/homura-runtime
   specs:
-    cloudflare-workers-runtime (0.1.1)
-      opal (= 1.8.3.rc1)
+    homura-runtime (0.1.1)
+      opal-homura (= 1.8.3.rc1)
+      parser (~> 3.3)
 
 PATH
-  remote: ../../gems/sinatra-cloudflare-workers
+  remote: ../../gems/sinatra-homura
   specs:
-    sinatra-cloudflare-workers (0.1.0)
-      cloudflare-workers-runtime (>= 0.1)
-      opal (= 1.8.3.rc1)
+    sinatra-homura (0.1.0)
+      homura-runtime (~> 0.1)
+      opal-homura (= 1.8.3.rc1)
 
 PATH
   remote: ../../vendor/opal-gem
   specs:
-    opal (1.8.3.rc1)
+    opal-homura (1.8.3.rc1)
       ast (>= 2.3.0)
       base64 (>= 0.2.0)
       parser (~> 3.0, >= 3.0.3.2)
@@ -33,9 +34,9 @@ PLATFORMS
   arm64-darwin-25
 
 DEPENDENCIES
-  cloudflare-workers-runtime!
-  opal!
-  sinatra-cloudflare-workers!
+  homura-runtime!
+  opal-homura!
+  sinatra-homura!
 
 RUBY VERSION
    ruby 3.4.9p82

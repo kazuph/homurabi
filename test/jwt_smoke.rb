@@ -74,7 +74,7 @@ end
 
 PAYLOAD = { 'sub' => 'alice', 'iat' => 1_000_000_000, 'role' => 'admin' }.freeze
 
-$stdout.puts '=== homurabi Phase 8 — JWT smoke ==='
+$stdout.puts '=== homura Phase 8 — JWT smoke ==='
 $stdout.puts ''
 
 # ---------------------------------------------------------------------
@@ -338,11 +338,11 @@ SmokeTest.assert('nbf in the future is rejected') {
 }
 
 SmokeTest.assert('issuer verification succeeds when matching') {
-  payload = { 'sub' => 'alice', 'iss' => 'homurabi' }
+  payload = { 'sub' => 'alice', 'iss' => 'homura' }
   token = JWT.encode(payload, 'secret', 'HS256').__await__
   decoded, = JWT.decode(token, 'secret', true,
-                        algorithm: 'HS256', iss: 'homurabi', verify_iss: true).__await__
-  decoded['iss'] == 'homurabi'
+                        algorithm: 'HS256', iss: 'homura', verify_iss: true).__await__
+  decoded['iss'] == 'homura'
 }
 
 SmokeTest.assert('issuer verification fails on mismatch') {
@@ -351,7 +351,7 @@ SmokeTest.assert('issuer verification fails on mismatch') {
   raised = false
   begin
     JWT.decode(token, 'secret', true,
-               algorithm: 'HS256', iss: 'homurabi', verify_iss: true).__await__
+               algorithm: 'HS256', iss: 'homura', verify_iss: true).__await__
   rescue JWT::InvalidIssuerError
     raised = true
   end

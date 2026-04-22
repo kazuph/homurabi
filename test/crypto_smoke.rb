@@ -78,7 +78,7 @@ SHA1_HELLO   = 'aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d'
 SHA1_EMPTY   = 'da39a3ee5e6b4b0d3255bfef95601890afd80709'
 SHA256_HELLO = '2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824'
 SHA256_EMPTY = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
-SHA256_HOMURABI = 'ab17644bf7428aa56793b975b0f8a94038d9941d99d31c3e0bb6b5017eceb3ad'
+SHA256_HOMURA = 'cedb08873dca79fda7f7a7d0d1c50a85450b3ca50d5361629d5687477eb73db4'
 SHA384_HELLO = '59e1748777448c69de6b800d7a33bbfb9ff1b463e44354c3553bcdb9c666fa90125a3c79f90397bdf5f6a13de828684f'
 SHA512_HELLO = '9b71d224bd62f3785d96d46ad3ea3d73319bfbc2890caadae2dff72519673ca72323c3d99ba5c11d7c7acc6e14b8c5da0c4663475c2e5c3adef46f73bcdec043'
 MD5_HELLO    = '5d41402abc4b2a76b9719d911017c592'
@@ -96,7 +96,7 @@ HKDF_SHA256   = 'fe8f9615d2374c0d17f77d1aeaf408c2e75fe0466073d0def23c733e2f862df
 # Tests
 # =====================================================================
 
-$stdout.puts "=== homurabi Phase 7 — crypto smoke ==="
+$stdout.puts "=== homura Phase 7 — crypto smoke ==="
 $stdout.puts ""
 
 # ---------------------------------------------------------------------
@@ -108,7 +108,7 @@ SmokeTest.assert("Digest::SHA1.hexdigest('hello')")    { Digest::SHA1.hexdigest(
 SmokeTest.assert("Digest::SHA1.hexdigest('')")         { Digest::SHA1.hexdigest('')         == SHA1_EMPTY }
 SmokeTest.assert("Digest::SHA256.hexdigest('hello')")  { Digest::SHA256.hexdigest('hello')  == SHA256_HELLO }
 SmokeTest.assert("Digest::SHA256.hexdigest('')")       { Digest::SHA256.hexdigest('')       == SHA256_EMPTY }
-SmokeTest.assert("Digest::SHA256.hexdigest('homurabi')") { Digest::SHA256.hexdigest('homurabi') == SHA256_HOMURABI }
+SmokeTest.assert("Digest::SHA256.hexdigest('homura')") { Digest::SHA256.hexdigest('homura') == SHA256_HOMURA }
 SmokeTest.assert("Digest::SHA384.hexdigest('hello')")  { Digest::SHA384.hexdigest('hello')  == SHA384_HELLO }
 SmokeTest.assert("Digest::SHA512.hexdigest('hello')")  { Digest::SHA512.hexdigest('hello')  == SHA512_HELLO }
 SmokeTest.assert("Digest::MD5.hexdigest('hello')")     { Digest::MD5.hexdigest('hello')     == MD5_HELLO }

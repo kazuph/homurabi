@@ -1,4 +1,4 @@
-# Minimal Tilt stub for the homurabi Phase 2 hello-world handler.
+# Minimal Tilt stub for the homura Phase 2 hello-world handler.
 #
 # Real Sinatra requires the actual `tilt` gem for template rendering
 # (ERB, Haml, etc.). janbiedermann does not maintain a tilt fork because
@@ -68,7 +68,7 @@ module Tilt
 
     def new(file = nil, line = nil, options = {}, &block)
       raise NotImplementedError,
-            'Tilt template rendering is not available in homurabi Phase 2 ' \
+            'Tilt template rendering is not available in homura Phase 2 ' \
             '(stubbed). Return Strings or arrays from your Sinatra handlers.'
     end
   end

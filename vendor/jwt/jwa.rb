@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 #
-# homurabi patch: adapted from ruby-jwt v2.9.3 jwa.rb. We drop the
+# homura patch: adapted from ruby-jwt v2.9.3 jwa.rb. We drop the
 # optional `require 'rbnacl'` dance (Workers has no libsodium; our EdDSA
 # goes through OpenSSL::PKey::Ed25519 in Phase 7). The EdDSA algo is
 # therefore loaded unconditionally from jwa/eddsa.rb.

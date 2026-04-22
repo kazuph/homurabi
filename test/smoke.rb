@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 # await: true
 #
-# homurabi smoke / contract test suite.
+# homura smoke / contract test suite.
 #
 # Runs inside the compiled Opal ESM on Node.js (same environment as
 # wrangler dev). Tests the Sinatra feature contracts that the patch
@@ -186,7 +186,7 @@ end
 # Tests
 # =====================================================================
 
-$stdout.puts "=== homurabi smoke tests ==="
+$stdout.puts "=== homura smoke tests ==="
 $stdout.puts ""
 
 $stdout.puts "--- Route matching ---"

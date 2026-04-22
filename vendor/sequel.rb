@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 # backtick_javascript: true
 #
-# homurabi patch: Phase 12 — vendored entry for Sequel v5.103.0
+# homura patch: Phase 12 — vendored entry for Sequel v5.103.0
 # (https://github.com/jeremyevans/sequel). This file replaces the
 # upstream `lib/sequel.rb` (which only does `require_relative
 # 'sequel/model'`) because on Cloudflare Workers we deliberately skip
@@ -34,7 +34,7 @@ require 'sequel/core'
 require 'sequel/connection_pool/single'
 require 'sequel/connection_pool/sharded_single'
 
-# homurabi 3-layer patch split (Codex-reviewed):
+# homura 3-layer patch split (Codex-reviewed):
 #   1. vendor/sequel/**/*.rb   — only load-time / class-body
 #      metaprogramming patches (class_eval(String) → define_method,
 #      Sequel.require + Mutex/Thread shims in core.rb). These
@@ -50,7 +50,7 @@ require 'sequel_opal_runtime_patches'
 require 'sequel_opal_async_dataset_patches'
 
 # Sequel.synchronize already delegates to @data_mutex.synchronize, and
-# the homurabi Mutex shim (sequel_opal_patches.rb) resolves that to a
+# the homura Mutex shim (sequel_opal_patches.rb) resolves that to a
 # plain yield — no override needed here.
 
 # SingleConnectionPool is the only pool shape compatible with Opal's

@@ -189,7 +189,7 @@ module Sequel
         check_truncation_allowed!
         check_not_limited!(:truncate)
         raise(InvalidOperation, "Can't truncate filtered datasets") if opts[:where] || opts[:having]
-        # homurabi patch (Phase 12): String.new → sql_string_origin (Buffer)
+        # homura patch (Phase 12): String.new → sql_string_origin (Buffer)
         t = sql_string_origin
         source_list_append(t, opts[:from])
         _truncate_sql(t)
@@ -240,7 +240,7 @@ module Sequel
     #            each pair being an if/elsif/else code fragment, and the second element in each pair
     #            being an array of symbol/strings for the appropriate branch.
     def self.def_sql_method(mod, type, clauses)
-      # homurabi patch (Phase 12): upstream builds a Ruby source
+      # homura patch (Phase 12): upstream builds a Ruby source
       # string and calls `mod.class_eval(string)` — Workers forbids
       # runtime eval. We translate the same generator to a
       # define_method block, preserving the branching structure
@@ -307,7 +307,7 @@ module Sequel
       mod.send(:private, meth_name) if priv
     end
 
-    # homurabi patch (Phase 12): Branch condition parser for
+    # homura patch (Phase 12): Branch condition parser for
     # `def_sql_method`. Covers every pattern used by Sequel's built-in
     # adapters (sqlite, postgres, mssql). Extend when a new adapter
     # or extension adds a new condition shape.
@@ -336,7 +336,7 @@ module Sequel
         ->(_ds) { true }
       else
         raise ::NotImplementedError,
-          "[homurabi phase12] def_sql_method branch condition " \
+          "[homura phase12] def_sql_method branch condition " \
           "#{branch_code.inspect} not recognised. Add a pattern to " \
           "Dataset.parse_def_sql_method_branch_condition in " \
           "vendor/sequel/dataset/sql.rb."
@@ -365,7 +365,7 @@ module Sequel
     REGEXP_OPERATORS = ::Sequel::SQL::ComplexExpression::REGEXP_OPERATORS
 
     [:literal, :quote_identifier, :quote_schema_table].each do |meth|
-      # homurabi patch (Phase 12): define_method replaces class_eval(HEREDOC)
+      # homura patch (Phase 12): define_method replaces class_eval(HEREDOC)
       meth_sym = meth
       append_sym = :"#{meth}_append"
       define_method(meth_sym) do |*args, &block|

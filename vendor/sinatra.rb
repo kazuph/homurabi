@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 #
-# homurabi entry-point for Sinatra.
+# homura entry-point for Sinatra.
 #
 # Phase 13: vendor/sinatra/ now tracks pristine upstream sinatra/sinatra
 # v4.2.1 bit-identical to the GitHub tag. All Opal / Cloudflare Workers

@@ -158,7 +158,7 @@ module Opal
               error 'Invalid next'
             elsif thrower_closure == last_closure
               if thrower_closure.is? LOOP_INSIDE
-                # homurabi patch: CRuby evaluates the argument of `next <expr>`
+                # homura patch: CRuby evaluates the argument of `next <expr>`
                 # in the surrounding scope *before* jumping to the top of the
                 # loop, so that `next base = base.superclass` actually assigns
                 # to the enclosing `base`. Upstream Opal just pushed `continue`

@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 #
-# homurabi Opal stub for Gem::Version.
+# homura Opal stub for Gem::Version.
 #
 # Upstream Sinatra 4.x uses `Gem::Version.new(RUBY_VERSION) >=
 # Gem::Version.new("3.0")` to conditionally activate the `except`

@@ -89,7 +89,7 @@ end
 # returned Promise instead of the resolved value. The literal
 # `__await__` token is what Opal scans for to emit a JS `await`.
 
-$stdout.puts '=== homurabi Phase 9 — Scheduled smoke ==='
+$stdout.puts '=== homura Phase 9 — Scheduled smoke ==='
 $stdout.puts ''
 
 # ---------------------------------------------------------------------
@@ -406,8 +406,8 @@ SmokeTest.assert('failed job records error class + message') {
 $stdout.puts ''
 $stdout.puts '--- JS dispatcher hook ---'
 
-SmokeTest.assert('globalThis.__HOMURABI_SCHEDULED_DISPATCH__ is installed') {
-  installed = `typeof globalThis.__HOMURABI_SCHEDULED_DISPATCH__ === 'function'`
+SmokeTest.assert('globalThis.__HOMURA_SCHEDULED_DISPATCH__ is installed') {
+  installed = `typeof globalThis.__HOMURA_SCHEDULED_DISPATCH__ === 'function'`
   installed
 }
 
@@ -421,7 +421,7 @@ SmokeTest.assert('JS dispatcher hook resolves to the Sinatra app via Rack handle
   result = nil
   begin
     js_event = `({ cron: '*/5 * * * *', scheduledTime: 1700000000000, type: 'scheduled' })`
-    promise = `globalThis.__HOMURABI_SCHEDULED_DISPATCH__(#{js_event}, null, null)`
+    promise = `globalThis.__HOMURA_SCHEDULED_DISPATCH__(#{js_event}, null, null)`
     result = promise.__await__
   ensure
     Cloudflare::Scheduled.app = nil

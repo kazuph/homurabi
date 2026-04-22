@@ -14,7 +14,7 @@ module Opal
       ES3_RESERVED_WORD_EXCLUSIVE = /#{REGEXP_START}(?:int|byte|char|goto|long|final|float|short|double|native|throws|boolean|abstract|volatile|transient|synchronized)#{REGEXP_END}/.freeze
 
       # Prototype special properties.
-      # homurabi patch: added `prototype` because every JS class constructor
+      # homura patch: added `prototype` because every JS class constructor
       # is a function object whose `.prototype` slot controls `new`; a Ruby
       # class instance variable named `@prototype` would otherwise overwrite
       # that slot and break allocate/new. Sinatra::Base#reset! sets

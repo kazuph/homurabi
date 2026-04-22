@@ -48,7 +48,7 @@ require 'json'
 require 'cloudflare_workers/http'
 
 module Faraday
-  VERSION = '2.0.0-homurabi-shim'
+  VERSION = '2.0.0-homura-shim'
 
   # --------------------------------------------------------------------
   # Error classes

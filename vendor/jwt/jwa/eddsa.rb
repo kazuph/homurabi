@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 # await: true
 #
-# homurabi patch: replacement for ruby-jwt v2.9.3 eddsa.rb. Upstream
+# homura patch: replacement for ruby-jwt v2.9.3 eddsa.rb. Upstream
 # requires RbNaCl (libsodium) and expects the caller to pass an
 # `RbNaCl::Signatures::Ed25519::{Signing,Verify}Key`. On Workers we have
 # no libsodium — Phase 7 implements EdDSA via Web Crypto subtle's
@@ -26,7 +26,7 @@ module JWT
           raise_sign_error!("Key given is a #{signing_key.class} but has to be an OpenSSL::PKey::Ed25519")
         end
 
-        # homurabi patch: `.__await__`. Ed25519#sign takes (digest_or_nil,
+        # homura patch: `.__await__`. Ed25519#sign takes (digest_or_nil,
         # data); Ed25519 applies SHA-512 internally so the digest arg is
         # ignored — we pass nil.
         signing_key.sign(nil, data).__await__
@@ -37,7 +37,7 @@ module JWT
           raise_verify_error!("Key given is a #{verification_key.class} but has to be an OpenSSL::PKey::Ed25519")
         end
 
-        # homurabi patch: `.__await__`. Returns bool directly from subtle.
+        # homura patch: `.__await__`. Returns bool directly from subtle.
         verification_key.verify(nil, signature, data).__await__
       end
 

@@ -4,7 +4,7 @@ post '/api/upload' do
   content_type 'application/json'
   unless foundations_demos_enabled?
     status 404
-    next({ 'error' => 'foundations demos disabled (set HOMURABI_ENABLE_FOUNDATIONS_DEMOS=1)' }.to_json)
+    next({ 'error' => 'foundations demos disabled (set HOMURA_ENABLE_FOUNDATIONS_DEMOS=1)' }.to_json)
   end
   # pull params BEFORE the first await — Sinatra clears @params when
   # it starts a Promise-returning route (same ceremony as /d1/users).

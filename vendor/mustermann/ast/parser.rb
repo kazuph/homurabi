@@ -152,7 +152,7 @@ module Mustermann
       #
       # @!visibility private
       def read_brackets(open, close, char: nil, escape: ?\\, quote: false, **options)
-        # homurabi patch: Opal strings are immutable. Replace mutating
+        # homura patch: Opal strings are immutable. Replace mutating
         # `<<` chains with string-concatenating `+=`.
         result = String.new
         escape = false if escape.nil?
@@ -191,7 +191,7 @@ module Mustermann
       #
       # @!visibility private
       def read_list(*close, separator: ?,, escape: ?\\, quotes: [?", ?'], ignore: " ", **options)
-        # homurabi patch: Opal strings are immutable, so the original
+        # homura patch: Opal strings are immutable, so the original
         # pattern `element = result.last; element << x` cannot mutate
         # the list entry in place. We replace element-side mutation
         # with an explicit `result[-1] = result.last + ...` rewrite.
@@ -219,7 +219,7 @@ module Mustermann
       #
       # @!visibility private
       def read_escaped(close, escape: ?\\, **options)
-        # homurabi patch: Opal strings are immutable; use +=.
+        # homura patch: Opal strings are immutable; use +=.
         result = String.new
         while current = getch
           case current

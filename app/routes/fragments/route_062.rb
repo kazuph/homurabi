@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 # Route fragment 62 — demo /docs/sequel-d1
 get '/docs/sequel-d1' do
-  @title = 'sequel-d1 — homurabi Docs'
+  @title = 'sequel-d1 — homura Docs'
   @docs_page = 'sequel-d1'
   @docs_section = :reference
   @docs_breadcrumb = [

@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
-require_relative '../gems/cloudflare-workers-runtime/lib/cloudflare_workers/async_registry'
-require_relative '../gems/cloudflare-workers-runtime/lib/cloudflare_workers/auto_await/analyzer'
-require_relative '../gems/cloudflare-workers-runtime/lib/cloudflare_workers/auto_await/transformer'
+require_relative '../gems/homura-runtime/lib/cloudflare_workers/async_registry'
+require_relative '../gems/homura-runtime/lib/cloudflare_workers/auto_await/analyzer'
+require_relative '../gems/homura-runtime/lib/cloudflare_workers/auto_await/transformer'
 
 registry = CloudflareWorkers::AsyncRegistry.new
 CloudflareWorkers::AsyncRegistry::Builder.new(registry).instance_eval do
@@ -24,7 +24,7 @@ CloudflareWorkers::AsyncRegistry::Builder.new(registry).instance_eval do
   async_accessor :env, :DB, 'Cloudflare::D1Database'
   async_accessor :env, :SEND_EMAIL, 'Cloudflare::Email'
   helper_factory :send_email, 'Cloudflare::Email'
-  async_helper :cache_get, 'Homurabi::CloudflareBindingHelpers'
+  async_helper :cache_get, 'Homura::CloudflareBindingHelpers'
   async_method 'JWT', :decode
 end
 
@@ -156,7 +156,7 @@ failed += 1 unless ok
 # Test 8: helper_factory local var survives opaque helper/controller calls
 src8 = <<~RUBY
   mail = send_email
-  ctx = Homurabi::DebugMailController.prepare_send(params, env, self, mail)
+  ctx = Homura::DebugMailController.prepare_send(params, env, self, mail)
   mail.send(to: ctx[:final_to], subject: ctx[:subject_line], text: ctx[:text_body])
 RUBY
 ok, _ = assert_transform(src8, ["mail.send(to: ctx[:final_to], subject: ctx[:subject_line], text: ctx[:text_body])"], registry)

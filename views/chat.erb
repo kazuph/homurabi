@@ -1,7 +1,7 @@
 <div class="chat-shell">
   <header class="chat-hero">
     <div class="chat-hero-text">
-      <h1>homurabi <span class="chat-hero-accent">/chat</span></h1>
+      <h1>homura <span class="chat-hero-accent">/chat</span></h1>
       <p class="chat-hero-sub">
         Real Sinatra route, hosted on Cloudflare Workers, talking to
         <strong>Workers AI</strong> via the <code>env.AI</code> binding.
@@ -32,7 +32,7 @@
     <% if @history && @history.any? %>
       <% @history.each do |msg| %>
         <% role = Rack::Utils.escape_html(msg['role'].to_s) %>
-        <article class="chat-msg chat-msg-<%= role %>"><header class="chat-msg-role"><%= role %></header><div class="chat-msg-body"><% if msg['role'].to_s == 'assistant' %><%= HomurabiMarkdown.render(msg['content'].to_s) %><% else %><%= Rack::Utils.escape_html(msg['content'].to_s) %><% end %></div></article>
+        <article class="chat-msg chat-msg-<%= role %>"><header class="chat-msg-role"><%= role %></header><div class="chat-msg-body"><% if msg['role'].to_s == 'assistant' %><%= HomuraMarkdown.render(msg['content'].to_s) %><% else %><%= Rack::Utils.escape_html(msg['content'].to_s) %><% end %></div></article>
       <% end %>
     <% else %>
       <div class="chat-empty">
@@ -81,7 +81,7 @@
     var sendBtn  = document.getElementById('chat-send');
     var sessionId = threadEl.getAttribute('data-session-id');
 
-    function tokenKey() { return 'homurabi.chat.jwt'; }
+    function tokenKey() { return 'homura.chat.jwt'; }
     function getToken() { return window.localStorage.getItem(tokenKey()); }
     function setToken(t) {
       if (t) window.localStorage.setItem(tokenKey(), t);
@@ -114,7 +114,7 @@
     // `contentHtml` is the server-rendered HTML (assistant replies)
     // — when supplied, it replaces `.innerHTML` on the body so the
     // bullet lists / bold / code fences render. The server-side
-    // `HomurabiMarkdown.render` HTML-escapes inputs before the
+    // `HomuraMarkdown.render` HTML-escapes inputs before the
     // Markdown rules fire, so trusting its output is safe.
     function appendMessage(role, content, contentHtml) {
       var wrap = document.createElement('article');

@@ -13,7 +13,7 @@ module Rack
       #
       # For more information on the use of media types in HTTP, see:
       # http://www.w3.org/Protocols/rfc2616/rfc2616-sec3.html#sec3.7
-      # homurabi patch: Opal Strings are immutable, so #rstrip!/#downcase!/
+      # homura patch: Opal Strings are immutable, so #rstrip!/#downcase!/
       # #strip! all raise. Rewritten to use non-mutating String forms.
       def type(content_type)
         return nil unless content_type && !content_type.empty?

@@ -14,7 +14,7 @@ post '/login' do
   # truncate it on verification (split(':', 2)), so the
   # displayed/stored user wouldn't match what was entered.
   if username.empty? || username.length > 64 || username.include?(':')
-    @title = 'Login — homurabi'
+    @title = 'Login — homura'
     @login_error = 'username is required (1-64 chars, no colon)'
     @content = erb :login
     next erb :layout

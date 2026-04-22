@@ -1,4 +1,4 @@
--- homurabi D1 schema (LOCAL DEVELOPMENT ONLY)
+-- homura D1 schema (LOCAL DEVELOPMENT ONLY)
 --
 -- Mirrors the structure used by app/hello.rb routes. Idempotent —
 -- safe to re-run; existing rows are preserved.
@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS users (
 
 INSERT OR IGNORE INTO users (id, name) VALUES
   (1, 'Kazu'),
-  (2, 'Homurabi-chan'),
+  (2, 'Homura-chan'),
   (3, 'Sinatra'),
   (4, 'Opal');
 
@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS posts (
 -- `*/5 * * * *` cron writes one row here. Verify the cron is
 -- actually wired by tailing this table in dev:
 --
---   wrangler d1 execute homurabi-db --local \
+--   wrangler d1 execute homura-db --local \
 --     --command "SELECT * FROM heartbeats ORDER BY id DESC LIMIT 5;"
 --
 CREATE TABLE IF NOT EXISTS heartbeats (

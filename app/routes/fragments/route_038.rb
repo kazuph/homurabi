@@ -4,7 +4,7 @@ get '/test/ai' do
   content_type 'application/json'
   unless ai_demos_enabled?
     status 404
-    next({ 'error' => 'AI demos disabled (set HOMURABI_ENABLE_AI_DEMOS=1)' }.to_json)
+    next({ 'error' => 'AI demos disabled (set HOMURA_ENABLE_AI_DEMOS=1)' }.to_json)
   end
   unless ai_binding?
     status 503

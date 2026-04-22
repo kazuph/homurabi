@@ -59,7 +59,7 @@ end
 # ---------------------------------------------------------------------
 
 `(function() {
-  if (globalThis.__HOMURABI_CACHE_FAKE_INSTALLED__) return;
+  if (globalThis.__HOMURA_CACHE_FAKE_INSTALLED__) return;
   var store = new Map();
   function keyFor(req) {
     if (typeof req === 'string') return req;
@@ -90,11 +90,11 @@ end
   globalThis.caches = globalThis.caches || {};
   globalThis.caches.default = fake;
   globalThis.caches.open = function(name) { return Promise.resolve(fake); };
-  globalThis.__HOMURABI_CACHE_FAKE_INSTALLED__ = true;
-  globalThis.__HOMURABI_CACHE_FAKE_STORE__ = store;
+  globalThis.__HOMURA_CACHE_FAKE_INSTALLED__ = true;
+  globalThis.__HOMURA_CACHE_FAKE_STORE__ = store;
 })()`
 
-$stdout.puts '=== homurabi Phase 11B — Cache API smoke ==='
+$stdout.puts '=== homura Phase 11B — Cache API smoke ==='
 $stdout.puts ''
 
 # ---------------------------------------------------------------------
@@ -302,7 +302,7 @@ SmokeTest.assert('two named caches with the same logical key hold independent en
         }
       };
     }
-    globalThis.__homurabi_cache_named_orig = orig;
+    globalThis.__homura_cache_named_orig = orig;
     globalThis.caches = {
       default: makeCache('default'),
       open: function(n) { return Promise.resolve(makeCache(n)); }
@@ -319,7 +319,7 @@ SmokeTest.assert('two named caches with the same logical key hold independent en
     got_b = b.match('https://same-key.example/logical').__await__
     got_a.body == 'from-A' && got_b.body == 'from-B'
   ensure
-    `(function() { globalThis.caches = globalThis.__homurabi_cache_named_orig; delete globalThis.__homurabi_cache_named_orig; })()`
+    `(function() { globalThis.caches = globalThis.__homura_cache_named_orig; delete globalThis.__homura_cache_named_orig; })()`
   end
 end
 
@@ -333,8 +333,8 @@ SmokeTest.assert('TTL-expired cache entry returns nil from match (post-expiry MI
     var orig = globalThis.caches;
     var entries = new Map();   // key => { resp, expiresAt }
     var now = { ms: 1000 };
-    globalThis.__homurabi_cache_ttl_advance = function(ms) { now.ms += ms; };
-    globalThis.__homurabi_cache_ttl_orig = orig;
+    globalThis.__homura_cache_ttl_advance = function(ms) { now.ms += ms; };
+    globalThis.__homura_cache_ttl_orig = orig;
     globalThis.caches = {
       default: {
         match: function(req) {
@@ -374,13 +374,13 @@ SmokeTest.assert('TTL-expired cache entry returns nil from match (post-expiry MI
     # Before expiry — returns body.
     got_before = c.match(url).__await__
     # Advance fake clock 6 seconds past max-age.
-    `globalThis.__homurabi_cache_ttl_advance(6000)`
+    `globalThis.__homura_cache_ttl_advance(6000)`
     # After expiry — must return nil; also cleans up the stale entry.
     got_after = c.match(url).__await__
 
     got_before && got_before.body == 'fresh-body' && got_after.nil?
   ensure
-    `(function() { globalThis.caches = globalThis.__homurabi_cache_ttl_orig; delete globalThis.__homurabi_cache_ttl_orig; delete globalThis.__homurabi_cache_ttl_advance; })()`
+    `(function() { globalThis.caches = globalThis.__homura_cache_ttl_orig; delete globalThis.__homura_cache_ttl_orig; delete globalThis.__homura_cache_ttl_advance; })()`
   end
 end
 

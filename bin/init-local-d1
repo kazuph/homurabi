@@ -21,7 +21,7 @@ set -eo pipefail   # 'u' (nounset) intentionally NOT set: some user
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-DB_NAME="homurabi-db"
+DB_NAME="homura-db"
 SCHEMA_FILE="bin/schema.sql"
 
 if [[ ! -f "$SCHEMA_FILE" ]]; then

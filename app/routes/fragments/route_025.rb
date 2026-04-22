@@ -4,7 +4,7 @@ get '/test/crypto' do
   content_type 'application/json'
   unless crypto_demos_enabled?
     status 404
-    next { 'error' => 'crypto demos disabled (set HOMURABI_ENABLE_CRYPTO_DEMOS=1 in wrangler vars)' }.to_json
+    next { 'error' => 'crypto demos disabled (set HOMURA_ENABLE_CRYPTO_DEMOS=1 in wrangler vars)' }.to_json
   end
   cases = []
   run = lambda { |label, &blk|

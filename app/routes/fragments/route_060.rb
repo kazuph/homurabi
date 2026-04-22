@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 # Route fragment 60 — demo /docs/migration
 get '/docs/migration' do
-  @title = '移行ガイド — homurabi Docs'
+  @title = '移行ガイド — homura Docs'
   @docs_page = 'migration'
   @docs_section = :guides
   @docs_breadcrumb = [

@@ -11,7 +11,7 @@ post '/test/queue/fire' do
   rescue StandardError
     {}
   end
-  qname = (body['queue'] || 'homurabi-jobs').to_s
+  qname = (body['queue'] || 'homura-jobs').to_s
   messages = body['messages'].is_a?(Array) ? body['messages'] : [{ 'fire' => true, 'ts' => Time.now.to_i }]
 
   js_msgs = `([])`

@@ -24,7 +24,7 @@ get '/demo/queue/dlq-status' do
     i += 1
   end
   {
-    'queue'   => 'homurabi-jobs-dlq',
+    'queue'   => 'homura-jobs-dlq',
     'count'   => recent.size,
     'recent'  => recent
   }.to_json

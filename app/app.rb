@@ -7,7 +7,7 @@
 # this file — the adapter lives entirely in `lib/cloudflare_workers.rb`.
 #
 # HTML pages go through real ERB templates stored under `views/*.erb`
-# and rendered with the classic `erb :name` helper. homurabi's build
+# and rendered with the classic `erb :name` helper. homura's build
 # pipeline precompiles those templates with `bin/compile-erb` so the
 # Workers sandbox never has to call `eval` / `new Function` at runtime.
 
@@ -19,7 +19,7 @@ require 'openssl'
 require 'securerandom'
 require 'base64'
 require 'jwt'
-require 'homurabi_markdown'
+require 'homura_markdown'
 # Phase 11A — HTTP foundations. `faraday` is the compat shim living
 # under vendor/ (NOT the real ruby-faraday gem — see file header for
 # the rationale). The Cloudflare::Multipart parser and the SSEStream
@@ -46,11 +46,11 @@ class App < Sinatra::Base
   # from a Workers secret (wrangler secret put JWT_SECRET) pulled via
   # `env['cloudflare.env'].JWT_SECRET`.
   register Sinatra::JwtAuth
-  set :jwt_secret, 'homurabi-phase8-demo-secret-change-me-in-prod'
+  set :jwt_secret, 'homura-phase8-demo-secret-change-me-in-prod'
   set :jwt_algorithm, 'HS256'
   # Phase 9 — Cron Trigger DSL. Use `schedule '*/5 * * * *' do ... end`
   # below; matching jobs are dispatched from `src/worker.mjs#scheduled`
-  # via `globalThis.__HOMURABI_SCHEDULED_DISPATCH__`.
+  # via `globalThis.__HOMURA_SCHEDULED_DISPATCH__`.
   register Sinatra::Scheduled
   # Phase 11A — SSE / streaming helper. Exposes `sse do |out| ... end`
   # on every route (returns a `Cloudflare::SSEStream` which
@@ -61,7 +61,7 @@ class App < Sinatra::Base
   # HTTP routes.
   register Sinatra::Queue
   # --- Cloudflare binding helpers (see app/helpers/chat_history.rb) ---
-  helpers Homurabi::CloudflareBindingHelpers
+  helpers Homura::CloudflareBindingHelpers
   # ------------------------------------------------------------------
   # HTML pages — each route sets a few `@ivars` then renders an ERB
   # template from `views/`. Exactly like Sinatra's README example:
@@ -74,14 +74,14 @@ class App < Sinatra::Base
   JWT_ACCESS_TTL  = 3600          # 1 hour
   JWT_REFRESH_TTL = 86_400 * 30   # 30 days
 
-  helpers Homurabi::JwtKeyHelpers
+  helpers Homura::JwtKeyHelpers
 
   # ------------------------------------------------------------------
   # Phase 9 — Cron Trigger handlers (see also /test/scheduled* routes).
   # ------------------------------------------------------------------
   schedule '*/5 * * * *', name: 'heartbeat' do |event|
     cf_env = env['cloudflare.env']
-    enabled = cf_env && `(#{cf_env}.HOMURABI_ENABLE_SCHEDULED_DEMOS || '')`.to_s == '1'
+    enabled = cf_env && `(#{cf_env}.HOMURA_ENABLE_SCHEDULED_DEMOS || '')`.to_s == '1'
     next unless enabled
     # Insert one row into D1's heartbeats table per cron firing.
     # Falls back to a no-op when DB is not bound (test envs).
@@ -95,7 +95,7 @@ class App < Sinatra::Base
 
   schedule '0 */1 * * *', name: 'hourly-housekeeping' do |event|
     cf_env = env['cloudflare.env']
-    enabled = cf_env && `(#{cf_env}.HOMURABI_ENABLE_SCHEDULED_DEMOS || '')`.to_s == '1'
+    enabled = cf_env && `(#{cf_env}.HOMURA_ENABLE_SCHEDULED_DEMOS || '')`.to_s == '1'
     next unless enabled
     # Demo: bump a KV counter so we can prove hourly cron runs from
     # outside a test by inspecting `/kv/cron:hourly-counter` over HTTP.
@@ -121,7 +121,7 @@ class App < Sinatra::Base
   end
 
   # ------------------------------------------------------------------
-  # Phase 9 self-test endpoints — gated on HOMURABI_ENABLE_SCHEDULED_DEMOS.
+  # Phase 9 self-test endpoints — gated on HOMURA_ENABLE_SCHEDULED_DEMOS.
   #
   # GET  /test/scheduled            → list every registered job (cron,
   #                                    name, source location)
@@ -139,16 +139,16 @@ class App < Sinatra::Base
   }.freeze
   CHAT_HISTORY_LIMIT = 32       # last N messages kept in KV per session
   CHAT_HISTORY_TTL   = 86_400 * 7  # 1 week
-  CHAT_SYSTEM_PROMPT = 'You are homurabi, a friendly Sinatra-on-Cloudflare-Workers assistant. Reply concisely. If the user writes Japanese, reply in Japanese. If the user writes English, reply in English.'
+  CHAT_SYSTEM_PROMPT = 'You are homura, a friendly Sinatra-on-Cloudflare-Workers assistant. Reply concisely. If the user writes Japanese, reply in Japanese. If the user writes English, reply in English.'
 
-  # Workers AI response shaping lives in `Homurabi::ChatHistoryClassMethods#extract_ai_text`.
-  extend Homurabi::ChatHistoryClassMethods
-  helpers Homurabi::ChatHistoryHelpers
-  helpers Homurabi::MarkdownRenderHelpers
+  # Workers AI response shaping lives in `Homura::ChatHistoryClassMethods#extract_ai_text`.
+  extend Homura::ChatHistoryClassMethods
+  helpers Homura::ChatHistoryHelpers
+  helpers Homura::MarkdownRenderHelpers
 
   # ----------------------------------------------------------------
   # Phase 13 follow-up — cookie-based session login.
-  # Browser flow: /login form → POST /login → set homurabi_session
+  # Browser flow: /login form → POST /login → set homura_session
   # cookie (base64url `username:exp` payload with HMAC-SHA256
   # signature) → redirect to /chat. Guards /chat so only
   # logged-in users can reach the AI page.
@@ -163,19 +163,19 @@ class App < Sinatra::Base
   # previous `helpers` block form pushed the Cloudflare deploy
   # startup past its CPU budget (code 10021).
   SESSION_COOKIE_TTL  = 86_400
-  SESSION_COOKIE_NAME = 'homurabi_session'
+  SESSION_COOKIE_NAME = 'homura_session'
 
   # Phase 17 — production /debug/mail gate (session username must match).
   DEBUG_MAIL_ADMIN_USERNAME = 'kazuph'
 
-  include Homurabi::SessionCookieInstanceMethods
-  helpers Homurabi::DebugMailHelpers
+  include Homura::SessionCookieInstanceMethods
+  helpers Homura::DebugMailHelpers
 
   # GET /login — simple demo login form. Any non-empty username
   # mints an HMAC-signed session cookie carrying `username:exp`.
   # No password check — this is a demo of the signed-cookie
   # session flow, not an identity provider.
-  consume_queue 'homurabi-jobs-dlq' do |batch|
+  consume_queue 'homura-jobs-dlq' do |batch|
     if kv
       msgs = batch.messages
       i = 0
@@ -198,7 +198,7 @@ class App < Sinatra::Base
     batch.size
   end
 
-  consume_queue 'homurabi-jobs' do |batch|
+  consume_queue 'homura-jobs' do |batch|
     # Under `# await: true`, using `Array#each` with an internal
     # `__await__` is unreliable because Opal yields to an async
     # callback whose return value is never awaited by `each` — some
@@ -237,13 +237,13 @@ class App < Sinatra::Base
     batch.size
   end
 
-  # Phase 11B — WebSocket handlers for HomurabiCounterDO. The DO
+  # Phase 11B — WebSocket handlers for HomuraCounterDO. The DO
   # echoes any text frame back prefixed with "echo:" AND atomically
   # bumps the counter per received frame so clients can observe the
   # hibernation-aware storage writes. Uses state.storage (same path
   # that HTTP /inc uses) so `wrangler dev` + `/demo/do?action=peek`
   # sees the increments after a WebSocket session.
-  Cloudflare::DurableObject.define_web_socket_handlers('HomurabiCounterDO',
+  Cloudflare::DurableObject.define_web_socket_handlers('HomuraCounterDO',
     on_message: ->(ws, message, state) {
       text = `typeof #{message} === 'string' ? #{message} : (typeof Buffer !== 'undefined' && Buffer.isBuffer(#{message}) ? #{message}.toString('utf8') : '')`
       # Fire-and-forget the storage increment inside the async IIFE
@@ -265,7 +265,7 @@ class App < Sinatra::Base
     },
     on_error: ->(ws, err, _state) {
       # Just log the error — nothing meaningful to do beyond record it.
-      `try { globalThis.console.error('[HomurabiCounterDO.ws] error:', #{err}); } catch (_) {}`
+      `try { globalThis.console.error('[HomuraCounterDO.ws] error:', #{err}); } catch (_) {}`
       nil
     }
   )
@@ -275,7 +275,7 @@ class App < Sinatra::Base
   # "echo:<text> count=<n>" where <n> is the shared counter, so a
   # single WS session also increments the same counter that
   # `/demo/do?action=peek` reads from over HTTP.
-  Cloudflare::DurableObject.define('HomurabiCounterDO') do |state, request|
+  Cloudflare::DurableObject.define('HomuraCounterDO') do |state, request|
     path = request.path
     prev = (state.storage.get('count') || 0).to_i
     if path.end_with?('/inc')
@@ -314,11 +314,11 @@ class App < Sinatra::Base
     # Phase 11A gate — same default-off pattern as /test/crypto / /test/ai.
     # /test/foundations hammers an external URL (ipify) and writes to R2,
     # so leaving it publicly reachable in production is a small but real
-    # abuse vector. Flip via wrangler [vars] HOMURABI_ENABLE_FOUNDATIONS_DEMOS=1.
+    # abuse vector. Flip via wrangler [vars] HOMURA_ENABLE_FOUNDATIONS_DEMOS=1.
     def foundations_demos_enabled?
       cf_env = env['cloudflare.env']
       return false unless cf_env
-      val = `(#{cf_env} && #{cf_env}.HOMURABI_ENABLE_FOUNDATIONS_DEMOS) || ''`
+      val = `(#{cf_env} && #{cf_env}.HOMURA_ENABLE_FOUNDATIONS_DEMOS) || ''`
       val.to_s == '1'
     end
   end
@@ -327,7 +327,7 @@ class App < Sinatra::Base
   # bundled :json middleware. Proves the Faraday shim can stand in for
   # the real gem for the usual "talk to a REST API" pattern.
   #
-  # Gated on HOMURABI_ENABLE_FOUNDATIONS_DEMOS (default deny) because
+  # Gated on HOMURA_ENABLE_FOUNDATIONS_DEMOS (default deny) because
   # the route makes outbound calls to an external service and shouldn't
   # be reachable by anonymous traffic in production.
   #

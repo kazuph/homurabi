@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 #
-# homurabi patch: verbatim from ruby-jwt v2.9.3. Holds the default decode
+# homura patch: verbatim from ruby-jwt v2.9.3. Holds the default decode
 # options (verify_expiration/nbf, algorithms: ['HS256'], etc.).
 
 module JWT

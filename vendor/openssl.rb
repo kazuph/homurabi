@@ -242,7 +242,7 @@ module OpenSSL
     # complete 16-byte blocks immediately, deferring the tail.
     def ctr_update_stream(new_data)
       bytes = @ctr_pending + new_data
-      # homurabi Opal patch: use String#length (UTF-16 code units) instead
+      # homura Opal patch: use String#length (UTF-16 code units) instead
       # of String#bytesize. Our ciphertext binstrs are built via
       # `u8_to_binstr` / `pack('C*')` / `pack('H*')`, which stores each
       # byte as a 1-unit JS String char (code point 0-255). Ruby's
@@ -1055,7 +1055,7 @@ module OpenSSL
       end
 
       # raw R||S → DER SEQUENCE { INTEGER r, INTEGER s }
-      # homurabi Opal patch: use `unpack('C*')` (byte-array from the
+      # homura Opal patch: use `unpack('C*')` (byte-array from the
       # latin1 binstr built by `u8_to_binstr`) instead of `.bytes`, and
       # `inner.length` (JS UTF-16 code units = byte count for our latin1
       # binstrs) instead of `.bytesize` (which returns UTF-8 byte count
@@ -1079,7 +1079,7 @@ module OpenSSL
         end
       end
 
-      # homurabi Opal helper: our binstrs store each byte as a JS String
+      # homura Opal helper: our binstrs store each byte as a JS String
       # char (code point 0-255). `.unpack('C*')` and `.bytes` in Opal go
       # through UTF-8 encoding — any char >= 0x80 is split into two
       # continuation bytes. Use the char-by-char ord reading to recover
@@ -1107,7 +1107,7 @@ module OpenSSL
       end
 
       # DER SEQUENCE { INTEGER r, INTEGER s } → raw R||S (curve_byte_size * 2)
-      # homurabi Opal patch: same `unpack('C*')` fix as raw_to_der —
+      # homura Opal patch: same `unpack('C*')` fix as raw_to_der —
       # `.bytes` returns UTF-8 byte codes in Opal which over-counts for
       # latin1 binstrs.
       def der_to_raw(der, curve_byte_size)

@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 # Route fragment 61 — demo /docs/sinatra
 get '/docs/sinatra' do
-  @title = 'sinatra-cloudflare-workers — homurabi Docs'
+  @title = 'sinatra-cloudflare-workers — homura Docs'
   @docs_page = 'sinatra'
   @docs_section = :reference
   @docs_breadcrumb = [

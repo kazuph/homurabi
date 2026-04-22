@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 #
-# homurabi patch: verbatim from ruby-jwt v2.9.3. No Opal incompatibility.
+# homura patch: verbatim from ruby-jwt v2.9.3. No Opal incompatibility.
 
 module JWT
   class EncodeError < StandardError; end

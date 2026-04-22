@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 #
-# homurabi patch: verbatim from ruby-jwt v2.9.3. Opal's JSON corelib
+# homura patch: verbatim from ruby-jwt v2.9.3. Opal's JSON corelib
 # implements ::JSON.generate / ::JSON.parse with CRuby semantics that
 # are compatible for the shapes JWT uses (Hash / Array / String / Numeric).
 

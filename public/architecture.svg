@@ -23,7 +23,7 @@
   <rect width="800" height="695" fill="#fafafa" rx="12"/>
 
   <!-- Title -->
-  <text x="400" y="35" text-anchor="middle" font-size="20" font-weight="bold" fill="#222">homurabi Architecture</text>
+  <text x="400" y="35" text-anchor="middle" font-size="20" font-weight="bold" fill="#222">homura Architecture</text>
   <text x="400" y="55" text-anchor="middle" font-size="12" fill="#888">Real Ruby + Real Sinatra on Cloudflare Workers via Opal</text>
 
   <!-- ===== Left column: Build time ===== -->
@@ -98,7 +98,7 @@
   <!-- R2 bucket -->
   <rect x="540" y="165" width="170" height="50" rx="6" fill="#fed7aa" stroke="#f97316" stroke-width="1"/>
   <text x="625" y="184" text-anchor="middle" fill="#9a3412" font-weight="bold" font-size="11">R2 Bucket</text>
-  <text x="625" y="200" text-anchor="middle" fill="#9a3412" font-size="10">homurabi-bucket</text>
+  <text x="625" y="200" text-anchor="middle" fill="#9a3412" font-size="10">homura-bucket</text>
 
   <!-- Arrow /images → R2 -->
   <line x1="510" y1="190" x2="540" y2="190" stroke="#f97316" stroke-width="1.5"/>
@@ -125,15 +125,15 @@
 
   <!-- Bindings row 1 -->
   <rect x="310" y="455" width="140" height="50" rx="6" fill="#dbeafe" stroke="#60a5fa" stroke-width="1"/>
-  <text x="380" y="474" text-anchor="middle" fill="#1e40af" font-weight="bold" font-size="11">D1 (homurabi-db)</text>
+  <text x="380" y="474" text-anchor="middle" fill="#1e40af" font-weight="bold" font-size="11">D1 (homura-db)</text>
   <text x="380" y="490" text-anchor="middle" fill="#1e40af" font-size="9.5">db.execute(sql, binds)</text>
 
   <rect x="460" y="455" width="130" height="50" rx="6" fill="#d1fae5" stroke="#34d399" stroke-width="1"/>
-  <text x="525" y="474" text-anchor="middle" fill="#065f46" font-weight="bold" font-size="11">KV (homurabi-kv)</text>
+  <text x="525" y="474" text-anchor="middle" fill="#065f46" font-weight="bold" font-size="11">KV (homura-kv)</text>
   <text x="525" y="490" text-anchor="middle" fill="#065f46" font-size="9.5">kv.get / kv.put</text>
 
   <rect x="600" y="455" width="140" height="50" rx="6" fill="#fed7aa" stroke="#f97316" stroke-width="1"/>
-  <text x="670" y="474" text-anchor="middle" fill="#9a3412" font-weight="bold" font-size="11">R2 (homurabi-bucket)</text>
+  <text x="670" y="474" text-anchor="middle" fill="#9a3412" font-weight="bold" font-size="11">R2 (homura-bucket)</text>
   <text x="670" y="490" text-anchor="middle" fill="#9a3412" font-size="9.5">bucket.get / bucket.put</text>
 
   <!-- Bindings row 2 -->
@@ -155,10 +155,10 @@
 
   <!-- ERB + Assets -->
   <rect x="310" y="578" width="210" height="36" rx="5" fill="#7c3aed" filter="url(#shadow)"/>
-  <text x="415" y="601" text-anchor="middle" fill="#fff" font-size="11">HomurabiTemplates (precompiled ERB)</text>
+  <text x="415" y="601" text-anchor="middle" fill="#fff" font-size="11">HomuraTemplates (precompiled ERB)</text>
 
   <rect x="530" y="578" width="210" height="36" rx="5" fill="#059669" filter="url(#shadow)"/>
-  <text x="635" y="601" text-anchor="middle" fill="#fff" font-size="11">HomurabiAssets (embedded public/)</text>
+  <text x="635" y="601" text-anchor="middle" fill="#fff" font-size="11">HomuraAssets (embedded public/)</text>
 
   <!-- Async label -->
   <rect x="310" y="628" width="440" height="36" rx="4" fill="#fef9c3" stroke="#eab308"/>

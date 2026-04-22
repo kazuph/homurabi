@@ -37,7 +37,7 @@ get '/demo/do/ws' do
   # JS Response must be passed through untouched (normal bodies
   # lose the WebSocket property when reconstructed).
   js_resp = stub.fetch_raw(
-    "https://homurabi-do.internal/ws/#{name}",
+    "https://homura-do.internal/ws/#{name}",
     method: 'GET',
     headers: { 'upgrade' => 'websocket' }
   )

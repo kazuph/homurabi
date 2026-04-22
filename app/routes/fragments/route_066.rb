@@ -5,8 +5,8 @@ get '/debug/mail' do
   next gate if gate
 
   @title = 'Debug — mail'
-  @mail_from = homurabi_mail_from
-  @form = Homurabi::DebugMailController.parse_form_params(params, default_to: true)
+  @mail_from = homura_mail_from
+  @form = Homura::DebugMailController.parse_form_params(params, default_to: true)
   @result = nil
   erb :debug_mail
 end

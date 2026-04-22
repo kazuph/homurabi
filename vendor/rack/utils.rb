@@ -1,7 +1,7 @@
 # -*- encoding: binary -*-
 # frozen_string_literal: true
 
-# homurabi patch: Opal's URI module does not provide RFC2396_PARSER /
+# homura patch: Opal's URI module does not provide RFC2396_PARSER /
 # DEFAULT_PARSER, and `fileutils` / `tempfile` are stubbed. We use `cgi`
 # for escape / unescape and provide a tiny CGI-backed URI_PARSER so the
 # rest of rack/utils.rb continues to work unchanged.
@@ -29,7 +29,7 @@ module Rack
     DEFAULT_SEP = QueryParser::DEFAULT_SEP
     COMMON_SEP = QueryParser::COMMON_SEP
     KeySpaceConstrainedParams = QueryParser::Params
-    # homurabi patch: CGI-backed URI_PARSER stand-in for Opal.
+    # homura patch: CGI-backed URI_PARSER stand-in for Opal.
     URI_PARSER = Module.new do
       def self.escape(s); CGI.escape(s.to_s); end
       def self.unescape(s); CGI.unescape(s.to_s); end

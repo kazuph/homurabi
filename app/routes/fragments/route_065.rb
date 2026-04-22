@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 # Route fragment 65 — demo /docs/architecture
 get '/docs/architecture' do
-  @title = 'アーキテクチャ — homurabi Docs'
+  @title = 'アーキテクチャ — homura Docs'
   @docs_page = 'architecture'
   @docs_section = :architecture
   @docs_breadcrumb = [

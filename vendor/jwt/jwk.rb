@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 #
-# homurabi patch: stub of ruby-jwt v2.9.3 jwk.rb. Upstream exposes
+# homura patch: stub of ruby-jwt v2.9.3 jwk.rb. Upstream exposes
 # `JWT::JWK.create_from` / `JWT::JWK::KeyFinder` which need full
 # OpenSSL::PKey::EC / RSA JWK serializers (n/e/d/p/q/dp/dq/qi,
 # crv/x/y/d, etc.) — a non-trivial vendoring effort beyond what Phase 8
@@ -13,7 +13,7 @@ module JWT
     class << self
       def create_from(*)
         raise JWT::JWKError,
-              'JWK support is not enabled in the homurabi jwt vendor (Phase 8). ' \
+              'JWK support is not enabled in the homura jwt vendor (Phase 8). ' \
               'Use plain OpenSSL::PKey::* keys with JWT.encode / JWT.decode.'
       end
 
@@ -24,7 +24,7 @@ module JWT
     class KeyFinder
       def initialize(*)
         raise JWT::JWKError,
-              'JWKS key finder is not enabled in the homurabi jwt vendor (Phase 8).'
+              'JWKS key finder is not enabled in the homura jwt vendor (Phase 8).'
       end
     end
   end

@@ -13,7 +13,7 @@ get '/chat' do
     next [302, '']
   end
 
-  @title = 'homurabi /chat — Workers AI'
+  @title = 'homura /chat — Workers AI'
   @primary_model  = App::CHAT_MODELS[:primary]
   @fallback_model = App::CHAT_MODELS[:fallback]
   @session_id = normalize_session_id(params['session'])

@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 # await: true
 #
-# homurabi patch: adapted from ruby-jwt v2.9.3 decode.rb.
+# homura patch: adapted from ruby-jwt v2.9.3 decode.rb.
 #
 # Every algorithm's verify() for non-HMAC algos returns a Promise (Web
 # Crypto subtle). Because Opal's `Enumerable#any?` evaluates the block
@@ -37,7 +37,7 @@ module JWT
         decode_signature
         verify_algo
         set_key
-        # homurabi patch: verify_signature is async (contains .__await__
+        # homura patch: verify_signature is async (contains .__await__
         # to resolve subtle-backed verify Promises). Without an explicit
         # await here, decode_segments would fall through while the
         # rejection fires out-of-band as an UnhandledPromiseRejection,
@@ -52,7 +52,7 @@ module JWT
 
     private
 
-    # homurabi patch: explicit while-loops replace Array#any? to await
+    # homura patch: explicit while-loops replace Array#any? to await
     # each per-key / per-algorithm verify call sequentially.
     def verify_signature
       return unless @key || @verify
@@ -82,13 +82,13 @@ module JWT
       @key = find_key(&@keyfinder) if @keyfinder
       @key = ::JWT::JWK::KeyFinder.new(jwks: @options[:jwks], allow_nil_kid: @options[:allow_nil_kid]).key_for(header['kid']) if @options[:jwks]
 
-      # homurabi patch: x5c verification not supported.
+      # homura patch: x5c verification not supported.
       return unless @options[:x5c]
 
-      raise JWT::DecodeError, 'x5c verification is not supported in the homurabi jwt vendor'
+      raise JWT::DecodeError, 'x5c verification is not supported in the homura jwt vendor'
     end
 
-    # homurabi patch: explicit while-loop so `.__await__` can sequence
+    # homura patch: explicit while-loop so `.__await__` can sequence
     # subtle verify Promises.
     def verify_signature_for?(key)
       algs = allowed_and_valid_algorithms

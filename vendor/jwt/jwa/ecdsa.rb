@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 # await: true
 #
-# homurabi patch: adapted from ruby-jwt v2.9.3 ecdsa.rb. Upstream goes
+# homura patch: adapted from ruby-jwt v2.9.3 ecdsa.rb. Upstream goes
 # through `signing_key.dsa_sign_asn1(digest.digest(data))` to get a DER
 # signature, then converts DER→raw R||S by hand via OpenSSL::ASN1. On
 # Workers we short-circuit: Web Crypto subtle's `ECDSA` sign already
@@ -23,7 +23,7 @@ module JWT
         'secp256r1'  => { algorithm: 'ES256', digest: 'sha256' }, # alias
         'secp384r1'  => { algorithm: 'ES384', digest: 'sha384' },
         'secp521r1'  => { algorithm: 'ES512', digest: 'sha512' }
-        # homurabi note: ES256K (secp256k1) intentionally omitted — not in
+        # homura note: ES256K (secp256k1) intentionally omitted — not in
         # the Web Crypto spec and not implementable through subtle.
       }.freeze
 
@@ -34,14 +34,14 @@ module JWT
 
       def sign(data:, signing_key:)
         check_curve!(signing_key)
-        # homurabi patch: `.__await__`. sign_jwt returns raw R||S directly
+        # homura patch: `.__await__`. sign_jwt returns raw R||S directly
         # — the JWT wire format — so no DER conversion is needed.
         signing_key.sign_jwt(digest, data).__await__
       end
 
       def verify(data:, signature:, verification_key:)
         check_curve!(verification_key)
-        # homurabi patch: `.__await__`. verify_jwt accepts raw R||S.
+        # homura patch: `.__await__`. verify_jwt accepts raw R||S.
         verification_key.verify_jwt(digest, signature, data).__await__
       rescue OpenSSL::PKey::PKeyError
         raise JWT::VerificationError, 'Signature verification raised'

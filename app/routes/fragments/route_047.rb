@@ -14,5 +14,5 @@ post '/demo/queue/force-dlq' do
   payload = { 'fail' => true, 'reason' => 'force-dlq demo', 'ts' => Time.now.to_i }
   q.send(payload)
   status 202
-  { 'enqueued' => true, 'payload' => payload, 'note' => 'main consumer will retry up to max_retries; then the runtime forwards the message to homurabi-jobs-dlq' }.to_json
+  { 'enqueued' => true, 'payload' => payload, 'note' => 'main consumer will retry up to max_retries; then the runtime forwards the message to homura-jobs-dlq' }.to_json
 end

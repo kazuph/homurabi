@@ -7,27 +7,27 @@ Phase 17.5 のゴール「ユーザーが `.__await__` も `# await:` magic comm
 ## 変更概要
 
 ### 新規ファイル
-- `gems/cloudflare-workers-runtime/lib/cloudflare_workers/async_registry.rb` — AsyncRegistry DSL
-- `gems/cloudflare-workers-runtime/lib/cloudflare_workers/auto_await/analyzer.rb` — AST flow analyzer
-- `gems/cloudflare-workers-runtime/lib/cloudflare_workers/auto_await/transformer.rb` — SourceRewriter による AST→ソース変換
-- `gems/cloudflare-workers-runtime/exe/auto-await` — CLI エントリポイント
-- `lib/homurabi_async_sources.rb` — プロジェクト固有の async source 登録
+- `gems/homura-runtime/lib/cloudflare_workers/async_registry.rb` — AsyncRegistry DSL
+- `gems/homura-runtime/lib/cloudflare_workers/auto_await/analyzer.rb` — AST flow analyzer
+- `gems/homura-runtime/lib/cloudflare_workers/auto_await/transformer.rb` — SourceRewriter による AST→ソース変換
+- `gems/homura-runtime/exe/auto-await` — CLI エントリポイント
+- `lib/homura_async_sources.rb` — プロジェクト固有の async source 登録
 - `test/auto_await_analyzer_test.rb` — analyzer 単体テスト
 - `examples/minimal-sinatra-with-email/` — Auto-Await デモ example（B8）
 - `views/docs_auto_await.erb` — `/docs/auto-await` ドキュメントページ（B10）
 
 ### 修正ファイル
-- `gems/cloudflare-workers-runtime/cloudflare-workers-runtime.gemspec` — `parser` を development dependency に移行
-- `gems/cloudflare-workers-runtime/lib/cloudflare_workers/auto_await/analyzer.rb` — ボトムアップ走査（子→親）に修正
+- `gems/homura-runtime/homura-runtime.gemspec` — auto-await analyzer 用に `parser` を runtime dependency のまま維持
+- `gems/homura-runtime/lib/cloudflare_workers/auto_await/analyzer.rb` — ボトムアップ走査（子→親）に修正
 - `gems/sequel-d1/lib/sequel/adapters/d1.rb` — `async_factory` 削除、`taint_return` のみに統合
-- `gems/cloudflare-workers-runtime/lib/cloudflare_workers/async_registry.rb` — Faraday::Connection HTTP verbs 追加
-- `lib/homurabi_async_sources.rb` — Sequel / HTTP / JWT 登録追加
+- `gems/homura-runtime/lib/cloudflare_workers/async_registry.rb` — Faraday::Connection HTTP verbs 追加
+- `lib/homura_async_sources.rb` — Sequel / HTTP / JWT 登録追加
 - `app/app.rb` — アプリ本体は素の Ruby のまま維持。auto-await 変換後ソースには必要に応じて `# await: true` が自動付与される
 - `app/routes/canonical_all.rb` — `# await: true` / 手動 `.__await__` を撤去、定数完全修飾名化（`App::JWT_ACCESS_TTL` 等）、`cache_get` を auto-await 可能な形へ整理
 - `app/app.rb` — Durable Object handler の `state.storage` access が auto-await されるよう analyzer 対応
 - `app/routes/fragments/route_034.rb` / `route_041.rb` / `route_067.rb` — canonical source 再生成結果を反映
-- `gems/cloudflare-workers-runtime/bin/cloudflare-workers-build` — auto-await 統合済み（確認済み）
-- `gems/sinatra-cloudflare-workers/lib/sinatra/jwt_auth.rb` — `register_async_source` 登録済み（確認済み）
+- `gems/homura-runtime/bin/cloudflare-workers-build` — auto-await 統合済み（確認済み）
+- `gems/sinatra-homura/lib/sinatra/jwt_auth.rb` — `register_async_source` 登録済み（確認済み）
 - `gems/sequel-d1/lib/sequel/adapters/d1.rb` — `register_async_source` 登録済み（確認済み）
 - `views/_docs_nav.erb` — Auto-Await リンク追加
 
@@ -62,7 +62,7 @@ Phase 17.5 のゴール「ユーザーが `.__await__` も `# await:` magic comm
 - [x] B1: `async_registry.rb` 実装
 - [x] B2: `analyzer.rb` 実装（ボトムアップ走査修正済み）
 - [x] B3: `cloudflare-workers-build` への統合
-- [x] B4: `sinatra-cloudflare-workers` の登録
+- [x] B4: `sinatra-homura` の登録
 - [x] B5: `sequel-d1` の登録
 - [x] B6: 既存 `__await__` 削除（app/ ソース上の `# await: true` / 手動 `.__await__` は 0 件）
 - [x] B7: 回帰検証（393/393 pass）

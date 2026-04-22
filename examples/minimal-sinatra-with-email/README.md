@@ -71,5 +71,5 @@ curl -X POST http://127.0.0.1:8787/send \
 | File | Purpose |
 |---|---|
 | `app.rb` | Your application — pure Ruby, no Cloudflare-specific syntax |
-| `Gemfile` | Pins the homurabi gems (use `gem install --local` for standalone) |
+| `Gemfile` | Pins the homura gems (use `gem install --local` for standalone) |
 | `wrangler.toml` | Workers config with `send_email` binding |

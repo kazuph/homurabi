@@ -4,7 +4,7 @@ get '/demo/queue/status' do
   content_type 'application/json'
   unless binding_demos_enabled?
     status 404
-    next({ 'error' => 'binding demos disabled (set HOMURABI_ENABLE_BINDING_DEMOS=1)' }.to_json)
+    next({ 'error' => 'binding demos disabled (set HOMURA_ENABLE_BINDING_DEMOS=1)' }.to_json)
   end
   if kv.nil?
     status 503
@@ -24,7 +24,7 @@ get '/demo/queue/status' do
     i += 1
   end
   {
-    'queue'   => 'homurabi-jobs',
+    'queue'   => 'homura-jobs',
     'count'   => recent.size,
     'recent'  => recent
   }.to_json

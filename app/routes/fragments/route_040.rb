@@ -4,7 +4,7 @@ get '/demo/do' do
   content_type 'application/json'
   unless binding_demos_enabled?
     status 404
-    next({ 'error' => 'binding demos disabled (set HOMURABI_ENABLE_BINDING_DEMOS=1)' }.to_json)
+    next({ 'error' => 'binding demos disabled (set HOMURA_ENABLE_BINDING_DEMOS=1)' }.to_json)
   end
   ns = do_counter
   if ns.nil?
@@ -17,12 +17,12 @@ get '/demo/do' do
   # `stub.fetch` requires an absolute URL — the Workers runtime
   # parses the URL to route the call. The host is irrelevant (the
   # DO receives the whole Request), but it must be parseable.
-  url = "https://homurabi-do.internal/#{action}"
+  url = "https://homura-do.internal/#{action}"
   res = stub.fetch(url, method: 'POST')
   {
     'demo'    => 'Durable Objects counter',
     'binding' => 'COUNTER',
-    'class'   => 'HomurabiCounterDO',
+    'class'   => 'HomuraCounterDO',
     'name'    => name,
     'action'  => action,
     'status'  => res.status,

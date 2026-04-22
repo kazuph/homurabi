@@ -42,7 +42,7 @@ module Sequel
     attr_reader :typecast_timezone
   
     %w'application database typecast'.each do |t|
-      # homurabi patch (Phase 12): define_method replaces class_eval(String)
+      # homura patch (Phase 12): define_method replaces class_eval(String)
       tz_name = t
       ivar_sym = :"@#{t}_timezone"
       define_method(:"#{tz_name}_timezone=") do |tz|

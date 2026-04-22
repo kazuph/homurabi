@@ -79,18 +79,18 @@ module Sequel
       end
       
       unless obj = Sequel.synchronize{map[scheme]}
-        # homurabi patch (Phase 12, LOAD-TIME required): Opal cannot
+        # homura patch (Phase 12, LOAD-TIME required): Opal cannot
         # statically resolve `require "sequel/adapters/#{file}"` —
         # its build-time require scanner rejects the interpolated
         # path. Must be patched in-place; externalising would be
         # too late (the MissingRequire fires at compile, not run).
-        # homurabi builds eagerly register adapters in vendor/sequel.rb,
+        # homura builds eagerly register adapters in vendor/sequel.rb,
         # so ADAPTER_MAP is already populated.
         return if subdir
         available = map.keys.inspect
         raise AdapterNotFound,
           "adapter #{file.inspect} is not registered (available: #{available}). " \
-          "homurabi builds only ship vendored adapters — see vendor/sequel.rb for the eager-require list."
+          "homura builds only ship vendored adapters — see vendor/sequel.rb for the eager-require list."
       end
 
       obj

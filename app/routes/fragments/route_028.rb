@@ -4,7 +4,7 @@ post '/test/scheduled/run' do
   content_type 'application/json'
   unless scheduled_demos_enabled?
     status 404
-    next({ 'error' => 'scheduled demos disabled (set HOMURABI_ENABLE_SCHEDULED_DEMOS=1 in wrangler vars)' }.to_json)
+    next({ 'error' => 'scheduled demos disabled (set HOMURA_ENABLE_SCHEDULED_DEMOS=1 in wrangler vars)' }.to_json)
   end
   cron = params['cron'].to_s
   if cron.empty?

@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 # backtick_javascript: true
 #
-# homurabi patch: Phase 12 — Sequel v5.103.0 Opal/Workers compatibility shims.
+# homura patch: Phase 12 — Sequel v5.103.0 Opal/Workers compatibility shims.
 #
 # Sequel's core path assumes CRuby Mutex/Thread and `class_eval("def x; end")`
 # runtime code generation. Cloudflare Workers forbids runtime eval; Opal's
@@ -9,11 +9,11 @@
 #
 # Two classes of fix:
 #   1. `class_eval(String)` → done **in-place** in vendor/sequel/*.rb,
-#      each patched with a `# homurabi patch:` comment marking the
+#      each patched with a `# homura patch:` comment marking the
 #      upstream line that was rewritten to `define_method(&block)`.
 #      See vendor/sequel/sql.rb, vendor/sequel/dataset/query.rb, etc.
 #   2. Runtime shims (Mutex, Thread.current) live here, loaded BEFORE
-#      vendor/sequel.rb — which is the homurabi entry point that
+#      vendor/sequel.rb — which is the homura entry point that
 #      requires 'sequel/core' after installing these shims.
 #
 # Scope: Phase 12 ships Dataset DSL + D1 adapter + migration CLI.
@@ -59,7 +59,7 @@ end
 # missing to avoid fighting Opal.
 # -----------------------------------------------------------------
 unless defined?(::Thread) && ::Thread.respond_to?(:current) && (::Thread.current.respond_to?(:status) rescue false)
-  module ::HomurabiThreadStub
+  module ::HomuraThreadStub
     class FauxThread
       def status
         'run'
@@ -88,7 +88,7 @@ unless defined?(::Thread) && ::Thread.respond_to?(:current) && (::Thread.current
   class ::Thread
     class << self
       def current
-        ::HomurabiThreadStub::INSTANCE
+        ::HomuraThreadStub::INSTANCE
       end
 
       def list
@@ -160,7 +160,7 @@ end
 # class_eval(String) guard was removed because it caused a
 # recursive alias_method loop during Opal load. All class_eval(String)
 # sites Sequel emits are patched **in-place** in the vendored file
-# (see `# homurabi patch:` comments in vendor/sequel/sql.rb,
+# (see `# homura patch:` comments in vendor/sequel/sql.rb,
 # vendor/sequel/dataset/query.rb, vendor/sequel/dataset/sql.rb,
 # vendor/sequel/timezones.rb). If a future Sequel upgrade introduces
 # a new class_eval(String) site we missed, the first call to that
@@ -196,7 +196,7 @@ end
 # `slice!`, `clear`) raises FrozenError, matching what native
 # String does. This avoids silent mutation bugs if Sequel (or a
 # future patch) freezes a cached SQL buffer.
-class ::HomurabiSqlBuffer
+class ::HomuraSqlBuffer
   def initialize(init = '')
     @chunks = init.empty? ? [] : [init.to_s]
     @frozen = false
@@ -292,7 +292,7 @@ class ::HomurabiSqlBuffer
   end
 
   def dup
-    ::HomurabiSqlBuffer.new(to_s)
+    ::HomuraSqlBuffer.new(to_s)
   end
 
   def inspect
@@ -310,7 +310,7 @@ class ::HomurabiSqlBuffer
   private
 
   def ensure_not_frozen!
-    raise ::FrozenError, "can't modify frozen HomurabiSqlBuffer: #{to_s.inspect}" if @frozen
+    raise ::FrozenError, "can't modify frozen HomuraSqlBuffer: #{to_s.inspect}" if @frozen
   end
 
   public

@@ -1,33 +1,32 @@
 require_relative 'lib/opal/version'
 
 Gem::Specification.new do |spec|
-  spec.name         = 'opal'
+  spec.name         = 'opal-homura'
   spec.version      = Opal::VERSION
-  spec.author       = ['Elia Schito', 'meh.', 'Adam Beynon']
+  spec.author       = ['Elia Schito', 'meh.', 'Adam Beynon', 'Kazuhiro Homma']
   spec.email        = ['elia@schito.me', 'meh@schizofreni.co']
 
-  spec.summary      = %{Ruby runtime and core library for JavaScript}
-  spec.description  = %{Opal is a Ruby to JavaScript compiler. It is source-to-source, making it fast as a runtime. Opal includes a compiler (which can be run in any browser), a corelib and runtime implementation. The corelib/runtime is also very small.}
-  spec.homepage     = 'https://opalrb.com'
+  spec.summary      = %{Patched Opal compiler/runtime for Cloudflare Workers}
+  spec.description  = %{Forked Opal 1.8.3.rc1 with homura patches for Cloudflare Workers, modern Ruby 3.4 compatibility, and the Sinatra-on-Workers toolchain. Library require path remains `opal`.}
+  spec.homepage     = 'https://github.com/kazuph/homura'
   spec.license      = 'MIT'
 
-  spec.metadata["homepage_uri"]          = "https://opalrb.com/"
-  spec.metadata["bug_tracker_uri"]       = "https://github.com/opal/opal/issues"
-  spec.metadata["changelog_uri"]         = "https://github.com/opal/opal/blob/v#{spec.version}/CHANGELOG.md"
-  spec.metadata["readme_uri"]            = "https://github.com/opal/opal/blob/v#{spec.version}/README.md"
-  spec.metadata["api_documentation_uri"] = "http://opalrb.com/docs/api/v#{spec.version}/index.html"
-  spec.metadata["guides_uri"]            = "http://opalrb.com/docs/guides/v#{spec.version}/index.html"
-  spec.metadata["chat_uri"]              = "https://gitter.im/opal/opal"
-  spec.metadata["source_code_uri"]       = "https://github.com/opal/opal"
+  gem_path = 'vendor/opal-gem'
+  spec.metadata["homepage_uri"]          = spec.homepage
+  spec.metadata["bug_tracker_uri"]       = "#{spec.homepage}/issues"
+  spec.metadata["changelog_uri"]         = "#{spec.homepage}/blob/main/#{gem_path}/CHANGELOG.md"
+  spec.metadata["readme_uri"]            = "#{spec.homepage}/blob/main/#{gem_path}/README.md"
+  spec.metadata["source_code_uri"]       = "#{spec.homepage}/tree/main/#{gem_path}"
 
-  # homurabi patch: vendor/opal-gem/ is not its own git repo (it's inside the
-  # homurabi repo), so upstream's `git ls-files` returns files from the outer
+  # homura patch: vendor/opal-gem/ is not its own git repo (it's inside the
+  # homura repo), so upstream's `git ls-files` returns files from the outer
   # repo and misses exe/. Use Dir.glob instead.
   files = Dir.chdir(__dir__) {
     Dir.glob('**/*', File::FNM_DOTMATCH).reject do |f|
       File.directory?(f) || File.symlink?(f) ||
         f.start_with?('.git/') || f == '.git' ||
-        f.start_with?('vendor/bundle/')
+        f.start_with?('vendor/bundle/') ||
+        f.end_with?('.gem')
     end
   }
 

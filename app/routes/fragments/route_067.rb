@@ -7,10 +7,10 @@ post '/debug/mail' do
   content_type 'text/html; charset=utf-8'
 
   @title = 'Debug — mail'
-  @mail_from = homurabi_mail_from
+  @mail_from = homura_mail_from
 
   mail = send_email
-  ctx = Homurabi::DebugMailController.prepare_send(params, env, self, mail)
+  ctx = Homura::DebugMailController.prepare_send(params, env, self, mail)
   if ctx[:error_result]
     @result = ctx[:error_result]
   else
@@ -22,9 +22,9 @@ post '/debug/mail' do
         text: ctx[:text_body],
         html: ctx[:html_body]
       )
-      @result = Homurabi::DebugMailController.after_send_success(raw, ctx)
+      @result = Homura::DebugMailController.after_send_success(raw, ctx)
     rescue Cloudflare::Email::Error => e
-      @result = Homurabi::DebugMailController.after_send_failure(e, ctx)
+      @result = Homura::DebugMailController.after_send_failure(e, ctx)
     end
   end
 

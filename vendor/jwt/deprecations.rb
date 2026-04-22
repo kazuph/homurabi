@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 #
-# homurabi patch: simplified from ruby-jwt v2.9.3 deprecations.rb.
+# homura patch: simplified from ruby-jwt v2.9.3 deprecations.rb.
 # Thread-local storage is replaced with a module-level @store because
 # Opal has no Thread.current and JWT.decode always runs on one worker
 # isolate at a time.

@@ -14,29 +14,31 @@
   <% else %>
     <p><strong>HOMURABI_MAIL_FROM</strong>: 未設定（ドメイン onboarding と wrangler vars が必要）</p>
   <% end %>
-  <% if @error %>
-    <p role="alert" style="color:#b91c1c;"><strong>エラー:</strong> <%= ERB::Util.html_escape(@error.to_s) %></p>
-  <% end %>
-  <% if @success_json %>
+  <% if @result && @result[:error] %>
+    <p role="alert" style="color:#b91c1c;"><strong>エラー:</strong> <%= ERB::Util.html_escape(@result[:error].to_s) %></p>
+  <% elsif @result && @result[:raw_json] %>
     <h2>送信結果（JSON）</h2>
-    <pre style="white-space:pre-wrap;background:#f3f4f6;padding:1rem;border-radius:6px;"><%= ERB::Util.html_escape(@success_json.to_s) %></pre>
+    <pre style="white-space:pre-wrap;background:#f3f4f6;padding:1rem;border-radius:6px;"><%= ERB::Util.html_escape(@result[:raw_json].to_s) %></pre>
+    <% if @result[:warning] %>
+      <p role="status" style="color:#b45309;"><strong>注意:</strong> <%= ERB::Util.html_escape(@result[:warning].to_s) %></p>
+    <% end %>
   <% end %>
   <form method="post" action="/debug/mail" style="max-width:36rem;">
     <p>
       <label for="to">To</label><br>
-      <input id="to" name="to" type="email" value="<%= ERB::Util.html_escape(@form_to.to_s) %>" style="width:100%;box-sizing:border-box;" required>
+      <input id="to" name="to" type="email" value="<%= ERB::Util.html_escape(@form[:to].to_s) %>" style="width:100%;box-sizing:border-box;" required>
     </p>
     <p>
       <label for="subject">Subject（空なら自動で Phase 17 テスト件名）</label><br>
-      <input id="subject" name="subject" type="text" value="<%= ERB::Util.html_escape(@form_subject.to_s) %>" style="width:100%;box-sizing:border-box;">
+      <input id="subject" name="subject" type="text" value="<%= ERB::Util.html_escape(@form[:subject].to_s) %>" style="width:100%;box-sizing:border-box;">
     </p>
     <p>
       <label for="text">Plain text（任意。<code>html</code> のみ指定時は省略可）</label><br>
-      <textarea id="text" name="text" rows="8" style="width:100%;box-sizing:border-box;"><%= ERB::Util.html_escape(@form_text.to_s) %></textarea>
+      <textarea id="text" name="text" rows="8" style="width:100%;box-sizing:border-box;"><%= ERB::Util.html_escape(@form[:text].to_s) %></textarea>
     </p>
     <p>
       <label for="html">HTML body（任意。<code>text:</code> と併用可）</label><br>
-      <textarea id="html" name="html" rows="8" placeholder="<p>HTML body…</p>" style="width:100%;box-sizing:border-box;"><%= ERB::Util.html_escape(@form_html.to_s) %></textarea>
+      <textarea id="html" name="html" rows="8" placeholder="<p>HTML body…</p>" style="width:100%;box-sizing:border-box;"><%= ERB::Util.html_escape(@form[:html].to_s) %></textarea>
     </p>
     <p><button type="submit">送信</button></p>
   </form>

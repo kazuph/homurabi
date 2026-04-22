@@ -15,11 +15,11 @@
     <p><strong>HOMURABI_MAIL_FROM</strong>: 未設定（ドメイン onboarding と wrangler vars が必要）</p>
   <% end %>
   <% if @error %>
-    <p role="alert" style="color:#b91c1c;"><strong>エラー:</strong> <%= Rack::Utils.escape_html(@error.to_s) %></p>
+    <p role="alert" style="color:#b91c1c;"><strong>エラー:</strong> <%= ERB::Util.html_escape(@error.to_s) %></p>
   <% end %>
   <% if @success_json %>
     <h2>送信結果（JSON）</h2>
-    <pre style="white-space:pre-wrap;background:#f3f4f6;padding:1rem;border-radius:6px;"><%= Rack::Utils.escape_html(@success_json.to_s) %></pre>
+    <pre style="white-space:pre-wrap;background:#f3f4f6;padding:1rem;border-radius:6px;"><%= ERB::Util.html_escape(@success_json.to_s) %></pre>
   <% end %>
   <form method="post" action="/debug/mail" style="max-width:36rem;">
     <p>

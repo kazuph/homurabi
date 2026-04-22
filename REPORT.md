@@ -115,7 +115,7 @@ curl -sS -b /tmp/p17-cookie.txt -X POST https://homurabi.kazu-san.workers.dev/de
   "cf_send_result_json": "{\"messageId\":\"<3bKVIsJnguzE9gjQt0BXP51yKwGwWRggFS33@kazuph-info.ai-work.uk>\"}",
   "to": "kazu.homma@gmail.com",
   "from": "noreply@kazuph-info.ai-work.uk",
-  "subject": "homurabi Phase 17 HTML CONFIRMATION (太字+リスト+リンク表示確認) — <CF-Ray suffix>"
+  "subject": "homurabi Phase 17 HTML CONFIRMATION (太字+リスト+リンク表示確認) — 9f00be87ee1dd534"
 }
 ```
 
@@ -133,3 +133,48 @@ curl -sS -b /tmp/p17-cookie.txt -X POST https://homurabi.kazu-san.workers.dev/de
 ```
 
 **マスターへ**: 件名に **HTML CONFIRMATION** と **太字+リスト+リンク** が含まれるメールで、Gmail でリッチ表示を確認してください。
+
+---
+
+## HTML が Gmail でレンダリングされなかった根本原因と修正（2026-04-22）
+
+参考: [Workers Email API — send](https://developers.cloudflare.com/email-service/api/send-emails/workers-api/)（`html` / `text` は任意組み合わせ・multipart）。
+
+### 原因（X）
+
+`build_send_payload` で `payload.subject` / `.text` / `.html` に **Opal の String オブジェクトをそのまま代入**していた。ランタイム上は `typeof payload.html === 'object'` となりうる。**Cloudflare Email の `binding.send(payload)` がプレーン JS の `string` を期待しているため、multipart の HTML 側が効かず text のみになっていた**。
+
+### 修正（Y）
+
+`gems/cloudflare-workers-runtime/lib/cloudflare_workers/email.rb` で **`subject` / `text` / `html` 代入時に `.toString()`（JS の primitive string）へ正規化**した。
+
+### wrangler tail での実証（デバッグビルド / Version `d851aa61-0315-445c-9639-cf0d6b6a23e2`）
+
+`binding.send` 直前に一時的に `console.log` を入れたデプロイで `/debug/mail` を POST。`logs` に以下が記録された（要旨）:
+
+```json
+{
+  "subject_type": "string",
+  "text_type": "string",
+  "html_type": "string",
+  "subject_len": 75,
+  "text_len": 28,
+  "html_len": 384,
+  "html_head": "<h1 style=\\\"color:#f6821f;\\\">HTML 表示確認</h1>..."
+}
+```
+
+※ `html_head` は URL エンコードされたフォーム由来で `%3D` 等が混ざるが、**`html_type` が `"string"` であること**が物理的な根拠。
+
+### 修正後の本番デプロイ
+
+- **ログ除去後の Version ID**: `a58bbf47-f411-446b-b4f2-45169fa1b4a3`
+
+### 再送信（修正後・ログなしビルド）
+
+- **message_id**: `<Fjgso94lijW0Ipw9tOdd8SVCkLzlGTWOGGmt@kazuph-info.ai-work.uk>`
+- **件名**: `homurabi Phase 17 HTML CONFIRMATION (太字+リスト+リンク表示確認)`（末尾に CF-Ray 由来の短いサフィックスが付く場合あり）
+
+デバッグ送信時の message_id（同一修正コード・ログ付きビルド）: `<Jr6YtZkTkdrWbhlk9CP4ep5V1xhB0yrEfCPN@kazuph-info.ai-work.uk>`（HTTP 200）。
+
+**マスターへ**: 上記 **再送信分**（`Fjgso94li…`）で Gmail の HTML 表示を確認してください。届かない場合はスパム／セグメントを確認。

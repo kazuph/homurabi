@@ -79,7 +79,9 @@ module Cloudflare
 
     def build_send_payload(to:, from:, subject:, text:, html:, reply_to:)
       obj = `({})`
-      `#{obj}.subject = #{subject}`
+      # Cloudflare Workers API は payload の text/html/subject を JS の primitive string として期待する。
+      # Opal の String は typeof === 'object' のため、そのまま代入すると multipart の html が無視されることがある。
+      `#{obj}.subject = #{subject}.toString()`
 
       # --- to (string | mixed array per Workers API) ---------------------
       to_js = normalize_to_js(to)
@@ -88,8 +90,8 @@ module Cloudflare
       # --- from -----------------------------------------------------------
       `#{obj}.from = #{normalize_from_js(from)}`
 
-      `#{obj}.text = #{text}` if !(text.nil? || text.to_s.empty?)
-      `#{obj}.html = #{html}` if !(html.nil? || html.to_s.empty?)
+      `#{obj}.text = #{text}.toString()` if !(text.nil? || text.to_s.empty?)
+      `#{obj}.html = #{html}.toString()` if !(html.nil? || html.to_s.empty?)
 
       # --- replyTo (camelCase in Workers API) -----------------------------
       rt_js = normalize_optional_reply_js(reply_to)

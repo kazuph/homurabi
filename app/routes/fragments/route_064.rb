@@ -1,4 +1,3 @@
-# await: true
 # frozen_string_literal: true
 # Route fragment 64 — demo /docs/auto-await
 get '/docs/auto-await' do

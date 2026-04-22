@@ -1,4 +1,3 @@
-# await: true
 # frozen_string_literal: true
 # Route fragment 59 — demo /docs/quick-start
 get '/docs/quick-start' do

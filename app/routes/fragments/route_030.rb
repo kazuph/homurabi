@@ -1,4 +1,3 @@
-# await: true
 # frozen_string_literal: true
 # Route fragment 30 — login /login
 post '/login' do

@@ -1,4 +1,3 @@
-# await: true
 # frozen_string_literal: true
 # Route fragment 32 — login /chat
 get '/chat' do

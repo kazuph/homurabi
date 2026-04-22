@@ -1,4 +1,3 @@
-# await: true
 # frozen_string_literal: true
 # Route fragment 55 — demo /demo/stream
 get '/demo/stream' do

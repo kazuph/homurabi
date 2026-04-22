@@ -1,4 +1,3 @@
-# await: true
 # frozen_string_literal: true
 # Route fragment 28 — test /test/scheduled/run
 post '/test/scheduled/run' do

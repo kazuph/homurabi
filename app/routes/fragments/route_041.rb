@@ -1,4 +1,3 @@
-# await: true
 # frozen_string_literal: true
 # Route fragment 41 — demo /demo/cache/heavy
 get '/demo/cache/heavy' do
@@ -12,10 +11,7 @@ get '/demo/cache/heavy' do
   cache_key = request.url
   ttl = (params['ttl'] || '60').to_i
   started = Time.now.to_f
-  # cache_get uses `__await__` internally (cache.match / cache.put)
-  # so the helper method is compiled as async by Opal — its return
-  # value is a Promise we MUST `__await__` at the call site.
-  body = cache_get(cache_key, ttl: ttl) do
+  compute_body = proc do
     # Expensive work: derive a PBKDF2 key + hash many times so the
     # first-request latency is non-trivial. The exact ~1000 iterations
     # is a compromise between "clearly slower than a cache hit" and
@@ -31,6 +27,7 @@ get '/demo/cache/heavy' do
       'computed_at' => Time.now.to_i
     }.to_json
   end
+  body = cache_get(cache_key, ttl: ttl, &compute_body)
   elapsed_ms = ((Time.now.to_f - started) * 1000).round
   # The helper set response.headers['x-homurabi-cache'] to HIT / MISS.
   cache_state = response['X-Homurabi-Cache'] || 'UNKNOWN'

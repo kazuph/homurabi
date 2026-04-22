@@ -1,4 +1,3 @@
-# await: true
 # frozen_string_literal: true
 # Route fragment 14 — demo /kv/:key
 put '/kv/:key' do

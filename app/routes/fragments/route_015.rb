@@ -1,4 +1,3 @@
-# await: true
 # frozen_string_literal: true
 # Route fragment 15 — demo /kv/:key
 delete '/kv/:key' do

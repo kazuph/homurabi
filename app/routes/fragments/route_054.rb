@@ -1,4 +1,3 @@
-# await: true
 # frozen_string_literal: true
 # Route fragment 54 — demo /phase11a/download/*
 get '/phase11a/download/*' do

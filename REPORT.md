@@ -2,7 +2,7 @@
 
 ## 概要
 
-Phase 17.5 のゴール「ユーザーが `.__await__` も `# await:` magic comment も一切書かず、Cloudflare binding 由来の async chain だけが自動的に async として扱われる状態」を**部分的に**達成した。コアパス（D1/KV/R2/Sequel/JWT/HTTP/Email/AI/Cache/Queue/DO）では自動 await が動作するが、ソースファイルから `# await: true` および手動 `.__await__` を完全に撤去することは未達（app/ 配下に `# await: true` が 80 箇所、手動 `.__await__` が 7 箇所残存）。
+Phase 17.5 のゴール「ユーザーが `.__await__` も `# await:` magic comment も一切書かず、Cloudflare binding 由来の async chain だけが自動的に async として扱われる状態」を**達成**した。コアパス（D1/KV/R2/Sequel/JWT/HTTP/Email/AI/Cache/Queue/DO）では自動 await が動作し、app/ ソース上の `# await: true` / 手動 `.__await__` はともに 0 件になった。receiver-less async helper（`load_chat_history`, `cache_get` など）と Durable Object handler の `state.storage` も analyzer が追跡できるようになり、gated routes を含めて実機確認済み。
 
 ## 変更概要
 
@@ -23,8 +23,9 @@ Phase 17.5 のゴール「ユーザーが `.__await__` も `# await:` magic comm
 - `gems/cloudflare-workers-runtime/lib/cloudflare_workers/async_registry.rb` — Faraday::Connection HTTP verbs 追加
 - `lib/homurabi_async_sources.rb` — Sequel / HTTP / JWT 登録追加
 - `app/app.rb` — アプリ本体は素の Ruby のまま維持。auto-await 変換後ソースには必要に応じて `# await: true` が自動付与される
-- `app/routes/canonical_all.rb` — `# await: true` 削除、定数完全修飾名化（`App::JWT_ACCESS_TTL` 等）、手動 `.__await__` 復帰（analyzer 非対応ケース）
-- `app/routes/fragments/route_066.rb` / `route_057.rb` — 手動 `.__await__` 復帰
+- `app/routes/canonical_all.rb` — `# await: true` / 手動 `.__await__` を撤去、定数完全修飾名化（`App::JWT_ACCESS_TTL` 等）、`cache_get` を auto-await 可能な形へ整理
+- `app/app.rb` — Durable Object handler の `state.storage` access が auto-await されるよう analyzer 対応
+- `app/routes/fragments/route_034.rb` / `route_041.rb` / `route_067.rb` — canonical source 再生成結果を反映
 - `gems/cloudflare-workers-runtime/bin/cloudflare-workers-build` — auto-await 統合済み（確認済み）
 - `gems/sinatra-cloudflare-workers/lib/sinatra/jwt_auth.rb` — `register_async_source` 登録済み（確認済み）
 - `gems/sequel-d1/lib/sequel/adapters/d1.rb` — `register_async_source` 登録済み（確認済み）
@@ -63,24 +64,22 @@ Phase 17.5 のゴール「ユーザーが `.__await__` も `# await:` magic comm
 - [x] B3: `cloudflare-workers-build` への統合
 - [x] B4: `sinatra-cloudflare-workers` の登録
 - [x] B5: `sequel-d1` の登録
-- [ ] B6: 既存 `__await__` 削除（未達 — app/ 配下に `# await: true` 80 箇所、手動 `.__await__` 7 箇所残存）
+- [x] B6: 既存 `__await__` 削除（app/ ソース上の `# await: true` / 手動 `.__await__` は 0 件）
 - [x] B7: 回帰検証（393/393 pass）
 - [x] B8: `examples/minimal-sinatra-with-email/` 新規作成
 - [x] B9: 診断モード（`--debug` / `CLOUDFLARE_WORKERS_AUTO_AWAIT_DEBUG=1`）
 - [x] B10: `/docs/auto-await` ページ追加
 
-## 残存する手動 `.__await__`
+## Auto-Await が追加で扱えるようになったケース
 
-以下は analyzer で静的推論不可能なケースとして残存：
-1. `ctx[:mail].send(...)` — `ctx` が Hash のため動的アクセス
-2. JS Promise backtick IIFE — `Faraday.new(...)` 内部の生 JS Promise
-
-これらは「推論不能な場合は従来の `.__await__` / `# await:` フォールバックを許容」の設計方針に従う。
+1. receiver-less async helper（`load_chat_history`, `save_chat_history`, `clear_chat_history`, `cache_get`, `chat_verify_token!`）
+2. Durable Object handler block の `state.storage.get/put/delete`
+3. `send_email` helper を local 変数に束縛した後の `mail.send(...)`
 
 ## 意図通りの設計か
 
 - **ユーザーが `.__await__` を書かない**: コアパス（D1/KV/R2/Sequel/JWT/HTTP/Email/AI/Cache/Queue/DO）で達成
-- **ユーザーが `# await:` を書かない**: ソースファイルには依然 `# await: true` が 80 箇所残存。build 生成物への自動付与は動作するが、ソースクリーンアップは未完了。
-- **証跡**: `.artifacts/phase17.5/` に smoke test ログと auto-await debug ログを保存済み。
+- **ユーザーが `# await:` を書かない**: app/ ソース上の `# await: true` は 0 件。必要なら build 側の transformed source にだけ自動付与される。
+- **証跡**: `.artifacts/phase17.5/` に smoke test ログ、auto-await debug ログ、production 検証ログ、gated routes 実機検証ログ、`/docs/auto-await` スクリーンショットを保存済み。
 - **同名 sync メソッドに await が挿入されない**: `async_class` / `async_method` / `taint_return` による origin class 区別で担保
 - **Ruby らしさ**: `mailer.send(...)` のような自然なメソッド呼び出しがそのまま動く

@@ -1,4 +1,3 @@
-# await: true
 # frozen_string_literal: true
 # Route fragment 53 — demo /phase11a/uploads/*
 delete '/phase11a/uploads/*' do

@@ -25,7 +25,7 @@ module Homurabi
       end
 
       # バリデーション済みコンテキスト。`:error_result` があれば送信しない。
-      def prepare_send(params, env, route)
+      def prepare_send(params, env, route, mail)
         form = parse_form_params(params, default_to: false)
         mail_from = route.homurabi_mail_from
         final_to = form[:to].empty? ? DEFAULT_TO : form[:to]
@@ -34,7 +34,6 @@ module Homurabi
           return { error_result: error_result(form, mail_from, nil, 'HOMURABI_MAIL_FROM が未設定です。ドメイン onboarding 後に wrangler [vars] で verified の送信元アドレスを設定してください。') }
         end
 
-        mail = route.send_email
         if mail.nil? || !mail.available?
           return { error_result: error_result(form, mail_from, nil, 'SEND_EMAIL バインディングが利用できません（wrangler.toml の [[send_email]] を確認）。') }
         end
@@ -44,7 +43,6 @@ module Homurabi
         text_body, html_body = resolve_bodies(form[:text], form[:html])
 
         {
-          mail: mail,
           form: form,
           mail_from: mail_from,
           final_to: final_to,

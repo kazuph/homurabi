@@ -788,27 +788,22 @@
       status 401
       next({ 'error' => 'unauthorized', 'reason' => 'missing bearer token' }.to_json)
     end
-    # JWT verify (post-await). Setting `status N` after the await would
-    # not take effect because Sinatra's `invoke` snapshots
-    # `response.status` synchronously when it sees a Promise body, so
-    # any mutation that happens later than that snapshot is lost. We
-    # work around it by returning `[status, body]` from the route — the
-    # homurabi patch in `build_js_response` detects that single-chunk
-    # shape and uses the embedded status when constructing the JS
-    # Response.
-    decode_err = `(async function(){
-      try {
-        await #{JWT.decode(auth_token, settings.jwt_secret, true, algorithm: settings.jwt_algorithm)};
-        return null;
-      } catch (e) {
-        var msg = (e && e.$message) ? e.$message() : (e && e.message) ? e.message : String(e);
-        return 'invalid token: ' + String(msg);
-      }
-    })()`.__await__
-    is_failure = `(#{decode_err} != null && #{decode_err} !== undefined)`
-    if is_failure
-      err_msg = decode_err.to_s
-      next [401, { 'error' => 'unauthorized', 'reason' => err_msg }.to_json]
+    # JWT verify may resolve asynchronously. If verification fails after
+    # the await, return `[status, body]` directly so build_js_response
+    # preserves the non-200 status instead of relying on post-await
+    # `status 401`.
+    begin
+      JWT.decode(auth_token, settings.jwt_secret, true, algorithm: settings.jwt_algorithm)
+    rescue JWT::ExpiredSignature
+      next [401, { 'error' => 'unauthorized', 'reason' => 'token expired' }.to_json]
+    rescue JWT::ImmatureSignature
+      next [401, { 'error' => 'unauthorized', 'reason' => 'token not yet valid' }.to_json]
+    rescue JWT::IncorrectAlgorithm
+      next [401, { 'error' => 'unauthorized', 'reason' => 'algorithm mismatch' }.to_json]
+    rescue JWT::VerificationError
+      next [401, { 'error' => 'unauthorized', 'reason' => 'signature verification failed' }.to_json]
+    rescue JWT::DecodeError => e
+      next [401, { 'error' => 'unauthorized', 'reason' => "invalid token: #{e.message}" }.to_json]
     end
     bgate = ai_binding_block_or_nil
     next bgate if bgate
@@ -1109,10 +1104,7 @@
     cache_key = request.url
     ttl = (params['ttl'] || '60').to_i
     started = Time.now.to_f
-    # cache_get uses `__await__` internally (cache.match / cache.put)
-    # so the helper method is compiled as async by Opal — its return
-    # value is a Promise we MUST `__await__` at the call site.
-    body = cache_get(cache_key, ttl: ttl) do
+    compute_body = proc do
       # Expensive work: derive a PBKDF2 key + hash many times so the
       # first-request latency is non-trivial. The exact ~1000 iterations
       # is a compromise between "clearly slower than a cache hit" and
@@ -1128,6 +1120,7 @@
         'computed_at' => Time.now.to_i
       }.to_json
     end
+    body = cache_get(cache_key, ttl: ttl, &compute_body)
     elapsed_ms = ((Time.now.to_f - started) * 1000).round
     # The helper set response.headers['x-homurabi-cache'] to HIT / MISS.
     cache_state = response['X-Homurabi-Cache'] || 'UNKNOWN'
@@ -1923,18 +1916,19 @@
     @title = 'Debug — mail'
     @mail_from = homurabi_mail_from
 
-    ctx = Homurabi::DebugMailController.prepare_send(params, env, self)
+    mail = send_email
+    ctx = Homurabi::DebugMailController.prepare_send(params, env, self, mail)
     if ctx[:error_result]
       @result = ctx[:error_result]
     else
       begin
-        raw = ctx[:mail].send(
+        raw = mail.send(
           to: ctx[:final_to],
           from: ctx[:mail_from],
           subject: ctx[:subject_line],
           text: ctx[:text_body],
           html: ctx[:html_body]
-        ).__await__
+        )
         @result = Homurabi::DebugMailController.after_send_success(raw, ctx)
       rescue Cloudflare::Email::Error => e
         @result = Homurabi::DebugMailController.after_send_failure(e, ctx)

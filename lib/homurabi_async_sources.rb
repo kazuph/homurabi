@@ -33,6 +33,11 @@ CloudflareWorkers::AsyncRegistry.register_async_source do
   helper_factory :cache, 'Cloudflare::Cache'
   helper_factory :jobs_queue, 'Cloudflare::Queue'
   helper_factory :do_counter, 'Cloudflare::DurableObjectNamespace'
+  async_helper :cache_get, 'Homurabi::CloudflareBindingHelpers'
+  async_helper :load_chat_history, 'Homurabi::ChatHistoryHelpers'
+  async_helper :save_chat_history, 'Homurabi::ChatHistoryHelpers'
+  async_helper :clear_chat_history, 'Homurabi::ChatHistoryHelpers'
+  async_helper :chat_verify_token!, 'Homurabi::ChatHistoryHelpers'
 
   taint_return 'Sequel', :connect, 'Sequel::D1::Database'
   async_method 'Sequel::D1::Database', :execute

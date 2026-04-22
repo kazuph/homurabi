@@ -1,0 +1,59 @@
+<h1>Cloudflare Email Service（送信）</h1>
+<p>Agents Week 2026 で public beta の Email Sending を、homurabi では <code>SEND_EMAIL</code> バインディングと Ruby ラッパー <code>Cloudflare::Email</code> から利用します。</p>
+
+<h2 id="overview">概要</h2>
+<ul>
+  <li>Workers の binding だけで送信でき、別途 API キーをコードに埋め込む必要はありません。</li>
+  <li>このサイトではテスト用に <a href="/debug/mail"><code>/debug/mail</code></a> を用意しています（本番では認可されたセッションのみ）。</li>
+</ul>
+
+<h2 id="setup">domain onboarding</h2>
+<ol>
+  <li>Cloudflare Dashboard → Email Sending → Onboard Domain で所有ドメインを選択。</li>
+  <li>DNS（SPF / DKIM / DMARC / bounce 用 MX）が自動提案されるので承認・反映を待つ。</li>
+  <li>検証済みの送信元アドレスを決め、<code>wrangler.toml</code> の <code>[vars] HOMURABI_MAIL_FROM</code> に設定する。</li>
+</ol>
+<p>未 onboarding のまま送ると <code>E_SENDER_NOT_VERIFIED</code> や <code>E_SENDER_DOMAIN_NOT_AVAILABLE</code> などが返ります。</p>
+
+<pre><code># wrangler.toml（抜粋）
+[[send_email]]
+name = "SEND_EMAIL"
+
+[vars]
+HOMURABI_MAIL_FROM = "noreply@example.com"
+</code></pre>
+
+<h2 id="wrapper">Cloudflare::Email</h2>
+<p><strong>送信バインディングは Worker の <code>env.SEND_EMAIL</code> が正</strong>です。<code>worker_module.mjs</code> の <code>fetch</code> 先頭で <code>globalThis.__OPAL_WORKERS__.sendEmailBinding</code> にコピーしたうえで、Rack 側は <code>env['cloudflare.SEND_EMAIL']</code>（<code>Cloudflare::Email</code> ラッパー）として参照します。D1 / Queue などが <code>cloudflare.env</code> 経由で触るパターンとは別に、Email はこの明示注入経路が主軸です（Miniflare でも同じ JS オブジェクトを拾えるようにするため）。</p>
+<pre><code>mail = send_email # => env['cloudflare.SEND_EMAIL']（内部は env.SEND_EMAIL と同一バインディング）
+mail.send(
+  to: 'you@example.com',
+  from: ENV_STYLE_FROM, # 実際は vars の HOMURABI_MAIL_FROM を参照
+  subject: 'Hello',
+  text: 'Plain text body',
+  html: '&lt;p&gt;Optional rich body&lt;/p&gt;' # 省略可／text と併用可（どちらか必須）
+).__await__
+</code></pre>
+<p>アプリ側ではヘルパー <code>send_email</code> と <code>homurabi_mail_from</code> を利用できます。</p>
+
+<h2 id="matrix">できること / できないこと</h2>
+<table>
+  <thead><tr><th></th><th>できること</th><th>できないこと</th></tr></thead>
+  <tbody>
+    <tr><td>送信</td><td>トランザクショナルメール（Workers binding 経由）</td><td>マーケティング向けの購読管理・テンプレート基盤は対象外</td></tr>
+    <tr><td>宛先</td><td>仕様上は任意の宛先（Rate / アカウント制限は別途）</td><td>インバウンド受信は <a href="https://developers.cloudflare.com/email-service/">別 API</a></td></tr>
+    <tr><td>ローカル</td><td><code>wrangler dev</code>（既定はシミュレーション、<code>remote: true</code> で実送信も可）</td><td>このリポジトリではデフォルト運用のみ記載</td></tr>
+    <tr><td>料金</td><td>Cloudflare の Email Service / Workers 課金ポリシーに従う</td><td>無料枠のみでの無制限は保証されない</td></tr>
+  </tbody>
+</table>
+
+<h2 id="debug">セルフホストデモ</h2>
+<p>認証付きの簡易フォーム: <a href="/debug/mail">/debug/mail</a></p>
+
+<h2 id="links">公式リンク</h2>
+<ul>
+  <li><a href="https://developers.cloudflare.com/email-service/get-started/send-emails/">Get Started — Send emails</a></li>
+  <li><a href="https://developers.cloudflare.com/email-service/api/send-emails/workers-api/">Workers API（send）</a></li>
+  <li><a href="https://developers.cloudflare.com/email-service/">Email Service トップ</a></li>
+  <li><a href="https://blog.cloudflare.com/email-for-agents/">ブログ: Email for Agents</a></li>
+</ul>

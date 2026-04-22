@@ -47,6 +47,12 @@ def trim_route_chunk(chunk)
   chunk[0..last_i]
 end
 
+# `canonical_all.rb` lines are indented with 2 spaces (as if inside `class App`). Fragment
+# files are read alone, so strip that common leading 2 spaces for a top-level look.
+def dedent_route_chunk_lines(chunk)
+  chunk.map { |line| line.sub(/\A  /, '') }
+end
+
 def route_starts?(line)
   line =~ ROUTE_HEAD
 end
@@ -92,7 +98,7 @@ route_chunks.each_with_index do |chunk, idx|
   fname = format('route_%03d.rb', idx + 1)
   body = +await_line + "\n# frozen_string_literal: true\n"
   body << "# Route fragment #{idx + 1} — #{cat} #{path}\n"
-  body << chunk.join
+  body << dedent_route_chunk_lines(chunk).join
   File.write(File.join(FRAG, fname), body)
 end
 

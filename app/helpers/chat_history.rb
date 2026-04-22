@@ -45,6 +45,17 @@ module Homurabi
       env['cloudflare.QUEUE_JOBS_DLQ']
     end
 
+    def send_email
+      env['cloudflare.SEND_EMAIL']
+    end
+
+    # Phase 17 — verified sender after Cloudflare Email Service domain onboarding (`wrangler.toml` [vars]).
+    def homurabi_mail_from
+      cf_env = env['cloudflare.env']
+      return '' unless cf_env
+      `(#{cf_env}.HOMURABI_MAIL_FROM || '')`.to_s.strip
+    end
+
     def cache_get(cache_key, ttl: 60, content_type_override: nil, &block)
       raise ArgumentError, 'cache_get requires a block' unless block
       cache_ttl = ttl.to_i

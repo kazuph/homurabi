@@ -16,7 +16,8 @@ PAGES = [
   { file: 'docs_sinatra.erb', path: '/docs/sinatra', title: 'sinatra-cloudflare-workers' },
   { file: 'docs_sequel_d1.erb', path: '/docs/sequel-d1', title: 'sequel-d1' },
   { file: 'docs_runtime.erb', path: '/docs/runtime', title: 'cloudflare-workers-runtime' },
-  { file: 'docs_architecture.erb', path: '/docs/architecture', title: 'Architecture' }
+  { file: 'docs_architecture.erb', path: '/docs/architecture', title: 'Architecture' },
+  { file: 'docs_email.erb', path: '/docs/email', title: 'Email Service' }
 ].freeze
 
 entries = []

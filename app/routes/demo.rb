@@ -1,6 +1,6 @@
 # await: all, authenticate!, call, chat_verify_token!, clear_chat_history, decode, dh_compute_key, dispatch_js, dispatch_scheduled, encode, execute, execute_insert, fetch, fetch_raw, final, get_binary, get_first_row, get_response, list, load_chat_history, open, private_decrypt, public_encrypt, run, save_chat_history, send, sign, sign_pss, sleep, verify, verify_pss
 # frozen_string_literal: true
-# Domain: demo — fragment indices 1, 2, 3, 5, 6, 7, 8, 9, 13, 14, 15, 16, 17, 18, 19, 20, 21, 26, 39, 40, 41, 43, 44, 46, 47, 49, 51, 52, 53, 54, 55, 56, 58, 59, 60, 61, 62, 63, 64 (documentation only; routes load via app/app.rb).
+# Domain: demo — fragment indices 1, 2, 3, 5, 6, 7, 8, 9, 13, 14, 15, 16, 17, 18, 19, 20, 21, 26, 39, 40, 41, 43, 44, 46, 47, 49, 51, 52, 53, 54, 55, 56, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67 (documentation only; routes load via app/app.rb).
 # fragments/route_001
 # fragments/route_002
 # fragments/route_003
@@ -40,3 +40,6 @@
 # fragments/route_062
 # fragments/route_063
 # fragments/route_064
+# fragments/route_065
+# fragments/route_066
+# fragments/route_067

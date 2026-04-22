@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 #
-# homurabi patch: simplified from ruby-jwt v2.9.3 hmac.rb.
+# homura patch: simplified from ruby-jwt v2.9.3 hmac.rb.
 #
 #   1. `OpenSSL::HMAC.digest` is synchronous in our Phase 7 vendor
 #      (node:crypto.createHmac), so no `.__await__` is needed.
@@ -50,7 +50,7 @@ module JWT
 
       attr_reader :digest
 
-      # homurabi patch: see header comment. Hex-normalised comparison is
+      # homura patch: see header comment. Hex-normalised comparison is
       # what actually works on Opal's two binary-String flavours.
       module SecurityUtils
         def self.secure_compare(a, b)

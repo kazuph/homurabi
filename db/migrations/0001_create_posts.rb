@@ -1,4 +1,4 @@
-# Example Sequel migration — compiled to SQL by bin/homurabi-migrate
+# Example Sequel migration — compiled to SQL by bin/homura-migrate
 # for consumption by `wrangler d1 migrations apply`. Never loaded
 # inside the Opal bundle (migration runner is CRuby-only).
 Sequel.migration do

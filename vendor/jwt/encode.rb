@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 # await: true
 #
-# homurabi patch: adapted from ruby-jwt v2.9.3 encode.rb.
+# homura patch: adapted from ruby-jwt v2.9.3 encode.rb.
 #
 # Algorithm sign() for RS/PS/ES/EdDSA hits Web Crypto subtle through
 # OpenSSL::PKey — async in Opal. Any method that transitively calls
@@ -52,7 +52,7 @@ module JWT
       encode_data(@payload)
     end
 
-    # homurabi patch: returns whatever the algorithm returns — a JS Promise
+    # homura patch: returns whatever the algorithm returns — a JS Promise
     # for subtle-backed algos (RS/PS/ES/EdDSA) or a String for HMAC. Caller
     # `.__await__`s the result.
     def compute_signature

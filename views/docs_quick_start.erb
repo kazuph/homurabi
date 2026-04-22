@@ -1,5 +1,5 @@
 <h1>Quick Start（約 5 分）</h1>
-<p>Phase 15-E のスキャフォールド（<code>gems/sinatra-cloudflare-workers/bin/cloudflare-workers-new</code>）で検証済みの手順です。</p>
+<p>Phase 15-E のスキャフォールド（<code>gems/sinatra-homura/bin/cloudflare-workers-new</code>）で検証済みの手順です。</p>
 
 <h2 id="prereq">前提</h2>
 <ul>
@@ -9,9 +9,9 @@
 </ul>
 
 <h2 id="scaffold">新規プロジェクト</h2>
-<p>gem は <strong>rubygems.org 未公開</strong>のため、homurabi 作業ツリーを <code>--gem-root</code> で指します（<code>vendor/opal-gem</code> と <code>gems/*</code> が必要）。</p>
-<pre><code># homurabi リポジトリのパスに置き換え
-bundle exec cloudflare-workers-new myapp --gem-root /path/to/homurabi
+<p>gem は <strong>rubygems.org 未公開</strong>のため、homura 作業ツリーを <code>--gem-root</code> で指します（<code>vendor/opal-gem</code> と <code>gems/*</code> が必要）。</p>
+<pre><code># homura リポジトリのパスに置き換え
+bundle exec cloudflare-workers-new myapp --gem-root /path/to/homura
 cd myapp
 bundle install
 npm install</code></pre>
@@ -33,6 +33,6 @@ npm install</code></pre>
 <h2 id="limits">現在の制限</h2>
 <ul>
   <li><strong>rubygems</strong>: 3 gem は <code>gem build</code> 可能だが、公開は別フェーズ（準備中）。当面は <code>path:</code> または <code>--gem-root</code> スキャフォールドを使う。</li>
-  <li><strong>ERB</strong>: Workers 上では実行時 <code>eval</code> 不可のため、<code>bundle exec cloudflare-workers-erb-compile</code>（または homurabi の <code>compile-erb</code> 相当）で事前コンパイルが必須。</li>
+  <li><strong>ERB</strong>: Workers 上では実行時 <code>eval</code> 不可のため、<code>bundle exec cloudflare-workers-erb-compile</code>（または homura の <code>compile-erb</code> 相当）で事前コンパイルが必須。</li>
   <li><strong>Opal</strong>: <code>vendor/opal-gem</code> 固定版（Gemfile の <code>path</code>）に合わせる。</li>
 </ul>

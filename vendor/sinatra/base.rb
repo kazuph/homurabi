@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 #
-# homurabi Phase 13 — Sinatra::Base loader wrapper.
+# homura Phase 13 — Sinatra::Base loader wrapper.
 #
 # vendor/sinatra_upstream/ holds pristine upstream sinatra/sinatra
 # v4.2.1. This file loads upstream unchanged, then applies every

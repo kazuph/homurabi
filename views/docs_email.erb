@@ -1,5 +1,5 @@
 <h1>Cloudflare Email Service（送信）</h1>
-<p>Agents Week 2026 で public beta の Email Sending を、homurabi では <code>SEND_EMAIL</code> バインディングと Ruby ラッパー <code>Cloudflare::Email</code> から利用します。</p>
+<p>Agents Week 2026 で public beta の Email Sending を、homura では <code>SEND_EMAIL</code> バインディングと Ruby ラッパー <code>Cloudflare::Email</code> から利用します。</p>
 
 <h2 id="overview">概要</h2>
 <ul>
@@ -11,7 +11,7 @@
 <ol>
   <li>Cloudflare Dashboard → Email Sending → Onboard Domain で所有ドメインを選択。</li>
   <li>DNS（SPF / DKIM / DMARC / bounce 用 MX）が自動提案されるので承認・反映を待つ。</li>
-  <li>検証済みの送信元アドレスを決め、<code>wrangler.toml</code> の <code>[vars] HOMURABI_MAIL_FROM</code> に設定する。</li>
+  <li>検証済みの送信元アドレスを決め、<code>wrangler.toml</code> の <code>[vars] HOMURA_MAIL_FROM</code> に設定する。</li>
 </ol>
 <p>未 onboarding のまま送ると <code>E_SENDER_NOT_VERIFIED</code> や <code>E_SENDER_DOMAIN_NOT_AVAILABLE</code> などが返ります。</p>
 
@@ -20,7 +20,7 @@
 name = "SEND_EMAIL"
 
 [vars]
-HOMURABI_MAIL_FROM = "noreply@example.com"
+HOMURA_MAIL_FROM = "noreply@example.com"
 </code></pre>
 
 <h2 id="wrapper">Cloudflare::Email</h2>
@@ -28,13 +28,13 @@ HOMURABI_MAIL_FROM = "noreply@example.com"
 <pre><code>mail = send_email # => env['cloudflare.SEND_EMAIL']（内部は env.SEND_EMAIL と同一バインディング）
 mail.send(
   to: 'you@example.com',
-  from: ENV_STYLE_FROM, # 実際は vars の HOMURABI_MAIL_FROM を参照
+  from: ENV_STYLE_FROM, # 実際は vars の HOMURA_MAIL_FROM を参照
   subject: 'Hello',
   text: 'Plain text body',
   html: '&lt;p&gt;Optional rich body&lt;/p&gt;' # 省略可／text と併用可（どちらか必須）
 ).__await__
 </code></pre>
-<p>アプリ側ではヘルパー <code>send_email</code> と <code>homurabi_mail_from</code> を利用できます。</p>
+<p>アプリ側ではヘルパー <code>send_email</code> と <code>homura_mail_from</code> を利用できます。</p>
 
 <h2 id="matrix">できること / できないこと</h2>
 <table>

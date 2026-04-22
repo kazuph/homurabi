@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 #
-# homurabi patch (Phase 12): runtime monkey-patches for Sequel that
+# homura patch (Phase 12): runtime monkey-patches for Sequel that
 # don't need to fire during the Sequel load — they only matter at
 # call time. Codex-reviewed split: compared to in-place edits under
 # vendor/sequel/, these overrides are portable and let the vendored
@@ -13,7 +13,7 @@ require 'sequel/core'
 
 module Sequel
   class Database
-    # homurabi patch (Phase 12): Opal represents Ruby Symbols as
+    # homura patch (Phase 12): Opal represents Ruby Symbols as
     # native JS strings, so `:table.is_a?(String)` returns true and
     # sends `DB[:users]` down the `fetch(String)` path (which expects
     # verbatim SQL). Explicit Symbol check routes correctly.
@@ -37,7 +37,7 @@ end
 # Opal's compile-time resolver rejects before runtime code has any
 # chance to intercept. They stay patched in-place under
 # vendor/sequel/connection_pool.rb and vendor/sequel/database/connecting.rb
-# with `# homurabi patch (Phase 12, LOAD-TIME required)` comments.
+# with `# homura patch (Phase 12, LOAD-TIME required)` comments.
 # ------------------------------------------------------------------
 
 # ------------------------------------------------------------------
@@ -45,22 +45,22 @@ end
 # literal_append allocate plain String instances which Opal treats
 # as immutable — the `<<` accumulator pattern raises
 # NotImplementedError. Replace the allocation sites with
-# HomurabiSqlBuffer, which implements the Sequel-expected subset of
+# HomuraSqlBuffer, which implements the Sequel-expected subset of
 # String (from lib/sequel_opal_patches.rb).
 # ------------------------------------------------------------------
 class Sequel::Dataset
   def sql_string_origin
-    ::HomurabiSqlBuffer.new
+    ::HomuraSqlBuffer.new
   end
 
   # upstream literal_append Symbol branch:
   #   l = String.new
   #   literal_symbol_append(l, v)
   #   db.literal_symbol_set(v, l)
-  # homurabi: use Buffer for the append accumulator; cache the
+  # homura: use Buffer for the append accumulator; cache the
   # rendered String form on the db so subsequent calls hit the
   # cache without re-creating a Buffer.
-  alias_method :__homurabi_orig_literal_append, :literal_append
+  alias_method :__homura_orig_literal_append, :literal_append
   def literal_append(sql, v)
     if v.is_a?(Symbol)
       if skip_symbol_cache?
@@ -74,7 +74,7 @@ class Sequel::Dataset
         sql << l
       end
     else
-      __homurabi_orig_literal_append(sql, v)
+      __homura_orig_literal_append(sql, v)
     end
   end
 end

@@ -130,7 +130,7 @@ post '/api/chat/messages' do
     # Phase 11B follow-up: pre-rendered HTML so the client can
     # `innerHTML = reply_html` to show Markdown formatting (bullet
     # lists, bold, code fences, links). Safe to insert because
-    # `HomurabiMarkdown.render` HTML-escapes the input first and
+    # `HomuraMarkdown.render` HTML-escapes the input first and
     # restricts link hrefs to http/https/mailto/relative.
     'reply_html'   => markdown_html(reply_text),
     'history_len'  => new_history.size

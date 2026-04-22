@@ -5,7 +5,7 @@ source 'https://rubygems.org'
 ruby '>= 3.4.0'
 
 # Mode A — monorepo dev | Mode B — local `.gem` install (order: opal → runtime → sinatra → sequel-d1).
-gem 'opal', path: '../../vendor/opal-gem'
-gem 'cloudflare-workers-runtime', path: '../../gems/cloudflare-workers-runtime'
-gem 'sinatra-cloudflare-workers', path: '../../gems/sinatra-cloudflare-workers'
+gem 'opal-homura', path: '../../vendor/opal-gem', require: 'opal'
+gem 'homura-runtime', path: '../../gems/homura-runtime'
+gem 'sinatra-homura', path: '../../gems/sinatra-homura'
 gem 'sequel-d1', path: '../../gems/sequel-d1'

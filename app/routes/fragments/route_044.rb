@@ -22,7 +22,7 @@ get '/demo/cache/named' do
     next({ 'error' => 'key must match /\\A[A-Za-z0-9._\\-\\/]{1,128}\\z/',
            'got'   => key }.to_json)
   end
-  cache_key = "https://homurabi-named-cache.internal/#{namespace}/#{key}"
+  cache_key = "https://homura-named-cache.internal/#{namespace}/#{key}"
   started = Time.now.to_f
   # Open the named partition fresh per request — the JS handle is
   # cached per-isolate internally but the Ruby wrapper is cheap.

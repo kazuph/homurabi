@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 #
-# homurabi patch: verbatim structure from ruby-jwt v2.9.3 claims.rb.
+# homura patch: verbatim structure from ruby-jwt v2.9.3 claims.rb.
 
 require 'jwt/claims/audience'
 require 'jwt/claims/expiration'

@@ -15,7 +15,7 @@ written retention reason.
 | **Rack** | `vendor/rack.rb`, `vendor/rack/{request,utils,show_exceptions,builder.rb}`, `vendor/rack/session/cookie.rb`, `vendor/rack/media_type.rb` | Opal regex / immutability / JSON session coder / Workers eval ban. **Retention**: cross-cutting; many hunks are `(b)` upstream feasibility checks. |
 | **OpenSSL stub** | `vendor/openssl.rb` | `nodejs_compat` + Web Crypto bridge for PBKDF/RSA used in demos. **Retention**: Workers environment; not upstream Rack. |
 | **Opal gem** | `vendor/opal-gem/opal/opal.rb`, `vendor/opal-gem/opal/corelib/{regexp,error}.rb` | CPU budget (`corelib/irb` drop), regexp `gsub` parity, `UncaughtThrowError` hierarchy. **Retention**: tracked as forked `path:` gem; upstream issues filed per hunk when possible. |
-| **Stubs** | `vendor/zlib.rb`, `vendor/tilt.rb`, `vendor/tempfile.rb`, `vendor/rackup.rb`, `vendor/rubygems/version.rb` | Minimal shims for gems Sinatra loads but Workers does not implement. **Retention**: `(a)` candidates to move into `lib/homurabi/stubs/` later. |
+| **Stubs** | `vendor/zlib.rb`, `vendor/tilt.rb`, `vendor/tempfile.rb`, `vendor/rackup.rb`, `vendor/rubygems/version.rb` | Minimal shims for gems Sinatra loads but Workers does not implement. **Retention**: `(a)` candidates to move into `lib/homura/stubs/` later. |
 | **JWT** | `vendor/jwt/**/*.rb` | Vendored dependency copy; grep hits are mostly version strings — verify diff vs upstream gem when promoting to `(b)`. |
 
 ## Classification key

@@ -4,7 +4,7 @@ get '/demo/cache/heavy' do
   content_type 'application/json'
   unless binding_demos_enabled?
     status 404
-    next({ 'error' => 'binding demos disabled (set HOMURABI_ENABLE_BINDING_DEMOS=1)' }.to_json)
+    next({ 'error' => 'binding demos disabled (set HOMURA_ENABLE_BINDING_DEMOS=1)' }.to_json)
   end
   # Cache by request URL so different query strings produce different
   # cache entries (cache-busting with ?v=N works).
@@ -17,7 +17,7 @@ get '/demo/cache/heavy' do
     # is a compromise between "clearly slower than a cache hit" and
     # "finishes inside wrangler dev's request budget on an M1".
     salt = SecureRandom.random_bytes(16)
-    derived = OpenSSL::KDF.pbkdf2_hmac('homurabi-phase11b',
+    derived = OpenSSL::KDF.pbkdf2_hmac('homura-phase11b',
       salt: salt, iterations: 50_000, length: 32, hash: 'SHA256')
     {
       'computed'    => 'expensive PBKDF2 derivation',
@@ -29,8 +29,8 @@ get '/demo/cache/heavy' do
   end
   body = cache_get(cache_key, ttl: ttl, &compute_body)
   elapsed_ms = ((Time.now.to_f - started) * 1000).round
-  # The helper set response.headers['x-homurabi-cache'] to HIT / MISS.
-  cache_state = response['X-Homurabi-Cache'] || 'UNKNOWN'
+  # The helper set response.headers['x-homura-cache'] to HIT / MISS.
+  cache_state = response['X-Homura-Cache'] || 'UNKNOWN'
   # Re-serialise with extra diagnostic fields so the route caller can
   # see which path ran without cracking open headers from a browser.
   orig = begin

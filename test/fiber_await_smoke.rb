@@ -72,7 +72,7 @@ end
 
 class MockD1
   def execute(sql)
-    PromiseV2.value([{ 'id' => 1, 'name' => 'kazu' }, { 'id' => 2, 'name' => 'homurabi' }])
+    PromiseV2.value([{ 'id' => 1, 'name' => 'kazu' }, { 'id' => 2, 'name' => 'homura' }])
   end
 
   def get_first_row(sql, binds)

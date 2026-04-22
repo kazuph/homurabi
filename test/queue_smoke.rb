@@ -15,7 +15,7 @@
 #      and #ack_all / #retry_all forward to the JS batch.
 #   6. consume_queue DSL (Sinatra::Queue) registers a handler that
 #      the dispatcher picks up by queue name.
-#   7. globalThis.__HOMURABI_QUEUE_DISPATCH__ is installed and runs
+#   7. globalThis.__HOMURA_QUEUE_DISPATCH__ is installed and runs
 #      the Ruby handler when invoked by JS.
 
 require 'json'
@@ -62,22 +62,22 @@ end
 # object (Opal treats multi-line x-strings as statements).
 # ---------------------------------------------------------------------
 
-`globalThis.__homurabi_queue_fake_producer = function() { var p = { _sends: [], _batches: [], send: function(body, opts) { p._sends.push({ body: body, opts: opts || {} }); return Promise.resolve(); }, sendBatch: function(msgs, opts) { p._batches.push({ msgs: msgs, opts: opts || {} }); return Promise.resolve(); } }; return p; };`
+`globalThis.__homura_queue_fake_producer = function() { var p = { _sends: [], _batches: [], send: function(body, opts) { p._sends.push({ body: body, opts: opts || {} }); return Promise.resolve(); }, sendBatch: function(msgs, opts) { p._batches.push({ msgs: msgs, opts: opts || {} }); return Promise.resolve(); } }; return p; };`
 
-`globalThis.__homurabi_queue_fake_batch = function(queue_name, bodies) { var calls = { acks: 0, retries: 0, ackAll: 0, retryAll: 0 }; var msgs = bodies.map(function(b, i) { return { id: 'mid-' + i, timestamp: new Date(1700000000000 + i * 1000), body: b, ack: function() { calls.acks += 1; }, retry: function(opts) { calls.retries += 1; this._retryOpts = opts; } }; }); return { queue: queue_name, messages: msgs, ackAll: function() { calls.ackAll += 1; }, retryAll: function(opts) { calls.retryAll += 1; this._retryAllOpts = opts; }, __calls: calls }; };`
+`globalThis.__homura_queue_fake_batch = function(queue_name, bodies) { var calls = { acks: 0, retries: 0, ackAll: 0, retryAll: 0 }; var msgs = bodies.map(function(b, i) { return { id: 'mid-' + i, timestamp: new Date(1700000000000 + i * 1000), body: b, ack: function() { calls.acks += 1; }, retry: function(opts) { calls.retries += 1; this._retryOpts = opts; } }; }); return { queue: queue_name, messages: msgs, ackAll: function() { calls.ackAll += 1; }, retryAll: function(opts) { calls.retryAll += 1; this._retryAllOpts = opts; }, __calls: calls }; };`
 
 def fake_queue_producer
-  `globalThis.__homurabi_queue_fake_producer()`
+  `globalThis.__homura_queue_fake_producer()`
 end
 
 def fake_batch(queue_name, bodies)
   js_bodies = `[]`
   bodies.each { |b| `#{js_bodies}.push(#{b})` }
   qname = queue_name.to_s
-  `globalThis.__homurabi_queue_fake_batch(#{qname}, #{js_bodies})`
+  `globalThis.__homura_queue_fake_batch(#{qname}, #{js_bodies})`
 end
 
-$stdout.puts '=== homurabi Phase 11B — Queue smoke ==='
+$stdout.puts '=== homura Phase 11B — Queue smoke ==='
 $stdout.puts ''
 
 # ---------------------------------------------------------------------
@@ -294,8 +294,8 @@ end
 $stdout.puts ''
 $stdout.puts '--- JS dispatcher hook ---'
 
-SmokeTest.assert('globalThis.__HOMURABI_QUEUE_DISPATCH__ is installed') do
-  `typeof globalThis.__HOMURABI_QUEUE_DISPATCH__ === 'function'`
+SmokeTest.assert('globalThis.__HOMURA_QUEUE_DISPATCH__ is installed') do
+  `typeof globalThis.__HOMURA_QUEUE_DISPATCH__ === 'function'`
 end
 
 SmokeTest.assert('JS hook forwards through to the Ruby handler') do
@@ -305,7 +305,7 @@ SmokeTest.assert('JS hook forwards through to the Ruby handler') do
     consume_queue('via-js-hook') { |batch| bucket['fired'] += batch.size }
   end
   batch = fake_batch('via-js-hook', [`({})`, `({})`, `({})`])
-  promise = `globalThis.__HOMURABI_QUEUE_DISPATCH__(#{batch}, ({}), ({}))`
+  promise = `globalThis.__HOMURA_QUEUE_DISPATCH__(#{batch}, ({}), ({}))`
   summary = promise.__await__
   bucket['fired'] == 3 && summary['handled'] == true
 end

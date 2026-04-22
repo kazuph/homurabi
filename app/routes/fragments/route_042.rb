@@ -4,7 +4,7 @@ post '/api/enqueue' do
   content_type 'application/json'
   unless binding_demos_enabled?
     status 404
-    next({ 'error' => 'binding demos disabled (set HOMURABI_ENABLE_BINDING_DEMOS=1)' }.to_json)
+    next({ 'error' => 'binding demos disabled (set HOMURA_ENABLE_BINDING_DEMOS=1)' }.to_json)
   end
   q = jobs_queue
   if q.nil?
@@ -18,5 +18,5 @@ post '/api/enqueue' do
   end
   q.send(body)
   status 202
-  { 'enqueued' => true, 'queue' => 'homurabi-jobs', 'payload' => body }.to_json
+  { 'enqueued' => true, 'queue' => 'homura-jobs', 'payload' => body }.to_json
 end

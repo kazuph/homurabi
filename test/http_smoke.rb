@@ -107,7 +107,7 @@ end
 # Tests
 # =====================================================================
 
-$stdout.puts "=== homurabi Phase 6 — HTTP smoke ==="
+$stdout.puts "=== homura Phase 6 — HTTP smoke ==="
 $stdout.puts ""
 
 $stdout.puts "--- Cloudflare::HTTP.fetch ---"

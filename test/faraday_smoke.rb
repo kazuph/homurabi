@@ -44,12 +44,12 @@ end
 
 # --- fetch stub --------------------------------------------------------
 # Records every call so tests can assert request URL / method / headers.
-`globalThis.__homurabi_fetch_calls__ = [];`
+`globalThis.__homura_fetch_calls__ = [];`
 
 def install_stub(response_factory)
   `
     globalThis.fetch = function(url, init) {
-      globalThis.__homurabi_fetch_calls__.push({ url: url, init: init });
+      globalThis.__homura_fetch_calls__.push({ url: url, init: init });
       var r = (typeof #{response_factory} === 'function')
         ? #{response_factory}(url, init)
         : #{response_factory};
@@ -59,11 +59,11 @@ def install_stub(response_factory)
 end
 
 def last_call
-  `globalThis.__homurabi_fetch_calls__[globalThis.__homurabi_fetch_calls__.length - 1]`
+  `globalThis.__homura_fetch_calls__[globalThis.__homura_fetch_calls__.length - 1]`
 end
 
 def reset_calls
-  `globalThis.__homurabi_fetch_calls__ = []`
+  `globalThis.__homura_fetch_calls__ = []`
   Faraday.reset_default_connection
 end
 

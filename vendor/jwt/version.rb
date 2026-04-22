@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 #
-# homurabi patch: vendored from ruby-jwt v2.9.3. We drop CRuby-specific
+# homura patch: vendored from ruby-jwt v2.9.3. We drop CRuby-specific
 # helpers (openssl_3?, rbnacl?) that are never true on Workers, keeping
 # just the version constant needed by deprecations/compat code paths.
 
@@ -13,12 +13,12 @@ module JWT
     MAJOR  = 2
     MINOR  = 9
     TINY   = 3
-    PRE    = 'homurabi'
+    PRE    = 'homura'
 
     STRING = [MAJOR, MINOR, TINY, PRE].compact.join('.')
   end
 
-  # homurabi patch: these probes are referenced by vendored code paths
+  # homura patch: these probes are referenced by vendored code paths
   # (jwa.rb). On Workers, RbNaCl is not available and OpenSSL is our
   # Opal wrapper, not libssl — both helpers return false.
   def self.openssl_3?;                           false; end

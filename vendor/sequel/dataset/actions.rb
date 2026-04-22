@@ -1,11 +1,11 @@
 # frozen-string-literal: true
 #
-# homurabi note (Phase 12): this file stays upstream-bit-identical.
+# homura note (Phase 12): this file stays upstream-bit-identical.
 # The async-boundary patches (`_all` / `with_sql_first` /
 # `single_value` / `with_sql_single_value`) live in
 # lib/sequel_opal_async_dataset_patches.rb and reopen Dataset with
 # the `# await: true` magic comment, keeping this file free of
-# homurabi-specific diffs that would rebase-conflict on upstream
+# homura-specific diffs that would rebase-conflict on upstream
 # upgrades.
 
 module Sequel

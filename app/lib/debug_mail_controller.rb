@@ -5,13 +5,13 @@
 
 require 'json'
 
-module Homurabi
+module Homura
   module DebugMailController
     class << self
       DEFAULT_TO = 'kazu.homma@gmail.com'
 
       SUBJECT_HAS_FULL_VERSION =
-        /homurabi Phase 17 test.{0,3}Version\s+[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z/i
+        /homura Phase 17 test.{0,3}Version\s+[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z/i
 
       def parse_form_params(params, default_to: false)
         to = sanitize_form(params['to']).strip
@@ -27,11 +27,11 @@ module Homurabi
       # バリデーション済みコンテキスト。`:error_result` があれば送信しない。
       def prepare_send(params, env, route, mail)
         form = parse_form_params(params, default_to: false)
-        mail_from = route.homurabi_mail_from
+        mail_from = route.homura_mail_from
         final_to = form[:to].empty? ? DEFAULT_TO : form[:to]
 
         if mail_from.empty?
-          return { error_result: error_result(form, mail_from, nil, 'HOMURABI_MAIL_FROM が未設定です。ドメイン onboarding 後に wrangler [vars] で verified の送信元アドレスを設定してください。') }
+          return { error_result: error_result(form, mail_from, nil, 'HOMURA_MAIL_FROM が未設定です。ドメイン onboarding 後に wrangler [vars] で verified の送信元アドレスを設定してください。') }
         end
 
         if mail.nil? || !mail.available?
@@ -74,9 +74,9 @@ module Homurabi
 
       private
 
-      # `Homurabi::DebugMailHelpers.www_decode` — `+` / `%xx`（閉じタグの `%2F` 等）を確実に直す。
+      # `Homura::DebugMailHelpers.www_decode` — `+` / `%xx`（閉じタグの `%2F` 等）を確実に直す。
       def sanitize_form(value)
-        Homurabi::DebugMailHelpers.www_decode(value)
+        Homura::DebugMailHelpers.www_decode(value)
       end
 
       def vid_from_env(env)
@@ -86,7 +86,7 @@ module Homurabi
 
       def resolve_subject_line(form_subject, vid)
         fs = form_subject.strip
-        return "homurabi Phase 17 test — #{vid}" if fs.empty?
+        return "homura Phase 17 test — #{vid}" if fs.empty?
         return fs if fs =~ SUBJECT_HAS_FULL_VERSION
 
         "#{fs} — #{vid}"
@@ -95,7 +95,7 @@ module Homurabi
       def resolve_bodies(form_text, form_html)
         html = form_html.strip.empty? ? nil : form_html
         text = if form_text.strip.empty?
-                 html ? nil : 'This is a test mail from homurabi'
+                 html ? nil : 'This is a test mail from homura'
                else
                  form_text
                end

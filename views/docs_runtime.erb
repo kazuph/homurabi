@@ -10,10 +10,10 @@
 
 <h2 id="build">ビルド CLI</h2>
 <pre><code>bundle exec cloudflare-workers-build</code></pre>
-<p>homurabi では <code>npm run build</code> がこれを呼びます。コンシューマ向けに <code>--standalone</code> があり、Gemfile の <code>path:</code> から <code>vendor/</code> を取り込みます。</p>
+<p>homura では <code>npm run build</code> がこれを呼びます。コンシューマ向けに <code>--standalone</code> があり、Gemfile の <code>path:</code> から <code>vendor/</code> を取り込みます。</p>
 
 <h2 id="entrypoint">worker.entrypoint.mjs</h2>
-<p><code>gems/cloudflare-workers-runtime/docs/ARCHITECTURE.md</code> に定義どおり:</p>
+<p><code>gems/homura-runtime/docs/ARCHITECTURE.md</code> に定義どおり:</p>
 <ul>
   <li><code>wrangler.toml</code> の <code>main</code> は生成された <code>build/worker.entrypoint.mjs</code>。</li>
   <li>エントリは <code>setup-node-crypto</code> → Opal バンドル（副作用ロード）→ <code>worker_module.mjs</code> の<strong>固定文字列 import</strong>。</li>

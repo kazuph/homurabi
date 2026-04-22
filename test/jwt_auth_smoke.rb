@@ -30,7 +30,7 @@ module Kernel
 end
 
 # Load the Sinatra::JwtAuth helpers in isolation
-$LOAD_PATH.unshift(File.expand_path('../gems/sinatra-cloudflare-workers/lib', __dir__))
+$LOAD_PATH.unshift(File.expand_path('../gems/sinatra-homura/lib', __dir__))
 require 'sinatra/jwt_auth'
 
 module SmokeTest

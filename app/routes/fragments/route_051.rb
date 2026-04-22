@@ -4,7 +4,7 @@ get '/phase11a/upload' do
   @title = 'Phase 11A — image upload demo'
   unless foundations_demos_enabled?
     status 404
-    @content = '<p>foundations demos disabled (set HOMURABI_ENABLE_FOUNDATIONS_DEMOS=1).</p>'
+    @content = '<p>foundations demos disabled (set HOMURA_ENABLE_FOUNDATIONS_DEMOS=1).</p>'
     next erb :layout
   end
   @images = []

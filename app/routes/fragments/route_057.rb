@@ -4,7 +4,7 @@ get '/test/foundations' do
   content_type 'application/json'
   unless foundations_demos_enabled?
     status 404
-    next({ 'error' => 'foundations demos disabled (set HOMURABI_ENABLE_FOUNDATIONS_DEMOS=1)' }.to_json)
+    next({ 'error' => 'foundations demos disabled (set HOMURA_ENABLE_FOUNDATIONS_DEMOS=1)' }.to_json)
   end
 
   cases = []
@@ -53,9 +53,9 @@ get '/test/foundations' do
   # directly instead of a live round-trip.
   run.call('Faraday :json middleware encodes Hash body (offline)') {
     env = Faraday::Env.new(method: :post, url: 'https://example.com/x')
-    env.body = { 'name' => 'homurabi', 'phase' => 11 }
+    env.body = { 'name' => 'homura', 'phase' => 11 }
     Faraday::Middleware::JSON.new.on_request(env)
-    env.body == '{"name":"homurabi","phase":11}' &&
+    env.body == '{"name":"homura","phase":11}' &&
       env.request_headers['content-type'] == 'application/json'
   }
 
@@ -121,7 +121,7 @@ end
 # Mustermann on Opal rejects `^`/`$` in regex routes. Trailing `/docs/` is normalized
 # to `/docs` in Rack::Handler::CloudflareWorkers.build_rack_env (runtime gem).
 docs_index_route = lambda do
-  @title = 'ドキュメント — homurabi'
+  @title = 'ドキュメント — homura'
   @docs_page = 'index'
   @docs_section = :getting_started
   @docs_breadcrumb = [

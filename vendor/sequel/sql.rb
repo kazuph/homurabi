@@ -109,7 +109,7 @@ module Sequel
         # Do not call this method with untrusted input, as that can result in
         # arbitrary code execution.
         def to_s_method(meth, args=:self) # :nodoc:
-          # homurabi patch (Phase 12): replace class_eval(String) with
+          # homura patch (Phase 12): replace class_eval(String) with
           # define_method. Upstream embedded the `args` expression
           # verbatim into a generated method body (so `'@op, @args'`
           # became `ds.xxx_append(sql, @op, @args)` — instance-var
@@ -136,7 +136,7 @@ module Sequel
           @comparison_attrs.freeze
         end
 
-        # homurabi patch (Phase 12): Small expression parser for
+        # homura patch (Phase 12): Small expression parser for
         # to_s_method's `args` — handles ivar (`@foo`), integer
         # literal, single-quoted string, symbol (`:foo`), and bare
         # identifier that resolves via `send(:foo)` on self. Anything
@@ -160,7 +160,7 @@ module Sequel
             ->(instance) { instance.send(m) }
           else
             raise ::NotImplementedError,
-              "[homurabi phase12] to_s_method cannot parse arg expression #{expr.inspect}. " \
+              "[homura phase12] to_s_method cannot parse arg expression #{expr.inspect}. " \
               "Extend vendor/sequel/sql.rb:parse_to_s_method_arg to handle new patterns."
           end
         end
@@ -329,7 +329,7 @@ module Sequel
     #   ~Sequel[:a].sql_number # ~"a"
     module BitwiseMethods
       ComplexExpression::BITWISE_OPERATORS.each do |o|
-        # homurabi patch (Phase 12): define_method in place of module_eval(String)
+        # homura patch (Phase 12): define_method in place of module_eval(String)
         # Original: module_eval("def #{o}(o) NumericExpression.new(#{o.inspect}, self, o) end", ...)
         op_sym = o
         define_method(op_sym) { |other| NumericExpression.new(op_sym, self, other) }
@@ -357,7 +357,7 @@ module Sequel
     #   Sequel[:a] | (Sequel[:b] + 1) # "a" | ("b" + 1)
     module BooleanMethods
       ComplexExpression::BOOLEAN_OPERATOR_METHODS.each do |m, o|
-        # homurabi patch (Phase 12): define_method in place of module_eval(HEREDOC).
+        # homura patch (Phase 12): define_method in place of module_eval(HEREDOC).
         # Captures `m` and `o` in block closure to preserve per-iteration values.
         meth_sym = m
         op_sym = o
@@ -818,7 +818,7 @@ module Sequel
     #   Sequel[:a] <= :b # a <= "b"
     module InequalityMethods
       ComplexExpression::INEQUALITY_OPERATORS.each do |o|
-        # homurabi patch (Phase 12): define_method replaces module_eval(String)
+        # homura patch (Phase 12): define_method replaces module_eval(String)
         op_sym = o
         define_method(op_sym) { |other| BooleanExpression.new(op_sym, self, other) }
       end
@@ -839,7 +839,7 @@ module Sequel
     #   Sequel[:a] + 'b' # "a" || 'b'
     module NumericMethods
       (ComplexExpression::MATHEMATICAL_OPERATORS - [:+]).each do |o|
-        # homurabi patch (Phase 12): define_method replaces module_eval(String)
+        # homura patch (Phase 12): define_method replaces module_eval(String)
         op_sym = o
         define_method(op_sym) { |other| NumericExpression.new(op_sym, self, other) }
       end
@@ -910,7 +910,7 @@ module Sequel
     #   Sequel.&(:b, :a)   # (b AND a)
     #   Sequel.|(:b, :a)   # (b OR a)
     module OperatorBuilders
-      # homurabi patch (Phase 12): keep the klass-by-name lookup lazy
+      # homura patch (Phase 12): keep the klass-by-name lookup lazy
       # (was upstream behaviour via class_eval(String) too). The actual
       # SQL::NumericExpression / BooleanExpression classes aren't
       # defined until later in this same file, so resolving at module
@@ -1977,7 +1977,7 @@ module Sequel
       include OperatorBuilders
 
       %w'> < >= <='.each do |op|
-        # homurabi patch (Phase 12): define_method replaces class_eval(HEREDOC)
+        # homura patch (Phase 12): define_method replaces class_eval(HEREDOC)
         op_sym = op.to_sym
         define_method(op_sym) { |*args| SQL::BooleanExpression.new(op_sym, *args) }
       end

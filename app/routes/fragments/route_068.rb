@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 # Route fragment 68 — demo /docs/email
 get '/docs/email' do
-  @title = 'Cloudflare Email Service — homurabi Docs'
+  @title = 'Cloudflare Email Service — homura Docs'
   @docs_page = 'email'
   @docs_section = :reference
   @docs_breadcrumb = [

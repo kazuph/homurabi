@@ -4,7 +4,7 @@
 #
 # Usage:
 #   ./bin/test-on-workers                  # against http://127.0.0.1:8787
-#   BASE=https://homurabi.kazu-san.workers.dev ./bin/test-on-workers
+#   BASE=https://homura.kazu-san.workers.dev ./bin/test-on-workers
 #
 # Designed to be the in-Worker equivalent of `npm run test:crypto`
 # (which runs in Node). Use this after `npm run dev` or `wrangler

@@ -143,7 +143,7 @@ def last_call
   Cloudflare.js_to_ruby(raw)
 end
 
-$stdout.puts '=== homurabi Phase 10 — Workers AI smoke ==='
+$stdout.puts '=== homura Phase 10 — Workers AI smoke ==='
 $stdout.puts ''
 
 # ---------------------------------------------------------------------

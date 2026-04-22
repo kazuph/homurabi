@@ -13,7 +13,7 @@
     erb :layout
   end
   get '/about' do
-    @title = 'About homurabi'
+    @title = 'About homura'
     @content = erb :about
     erb :layout
   end
@@ -388,7 +388,7 @@
     content_type 'application/json'
     unless crypto_demos_enabled?
       status 404
-      next { 'error' => 'crypto demos disabled (set HOMURABI_ENABLE_CRYPTO_DEMOS=1 in wrangler vars)' }.to_json
+      next { 'error' => 'crypto demos disabled (set HOMURA_ENABLE_CRYPTO_DEMOS=1 in wrangler vars)' }.to_json
     end
     cases = []
     run = lambda { |label, &blk|
@@ -588,7 +588,7 @@
     content_type 'application/json'
     unless crypto_demos_enabled?
       status 404
-      next { 'error' => 'crypto demos disabled (set HOMURABI_ENABLE_CRYPTO_DEMOS=1 in wrangler vars)' }.to_json
+      next { 'error' => 'crypto demos disabled (set HOMURA_ENABLE_CRYPTO_DEMOS=1 in wrangler vars)' }.to_json
     end
 
     # 1) Digest one-shots
@@ -656,7 +656,7 @@
     content_type 'application/json'
     unless scheduled_demos_enabled?
       status 404
-      next { 'error' => 'scheduled demos disabled (set HOMURABI_ENABLE_SCHEDULED_DEMOS=1 in wrangler vars)' }.to_json
+      next { 'error' => 'scheduled demos disabled (set HOMURA_ENABLE_SCHEDULED_DEMOS=1 in wrangler vars)' }.to_json
     end
     {
       'jobs' => App.scheduled_jobs.map do |job|
@@ -673,7 +673,7 @@
     content_type 'application/json'
     unless scheduled_demos_enabled?
       status 404
-      next({ 'error' => 'scheduled demos disabled (set HOMURABI_ENABLE_SCHEDULED_DEMOS=1 in wrangler vars)' }.to_json)
+      next({ 'error' => 'scheduled demos disabled (set HOMURA_ENABLE_SCHEDULED_DEMOS=1 in wrangler vars)' }.to_json)
     end
     cron = params['cron'].to_s
     if cron.empty?
@@ -692,7 +692,7 @@
     result.merge('cron' => cron, 'registered_crons' => App.scheduled_jobs.map(&:cron)).to_json
   end
   get '/login' do
-    @title = 'Login — homurabi'
+    @title = 'Login — homura'
     @login_error = nil
     @content = erb :login
     erb :layout
@@ -711,7 +711,7 @@
     # truncate it on verification (split(':', 2)), so the
     # displayed/stored user wouldn't match what was entered.
     if username.empty? || username.length > 64 || username.include?(':')
-      @title = 'Login — homurabi'
+      @title = 'Login — homura'
       @login_error = 'username is required (1-64 chars, no colon)'
       @content = erb :login
       next erb :layout
@@ -749,7 +749,7 @@
       next [302, '']
     end
 
-    @title = 'homurabi /chat — Workers AI'
+    @title = 'homura /chat — Workers AI'
     @primary_model  = App::CHAT_MODELS[:primary]
     @fallback_model = App::CHAT_MODELS[:fallback]
     @session_id = normalize_session_id(params['session'])
@@ -898,7 +898,7 @@
       # Phase 11B follow-up: pre-rendered HTML so the client can
       # `innerHTML = reply_html` to show Markdown formatting (bullet
       # lists, bold, code fences, links). Safe to insert because
-      # `HomurabiMarkdown.render` HTML-escapes the input first and
+      # `HomuraMarkdown.render` HTML-escapes the input first and
       # restricts link hrefs to http/https/mailto/relative.
       'reply_html'   => markdown_html(reply_text),
       'history_len'  => new_history.size
@@ -970,7 +970,7 @@
     content_type 'application/json'
     unless ai_demos_enabled?
       status 404
-      next({ 'error' => 'AI demos disabled (set HOMURABI_ENABLE_AI_DEMOS=1)' }.to_json)
+      next({ 'error' => 'AI demos disabled (set HOMURA_ENABLE_AI_DEMOS=1)' }.to_json)
     end
     unless ai_binding?
       status 503
@@ -1058,7 +1058,7 @@
     # JS Response must be passed through untouched (normal bodies
     # lose the WebSocket property when reconstructed).
     js_resp = stub.fetch_raw(
-      "https://homurabi-do.internal/ws/#{name}",
+      "https://homura-do.internal/ws/#{name}",
       method: 'GET',
       headers: { 'upgrade' => 'websocket' }
     )
@@ -1068,7 +1068,7 @@
     content_type 'application/json'
     unless binding_demos_enabled?
       status 404
-      next({ 'error' => 'binding demos disabled (set HOMURABI_ENABLE_BINDING_DEMOS=1)' }.to_json)
+      next({ 'error' => 'binding demos disabled (set HOMURA_ENABLE_BINDING_DEMOS=1)' }.to_json)
     end
     ns = do_counter
     if ns.nil?
@@ -1081,12 +1081,12 @@
     # `stub.fetch` requires an absolute URL — the Workers runtime
     # parses the URL to route the call. The host is irrelevant (the
     # DO receives the whole Request), but it must be parseable.
-    url = "https://homurabi-do.internal/#{action}"
+    url = "https://homura-do.internal/#{action}"
     res = stub.fetch(url, method: 'POST')
     {
       'demo'    => 'Durable Objects counter',
       'binding' => 'COUNTER',
-      'class'   => 'HomurabiCounterDO',
+      'class'   => 'HomuraCounterDO',
       'name'    => name,
       'action'  => action,
       'status'  => res.status,
@@ -1097,7 +1097,7 @@
     content_type 'application/json'
     unless binding_demos_enabled?
       status 404
-      next({ 'error' => 'binding demos disabled (set HOMURABI_ENABLE_BINDING_DEMOS=1)' }.to_json)
+      next({ 'error' => 'binding demos disabled (set HOMURA_ENABLE_BINDING_DEMOS=1)' }.to_json)
     end
     # Cache by request URL so different query strings produce different
     # cache entries (cache-busting with ?v=N works).
@@ -1110,7 +1110,7 @@
       # is a compromise between "clearly slower than a cache hit" and
       # "finishes inside wrangler dev's request budget on an M1".
       salt = SecureRandom.random_bytes(16)
-      derived = OpenSSL::KDF.pbkdf2_hmac('homurabi-phase11b',
+      derived = OpenSSL::KDF.pbkdf2_hmac('homura-phase11b',
         salt: salt, iterations: 50_000, length: 32, hash: 'SHA256')
       {
         'computed'    => 'expensive PBKDF2 derivation',
@@ -1122,8 +1122,8 @@
     end
     body = cache_get(cache_key, ttl: ttl, &compute_body)
     elapsed_ms = ((Time.now.to_f - started) * 1000).round
-    # The helper set response.headers['x-homurabi-cache'] to HIT / MISS.
-    cache_state = response['X-Homurabi-Cache'] || 'UNKNOWN'
+    # The helper set response.headers['x-homura-cache'] to HIT / MISS.
+    cache_state = response['X-Homura-Cache'] || 'UNKNOWN'
     # Re-serialise with extra diagnostic fields so the route caller can
     # see which path ran without cracking open headers from a browser.
     orig = begin
@@ -1142,7 +1142,7 @@
     content_type 'application/json'
     unless binding_demos_enabled?
       status 404
-      next({ 'error' => 'binding demos disabled (set HOMURABI_ENABLE_BINDING_DEMOS=1)' }.to_json)
+      next({ 'error' => 'binding demos disabled (set HOMURA_ENABLE_BINDING_DEMOS=1)' }.to_json)
     end
     q = jobs_queue
     if q.nil?
@@ -1156,13 +1156,13 @@
     end
     q.send(body)
     status 202
-    { 'enqueued' => true, 'queue' => 'homurabi-jobs', 'payload' => body }.to_json
+    { 'enqueued' => true, 'queue' => 'homura-jobs', 'payload' => body }.to_json
   end
   get '/demo/queue/status' do
     content_type 'application/json'
     unless binding_demos_enabled?
       status 404
-      next({ 'error' => 'binding demos disabled (set HOMURABI_ENABLE_BINDING_DEMOS=1)' }.to_json)
+      next({ 'error' => 'binding demos disabled (set HOMURA_ENABLE_BINDING_DEMOS=1)' }.to_json)
     end
     if kv.nil?
       status 503
@@ -1182,7 +1182,7 @@
       i += 1
     end
     {
-      'queue'   => 'homurabi-jobs',
+      'queue'   => 'homura-jobs',
       'count'   => recent.size,
       'recent'  => recent
     }.to_json
@@ -1209,7 +1209,7 @@
       next({ 'error' => 'key must match /\\A[A-Za-z0-9._\\-\\/]{1,128}\\z/',
              'got'   => key }.to_json)
     end
-    cache_key = "https://homurabi-named-cache.internal/#{namespace}/#{key}"
+    cache_key = "https://homura-named-cache.internal/#{namespace}/#{key}"
     started = Time.now.to_f
     # Open the named partition fresh per request — the JS handle is
     # cached per-isolate internally but the Ruby wrapper is cheap.
@@ -1258,7 +1258,7 @@
     rescue StandardError
       {}
     end
-    qname = (body['queue'] || 'homurabi-jobs').to_s
+    qname = (body['queue'] || 'homura-jobs').to_s
     messages = body['messages'].is_a?(Array) ? body['messages'] : [{ 'fire' => true, 'ts' => Time.now.to_i }]
 
     js_msgs = `([])`
@@ -1298,7 +1298,7 @@
       i += 1
     end
     {
-      'queue'   => 'homurabi-jobs-dlq',
+      'queue'   => 'homura-jobs-dlq',
       'count'   => recent.size,
       'recent'  => recent
     }.to_json
@@ -1317,13 +1317,13 @@
     payload = { 'fail' => true, 'reason' => 'force-dlq demo', 'ts' => Time.now.to_i }
     q.send(payload)
     status 202
-    { 'enqueued' => true, 'payload' => payload, 'note' => 'main consumer will retry up to max_retries; then the runtime forwards the message to homurabi-jobs-dlq' }.to_json
+    { 'enqueued' => true, 'payload' => payload, 'note' => 'main consumer will retry up to max_retries; then the runtime forwards the message to homura-jobs-dlq' }.to_json
   end
   get '/test/bindings' do
     content_type 'application/json'
     unless binding_demos_enabled?
       status 404
-      next({ 'error' => 'binding demos disabled (set HOMURABI_ENABLE_BINDING_DEMOS=1)' }.to_json)
+      next({ 'error' => 'binding demos disabled (set HOMURA_ENABLE_BINDING_DEMOS=1)' }.to_json)
     end
     cases = []
     started = Time.now.to_f
@@ -1338,7 +1338,7 @@
       else
         name = "selftest-#{SecureRandom.hex(4)}"
         stub = ns.get_by_name(name)
-        base = 'https://homurabi-do.internal'
+        base = 'https://homura-do.internal'
         stub.fetch("#{base}/reset", method: 'POST')
         r1 = JSON.parse(stub.fetch("#{base}/inc", method: 'POST').body)
         r2 = JSON.parse(stub.fetch("#{base}/inc", method: 'POST').body)
@@ -1414,12 +1414,12 @@
     content_type 'application/json'
     unless foundations_demos_enabled?
       status 404
-      next({ 'error' => 'foundations demos disabled (set HOMURABI_ENABLE_FOUNDATIONS_DEMOS=1)' }.to_json)
+      next({ 'error' => 'foundations demos disabled (set HOMURA_ENABLE_FOUNDATIONS_DEMOS=1)' }.to_json)
     end
     client = Faraday.new(url: 'https://api.ipify.org') do |c|
       c.request :json
       c.response :json
-      c.headers['user-agent'] = 'homurabi-phase11a/1.0'
+      c.headers['user-agent'] = 'homura-phase11a/1.0'
     end
     res = client.get('/', { 'format' => 'json' })
     {
@@ -1435,7 +1435,7 @@
     content_type 'application/json'
     unless foundations_demos_enabled?
       status 404
-      next({ 'error' => 'foundations demos disabled (set HOMURABI_ENABLE_FOUNDATIONS_DEMOS=1)' }.to_json)
+      next({ 'error' => 'foundations demos disabled (set HOMURA_ENABLE_FOUNDATIONS_DEMOS=1)' }.to_json)
     end
     # pull params BEFORE the first await — Sinatra clears @params when
     # it starts a Promise-returning route (same ceremony as /d1/users).
@@ -1486,7 +1486,7 @@
     @title = 'Phase 11A — image upload demo'
     unless foundations_demos_enabled?
       status 404
-      @content = '<p>foundations demos disabled (set HOMURABI_ENABLE_FOUNDATIONS_DEMOS=1).</p>'
+      @content = '<p>foundations demos disabled (set HOMURA_ENABLE_FOUNDATIONS_DEMOS=1).</p>'
       next erb :layout
     end
     @images = []
@@ -1523,7 +1523,7 @@
     content_type 'application/json'
     unless foundations_demos_enabled?
       status 404
-      next({ 'error' => 'foundations demos disabled (set HOMURABI_ENABLE_FOUNDATIONS_DEMOS=1)' }.to_json)
+      next({ 'error' => 'foundations demos disabled (set HOMURA_ENABLE_FOUNDATIONS_DEMOS=1)' }.to_json)
     end
     if bucket.nil?
       status 503
@@ -1546,7 +1546,7 @@
     content_type 'application/json'
     unless foundations_demos_enabled?
       status 404
-      next({ 'error' => 'foundations demos disabled (set HOMURABI_ENABLE_FOUNDATIONS_DEMOS=1)' }.to_json)
+      next({ 'error' => 'foundations demos disabled (set HOMURA_ENABLE_FOUNDATIONS_DEMOS=1)' }.to_json)
     end
     if bucket.nil?
       status 503
@@ -1568,7 +1568,7 @@
     unless foundations_demos_enabled?
       content_type 'application/json'
       status 404
-      next({ 'error' => 'foundations demos disabled (set HOMURABI_ENABLE_FOUNDATIONS_DEMOS=1)' }.to_json)
+      next({ 'error' => 'foundations demos disabled (set HOMURA_ENABLE_FOUNDATIONS_DEMOS=1)' }.to_json)
     end
     if bucket.nil?
       content_type 'application/json'
@@ -1589,7 +1589,7 @@
     unless foundations_demos_enabled?
       content_type 'application/json'
       status 404
-      next({ 'error' => 'foundations demos disabled (set HOMURABI_ENABLE_FOUNDATIONS_DEMOS=1)' }.to_json)
+      next({ 'error' => 'foundations demos disabled (set HOMURA_ENABLE_FOUNDATIONS_DEMOS=1)' }.to_json)
     end
     stream do |out|
       i = 0
@@ -1605,7 +1605,7 @@
     unless foundations_demos_enabled?
       content_type 'application/json'
       status 404
-      next({ 'error' => 'foundations demos disabled (set HOMURABI_ENABLE_FOUNDATIONS_DEMOS=1)' }.to_json)
+      next({ 'error' => 'foundations demos disabled (set HOMURA_ENABLE_FOUNDATIONS_DEMOS=1)' }.to_json)
     end
     sse do |out|
       # Manual `while` instead of `Integer#times` because Opal compiles
@@ -1632,7 +1632,7 @@
     content_type 'application/json'
     unless foundations_demos_enabled?
       status 404
-      next({ 'error' => 'foundations demos disabled (set HOMURABI_ENABLE_FOUNDATIONS_DEMOS=1)' }.to_json)
+      next({ 'error' => 'foundations demos disabled (set HOMURA_ENABLE_FOUNDATIONS_DEMOS=1)' }.to_json)
     end
 
     cases = []
@@ -1681,9 +1681,9 @@
     # directly instead of a live round-trip.
     run.call('Faraday :json middleware encodes Hash body (offline)') {
       env = Faraday::Env.new(method: :post, url: 'https://example.com/x')
-      env.body = { 'name' => 'homurabi', 'phase' => 11 }
+      env.body = { 'name' => 'homura', 'phase' => 11 }
       Faraday::Middleware::JSON.new.on_request(env)
-      env.body == '{"name":"homurabi","phase":11}' &&
+      env.body == '{"name":"homura","phase":11}' &&
         env.request_headers['content-type'] == 'application/json'
     }
 
@@ -1749,7 +1749,7 @@
   # Mustermann on Opal rejects `^`/`$` in regex routes. Trailing `/docs/` is normalized
   # to `/docs` in Rack::Handler::CloudflareWorkers.build_rack_env (runtime gem).
   docs_index_route = lambda do
-    @title = 'ドキュメント — homurabi'
+    @title = 'ドキュメント — homura'
     @docs_page = 'index'
     @docs_section = :getting_started
     @docs_breadcrumb = [
@@ -1766,7 +1766,7 @@
   end
   get '/docs', &docs_index_route
   get '/docs/quick-start' do
-    @title = 'クイックスタート — homurabi Docs'
+    @title = 'クイックスタート — homura Docs'
     @docs_page = 'quick-start'
     @docs_section = :getting_started
     @docs_breadcrumb = [
@@ -1785,7 +1785,7 @@
     erb :layout_docs
   end
   get '/docs/migration' do
-    @title = '移行ガイド — homurabi Docs'
+    @title = '移行ガイド — homura Docs'
     @docs_page = 'migration'
     @docs_section = :guides
     @docs_breadcrumb = [
@@ -1802,7 +1802,7 @@
     erb :layout_docs
   end
   get '/docs/sinatra' do
-    @title = 'sinatra-cloudflare-workers — homurabi Docs'
+    @title = 'sinatra-cloudflare-workers — homura Docs'
     @docs_page = 'sinatra'
     @docs_section = :reference
     @docs_breadcrumb = [
@@ -1823,7 +1823,7 @@
     erb :layout_docs
   end
   get '/docs/sequel-d1' do
-    @title = 'sequel-d1 — homurabi Docs'
+    @title = 'sequel-d1 — homura Docs'
     @docs_page = 'sequel-d1'
     @docs_section = :reference
     @docs_breadcrumb = [
@@ -1841,7 +1841,7 @@
     erb :layout_docs
   end
   get '/docs/runtime' do
-    @title = 'cloudflare-workers-runtime — homurabi Docs'
+    @title = 'cloudflare-workers-runtime — homura Docs'
     @docs_page = 'runtime'
     @docs_section = :reference
     @docs_breadcrumb = [
@@ -1859,7 +1859,7 @@
     erb :layout_docs
   end
   get '/docs/auto-await' do
-    @title = 'Auto-Await — homurabi Docs'
+    @title = 'Auto-Await — homura Docs'
     @docs_page = 'auto-await'
     @docs_section = :guides
     @docs_breadcrumb = [
@@ -1878,7 +1878,7 @@
     erb :layout_docs
   end
   get '/docs/architecture' do
-    @title = 'アーキテクチャ — homurabi Docs'
+    @title = 'アーキテクチャ — homura Docs'
     @docs_page = 'architecture'
     @docs_section = :architecture
     @docs_breadcrumb = [
@@ -1901,8 +1901,8 @@
     next gate if gate
 
     @title = 'Debug — mail'
-    @mail_from = homurabi_mail_from
-    @form = Homurabi::DebugMailController.parse_form_params(params, default_to: true)
+    @mail_from = homura_mail_from
+    @form = Homura::DebugMailController.parse_form_params(params, default_to: true)
     @result = nil
     erb :debug_mail
   end
@@ -1914,10 +1914,10 @@
     content_type 'text/html; charset=utf-8'
 
     @title = 'Debug — mail'
-    @mail_from = homurabi_mail_from
+    @mail_from = homura_mail_from
 
     mail = send_email
-    ctx = Homurabi::DebugMailController.prepare_send(params, env, self, mail)
+    ctx = Homura::DebugMailController.prepare_send(params, env, self, mail)
     if ctx[:error_result]
       @result = ctx[:error_result]
     else
@@ -1929,9 +1929,9 @@
           text: ctx[:text_body],
           html: ctx[:html_body]
         )
-        @result = Homurabi::DebugMailController.after_send_success(raw, ctx)
+        @result = Homura::DebugMailController.after_send_success(raw, ctx)
       rescue Cloudflare::Email::Error => e
-        @result = Homurabi::DebugMailController.after_send_failure(e, ctx)
+        @result = Homura::DebugMailController.after_send_failure(e, ctx)
       end
     end
 
@@ -1940,7 +1940,7 @@
   end
 
   get '/docs/email' do
-    @title = 'Cloudflare Email Service — homurabi Docs'
+    @title = 'Cloudflare Email Service — homura Docs'
     @docs_page = 'email'
     @docs_section = :reference
     @docs_breadcrumb = [

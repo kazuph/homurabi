@@ -1,5 +1,5 @@
 <h1>既存 Sinatra → Cloudflare Workers 移行</h1>
-<p>homurabi 本体（<code>app/app.rb</code> + <code>app/routes/canonical_all.rb</code>）が実際に踏んでいるパターンに基づきます。誇張せず、<strong>このスタックで動作確認済みの範囲</strong>だけを書きます。</p>
+<p>homura 本体（<code>app/app.rb</code> + <code>app/routes/canonical_all.rb</code>）が実際に踏んでいるパターンに基づきます。誇張せず、<strong>このスタックで動作確認済みの範囲</strong>だけを書きます。</p>
 
 <h2 id="scope">対象と非対象</h2>
 <h3>向いているもの</h3>
@@ -30,7 +30,7 @@
   <li><strong>同期 FS</strong>: Workers ではリクエスト処理中の <code>File.read</code> は使えません。ERB／アセットはビルド時に埋め込み。</li>
   <li><strong>require パス</strong>: <code>vendor/</code> や gem <code>lib</code> を Opal の <code>-I</code> に載せる順序が重要（<code>sequel-d1</code> README のとおり <code>gems/sequel-d1/lib</code> を <code>vendor</code> より前）。</li>
   <li><strong>direct eval</strong>: Opal の制約へはビルド後 <code>patch-opal-evals.mjs</code> が自動適用（<code>cloudflare-workers-build</code> パイプライン）。</li>
-  <li><strong>起動 CPU</strong>: 重い定数初期化はリクエストをまたぐとタイムアウトしやすい。homurabi では分割・遅延初期化で対処済みの箇所あり（具体値は本番計測に依存）。</li>
+  <li><strong>起動 CPU</strong>: 重い定数初期化はリクエストをまたぐとタイムアウトしやすい。homura では分割・遅延初期化で対処済みの箇所あり（具体値は本番計測に依存）。</li>
   <li><strong>Cookie セッション</strong>: 本リポジトリの <code>/login</code> は署名クッキー方式。JWT も別ルートで利用可能。</li>
 </ul>
 

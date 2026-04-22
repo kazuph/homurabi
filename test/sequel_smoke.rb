@@ -142,7 +142,7 @@ end
 # Tests
 # ---------------------------------------------------------------------
 
-$stdout.puts '=== homurabi Phase 12 — Sequel smoke ==='
+$stdout.puts '=== homura Phase 12 — Sequel smoke ==='
 $stdout.puts ''
 
 mock = MockD1Database.new
@@ -297,7 +297,7 @@ SequelSmoke.assert_include(
 $stdout.puts ''
 $stdout.puts '--- Identifier / schema SQL primitives ---'
 
-# create_table / alter_table are run via bin/homurabi-migrate (CRuby
+# create_table / alter_table are run via bin/homura-migrate (CRuby
 # side) so we don't exercise them inside the Opal bundle here.
 # Instead we verify the building blocks: quoting identifiers with
 # special chars, multi-part table names, and Dataset#update_sql for

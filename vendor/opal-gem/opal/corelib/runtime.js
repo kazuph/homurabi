@@ -2532,7 +2532,7 @@
     // methods
     "hasOwnProperty", "valueOf"
   ];
-  // homurabi patch: `prototype` added above — classes in Opal are JS
+  // homura patch: `prototype` added above — classes in Opal are JS
   // functions, so `@prototype = ...` would overwrite the JS-native
   // `constructor.prototype` slot used by `new` and break allocate/new.
   // Must stay in sync with Opal::Rewriters::JsReservedWords::PROTO_SPECIAL_PROPS.

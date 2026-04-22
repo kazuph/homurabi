@@ -17,7 +17,7 @@ get '/users' do
 end
 ```
 
-`d1:` must respond to `prepare(sql)` returning a statement that supports `bind(*args)`, `all`, and `run` (same contract as the JavaScript D1 API). The Ruby wrapper from `cloudflare-workers-runtime` (`env['cloudflare.DB']`) is the usual choice.
+`d1:` must respond to `prepare(sql)` returning a statement that supports `bind(*args)`, `all`, and `run` (same contract as the JavaScript D1 API). The Ruby wrapper from `homura-runtime` (`env['cloudflare.DB']`) is the usual choice.
 
 ## Opal build paths
 
@@ -38,10 +38,10 @@ bundle exec cloudflare-workers-migrate compile db/migrations
 Apply (uses `WRANGLER_BIN` or `wrangler`; database from `--database` or `CLOUDFLARE_D1_DATABASE`):
 
 ```bash
-bundle exec cloudflare-workers-migrate apply --database homurabi-db
-bundle exec cloudflare-workers-migrate apply --remote --database homurabi-db
+bundle exec cloudflare-workers-migrate apply --database homura-db
+bundle exec cloudflare-workers-migrate apply --remote --database homura-db
 ```
 
 ## License
 
-Same as the homurabi repository (personal project).
+MIT. See the repository `LICENSE`.

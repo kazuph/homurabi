@@ -8,11 +8,11 @@
 </head>
 <body>
   <h1><%= ERB::Util.html_escape(@title.to_s) %></h1>
-  <p>Cloudflare Email Service（<code>SEND_EMAIL</code>）経由の送信テスト。from は <code>HOMURABI_MAIL_FROM</code>（verified）、ローカルでは認証免除。</p>
+  <p>Cloudflare Email Service（<code>SEND_EMAIL</code>）経由の送信テスト。from は <code>HOMURA_MAIL_FROM</code>（verified）、ローカルでは認証免除。</p>
   <% if @mail_from && !@mail_from.empty? %>
     <p><strong>現在の From（vars）</strong>: <code><%= ERB::Util.html_escape(@mail_from.to_s) %></code></p>
   <% else %>
-    <p><strong>HOMURABI_MAIL_FROM</strong>: 未設定（ドメイン onboarding と wrangler vars が必要）</p>
+    <p><strong>HOMURA_MAIL_FROM</strong>: 未設定（ドメイン onboarding と wrangler vars が必要）</p>
   <% end %>
   <% if @result && @result[:error] %>
     <p role="alert" style="color:#b91c1c;"><strong>エラー:</strong> <%= ERB::Util.html_escape(@result[:error].to_s) %></p>

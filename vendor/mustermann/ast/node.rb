@@ -55,7 +55,7 @@ module Mustermann
       # Double dispatch helper for reading from the buffer into the payload.
       # @!visibility private
       def parse
-        # homurabi patch: Opal strings are immutable, so `payload <<`
+        # homura patch: Opal strings are immutable, so `payload <<`
         # cannot append to a String-typed payload (used by Capture).
         # Detect the type at runtime and reassign via `+` instead.
         self.payload ||= []

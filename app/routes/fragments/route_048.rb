@@ -4,7 +4,7 @@ get '/test/bindings' do
   content_type 'application/json'
   unless binding_demos_enabled?
     status 404
-    next({ 'error' => 'binding demos disabled (set HOMURABI_ENABLE_BINDING_DEMOS=1)' }.to_json)
+    next({ 'error' => 'binding demos disabled (set HOMURA_ENABLE_BINDING_DEMOS=1)' }.to_json)
   end
   cases = []
   started = Time.now.to_f
@@ -19,7 +19,7 @@ get '/test/bindings' do
     else
       name = "selftest-#{SecureRandom.hex(4)}"
       stub = ns.get_by_name(name)
-      base = 'https://homurabi-do.internal'
+      base = 'https://homura-do.internal'
       stub.fetch("#{base}/reset", method: 'POST')
       r1 = JSON.parse(stub.fetch("#{base}/inc", method: 'POST').body)
       r2 = JSON.parse(stub.fetch("#{base}/inc", method: 'POST').body)

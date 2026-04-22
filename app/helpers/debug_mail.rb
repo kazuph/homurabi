@@ -2,7 +2,7 @@
 
 require 'uri'
 
-module Homurabi
+module Homura
   # Phase 17 — `/debug/mail` is open on localhost only; deployed Workers require session user App::DEBUG_MAIL_ADMIN_USERNAME.
   #
   # Gate uses `#debug_mail_gate_response` returning a Rack triple `[403, headers, [body]]`;

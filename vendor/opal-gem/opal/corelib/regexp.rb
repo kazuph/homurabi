@@ -87,7 +87,7 @@ class ::Regexp < `RegExp`
           #{::Kernel.raise ::RegexpError, "too short escape sequence: /#{regexp}/"}
         }
 
-        // homurabi patch: upstream only replaces the first occurrence of
+        // homura patch: upstream only replaces the first occurrence of
         // \A and \z, and does not handle Ruby's \Z (end-of-string or just
         // before a trailing newline). Mustermann compiles patterns like
         // /\A\/\Z/ which Opal otherwise leaves intact and JavaScript

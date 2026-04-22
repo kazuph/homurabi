@@ -242,7 +242,7 @@ class ::FrozenError           < ::RuntimeError; end
 class ::LocalJumpError      < ::StandardError; end
 class ::TypeError           < ::StandardError; end
 class ::ArgumentError       < ::StandardError; end
-# homurabi patch: UncaughtThrowError was `< ArgumentError`, which makes it
+# homura patch: UncaughtThrowError was `< ArgumentError`, which makes it
 # a StandardError. MRI's throw/catch does not raise anything until the
 # thrown tag has no matching outer catch — it uses a C-level longjmp, so
 # `rescue StandardError` never sees an in-flight throw. Opal implements
@@ -283,7 +283,7 @@ class ::FrozenError < ::RuntimeError
   end
 end
 
-class ::UncaughtThrowError < ::Exception  # homurabi patch: was < ArgumentError, see note on line 245.
+class ::UncaughtThrowError < ::Exception  # homura patch: was < ArgumentError, see note on line 245.
   attr_reader :tag, :value
 
   def initialize(tag, value = nil)

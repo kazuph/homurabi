@@ -10,11 +10,11 @@ class App &lt; Sinatra::Base
 end</code></pre>
 
 <h2 id="register">登録と require</h2>
-<p>アプリクラス内で <code>register</code> し、homurabi と同様に <code>require 'sequel'</code> 等はルート定義より前に置きます。</p>
+<p>アプリクラス内で <code>register</code> し、homura と同様に <code>require 'sequel'</code> 等はルート定義より前に置きます。</p>
 
 <h2 id="erb">ERB プリコンパイル</h2>
 <pre><code>bundle exec cloudflare-workers-erb-compile --input views --output build/templates.rb --namespace MyTemplates</code></pre>
-<p>Rake 連携例は <code>gems/sinatra-cloudflare-workers/templates/Rakefile.example</code> を参照。</p>
+<p>Rake 連携例は <code>gems/sinatra-homura/templates/Rakefile.example</code> を参照。</p>
 
 <h2 id="jwt">JWT（Sinatra::JwtAuth）</h2>
 <p>ヘッダ <code>Authorization: Bearer …</code> を検証し、<code>authenticate!</code> で 401 を返せます。トークン検証内部は <code>JWT.decode(...).__await__</code> を利用（<code>sinatra/jwt_auth.rb</code>）。</p>
@@ -42,7 +42,7 @@ end</code></pre>
 <table>
   <thead><tr><th></th><th>できること</th><th>できないこと</th></tr></thead>
   <tbody>
-    <tr><td>HTTP</td><td>Sinatra DSL でルート定義、homurabi と同じパッチ経由で Rack 応答</td><td>MRI 固有のネイティブ拡張 gem をそのまま追加</td></tr>
+    <tr><td>HTTP</td><td>Sinatra DSL でルート定義、homura と同じパッチ経由で Rack 応答</td><td>MRI 固有のネイティブ拡張 gem をそのまま追加</td></tr>
     <tr><td>認証</td><td>JWT 拡張、Bearer 検証</td><td>未検証の一般 OAuth フローをそのまま流用（要独自実装）</td></tr>
     <tr><td>バックグラウンド</td><td>Cron / Queues の登録 DSL</td><td>Unix シグナルや別 OS プロセス前提のジョブ</td></tr>
   </tbody>

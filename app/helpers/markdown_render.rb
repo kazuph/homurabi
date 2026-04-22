@@ -1,9 +1,9 @@
 # frozen_string_literal: true
 
-module Homurabi
+module Homura
   module MarkdownRenderHelpers
     def markdown_html(text)
-      HomurabiMarkdown.render(text)
+      HomuraMarkdown.render(text)
     end
   end
 end

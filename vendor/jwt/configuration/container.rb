@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 #
-# homurabi patch: from ruby-jwt v2.9.3, with the JwkConfiguration field
+# homura patch: from ruby-jwt v2.9.3, with the JwkConfiguration field
 # replaced by a stub that never touches OpenSSL::Digest at init time. The
 # real upstream container eagerly constructs a KidAsKeyDigest which needs
 # OpenSSL::Digest.new('sha256'); we leave that lazy so plain JWT flow

@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 #
-# homurabi patch: vendored from ruby-jwt v2.9.3 base64.rb.
+# homura patch: vendored from ruby-jwt v2.9.3 base64.rb.
 # `::Base64.urlsafe_encode64` in Opal's base64 corelib does not accept the
 # `padding:` keyword argument from CRuby 2.5+, so we strip padding manually
 # with `.delete('=')`. Everything else matches upstream byte-for-byte.
@@ -11,13 +11,13 @@ module JWT
   class Base64
     class << self
       def url_encode(str)
-        # homurabi patch: strip '=' padding manually (Opal base64 has no
+        # homura patch: strip '=' padding manually (Opal base64 has no
         # padding: false option).
         ::Base64.urlsafe_encode64(str.to_s).delete('=')
       end
 
       def url_decode(str)
-        # homurabi patch: upstream catches ArgumentError('invalid base64')
+        # homura patch: upstream catches ArgumentError('invalid base64')
         # when CRuby's urlsafe_decode64 rejects missing padding. Our Opal
         # base64 either pads automatically or errors differently, so we
         # just pad manually up-front — no legacy warning path needed

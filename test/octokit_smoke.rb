@@ -99,7 +99,7 @@ end
 # `Octokit::Client::Users`, `::Repositories`, `::Search`.
 
 class MiniOctokit
-  DEFAULT_USER_AGENT = 'MiniOctokit-test/1.0 (homurabi-phase11a)'
+  DEFAULT_USER_AGENT = 'MiniOctokit-test/1.0 (homura-phase11a)'
 
   attr_reader :conn
 
@@ -120,7 +120,7 @@ class MiniOctokit
   # Array right from the wire. On Workers via Opal, every HTTP call is
   # async, so we return the Faraday::Connection Promise and let the
   # caller `.__await__.body` — the same ceremony every other async
-  # call site in homurabi uses. Keep the method body thin so the test
+  # call site in homura uses. Keep the method body thin so the test
   # exercise matches how octokit would actually lay out the call.
   def user_req(login)
     @conn.get("/users/#{login}")
@@ -250,7 +250,7 @@ reset_calls
 install_router(lambda { |_u, _i| gh_response({ 'items' => [] }) })
 OctokitSmoke.assert('query params encode in URL') {
   c = MiniOctokit.new
-  c.search_req('homurabi in:name').__await__
+  c.search_req('homura in:name').__await__
   url = `#{last_call}.url`
   url.include?('/search/repositories') && url.include?('q=')
 }
@@ -295,12 +295,12 @@ OctokitSmoke.assert('URL prefix + "/users/..." path joins cleanly') {
 
 # 12. Repo-NWO traversal (octokit ubiquitous two-slash pattern)
 reset_calls
-install_router(lambda { |_u, _i| gh_response({ 'full_name' => 'kazuph/homurabi' }) })
+install_router(lambda { |_u, _i| gh_response({ 'full_name' => 'kazuph/homura' }) })
 OctokitSmoke.assert('repo "owner/name" NWO path survives') {
   c = MiniOctokit.new
-  r = c.repo_req('kazuph/homurabi').__await__.body
-  r['full_name'] == 'kazuph/homurabi' &&
-    `#{last_call}.url.indexOf('/repos/kazuph/homurabi')` >= 0
+  r = c.repo_req('kazuph/homura').__await__.body
+  r['full_name'] == 'kazuph/homura' &&
+    `#{last_call}.url.indexOf('/repos/kazuph/homura')` >= 0
 }
 
 success = OctokitSmoke.report

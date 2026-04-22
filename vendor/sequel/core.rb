@@ -1,6 +1,6 @@
 # frozen-string-literal: true
 
-# homurabi patch (Phase 12): Opal 1.8.3.rc1 does not ship `thread` or
+# homura patch (Phase 12): Opal 1.8.3.rc1 does not ship `thread` or
 # `bigdecimal` as separate stdlib entries. Both are provided by
 # lib/sequel_opal_patches.rb (Mutex + BigDecimal shims). The remaining
 # requires (date, set, time, uri) are Opal-native and must succeed.
@@ -8,12 +8,12 @@
 # other missing dependencies surface immediately.
 # Original upstream line:
 #   %w'bigdecimal date set thread time uri'.each{|f| require f}
-HOMURABI_OPTIONAL_OPAL_REQUIRES = %w'bigdecimal thread'.freeze
+HOMURA_OPTIONAL_OPAL_REQUIRES = %w'bigdecimal thread'.freeze
 %w'date set time uri bigdecimal thread'.each do |f|
   begin
     require f
   rescue ::LoadError => e
-    raise unless HOMURABI_OPTIONAL_OPAL_REQUIRES.include?(f)
+    raise unless HOMURA_OPTIONAL_OPAL_REQUIRES.include?(f)
     # bigdecimal / thread are provided by sequel_opal_patches.rb;
     # a LoadError here is expected under Opal.
   end
@@ -48,7 +48,7 @@ module Sequel
   @single_threaded = false
 
   # Mutex used to protect mutable data structures.
-  # homurabi patch (Phase 12): Mutex is a no-op shim from
+  # homura patch (Phase 12): Mutex is a no-op shim from
   # lib/sequel_opal_patches.rb; Workers isolates are single-threaded.
   @data_mutex = ::Mutex.new
 
@@ -161,7 +161,7 @@ module Sequel
     end
 
     # The current concurrency primitive, Thread.current by default.
-    # homurabi patch (Phase 12): Thread shim from sequel_opal_patches.rb
+    # homura patch (Phase 12): Thread shim from sequel_opal_patches.rb
     # returns a stable stub with status=='run'.
     def current
       ::Thread.current
@@ -250,7 +250,7 @@ module Sequel
       end
     end
 
-    # homurabi patch (Phase 12): Opal's compiler rewrites `require_relative "foo"`
+    # homura patch (Phase 12): Opal's compiler rewrites `require_relative "foo"`
     # (module body + `Sequel.extension` bodies) into
     # `self.$require("<absolute>/foo")` — i.e. a runtime call into
     # THIS method. Opal emits paths like
@@ -268,14 +268,14 @@ module Sequel
       list = files.is_a?(Array) ? files : [files]
       list.each do |f|
         raw = subdir ? "#{subdir}/#{f}" : f.to_s
-        Kernel.require(__homurabi_normalize_path(raw))
+        Kernel.require(__homura_normalize_path(raw))
       end
     end
 
     # Collapse `..` segments (and strip the preceding slot) against a
     # slash-separated path. Retains `.rb` suffixes on non-collapsed
     # segments because Opal's module map keys are extensionless.
-    def __homurabi_normalize_path(path)
+    def __homura_normalize_path(path)
       out = []
       path.to_s.split('/').each do |part|
         next if part == '.' || part.empty?
@@ -514,7 +514,7 @@ module Sequel
     require_relative "ast_transformer"
     require_relative "version"
 
-  # homurabi patch (Phase 12): upstream uses
+  # homura patch (Phase 12): upstream uses
   #   class << self; alias_method :[], :expr; end
   # to install `Sequel[...]` as a shortcut for `Sequel.expr(...)`.
   # `expr` lives in the Builders module which is only mixed into
@@ -528,7 +528,7 @@ module Sequel
     expr(*args, &block)
   end
 
-  # homurabi patch (Phase 12): Use fully-qualified `::Sequel::Database::ADAPTERS`
+  # homura patch (Phase 12): Use fully-qualified `::Sequel::Database::ADAPTERS`
   # — Opal's const lookup inside `module Sequel ... end` reopen blocks
   # sometimes fails to see constants defined by files loaded via
   # `require_relative` above. Explicit top-level path sidesteps the issue.

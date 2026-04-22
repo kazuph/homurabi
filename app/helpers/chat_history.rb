@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module Homurabi
+module Homura
   # D1/KV/R2 + Cache / Queue gates, plus Workers AI chat history helpers.
   module CloudflareBindingHelpers
     def db;     env['cloudflare.DB'];     end
@@ -10,21 +10,21 @@ module Homurabi
     def crypto_demos_enabled?
       cf_env = env['cloudflare.env']
       return false unless cf_env
-      val = `(#{cf_env} && #{cf_env}.HOMURABI_ENABLE_CRYPTO_DEMOS) || ''`
+      val = `(#{cf_env} && #{cf_env}.HOMURA_ENABLE_CRYPTO_DEMOS) || ''`
       val.to_s == '1'
     end
 
     def scheduled_demos_enabled?
       cf_env = env['cloudflare.env']
       return false unless cf_env
-      val = `(#{cf_env} && #{cf_env}.HOMURABI_ENABLE_SCHEDULED_DEMOS) || ''`
+      val = `(#{cf_env} && #{cf_env}.HOMURA_ENABLE_SCHEDULED_DEMOS) || ''`
       val.to_s == '1'
     end
 
     def binding_demos_enabled?
       cf_env = env['cloudflare.env']
       return false unless cf_env
-      val = `(#{cf_env} && #{cf_env}.HOMURABI_ENABLE_BINDING_DEMOS) || ''`
+      val = `(#{cf_env} && #{cf_env}.HOMURA_ENABLE_BINDING_DEMOS) || ''`
       val.to_s == '1'
     end
 
@@ -49,10 +49,10 @@ module Homurabi
     end
 
     # Phase 17 — verified sender after Cloudflare Email Service domain onboarding (`wrangler.toml` [vars]).
-    def homurabi_mail_from
+    def homura_mail_from
       cf_env = env['cloudflare.env']
       return '' unless cf_env
-      `(#{cf_env}.HOMURABI_MAIL_FROM || '')`.to_s.strip
+      `(#{cf_env}.HOMURA_MAIL_FROM || '')`.to_s.strip
     end
 
     def cache_get(cache_key, ttl: 60, content_type_override: nil, &block)
@@ -65,7 +65,7 @@ module Homurabi
       cached = c.match(cache_key)
       if cached
         cached.headers.each { |k, v| response.headers[k] = v }
-        response.headers['x-homurabi-cache'] = 'HIT'
+        response.headers['x-homura-cache'] = 'HIT'
         return cached.body
       end
       body = block.call
@@ -77,10 +77,10 @@ module Homurabi
           'content-type'     => ct,
           'cache-control'    => "public, max-age=#{cache_ttl}",
           'date'             => Time.now.httpdate,
-          'x-homurabi-cache' => 'MISS'
+          'x-homura-cache' => 'MISS'
         }
       )
-      response.headers['x-homurabi-cache'] = 'MISS'
+      response.headers['x-homura-cache'] = 'MISS'
       body
     end
   end
@@ -91,7 +91,7 @@ module Homurabi
     def ai_demos_enabled?
       cf_env = env['cloudflare.env']
       return false unless cf_env
-      val = `(#{cf_env} && #{cf_env}.HOMURABI_ENABLE_AI_DEMOS) || ''`
+      val = `(#{cf_env} && #{cf_env}.HOMURA_ENABLE_AI_DEMOS) || ''`
       val.to_s == '1'
     end
 
@@ -152,7 +152,7 @@ module Homurabi
 
     def ai_demos_block_or_nil
       return nil if ai_demos_enabled?
-      [404, { 'error' => 'AI demos disabled (set HOMURABI_ENABLE_AI_DEMOS=1 in wrangler vars)' }.to_json]
+      [404, { 'error' => 'AI demos disabled (set HOMURA_ENABLE_AI_DEMOS=1 in wrangler vars)' }.to_json]
     end
 
     def ai_binding_block_or_nil

@@ -32,7 +32,7 @@ module Rack
   autoload :ForwardRequest, "rack/recursive"
   autoload :Head, "rack/head"
   autoload :Headers, "rack/headers"
-  # autoload :Lint, "rack/lint"   # disabled in homurabi: contains
+  # autoload :Lint, "rack/lint"   # disabled in homura: contains
   # /[\x80-\xff]/ regex that Opal's compiler rejects. Lint is a debug
   # middleware and is not used at runtime.
   autoload :Lock, "rack/lock"

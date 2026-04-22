@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 #
-# homurabi patch: stub of JwkConfiguration. The upstream version eagerly
+# homura patch: stub of JwkConfiguration. The upstream version eagerly
 # loads JWT::JWK::KidAsKeyDigest / Thumbprint, which pull in OpenSSL::Digest
 # and a full DER-encoded fingerprint path we don't need for plain JWT
 # encode/decode. This stub preserves the `kid_generator` interface (readable
@@ -18,7 +18,7 @@ module JWT
 
       def kid_generator_type=(_value)
         raise NotImplementedError,
-              'JWK key fingerprinting is not enabled in the homurabi jwt vendor. ' \
+              'JWK key fingerprinting is not enabled in the homura jwt vendor. ' \
               'Assign a custom kid_generator directly if you need thumbprints.'
       end
     end

@@ -14,7 +14,7 @@
 
 require 'json'
 
-$LOAD_PATH.unshift(File.expand_path('../gems/cloudflare-workers-runtime/lib', __dir__))
+$LOAD_PATH.unshift(File.expand_path('../gems/homura-runtime/lib', __dir__))
 require 'cloudflare_workers/async_registry'
 require 'cloudflare_workers/auto_await/analyzer'
 

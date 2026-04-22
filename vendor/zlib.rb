@@ -1,5 +1,5 @@
-# Minimal Zlib stub for the homurabi Phase 2 hello-world handler.
-# Opal stdlib does not ship a zlib module. Real homurabi apps that need
+# Minimal Zlib stub for the homura Phase 2 hello-world handler.
+# Opal stdlib does not ship a zlib module. Real homura apps that need
 # response compression should rely on the Cloudflare edge to gzip
 # responses on the way out. This stub only exists so that
 # `require 'zlib'` (transitively pulled in by rack/deflater) does not

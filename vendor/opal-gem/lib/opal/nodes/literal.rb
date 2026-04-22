@@ -157,7 +157,7 @@ module Opal
         push ")"
       end
 
-      # homurabi patch: replace Ruby's `\Z` / `\z` end-of-string anchors
+      # homura patch: replace Ruby's `\Z` / `\z` end-of-string anchors
       # with JavaScript's `$`. Keep the match spec-compatible for the
       # common "end of input" case Mustermann relies on.
       def normalize_ruby_regex_anchors(str)
@@ -167,7 +167,7 @@ module Opal
 
       def compile_static_regexp
         value = self.value.children[0]
-        # homurabi patch: upstream normalises `\A` to `^` (via the parser gem)
+        # homura patch: upstream normalises `\A` to `^` (via the parser gem)
         # but leaves `\Z` / `\z` as the literal two-character escape, which
         # JavaScript regex engines then treat as the literal letter `Z` / `z`
         # at the end. Ruby semantics map `\z` (strict end) and `\Z` (end or
@@ -235,12 +235,12 @@ module Opal
 
         if value.type == :str
           # Replacing \A -> ^, \z -> $, required for the parser gem.
-          # homurabi patch: also rewrite \Z (end-or-trailing-newline) to $,
+          # homura patch: also rewrite \Z (end-or-trailing-newline) to $,
           # matching Ruby semantics closely enough for real-world regexes
           # (Mustermann's route patterns in particular).
           self.value = s(:str, value.children[0].gsub('\A', '^').gsub('\z', '$').gsub('\Z', '$'))
         elsif value.type == :dstr
-          # homurabi patch: interpolated regex literals (`/\A#{inner}\Z/`,
+          # homura patch: interpolated regex literals (`/\A#{inner}\Z/`,
           # produced heavily by Mustermann's RegexpBased#initialize) are
           # compiled via `compile_dynamic_regexp`, which concatenates the
           # children verbatim into a JavaScript `new RegExp(...)` call.

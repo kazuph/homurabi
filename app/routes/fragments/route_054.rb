@@ -4,7 +4,7 @@ get '/phase11a/download/*' do
   unless foundations_demos_enabled?
     content_type 'application/json'
     status 404
-    next({ 'error' => 'foundations demos disabled (set HOMURABI_ENABLE_FOUNDATIONS_DEMOS=1)' }.to_json)
+    next({ 'error' => 'foundations demos disabled (set HOMURA_ENABLE_FOUNDATIONS_DEMOS=1)' }.to_json)
   end
   if bucket.nil?
     content_type 'application/json'

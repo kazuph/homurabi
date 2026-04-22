@@ -272,7 +272,7 @@ module Rack
       app = @map ? generate_map(@run, @map) : @run
       fail "missing run or map statement" unless app
       app.freeze if @freeze_app
-      # homurabi patch: neither Array#inject nor an `each` block with
+      # homura patch: neither Array#inject nor an `each` block with
       # a closured local variable reliably threads the middleware
       # accumulator through the chain on Opal (the closure copy of
       # `acc` does not propagate). Use an index-based loop so the

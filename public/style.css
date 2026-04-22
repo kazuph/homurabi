@@ -1,4 +1,4 @@
-/* homurabi – public/style.css */
+/* homura – public/style.css */
 :root { --brand: #0073bb; --accent: #e4572e; --muted: #888; }
 body { font: 16px/1.6 -apple-system, BlinkMacSystemFont, sans-serif; color: #222; max-width: 42em; margin: 3em auto; padding: 0 1em; }
 h1 { color: var(--brand); }
@@ -36,7 +36,7 @@ body:has(.chat-shell) { max-width: 56em; }
 .chat-msg-role { font-size: .7em; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); margin: 0 0 .25em 0; }
 /* Phase 11B — Markdown rendering styles for chat bubbles. The server
    converts assistant replies to a restricted HTML subset via
-   `lib/homurabi_markdown.rb`. Selectors are scoped to
+   `lib/homura_markdown.rb`. Selectors are scoped to
    `.chat-msg-body` so the app's global `<pre>` / `<code>` theme
    is not affected. */
 .chat-msg-body { white-space: pre-wrap; }

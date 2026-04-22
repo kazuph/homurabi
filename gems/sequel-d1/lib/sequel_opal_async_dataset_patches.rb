@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 # await: true
 #
-# homurabi patch (Phase 12): async Dataset action overrides.
+# homura patch (Phase 12): async Dataset action overrides.
 #
 # Upstream Sequel's Dataset#_all / #with_sql_first / #single_value /
 # #with_sql_single_value use synchronous `return v` / `break` from
@@ -31,7 +31,7 @@ module Sequel
     #   if rp = row_proc; fetch_rows(select_sql){|r| yield rp.call(r)}
     #   else              fetch_rows(select_sql){|r| yield r}
     #   end; self
-    # homurabi: fetch_rows is async (D1 adapter awaits the Promise
+    # homura: fetch_rows is async (D1 adapter awaits the Promise
     # chain). If we leave each sync, the block passed to fetch_rows
     # never runs before each returns. Await fetch_rows to let the
     # inner block fire first.
@@ -45,7 +45,7 @@ module Sequel
     end
 
     # upstream: a = []; yield a; post_load(a); a.each(&block) if block; a
-    # homurabi: yield(a) returns a Promise when the caller block
+    # homura: yield(a) returns a Promise when the caller block
     # crosses the D1 adapter's async boundary (Dataset#all's block
     # is async-compiled). Await so `a` is populated before post_load.
     def _all(block)
@@ -59,7 +59,7 @@ module Sequel
     # upstream: with_sql_each(sql){|r| yield r}; self (sync, but fetch_rows
     # returns a Promise under the D1 adapter, so the block body doesn't
     # run before the caller's sync flow resumes — the Promise is dropped).
-    # homurabi: reopen with `.__await__` so the async fetch_rows resolves
+    # homura: reopen with `.__await__` so the async fetch_rows resolves
     # before this method returns. Required for #first / #with_sql_first /
     # #with_sql_single_value which expect the block to have fired.
     def with_sql_each(sql)
@@ -72,7 +72,7 @@ module Sequel
     end
 
     # upstream: with_sql_each(sql){|r| return r}; nil
-    # homurabi: capture first row without `return`; callers always
+    # homura: capture first row without `return`; callers always
     # clone with limit(1) so the no-break form is equivalent. Needs
     # with_sql_each to actually await its fetch_rows (see above).
     def with_sql_first(sql)
@@ -86,7 +86,7 @@ module Sequel
     end
 
     # upstream: single_value_ds.each{|r| r.each{|_, v| return v}}; nil
-    # homurabi: capture first value using sentinel flag. Relies on each
+    # homura: capture first value using sentinel flag. Relies on each
     # awaiting the D1 Promise chain.
     def single_value
       value = nil
@@ -104,7 +104,7 @@ module Sequel
     end
 
     # upstream: if r = with_sql_first(sql); r.each{|_, v| return v}; end
-    # homurabi: same capture-first-value pattern via sentinel.
+    # homura: same capture-first-value pattern via sentinel.
     def with_sql_single_value(sql)
       if r = with_sql_first(sql)
         value = nil

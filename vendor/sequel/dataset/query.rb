@@ -623,12 +623,12 @@ module Sequel
     end
     
     CONDITIONED_JOIN_TYPES.each do |jtype|
-      # homurabi patch (Phase 12): define_method replaces class_eval(String)
+      # homura patch (Phase 12): define_method replaces class_eval(String)
       jtype_sym = jtype
       define_method(:"#{jtype_sym}_join") { |*args, &block| join_table(jtype_sym, *args, &block) }
     end
     UNCONDITIONED_JOIN_TYPES.each do |jtype|
-      # homurabi patch (Phase 12): define_method replaces class_eval(HEREDOC).
+      # homura patch (Phase 12): define_method replaces class_eval(HEREDOC).
       # `defined?(yield)` inside class_eval evaluated at call time, but
       # define_method receives the caller's block via &block — check that.
       jtype_sym = jtype

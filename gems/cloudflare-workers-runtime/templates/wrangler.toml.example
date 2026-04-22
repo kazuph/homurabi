@@ -1,8 +1,0 @@
-# Minimal Consumer wrangler.toml — paste into your Worker project.
-# Phase 17: uncomment to enable Cloudflare Email Service outbound sending.
-
-# [[send_email]]
-# name = "SEND_EMAIL"
-
-# [vars]
-# HOMURABI_MAIL_FROM = "noreply@your-verified-domain.example"

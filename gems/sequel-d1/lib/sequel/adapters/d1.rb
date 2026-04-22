@@ -2,7 +2,7 @@
 # backtick_javascript: true
 # await: true
 #
-# homurabi patch: Phase 12 — Cloudflare D1 adapter for Sequel.
+# homura patch: Phase 12 — Cloudflare D1 adapter for Sequel.
 #
 # Sequel's upstream `sequel/adapters/sqlite.rb` drives sqlite3-ruby
 # (a C extension that speaks to a file-backed SQLite via synchronous
@@ -73,7 +73,7 @@ module Sequel
       # execute_insert / execute_dui can pass them back.
       def run(sql, bindings = [])
         # Always stringify — Sequel's SQL builder uses
-        # HomurabiSqlBuffer (buffer wrapper for Opal), and D1's
+        # HomuraSqlBuffer (buffer wrapper for Opal), and D1's
         # prepare() validator (Zod) rejects non-string inputs with
         # "Expected string, received object".
         stmt = @binding.prepare(sql.to_s)

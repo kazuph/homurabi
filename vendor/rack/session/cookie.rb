@@ -157,7 +157,7 @@ module Rack
       attr_reader :coder, :encryptors
 
       def initialize(app, options = {})
-        # homurabi patch: Opal/Workers has no OpenSSL, so
+        # homura patch: Opal/Workers has no OpenSSL, so
         # Rack::Session::Encryptor (which uses OpenSSL::Cipher and
         # mutating String#slice!) cannot be instantiated. We skip
         # encryption entirely and fall through to the plain
@@ -170,7 +170,7 @@ module Rack
         @encryptors = []
         @legacy_hmac = false
 
-        # homurabi patch: use JSON coder instead of Marshal — Opal doesn't
+        # homura patch: use JSON coder instead of Marshal — Opal doesn't
         # ship a full Marshal implementation, but JSON is native on JS.
         @coder = options[:coder] ||= Base64::JSON.new
 

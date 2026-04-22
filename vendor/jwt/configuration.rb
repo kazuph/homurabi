@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 #
-# homurabi patch: verbatim from ruby-jwt v2.9.3 configuration.rb. The
+# homura patch: verbatim from ruby-jwt v2.9.3 configuration.rb. The
 # container loads DecodeConfiguration + a stubbed JwkConfiguration (since
 # Opal has no deep dup for kid generators).
 

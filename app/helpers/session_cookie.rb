@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module Homurabi
+module Homura
   module JwtKeyHelpers
     # Returns the signing key + verification key pair for the given alg.
     # Keys are lazily generated and cached on the App class so repeat

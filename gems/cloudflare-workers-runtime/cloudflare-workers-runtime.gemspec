@@ -19,6 +19,8 @@ Gem::Specification.new do |spec|
   spec.metadata['homepage_uri'] = spec.homepage
   spec.metadata['source_code_uri'] = "#{spec.homepage}/tree/main/gems/cloudflare-workers-runtime"
 
+  # Consumer-facing snippets (e.g. templates/wrangler.toml.example) ship with the gem —
+  # `templates/**/*` must remain in this glob so rubygems packaging does not omit them.
   spec.files = Dir.chdir(__dir__) do
     Dir['lib/**/*', 'runtime/**/*', 'exe/**/*', 'bin/*', 'docs/**/*', 'templates/**/*', 'README.md', 'CHANGELOG.md'].select { |f| File.file?(f) }
   end

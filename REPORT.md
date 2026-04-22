@@ -17,7 +17,7 @@ Phase 17.5 のゴール「ユーザーが `.__await__` も `# await:` magic comm
 - `views/docs_auto_await.erb` — `/docs/auto-await` ドキュメントページ（B10）
 
 ### 修正ファイル
-- `gems/homura-runtime/homura-runtime.gemspec` — `parser` を development dependency に移行
+- `gems/homura-runtime/homura-runtime.gemspec` — auto-await analyzer 用に `parser` を runtime dependency のまま維持
 - `gems/homura-runtime/lib/cloudflare_workers/auto_await/analyzer.rb` — ボトムアップ走査（子→親）に修正
 - `gems/sequel-d1/lib/sequel/adapters/d1.rb` — `async_factory` 削除、`taint_return` のみに統合
 - `gems/homura-runtime/lib/cloudflare_workers/async_registry.rb` — Faraday::Connection HTTP verbs 追加

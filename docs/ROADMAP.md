@@ -1290,7 +1290,7 @@ build/app.opal.mjs
 - **定数スコープ問題**: `# await: true` でファイル全体が async function に包まれると `App.class_eval` 内の定数がトップレベルとして解釈される。`App::JWT_ACCESS_TTL` 等に完全修飾名化。
 - **重複 await 問題 (copilot レビュー指摘)**: `db.prepare(sql).all` で `prepare` が `async_method` + `taint_return` の両方に登録されていたため、内外両方に `.__await__` が挿入される可能性があった。`prepare` は JS 上同期的なので `async_method` 登録を削除して解消。
 - **`lib/homura_async_sources.rb`**: プロジェクト固有の async source 登録を集約。sequel-d1 gem 内の登録は auto-await CLI の読み込み対象外だったためここに移動。
-- **`parser` gem**: runtime dependency → `add_development_dependency` に移行済み。
+- **`parser` gem**: auto-await analyzer を build pipeline から利用する都合で runtime dependency のまま維持。
 
 ### Phase 17.5 クローズ時メモ（2026-04-22 更新）
 

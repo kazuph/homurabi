@@ -59,14 +59,14 @@ module Cloudflare
           var r = await binding.send(payload);
           if (r == null || r === undefined) {
             var o0 = {}; o0['message_id'] = ''; o0['cf_send_result_json'] = '"void"';
-            return cf.$js_object_to_hash(o0);
+            return cf.$js_to_ruby(o0);
           }
           var raw = '';
           try { raw = JSON.stringify(r); } catch (x1) { raw = String(r); }
           var mid = r.messageId != null ? String(r.messageId)
             : (r.message_id != null ? String(r.message_id) : '');
           var o = {}; o['message_id'] = mid; o['cf_send_result_json'] = raw;
-          return cf.$js_object_to_hash(o);
+          return cf.$js_to_ruby(o);
         } catch (e) {
           var code = (e && e.code != null) ? String(e.code) : '';
           var msg = (e && e.message) ? String(e.message) : String(e);

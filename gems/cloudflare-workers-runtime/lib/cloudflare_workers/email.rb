@@ -36,9 +36,9 @@ module Cloudflare
     end
 
     # Workers `env.SEND_EMAIL.send({ to, from, subject, text?, html?, replyTo? })`.
-    # `to`: String, Array (nested), or Hash with `:email` / `'email'` (display `name` on `to`
-    # recipients is not preserved — only the address string is sent). `from` / `reply_to`:
-    # String or `{ email:, name: }`. At least one of `text:` or `html:` is required.
+    # `to`: String, Array (nested), or `{ email:, name?: }`; name is forwarded to Workers as
+    # `{ email, name }` entries when present. `from` / `reply_to`: String or `{ email:, name?: }`.
+    # At least one of `text:` or `html:` is required.
     def send(to:, from:, subject:, text: nil, html: nil, reply_to: nil)
       js = @js
       err_klass = Cloudflare::Email::Error
@@ -81,7 +81,7 @@ module Cloudflare
       obj = `({})`
       `#{obj}.subject = #{subject}`
 
-      # --- to (string | string[]) -----------------------------------------
+      # --- to (string | mixed array per Workers API) ---------------------
       to_js = normalize_to_js(to)
       `#{obj}.to = #{to_js}`
 
@@ -98,16 +98,27 @@ module Cloudflare
       obj
     end
 
-    # Returns a JS array of email strings or a single string (API accepts both).
+    # Returns a JS array: mix of address strings and `{ email, name? }` objects (Workers API shape).
     def normalize_to_js(raw)
-      emails = flatten_recipients(raw)
-      raise Error, 'to is empty' if emails.empty?
+      entries = flatten_recipients(raw)
+      raise Error, 'to is empty' if entries.empty?
 
       arr = `([])`
-      emails.each { |e| `#{arr}.push(#{e})` }
+      entries.each do |e|
+        case e
+        when String
+          `#{arr}.push(#{e})`
+        when Hash
+          js = `({})`
+          `#{js}.email = #{e[:email]}`
+          `#{js}.name = #{e[:name].to_s}` if e[:name] && !e[:name].to_s.strip.empty?
+          `#{arr}.push(#{js})`
+        end
+      end
       arr
     end
 
+    # Returns Ruby strings (bare address) or `{ email:, name: }` when a display name was given.
     def flatten_recipients(raw)
       case raw
       when nil
@@ -117,7 +128,13 @@ module Cloudflare
         s.empty? ? [] : [s]
       when Hash
         em = raw[:email] || raw['email']
-        em.nil? ? [] : [em.to_s.strip].reject(&:empty?)
+        return [] if em.nil? || em.to_s.strip.empty?
+        nm = raw[:name] || raw['name']
+        if nm.nil? || nm.to_s.strip.empty?
+          [em.to_s.strip]
+        else
+          [{ email: em.to_s.strip, name: nm.to_s }]
+        end
       when Array
         raw.flat_map { |x| flatten_recipients(x) }
       else

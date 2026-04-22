@@ -56,9 +56,12 @@ module Cloudflare
       `(async function(binding, payload, Kernel, Err, cf) {
         try {
           var r = await binding.send(payload);
-          if (r == null) return nil;
-          var mid = r.messageId != null ? String(r.messageId) : '';
-          var o = {}; o['message_id'] = mid;
+          if (r == null || r === undefined) return nil;
+          var raw = '';
+          try { raw = JSON.stringify(r); } catch (x1) { raw = String(r); }
+          var mid = r.messageId != null ? String(r.messageId)
+            : (r.message_id != null ? String(r.message_id) : '');
+          var o = {}; o['message_id'] = mid; o['cf_send_result_json'] = raw;
           return cf.$js_object_to_hash(o);
         } catch (e) {
           var code = (e && e.code != null) ? String(e.code) : '';

@@ -24,13 +24,13 @@
     # mint_session_cookie is sync (HMAC-SHA256 via node:crypto).
     # Keeping the route body sync lets `redirect` work normally.
     token = mint_session_cookie(username)
-    response.set_cookie(SESSION_COOKIE_NAME, {
+    response.set_cookie(App::SESSION_COOKIE_NAME, {
       value: token,
       path: '/',
       httponly: true,
       secure: request.scheme == 'https',
       same_site: :lax,
-      max_age: SESSION_COOKIE_TTL
+      max_age: App::SESSION_COOKIE_TTL
     })
     # 303 See Other — explicitly tells the client to follow up with
     # GET, avoiding any ambiguous POST-replay semantics around 302.

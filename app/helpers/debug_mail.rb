@@ -3,6 +3,11 @@
 
 module Homurabi
   # Phase 17 — `/debug/mail` is open on localhost only; deployed Workers require session user App::DEBUG_MAIL_ADMIN_USERNAME.
+  #
+  # Gate uses `#debug_mail_gate_response` returning a Rack triple `[403, headers, [body]]`;
+  # routes use `gate = …; next gate if gate`. Sinatra `halt` is intentionally not used:
+  # `throw :halt` does not reliably cross Opal/async boundaries (same rationale as avoiding
+  # bare `redirect` in async-sensitive routes documented elsewhere in this repo).
   module DebugMailHelpers
     def debug_mail_local_request?
       h = request.host.to_s

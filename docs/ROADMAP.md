@@ -1362,9 +1362,39 @@ end
 ## 後回しメモ
 
 - **15-F** rubygems.org 公開
-  - repo 分割は不要。今の構成は「開発は monorepo / 公開は gemspec 単位」で進める。
-  - `homura` 名の gem は出さない。`homura` は showcase / integration repo として当面維持。
-  - 公開名は `homura-runtime`, `sinatra-homura`, `sequel-d1`, `opal-homura`。
-  - MIT ライセンス明示と gem build は通過済み。残りは RubyGems への実 push と prerelease 運用判断。
+  - repo 分割は不要。今の構成は **「開発は monorepo / 公開は gemspec 単位」** で固定。
+  - **最終ブランド決定 (2026-04-23):**
+    - この repo / showcase app の名前は **`homura`**
+    - sister mruby/WASI repo の名前は **`hinoko`**
+    - **`homura` という gem は出さない**
+  - **公開名はこの 4 つで確定**:
+    - `opal-homura`
+    - `homura-runtime`
+    - `sinatra-homura`
+    - `sequel-d1`
+  - **公開単位と役割**:
+    - `opal-homura` — Opal fork。`require: 'opal'` のまま使う
+    - `homura-runtime` — core runtime
+    - `sinatra-homura` — Sinatra integration
+    - `sequel-d1` — D1 / Sequel integration
+  - **publish 順**は依存順で固定:
+    1. `opal-homura`
+    2. `homura-runtime`
+    3. `sinatra-homura`
+    4. `sequel-d1`
+  - **publish 前提条件**:
+    - gemspec / README / 同梱 docs / unpack 後 `.gem` artifact に **`homurabi` を残さない**
+    - MIT ライセンス明示済み
+    - 各 gem の `gem build` は通す
+    - repo 全体の検証は `npm test` と `npm run build`
+  - **他 AI 向け注意**:
+    - ローカル worktree のディレクトリ名が旧名のまま残っていても、それを branding の根拠にしないこと
+    - publish 判断は **gemspec 名 / 同梱物 / unpack 後 artifact** で行うこと
+    - GitHub repo は **`kazuph/homura`**、mruby 側は **`kazuph/hinoko`**
+  - **実 push 直前チェック**:
+    - RubyGems の認証 / MFA を確認
+    - 既存 version との衝突を確認
+    - `gem push` は上の依存順で実行
+  - prerelease 運用判断だけは別途残タスク。
 
 ---

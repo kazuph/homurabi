@@ -1297,7 +1297,7 @@ build/app.opal.mjs
 
 #### P0 — ドキュメント・表現修正（現状の正確な反映）
 
-1. **ROADMAP/docs の表現修正**: B6 は未達成（`# await: true` が app/ 下に 86 箇所以上残存）。「ユーザーが `__await__` も `# await:` も一切書かない」は現状より強い表現。`docs_auto_await.erb` の表現を現実に合わせて軟化。
+1. **ROADMAP/docs の表現修正**: B6 は未達成（`# await: true` が app/ 下に 80 箇所残存）。「ユーザーが `__await__` も `# await:` も一切書かない」は現状より強い表現。`docs_auto_await.erb` の表現を現実に合わせて軟化。
 2. **B4/B5 の設計未達を明記**: auto-await CLI は gem 側 `register_async_source` を自動収集していない（手動 require リストのみ）。ROADMAP 1249 行「全 gem の register_async_source 収集」は未達。
 
 #### P1 — 自動化・公開API再設計
@@ -1315,7 +1315,7 @@ build/app.opal.mjs
    - wrapper/helper の戻り値伝播テスト（ユーザー定義メソッド経由の async taint）
    - JWT helper/halt境界テスト（`authenticate!` が async 境界で壊れるケース）
    - gem 自動ロードテスト（仮想 gem から register_async_source が拾われること）
-7. **`.artifacts/phase17.5/` 証跡整備**: build log、test result（修正後のスモークテスト全緑）、screenshot（`/test/auto-await` 診断ページ）。
+7. **`.artifacts/phase17.5/` 証跡整備**: build log、test result（修正後のスモークテスト全緑）、screenshot（`/test/auto-await` 診断ページ）。**build/test ログは保存済み**、screenshot は未取得。
 8. **本番 deploy + 実機検証**: `wrangler deploy` 後、全 12 ルート 200 OK + `/debug/mail` 実送信確認。
 9. ** gated routes 検証**: `HOMURABI_ENABLE_*=1` を設定して `/test/bindings`、`/demo/cache/heavy`、`/demo/do` 等の動作確認。
 

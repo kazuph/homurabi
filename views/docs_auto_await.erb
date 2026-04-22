@@ -26,7 +26,7 @@ end
 end
 </code></pre>
 
-<p>ファイル先頭の <code># await:</code> magic comment も、ユーザー定義のメソッド名リストも不要になりました。</p>
+<p>多くのケースで、ファイル先頭の <code># await:</code> magic comment やユーザー定義のメソッド名リストは不要になりました。ただし、推論不能なケース（metaprogramming、Hash 動的アクセスなど）では、従来の <code>.__await__</code> や <code># await:</code> によるフォールバックが依然として必要です。</p>
 
 <h2 id="registry">AsyncRegistry</h2>
 <p>gem 側で「これは async source」を宣言します:</p>

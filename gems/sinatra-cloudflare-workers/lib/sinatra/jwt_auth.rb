@@ -7,7 +7,8 @@
 # body can do:
 #
 #     get '/api/me' do
-#       authenticate!
+#       auth_status, auth_result = authenticate_or_401
+#       next [auth_status, auth_result] if auth_status
 #       content_type 'application/json'
 #       { 'user' => current_user }.to_json
 #     end

@@ -772,15 +772,11 @@
     content_type 'application/json'
     gate = ai_demos_block_or_nil
     next gate if gate
-    # Inline JWT verification — early-exit with explicit `status` and
-    # `next` (the same pattern Phase 8's /api/me uses successfully).
-    # We deliberately do NOT call `Sinatra::JwtAuth#authenticate!`
-    # because that helper uses `halt` which throws past Opal's async
-    # boundary (Sinatra's `catch :halt` cannot see a JS Promise
-    # rejection). And we keep the token decode outside any helper so
-    # the `status N` call sits in the same `dispatch!` frame as the
-    # `next` — pulling it into a helper made the response leak out
-    # as 200 in earlier iterations.
+    # Inline JWT verification with dynamic algorithm detection.
+    # authenticate_or_401 is the recommended safe API for fixed-algorithm
+    # routes (see GET /api/chat/messages). This route uses inline
+    # verification because it needs to detect the algorithm from the
+    # token header (alg_from_token) to support multiple algorithms.
     auth_header = request.env['HTTP_AUTHORIZATION'].to_s
     parts = auth_header.split(' ', 2)
     if parts.length != 2 || parts[0].downcase != 'bearer'
@@ -917,13 +913,9 @@
     content_type 'application/json'
     gate = ai_demos_block_or_nil
     next gate if gate
-    auth = chat_verify_token!
-    if auth['ok'] != true
-      # See the long comment in POST /api/chat/messages for why we
-      # return [status, body] instead of using `status N; next body`
-      # — Sinatra snapshots response.status before the await resolves,
-      # so any later mutation is lost.
-      next [auth['status'].to_i, auth['body']]
+    auth_status, auth_result = authenticate_or_401
+    if auth_status
+      next [auth_status, auth_result]
     end
     session_id = normalize_session_id(params['session'])
     history = load_chat_history(session_id)
@@ -947,13 +939,9 @@
     content_type 'application/json'
     gate = ai_demos_block_or_nil
     next gate if gate
-    auth = chat_verify_token!
-    if auth['ok'] != true
-      # See the long comment in POST /api/chat/messages for why we
-      # return [status, body] instead of using `status N; next body`
-      # — Sinatra snapshots response.status before the await resolves,
-      # so any later mutation is lost.
-      next [auth['status'].to_i, auth['body']]
+    auth_status, auth_result = authenticate_or_401
+    if auth_status
+      next [auth_status, auth_result]
     end
     session_id = normalize_session_id(params['session'])
     clear_chat_history(session_id)

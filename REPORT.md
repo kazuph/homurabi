@@ -2,7 +2,7 @@
 
 ## 概要
 
-Phase 17.5 のゴール「ユーザーが `.__await__` も `# await:` magic comment も一切書かず、Cloudflare binding 由来の async chain だけが自動的に async として扱われる状態」を達成した。
+Phase 17.5 のゴール「ユーザーが `.__await__` も `# await:` magic comment も一切書かず、Cloudflare binding 由来の async chain だけが自動的に async として扱われる状態」を**部分的に**達成した。コアパス（D1/KV/R2/Sequel/JWT/HTTP/Email/AI/Cache/Queue/DO）では自動 await が動作するが、ソースファイルから `# await: true` および手動 `.__await__` を完全に撤去することは未達（app/ 配下に `# await: true` が 80 箇所、手動 `.__await__` が 7 箇所残存）。
 
 ## 変更概要
 
@@ -22,7 +22,7 @@ Phase 17.5 のゴール「ユーザーが `.__await__` も `# await:` magic comm
 - `gems/sequel-d1/lib/sequel/adapters/d1.rb` — `async_factory` 削除、`taint_return` のみに統合
 - `gems/cloudflare-workers-runtime/lib/cloudflare_workers/async_registry.rb` — Faraday::Connection HTTP verbs 追加
 - `lib/homurabi_async_sources.rb` — Sequel / HTTP / JWT 登録追加
-- `app/app.rb` — `# await: true` 削除（build 生成物に閉じ込め）
+- `app/app.rb` — アプリ本体は素の Ruby のまま維持。auto-await 変換後ソースには必要に応じて `# await: true` が自動付与される
 - `app/routes/canonical_all.rb` — `# await: true` 削除、定数完全修飾名化（`App::JWT_ACCESS_TTL` 等）、手動 `.__await__` 復帰（analyzer 非対応ケース）
 - `app/routes/fragments/route_066.rb` / `route_057.rb` — 手動 `.__await__` 復帰
 - `gems/cloudflare-workers-runtime/bin/cloudflare-workers-build` — auto-await 統合済み（確認済み）
@@ -63,7 +63,7 @@ Phase 17.5 のゴール「ユーザーが `.__await__` も `# await:` magic comm
 - [x] B3: `cloudflare-workers-build` への統合
 - [x] B4: `sinatra-cloudflare-workers` の登録
 - [x] B5: `sequel-d1` の登録
-- [x] B6: 既存 `__await__` 削除（analyzer非対応ケースのみ手動残存）
+- [ ] B6: 既存 `__await__` 削除（未達 — app/ 配下に `# await: true` 80 箇所、手動 `.__await__` 7 箇所残存）
 - [x] B7: 回帰検証（393/393 pass）
 - [x] B8: `examples/minimal-sinatra-with-email/` 新規作成
 - [x] B9: 診断モード（`--debug` / `CLOUDFLARE_WORKERS_AUTO_AWAIT_DEBUG=1`）
@@ -80,6 +80,7 @@ Phase 17.5 のゴール「ユーザーが `.__await__` も `# await:` magic comm
 ## 意図通りの設計か
 
 - **ユーザーが `.__await__` を書かない**: コアパス（D1/KV/R2/Sequel/JWT/HTTP/Email/AI/Cache/Queue/DO）で達成
-- **ユーザーが `# await:` を書かない**: ソースファイルから削除、build 生成物のみに付与
+- **ユーザーが `# await:` を書かない**: ソースファイルには依然 `# await: true` が 80 箇所残存。build 生成物への自動付与は動作するが、ソースクリーンアップは未完了。
+- **証跡**: `.artifacts/phase17.5/` に smoke test ログと auto-await debug ログを保存済み。
 - **同名 sync メソッドに await が挿入されない**: `async_class` / `async_method` / `taint_return` による origin class 区別で担保
 - **Ruby らしさ**: `mailer.send(...)` のような自然なメソッド呼び出しがそのまま動く

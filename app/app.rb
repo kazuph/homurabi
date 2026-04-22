@@ -35,6 +35,7 @@ require 'sequel'
 require_relative 'helpers/session_cookie'
 require_relative 'helpers/chat_history'
 require_relative 'helpers/debug_mail'
+require_relative 'lib/debug_mail_controller'
 require_relative 'helpers/markdown_render'
 
 class App < Sinatra::Base

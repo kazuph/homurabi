@@ -14,13 +14,13 @@ module Homurabi
         /homurabi Phase 17 test.{0,3}Version\s+[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z/i
 
       def parse_form_params(params, default_to: false)
-        to = params['to'].to_s.strip
+        to = sanitize_form(params['to']).strip
         to = DEFAULT_TO if default_to && to.empty?
         {
           to: to,
-          subject: sanitize_form(params['subject'].to_s.strip),
-          text: sanitize_form(params['text'].to_s),
-          html: sanitize_form(params['html'].to_s)
+          subject: sanitize_form(params['subject']).strip,
+          text: sanitize_form(params['text']),
+          html: sanitize_form(params['html'])
         }
       end
 
@@ -76,10 +76,9 @@ module Homurabi
 
       private
 
-      # `+` → space のみ（application/x-www-form-urlencoded）。
-      # `%2F` 等は Rack が `URI.decode_www_form_component`（Opal では decodeURIComponent）で解く。
+      # `Homurabi::DebugMailHelpers.www_decode` — `+` / `%xx`（閉じタグの `%2F` 等）を確実に直す。
       def sanitize_form(value)
-        value.to_s.tr('+', ' ')
+        Homurabi::DebugMailHelpers.www_decode(value)
       end
 
       def vid_from_env(env)

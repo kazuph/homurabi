@@ -1,6 +1,8 @@
 # await: all, authenticate!, call, chat_verify_token!, clear_chat_history, decode, dh_compute_key, dispatch_js, dispatch_scheduled, encode, execute, execute_insert, fetch, fetch_raw, final, get_binary, get_first_row, get_response, list, load_chat_history, open, private_decrypt, public_encrypt, run, save_chat_history, send, sign, sign_pss, sleep, verify, verify_pss
 # frozen_string_literal: true
 
+require 'uri'
+
 module Homurabi
   # Phase 17 — `/debug/mail` is open on localhost only; deployed Workers require session user App::DEBUG_MAIL_ADMIN_USERNAME.
   #
@@ -9,6 +11,16 @@ module Homurabi
   # `throw :halt` does not reliably cross Opal/async boundaries (same rationale as avoiding
   # bare `redirect` in async-sensitive routes documented elsewhere in this repo).
   module DebugMailHelpers
+    # application/x-www-form-urlencoded 相当: `+` → space、`%xx` → 文字（decodeURIComponent 相当）。
+    # Opal 上で Sinatra/Rack の params に `%2F` が残り `<%2Fh1>` になる場合の保険。
+    # 既に `/` まで decode 済みの値は URI 実装によりほぼそのまま返る。
+    def self.www_decode(s)
+      s = s.to_s
+      URI.decode_www_form_component(s.tr('+', ' '))
+    rescue StandardError
+      s
+    end
+
     def debug_mail_local_request?
       h = request.host.to_s
       h == '127.0.0.1' || h == 'localhost'

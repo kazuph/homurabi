@@ -56,14 +56,6 @@ module Cloudflare
       # 多行 x-string をメソッド末尾に置くと Opal が Promise を返さない出力になることがあるため return を明示する。
       return `(async function(binding, payload, Kernel, Err, cf) {
         try {
-          var _h = payload.html != null ? String(payload.html) : '';
-          console.log(JSON.stringify({
-            homurabi_email_payload_probe: {
-              html_len: _h.length,
-              html_has_literal_pct2f: _h.indexOf('%2F') >= 0,
-              html_has_closing_h1: _h.indexOf('</h1>') >= 0
-            }
-          }));
           var r = await binding.send(payload);
           if (r == null || r === undefined) {
             var o0 = {}; o0['message_id'] = ''; o0['cf_send_result_json'] = '"void"';

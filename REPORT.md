@@ -231,3 +231,52 @@ curl -sS -b /tmp/p17-cookie.txt -X POST https://homurabi.kazu-san.workers.dev/de
 `2026-04-22T01:43:34Z` 時点で `npm test` 全スイート PASS。
 
 **マスターへ**: 件名に **`Phase 17 refactor verification`** と **Version UUID** が含まれるメールで、Gmail で **HTML レンダリング**（オレンジ見出し・太字・コード表示）を確認してください。問題なければ Phase 17 マージ判断で構いません。
+
+---
+
+## Phase 17 URL decode 修正・本番検証（マスター承認デプロイ 1 回）
+
+### Workers Version ID（`wrangler deploy` 出力）
+
+`8d40afc4-e230-412f-9818-19b54e1762a8`
+
+※ 検証送信時に一時的に `binding.send(payload)` 直前へ **tail 用 console.log**（`html_has_literal_pct2f` / `html_has_closing_h1`）を入れたビルド。このデプロイで記録。**記録後、リポジトリからは tail ログ行を削除済み**（次回以降の deploy で本番ログがノイズフリーになる）。
+
+### POST `/debug/mail`（admin セッション）
+
+- **to**: `kazu.homma@gmail.com`
+- **subject（応答 JSON）**: `homurabi Phase 17 url-decode verification — 8d40afc4-e230-412f-9818-19b54e1762a8 — 9f00fedd39e69501`
+- **text**: `plain fallback`
+- **html**: ユーザー指定どおり（`<h1 style="color:#f6821f;">URL decode fix 検証</h1>` … リスト・リンク）
+
+### レスポンス JSON（復元）
+
+```json
+{
+  "message_id": "<Y2OFCCO7qCKmYcJFIh8oy1r3ZHBlzZS0mByQ@kazuph-info.ai-work.uk>",
+  "subject": "homurabi Phase 17 url-decode verification — 8d40afc4-e230-412f-9818-19b54e1762a8 — 9f00fedd39e69501"
+}
+```
+
+- **HTTP**: 200
+
+### wrangler tail（payload 直前）
+
+`homurabi_email_payload_probe`:
+
+```json
+{"homurabi_email_payload_probe":{"html_len":282,"html_has_literal_pct2f":false,"html_has_closing_h1":true}}
+```
+
+- **`html_has_literal_pct2f`: `false`** → binding に渡す **JS 文字列にリテラル `%2F` が残っていない**ことを確認。
+- **`html_has_closing_h1`: `true`** → **`</h1>` が実タグとして含まれる**ことを確認。
+
+### スモーク（本番 GET 12 ルート・HTTP 200）
+
+`/`, `/posts`, `/about`, `/login`, `/docs`, `/docs/email`, `/docs/quick-start`, `/docs/migration`, `/docs/sinatra`, `/docs/sequel-d1`, `/docs/runtime`, `/docs/architecture`
+
+### 検証時刻（UTC）
+
+`2026-04-22T01:54:13Z` 時点で deploy／POST／tail／12 ルート smoke 済み。
+
+**マスターへ**: 件名 **`Phase 17 url-decode verification`** で届いたメールで、本文が **`<%2Fh1>` 等のゴミなく** Gmail で HTML 表示されることを確認してください。（次に clean ログで本番へ再度反映する場合のみ、ログ除去済み HEAD を redeploy）

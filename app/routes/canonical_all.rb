@@ -721,20 +721,20 @@
     # mint_session_cookie is sync (HMAC-SHA256 via node:crypto).
     # Keeping the route body sync lets `redirect` work normally.
     token = mint_session_cookie(username)
-    response.set_cookie(SESSION_COOKIE_NAME, {
+    response.set_cookie(App::SESSION_COOKIE_NAME, {
       value: token,
       path: '/',
       httponly: true,
       secure: request.scheme == 'https',
       same_site: :lax,
-      max_age: SESSION_COOKIE_TTL
+      max_age: App::SESSION_COOKIE_TTL
     })
     # 303 See Other — explicitly tells the client to follow up with
     # GET, avoiding any ambiguous POST-replay semantics around 302.
     redirect return_to, 303
   end
   get '/logout' do
-    response.delete_cookie(SESSION_COOKIE_NAME, path: '/')
+    response.delete_cookie(App::SESSION_COOKIE_NAME, path: '/')
     redirect '/'
   end
   get '/chat' do
@@ -1894,5 +1894,68 @@
       %w[diagram 依存関係 (Mermaid)]
     ]
     @docs_inner = erb :docs_architecture
+    erb :layout_docs
+  end
+  # Phase 17 — Cloudflare Email Service (SEND_EMAIL) manual test
+  get '/debug/mail' do
+    gate = debug_mail_gate_response
+    next gate if gate
+
+    @title = 'Debug — mail'
+    @mail_from = homurabi_mail_from
+    @form = Homurabi::DebugMailController.parse_form_params(params, default_to: true)
+    @result = nil
+    erb :debug_mail
+  end
+
+  post '/debug/mail' do
+    gate = debug_mail_gate_response
+    next gate if gate
+
+    content_type 'text/html; charset=utf-8'
+
+    @title = 'Debug — mail'
+    @mail_from = homurabi_mail_from
+
+    ctx = Homurabi::DebugMailController.prepare_send(params, env, self)
+    if ctx[:error_result]
+      @result = ctx[:error_result]
+    else
+      begin
+        raw = ctx[:mail].send(
+          to: ctx[:final_to],
+          from: ctx[:mail_from],
+          subject: ctx[:subject_line],
+          text: ctx[:text_body],
+          html: ctx[:html_body]
+        ).__await__
+        @result = Homurabi::DebugMailController.after_send_success(raw, ctx)
+      rescue Cloudflare::Email::Error => e
+        @result = Homurabi::DebugMailController.after_send_failure(e, ctx)
+      end
+    end
+
+    @form = @result[:form]
+    erb :debug_mail
+  end
+
+  get '/docs/email' do
+    @title = 'Cloudflare Email Service — homurabi Docs'
+    @docs_page = 'email'
+    @docs_section = :reference
+    @docs_breadcrumb = [
+      ['Docs', '/docs'],
+      ['API Reference', '/docs/runtime'],
+      ['Email Service', nil]
+    ]
+    @docs_toc = [
+      %w[overview 概要],
+      %w[setup domain onboarding],
+      %w[wrapper Cloudflare::Email],
+      %w[matrix できること / できないこと],
+      %w[debug /debug/mail],
+      %w[links 公式リンク]
+    ]
+    @docs_inner = erb :docs_email
     erb :layout_docs
   end

@@ -153,5 +153,35 @@
     "t": "Architecture — 依存関係（Mermaid）",
     "h": "/docs/architecture#diagram",
     "k": "Architecture 依存関係（Mermaid）"
+  },
+  {
+    "t": "Email Service — 概要",
+    "h": "/docs/email#overview",
+    "k": "Email Service 概要"
+  },
+  {
+    "t": "Email Service — domain onboarding",
+    "h": "/docs/email#setup",
+    "k": "Email Service domain onboarding"
+  },
+  {
+    "t": "Email Service — Cloudflare::Email",
+    "h": "/docs/email#wrapper",
+    "k": "Email Service Cloudflare::Email"
+  },
+  {
+    "t": "Email Service — できること / できないこと",
+    "h": "/docs/email#matrix",
+    "k": "Email Service できること / できないこと"
+  },
+  {
+    "t": "Email Service — セルフホストデモ",
+    "h": "/docs/email#debug",
+    "k": "Email Service セルフホストデモ"
+  },
+  {
+    "t": "Email Service — 公式リンク",
+    "h": "/docs/email#links",
+    "k": "Email Service 公式リンク"
   }
 ]

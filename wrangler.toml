@@ -13,6 +13,7 @@ compatibility_flags = ["nodejs_compat"]
 binding = "DB"
 database_name = "homurabi-db"
 database_id = "3a59c955-198e-478f-8f11-71d5f3eb7600"
+preview_database_id = "6642a8ca-c5d0-4277-9755-3bcee6147c11"
 # Phase 13 follow-up: Sequel migrations compiled by `bin/homurabi-migrate`
 # (wrapper → `cloudflare-workers-migrate`) into `.sql` files under the same path. Point
 # `wrangler d1 migrations apply` at the same directory so both tools
@@ -22,10 +23,13 @@ migrations_dir = "db/migrations"
 [[kv_namespaces]]
 binding = "KV"
 id = "64ee32f1c6c64f85af9591e827da7462"
+# Remote/preview `wrangler dev` requires a separate preview namespace (production id above unchanged).
+preview_id = "4a478ce244b5493d857b5f715ed8acf5"
 
 [[r2_buckets]]
 binding = "BUCKET"
 bucket_name = "homurabi-bucket"
+preview_bucket_name = "homurabi-r2-remote-preview"
 
 # Phase 10: Workers AI binding. Routes reach this from Ruby as
 # `env['cloudflare.AI']` and pass it to `Cloudflare::AI.run(model, …)`.
@@ -36,6 +40,11 @@ bucket_name = "homurabi-bucket"
 # Workers AI catalog) once `wrangler login` has run.
 [ai]
 binding = "AI"
+
+# Phase 17 — Cloudflare Email Service (Agents Week 2026 public beta).
+# Routes use `env['cloudflare.SEND_EMAIL']` → Cloudflare::Email wrapping `env.SEND_EMAIL`.
+[[send_email]]
+name = "SEND_EMAIL"
 
 # Phase 7: gating for the educational crypto routes (`/test/crypto`,
 # `/demo/crypto`). Default OFF — those routes generate fresh RSA keys
@@ -70,6 +79,8 @@ HOMURABI_ENABLE_SCHEDULED_DEMOS = "0"
 # external JSON API (ipify) and writes to R2 under phase11a/, so we
 # keep the pattern: default OFF, flip to "1" only in dev.
 HOMURABI_ENABLE_FOUNDATIONS_DEMOS = "0"
+# Phase 17 — verified From address (domain kazuph-info.ai-work.uk onboarded 2026-04-21).
+HOMURABI_MAIL_FROM = "noreply@kazuph-info.ai-work.uk"
 
 # Phase 9 — Cloudflare Workers Cron Triggers.
 #
@@ -176,6 +187,7 @@ HOMURABI_ENABLE_CRYPTO_DEMOS = "0"
 HOMURABI_ENABLE_AI_DEMOS = "0"
 HOMURABI_ENABLE_BINDING_DEMOS = "0"
 HOMURABI_ENABLE_SCHEDULED_DEMOS = "0"
+HOMURABI_MAIL_FROM = "noreply@kazuph-info.ai-work.uk"
 
 [[env.dlq-demo.d1_databases]]
 binding = "DB"
@@ -192,6 +204,9 @@ bucket_name = "homurabi-bucket"
 
 [env.dlq-demo.ai]
 binding = "AI"
+
+[[env.dlq-demo.send_email]]
+name = "SEND_EMAIL"
 
 [[env.dlq-demo.durable_objects.bindings]]
 name       = "COUNTER"

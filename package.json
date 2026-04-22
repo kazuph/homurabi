@@ -10,6 +10,8 @@
     "build:opal": "bundle exec cloudflare-workers-build",
     "build": "ruby bin/generate-docs-search-index && bundle exec cloudflare-workers-build",
     "dev": "npm run build && wrangler dev --port 8787 --ip 127.0.0.1",
+    "dev:remote": "npm run build && wrangler dev --remote --port 8787 --ip 127.0.0.1",
+    "preflight": "npm test && npm run build",
     "dev:dlq": "npm run build && wrangler dev --env dlq-demo --port 8787 --ip 127.0.0.1",
     "d1:init": "bin/init-local-d1",
     "test:workers": "bin/test-on-workers",

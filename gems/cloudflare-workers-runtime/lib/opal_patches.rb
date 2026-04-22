@@ -250,10 +250,16 @@ module ::URI
   # them. Back them with CGI so that Rack's query-string parser works for
   # any request with a body / query (Sinatra's `request.body.read` path
   # eventually walks through this code).
-  unless respond_to?(:decode_www_form_component)
-    def self.decode_www_form_component(str, _enc = nil)
-      CGI.unescape(str.to_s)
-    end
+  #
+  # IMPORTANT (Opal): CGI.unescape maps to JS **decodeURI**, which does NOT
+  # decode `%2F` (`/`). RFC 3986 decodeURI reserves those escapes; Rack form
+  # bodies need **decodeURIComponent** semantics (same as CGI.unescapeURIComponent).
+  # Without this, HTML like `</h1>` survives as literal `<%2Fh1>` in params.
+  def self.decode_www_form_component(str, _enc = nil)
+    s = str.to_s.tr('+', ' ')
+    CGI.unescapeURIComponent(s)
+  rescue ::Exception
+    str.to_s
   end
 
   unless respond_to?(:encode_www_form_component)

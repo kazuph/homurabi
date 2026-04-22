@@ -13,6 +13,46 @@ function rackDispatch() {
   return fn || globalThis.__HOMURABI_RACK_DISPATCH__;
 }
 
+/** Phase 17 — Workers `env.SEND_EMAIL` を Rack 構築より前に global に載せ、Miniflare でも Ruby が同じバインディングを拾えるようにする。 */
+function ensureOpalWorkersEmailBinding(env) {
+  const ow = (globalThis.__OPAL_WORKERS__ ||= {});
+  if (env && env.SEND_EMAIL) {
+    ow.sendEmailBinding = env.SEND_EMAIL;
+  }
+}
+
+/**
+ * Miniflare の entry.worker は `/cdn-cgi/mf/scheduled` だけ先に処理する。
+ * `/cdn-cgi/handler/email` 等はユーザ Worker の fetch に届くため、ここで Rack に渡さず処理する。
+ * （Cloudflare Email Routing — Local Development の受信スタブ向け。Phase 18 で `email()` と接続予定）
+ */
+async function handleCdnCgiBypass(request, env, _ctx) {
+  const url = new URL(request.url);
+  if (url.pathname === "/cdn-cgi/handler/email") {
+    if (request.method === "POST") {
+      try {
+        globalThis.console.log(
+          "[homurabi] POST /cdn-cgi/handler/email — bypass Rack (Email Routing local-dev stub path)",
+        );
+      } catch (_e) {}
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          bypass: "rack",
+          pathname: url.pathname,
+          note: "homurabi worker_module forwards /cdn-cgi away from Sinatra. Full inbound handling: Phase 18 (export email()).",
+        }),
+        { status: 200, headers: { "content-type": "application/json; charset=utf-8" } },
+      );
+    }
+    return new Response("Method Not Allowed", { status: 405 });
+  }
+  if (env.ASSETS && typeof env.ASSETS.fetch === "function") {
+    return env.ASSETS.fetch(request);
+  }
+  return new Response("not handled", { status: 404, headers: { "content-type": "text/plain; charset=utf-8" } });
+}
+
 function scheduledDispatch() {
   const ow = globalThis.__OPAL_WORKERS__;
   const fn = ow && typeof ow.scheduled === "function" ? ow.scheduled : undefined;
@@ -101,6 +141,18 @@ async function readBodyTextForRubyDispatcher(request) {
 
 export default {
   async fetch(request, env, ctx) {
+    ensureOpalWorkersEmailBinding(env);
+
+    let reqUrl;
+    try {
+      reqUrl = new URL(request.url);
+    } catch (_e) {
+      reqUrl = { pathname: "/" };
+    }
+    if (reqUrl.pathname.startsWith("/cdn-cgi/")) {
+      return handleCdnCgiBypass(request, env, ctx);
+    }
+
     const dispatch = rackDispatch();
     if (typeof dispatch !== "function") {
       return new Response(

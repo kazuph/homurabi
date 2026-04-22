@@ -239,6 +239,14 @@ module Rack
           js_dlq = `#{js_env} && #{js_env}.JOBS_DLQ`
           env['cloudflare.QUEUE_JOBS_DLQ'] = Cloudflare::Queue.new(js_dlq, 'JOBS_DLQ') if `#{js_dlq} != null`
 
+          # Phase 17 — SEND_EMAIL。worker_module.fetch は先に globalThis.__OPAL_WORKERS__.sendEmailBinding を設定する。
+          # 本番では js_env.SEND_EMAIL が直に入る。Miniflare で欠ける場合のみ global を試す（2 段に分けて Opal の埋め込みを単純化）。
+          js_send_email = `#{js_env}.SEND_EMAIL`
+          if `#{js_send_email} == null || #{js_send_email} === undefined`
+            js_send_email = `(typeof globalThis !== 'undefined' && globalThis.__OPAL_WORKERS__ && globalThis.__OPAL_WORKERS__.sendEmailBinding) || null`
+          end
+          env['cloudflare.SEND_EMAIL'] = Cloudflare::Email.new(js_send_email) if `#{js_send_email} != null`
+
           env
         end
 
@@ -787,4 +795,5 @@ require 'cloudflare_workers/stream'
 # binding.
 require 'cloudflare_workers/cache'
 require 'cloudflare_workers/queue'
+require 'cloudflare_workers/email'
 require 'cloudflare_workers/durable_object'

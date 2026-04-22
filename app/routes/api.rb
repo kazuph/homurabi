@@ -1,4 +1,3 @@
-# await: true
 # frozen_string_literal: true
 # Domain: api — fragment indices 4, 22, 23, 24, 33, 34, 35, 36, 42, 50 (documentation only; routes load via app/app.rb).
 # fragments/route_004

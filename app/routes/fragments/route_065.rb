@@ -1,4 +1,3 @@
-# await: true
 # frozen_string_literal: true
 # Route fragment 65 — demo /docs/architecture
 get '/docs/architecture' do

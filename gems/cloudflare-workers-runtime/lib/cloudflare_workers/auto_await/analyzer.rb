@@ -34,6 +34,10 @@ module CloudflareWorkers
           process_def(node)
           return
         end
+        if node.type == :block
+          process_block(node)
+          return
+        end
 
         # Bottom-up traversal: process children first so helper-factory
         # sends (e.g. bare +db+) populate @env before their parent
@@ -76,6 +80,21 @@ module CloudflareWorkers
         return_cls = infer_class(body)
         @method_returns[method_name] = return_cls if return_cls
 
+        @env = saved_env
+      end
+
+      def process_block(node)
+        call_node, args_node, body = *node
+        saved_env = @env
+        @env = @env.dup
+
+        block_param_bindings(call_node, args_node).each do |name, cls|
+          @env[name] = cls
+        end
+
+        process_node(call_node) if call_node.is_a?(Parser::AST::Node)
+        process_node(body) if body.is_a?(Parser::AST::Node)
+      ensure
         @env = saved_env
       end
 
@@ -153,6 +172,28 @@ module CloudflareWorkers
           return @method_returns[method_name] if @method_returns.key?(method_name)
         end
         nil
+      end
+
+      def block_param_bindings(call_node, args_node)
+        return {} unless durable_object_define_call?(call_node)
+        return {} unless args_node&.type == :args
+
+        arg_names = args_node.children.filter_map do |arg|
+          next unless arg&.type == :arg
+          arg.children[0]
+        end
+        return {} if arg_names.empty?
+
+        bindings = { arg_names[0] => 'Cloudflare::DurableObjectState' }
+        bindings[arg_names[1]] = 'Cloudflare::DurableObjectRequest' if arg_names.length > 1
+        bindings
+      end
+
+      def durable_object_define_call?(call_node)
+        return false unless call_node&.type == :send
+
+        receiver, method_name = *call_node
+        method_name == :define && const_path(receiver) == 'Cloudflare::DurableObject'
       end
 
       def infer_index_class(node)

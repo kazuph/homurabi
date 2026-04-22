@@ -1,4 +1,3 @@
-# await: true
 # frozen_string_literal: true
 # Route fragment 26 — demo /demo/crypto
 get '/demo/crypto' do

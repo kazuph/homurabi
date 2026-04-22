@@ -1,4 +1,3 @@
-# await: true
 # frozen_string_literal: true
 # Route fragment 4 — api /api/echo
 post '/api/echo' do

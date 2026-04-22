@@ -1,4 +1,3 @@
-# await: true
 # frozen_string_literal: true
 # Route fragment 47 — demo /demo/queue/force-dlq
 post '/demo/queue/force-dlq' do

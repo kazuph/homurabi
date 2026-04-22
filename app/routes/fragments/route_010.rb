@@ -1,4 +1,3 @@
-# await: true
 # frozen_string_literal: true
 # Route fragment 10 — posts /posts
 get '/posts' do

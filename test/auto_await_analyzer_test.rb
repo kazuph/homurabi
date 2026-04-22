@@ -18,8 +18,14 @@ CloudflareWorkers::AsyncRegistry::Builder.new(registry).instance_eval do
   taint_return 'Sequel::Dataset', :limit, 'Sequel::Dataset'
   async_factory 'Cloudflare::Email', :new
   async_method 'Cloudflare::Email', :send
+  taint_return 'Cloudflare::DurableObjectState', :storage, 'Cloudflare::DurableObjectStorage'
+  async_method 'Cloudflare::DurableObjectStorage', :get
+  async_method 'Cloudflare::DurableObjectStorage', :put
   async_accessor :env, :DB, 'Cloudflare::D1Database'
   async_accessor :env, :SEND_EMAIL, 'Cloudflare::Email'
+  helper_factory :send_email, 'Cloudflare::Email'
+  async_helper :cache_get, 'Homurabi::CloudflareBindingHelpers'
+  async_method 'JWT', :decode
 end
 
 passed = 0
@@ -134,6 +140,48 @@ if transformed.include?("Cloudflare::Email.new(env.SEND_EMAIL).__await__")
 else
   passed += 1
 end
+
+# Test 7: begin/rescue keeps JWT.decode awaitable without manual IIFE
+src7 = <<~RUBY
+  begin
+    JWT.decode(token, verify_key, true, algorithm: algorithm)
+  rescue JWT::DecodeError => e
+    next [401, { 'error' => e.message }.to_json]
+  end
+RUBY
+ok, _ = assert_transform(src7, ["JWT.decode(token, verify_key, true, algorithm: algorithm)"], registry)
+passed += 1 if ok
+failed += 1 unless ok
+
+# Test 8: helper_factory local var survives opaque helper/controller calls
+src8 = <<~RUBY
+  mail = send_email
+  ctx = Homurabi::DebugMailController.prepare_send(params, env, self, mail)
+  mail.send(to: ctx[:final_to], subject: ctx[:subject_line], text: ctx[:text_body])
+RUBY
+ok, _ = assert_transform(src8, ["mail.send(to: ctx[:final_to], subject: ctx[:subject_line], text: ctx[:text_body])"], registry)
+passed += 1 if ok
+failed += 1 unless ok
+
+# Test 9: async helper call with explicit block arg is awaited
+src9 = <<~RUBY
+  compute_body = proc { 'ok' }
+  body = cache_get(cache_key, ttl: ttl, &compute_body)
+RUBY
+ok, _ = assert_transform(src9, ["cache_get(cache_key, ttl: ttl, &compute_body)"], registry)
+passed += 1 if ok
+failed += 1 unless ok
+
+# Test 10: DurableObject.define block binds state.storage async methods
+src10 = <<~RUBY
+  Cloudflare::DurableObject.define('Counter') do |state, request|
+    prev = (state.storage.get('count') || 0).to_i
+    state.storage.put('count', prev + 1)
+  end
+RUBY
+ok, _ = assert_transform(src10, ["state.storage.get('count')", "state.storage.put('count', prev + 1)"], registry)
+passed += 1 if ok
+failed += 1 unless ok
 
 puts "\n#{passed} passed, #{failed} failed"
 exit(failed > 0 ? 1 : 0)

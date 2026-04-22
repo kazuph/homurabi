@@ -1,4 +1,3 @@
-# await: true
 # frozen_string_literal: true
 # Route fragment 52 — demo /phase11a/cleanup
 post '/phase11a/cleanup' do

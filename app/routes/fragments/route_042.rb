@@ -1,4 +1,3 @@
-# await: true
 # frozen_string_literal: true
 # Route fragment 42 — api /api/enqueue
 post '/api/enqueue' do

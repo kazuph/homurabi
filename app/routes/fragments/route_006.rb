@@ -1,4 +1,3 @@
-# await: true
 # frozen_string_literal: true
 # Route fragment 6 — demo /d1/users/:id
 get '/d1/users/:id' do

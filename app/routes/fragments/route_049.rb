@@ -1,4 +1,3 @@
-# await: true
 # frozen_string_literal: true
 # Route fragment 49 — demo /demo/faraday
 get '/demo/faraday' do

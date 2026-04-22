@@ -1,4 +1,3 @@
-# await: true
 # frozen_string_literal: true
 # Route fragment 21 — demo /demo/http/raw
 get '/demo/http/raw' do

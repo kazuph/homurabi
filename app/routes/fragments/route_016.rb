@@ -1,4 +1,3 @@
-# await: true
 # frozen_string_literal: true
 # Route fragment 16 — demo /images/:key
 get '/images/:key' do

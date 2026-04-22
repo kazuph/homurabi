@@ -1,7 +1,7 @@
 # frozen_string_literal: true
-# await: true
 #
-# Phase 17 — `/debug/mail` の送信・件名生成・結果 JSON 組み立て（ルート本体から分離）。
+# Phase 17 — `/debug/mail` の送信準備・結果整形（実際の `mail.send.__await__` はルート本体に置く。
+# Opal は `# await:` ブロック外のヘルパー内では `.__await__` が Promise を解決しない)。
 
 require 'json'
 
@@ -24,25 +24,54 @@ module Homurabi
         }
       end
 
-      def send_test_mail(params, env, route)
+      # バリデーション済みコンテキスト。`:error_result` があれば送信しない。
+      def prepare_send(params, env, route)
         form = parse_form_params(params, default_to: false)
         mail_from = route.homurabi_mail_from
         final_to = form[:to].empty? ? DEFAULT_TO : form[:to]
 
         if mail_from.empty?
-          return error_result(form, mail_from, nil, 'HOMURABI_MAIL_FROM が未設定です。ドメイン onboarding 後に wrangler [vars] で verified の送信元アドレスを設定してください。')
+          return { error_result: error_result(form, mail_from, nil, 'HOMURABI_MAIL_FROM が未設定です。ドメイン onboarding 後に wrangler [vars] で verified の送信元アドレスを設定してください。') }
         end
 
         mail = route.send_email
         if mail.nil? || !mail.available?
-          return error_result(form, mail_from, nil, 'SEND_EMAIL バインディングが利用できません（wrangler.toml の [[send_email]] を確認）。')
+          return { error_result: error_result(form, mail_from, nil, 'SEND_EMAIL バインディングが利用できません（wrangler.toml の [[send_email]] を確認）。') }
         end
 
         vid = vid_from_env(env)
         subject_line = resolve_subject_line(form[:subject], vid)
         text_body, html_body = resolve_bodies(form[:text], form[:html])
 
-        dispatch_send(mail, form, mail_from, final_to, subject_line, text_body, html_body)
+        {
+          mail: mail,
+          form: form,
+          mail_from: mail_from,
+          final_to: final_to,
+          subject_line: subject_line,
+          text_body: text_body,
+          html_body: html_body
+        }
+      end
+
+      def after_send_success(raw, ctx)
+        form = ctx[:form]
+        mail_from = ctx[:mail_from]
+        final_to = ctx[:final_to]
+        subject_line = ctx[:subject_line]
+
+        if `(#{raw} == null || #{raw} === undefined || #{raw} === Opal.nil)`
+          return error_result(form, mail_from, subject_line, 'SEND_EMAIL.send の戻りが null です。メールは送信されていません。')
+        end
+
+        message_id = extract_message_id(raw)
+        cf_raw = extract_cf_raw(raw)
+        success_result(form, mail_from, final_to, subject_line, message_id, cf_raw)
+      end
+
+      def after_send_failure(error, ctx)
+        code = error.code.to_s
+        error_result(ctx[:form], ctx[:mail_from], ctx[:subject_line], "#{code}: #{error.message}".strip)
       end
 
       private
@@ -72,27 +101,6 @@ module Homurabi
                  form_text
                end
         [text, html]
-      end
-
-      def dispatch_send(mail, form, mail_from, final_to, subject_line, text_body, html_body)
-        raw = mail.send(
-          to: final_to,
-          from: mail_from,
-          subject: subject_line,
-          text: text_body,
-          html: html_body
-        ).__await__
-
-        if `(#{raw} == null || #{raw} === undefined || #{raw} === Opal.nil)`
-          return error_result(form, mail_from, subject_line, 'SEND_EMAIL.send の戻りが null です。メールは送信されていません。')
-        end
-
-        message_id = extract_message_id(raw)
-        cf_raw = extract_cf_raw(raw)
-        success_result(form, mail_from, final_to, subject_line, message_id, cf_raw)
-      rescue Cloudflare::Email::Error => e
-        code = e.code.to_s
-        error_result(form, mail_from, subject_line, "#{code}: #{e.message}".strip)
       end
 
       def extract_message_id(result)

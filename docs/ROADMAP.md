@@ -1264,18 +1264,38 @@ build/app.opal.mjs
 
 ### 期待される振る舞い (B1-B10)
 
-- [ ] **B1**: `gems/cloudflare-workers-runtime/lib/cloudflare_workers/async_registry.rb` 実装（`register_async_source` DSL）
-- [ ] **B2**: `gems/cloudflare-workers-runtime/lib/cloudflare_workers/auto_await/analyzer.rb` 実装
+- [x] **B1**: `gems/cloudflare-workers-runtime/lib/cloudflare_workers/async_registry.rb` 実装（`register_async_source` DSL）
+- [x] **B2**: `gems/cloudflare-workers-runtime/lib/cloudflare_workers/auto_await/analyzer.rb` 実装
   - `parser` gem 依存（build-time only、runtime には乗らない）
   - tainting pass + insertion pass + unparse pass
-- [ ] **B3**: `bin/cloudflare-workers-build` 内で auto-await 変換を opal compile 前段に挿入
-- [ ] **B4**: `sinatra-cloudflare-workers` の `register_async_source` に Sinatra::Base の async extension (JWT / Scheduled / Queue) を登録
-- [ ] **B5**: `sequel-d1` の `register_async_source` に `Sequel::D1::Database` の dataset chain を登録
-- [ ] **B6**: homurabi 既存 51 箇所の `__await__` を削除 (auto 挿入に切替)、`# await:` magic comment もユーザー指定以外は削除
-- [ ] **B7**: 既存全動作不変 (本番 deploy x1 + 全 12 ルート 200 + 実メール送信再確認)
-- [ ] **B8**: **ユーザーが `.__await__` 一切書かずに** `examples/minimal-sinatra-with-email/` で新しい Sinatra アプリを動かせる新 example 追加
-- [ ] **B9**: 診断モードで insertion 箇所を可視化（開発者デバッグ用）
-- [ ] **B10**: `/docs/auto-await` ページ追加（設計思想 + 使い方 + magic comment との関係）
+  - **修正済**: ボトムアップ走査（子→親）に変更、`kv.get(key)` 等のawait漏れを解消
+- [x] **B3**: `bin/cloudflare-workers-build` 内で auto-await 変換を opal compile 前段に挿入
+- [x] **B4**: `sinatra-cloudflare-workers` の `register_async_source` に Sinatra::Base の async extension (JWT) を登録
+- [x] **B5**: `sequel-d1` の `register_async_source` に `Sequel::D1::Database` の dataset chain を登録
+- [x] **B6**: homurabi 既存 `__await__` を削除 (auto 挿入に切替)、`# await:` magic comment もユーザー指定以外は削除
+  - **残存**: `ctx[:mail].send(...)`（Hash動的アクセス）、JS Promise IIFE backtick（ analyzer 非対応）
+- [x] **B7**: 回帰検証 — `npm test` 全 16 スイート **393/393 pass**
+  - **未実施**: 本番 deploy + 全ルート実機 200 + Email 実送信再確認
+- [x] **B8**: `examples/minimal-sinatra-with-email/` 新 example 追加
+- [x] **B9**: 診断モード（`--debug` / `CLOUDFLARE_WORKERS_AUTO_AWAIT_DEBUG=1`）
+- [x] **B10**: `/docs/auto-await` ページ追加
+
+### Phase 17.5 実装中の発見・修正
+
+- **Analyzer ボトムアップ走査**: トップダウン走査では `@env` が未設定のため `kv.get(key)` 等が await 対象から漏れていた。子→親に修正。
+- **`async_factory` vs `taint_return` 競合**: `Sequel.connect` に両方登録され `infer_send_class` で factory が先に評価されていた。`async_factory` を削除。
+- **定数スコープ問題**: `# await: true` でファイル全体が async function に包まれると `App.class_eval` 内の定数がトップレベルとして解釈される。`App::JWT_ACCESS_TTL` 等に完全修飾名化。
+- **重複 await 問題 (copilot レビュー指摘)**: `db.prepare(sql).all` で `prepare` が `async_method` + `taint_return` の両方に登録されていたため、内外両方に `.__await__` が挿入される可能性があった。`prepare` は JS 上同期的なので `async_method` 登録を削除して解消。
+- **`lib/homurabi_async_sources.rb`**: プロジェクト固有の async source 登録を集約。sequel-d1 gem 内の登録は auto-await CLI の読み込み対象外だったためここに移動。
+- **`parser` gem**: runtime dependency → `add_development_dependency` に移行済み。
+
+### 残タスク（次の担当者へ）
+
+1. **Copilot 包括レビュー完了**: `copilot -p` で transformer.rb、canonical_all.rb、build pipeline 等の残りファイルをレビュー。現状は async_registry.rb と analyzer.rb のみ実施済み。
+2. **本番 deploy + 実機検証**: `wrangler deploy` 後、全 12 ルート 200 OK + `/debug/mail` 実送信確認。
+3. ** gated routes 検証**: `HOMURABI_ENABLE_*=1` を設定して `/test/bindings`、`/demo/cache/heavy`、`/demo/do` 等の動作確認。
+4. **REPORT.md 整備**: `.artifacts/phase17.5/` へ evidence 収集（build log、test result、screenshot）。
+5. **PR 作成**: `feature/phase17.5-auto-await` ブランチから main へ PR。Copilot レビュー対応後にマージ。
 
 ### リスク & 対策
 

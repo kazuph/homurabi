@@ -1,4 +1,4 @@
-# await: all, authenticate!, call, chat_verify_token!, clear_chat_history, decode, dh_compute_key, dispatch_js, dispatch_scheduled, encode, execute, execute_insert, fetch, fetch_raw, final, get_binary, get_first_row, get_response, list, load_chat_history, open, private_decrypt, public_encrypt, run, save_chat_history, send, sign, sign_pss, sleep, verify, verify_pss
+# await: true
 # frozen_string_literal: true
 # Route fragment 24 — api /api/login/refresh
 post '/api/login/refresh' do
@@ -19,7 +19,7 @@ post '/api/login/refresh' do
     next { 'error' => 'refresh_token required' }.to_json
   end
 
-  raw = kv.get("refresh:#{refresh}").__await__
+  raw = kv.get("refresh:#{refresh}")
   if raw.nil?
     status 401
     next { 'error' => 'unknown refresh_token' }.to_json
@@ -33,7 +33,7 @@ post '/api/login/refresh' do
   end
 
   if entry['exp'].to_i < Time.now.to_i
-    kv.delete("refresh:#{refresh}").__await__
+    kv.delete("refresh:#{refresh}")
     status 401
     next { 'error' => 'refresh_token expired' }.to_json
   end
@@ -45,14 +45,14 @@ post '/api/login/refresh' do
     'sub'  => sub,
     'role' => entry['role'] || 'user',
     'iat'  => Time.now.to_i,
-    'exp'  => Time.now.to_i + JWT_ACCESS_TTL
+    'exp'  => Time.now.to_i + App::JWT_ACCESS_TTL
   }
   access_token = JWT.encode(payload, sign_key, alg)
 
   {
     'access_token' => access_token,
     'token_type'   => 'Bearer',
-    'expires_in'   => JWT_ACCESS_TTL,
+    'expires_in'   => App::JWT_ACCESS_TTL,
     'alg'          => alg
   }.to_json
 end

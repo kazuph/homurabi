@@ -1,0 +1,62 @@
+<h1 id="concept">Auto-Await</h1>
+<p>Phase 17.5 で導入された <strong>Auto-Await</strong> は、Cloudflare binding 由来の async chain を自動的に検出して <code>.__await__</code> を挿入する仕組みです。</p>
+
+<h2 id="before-after">Before / After</h2>
+<p><strong>Before（手動 await）</strong>:</p>
+<pre><code class="language-ruby"># await: get, put, execute, fetch, send, decode, ...
+
+post '/users' do
+  db = Sequel.connect(adapter: :d1, d1: env['cloudflare.env'].DB)
+  result = db[:users].insert(name: 'foo').__await__
+  Cloudflare::Email.new(env.SEND_EMAIL).send(
+    to: '...', subject: '...', text: '...'
+  ).__await__
+  'ok'
+end
+</code></pre>
+
+<p><strong>After（Auto-Await）</strong>:</p>
+<pre><code class="language-ruby">post '/users' do
+  db = Sequel.connect(adapter: :d1, d1: env['cloudflare.env'].DB)
+  result = db[:users].insert(name: 'foo')
+  Cloudflare::Email.new(env.SEND_EMAIL).send(
+    to: '...', subject: '...', text: '...'
+  )
+  'ok'
+end
+</code></pre>
+
+<p>ファイル先頭の <code># await:</code> magic comment も、ユーザー定義のメソッド名リストも不要になりました。</p>
+
+<h2 id="registry">AsyncRegistry</h2>
+<p>gem 側で「これは async source」を宣言します:</p>
+<pre><code class="language-ruby">CloudflareWorkers::AsyncRegistry.register_async_source do
+  async_class 'Cloudflare::D1Database'
+  async_class 'Cloudflare::KVNamespace'
+  async_class 'Cloudflare::Email'
+
+  async_accessor :env, :DB, 'Cloudflare::D1Database'
+  async_accessor :env, :SEND_EMAIL, 'Cloudflare::Email'
+
+  taint_return 'Sequel', :connect, 'Sequel::D1::Database'
+  async_method 'Sequel::Dataset', :all
+end
+</code></pre>
+
+<p>各 gem（<code>cloudflare-workers-runtime</code>、<code>sinatra-cloudflare-workers</code>、<code>sequel-d1</code>）が自身の async source を登録します。プロジェクト固有の登録は <code>lib/homurabi_async_sources.rb</code> に集約できます。</p>
+
+<h2 id="diagnostic">診断モード</h2>
+<p>build 時にどの call に await を入れたかを確認できます:</p>
+<pre><code class="language-sh">CLOUDFLARE_WORKERS_AUTO_AWAIT_DEBUG=1 bundle exec cloudflare-workers-build
+</code></pre>
+
+<h2 id="limits">制限とフォールバック</h2>
+<table>
+  <tr><th>ケース</th><th>挙動</th></tr>
+  <tr><td>静的に型が決まる receiver</td><td>自動 await</td></tr>
+  <tr><td>同名 sync メソッド（<code>String#sub</code> 等）</td><td>誤検知なし（origin class で区別）</td></tr>
+  <tr><td>metaprogramming（<code>env.send(binding_name)</code>）</td><td>推論不能 → 手動 <code>.__await__</code> でフォールバック</td></tr>
+  <tr><td>Hash 動的アクセス（<code>ctx[:mail].send(...)</code>）</td><td>推論不能 → 手動 <code>.__await__</code> でフォールバック</td></tr>
+</table>
+
+<p>推論不能なケースでは従来の <code>.__await__</code> または <code># await:</code> magic comment が引き続き有効です。</p>

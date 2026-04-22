@@ -1,4 +1,3 @@
-# await: all, authenticate!, call, chat_verify_token!, clear_chat_history, decode, dh_compute_key, dispatch_js, dispatch_scheduled, encode, execute, execute_insert, fetch, fetch_raw, final, get_binary, get_first_row, get_response, list, load_chat_history, open, private_decrypt, public_encrypt, run, save_chat_history, send, sign, sign_pss, sleep, verify, verify_pss
 # frozen_string_literal: true
 #
 # A plain Sinatra application. Ported as faithfully as possible from
@@ -102,7 +101,7 @@ class App < Sinatra::Base
     # outside a test by inspecting `/kv/cron:hourly-counter` over HTTP.
     # Falls back to a no-op when KV is not bound (test envs).
     if kv
-      raw  = kv.get('cron:hourly-counter').__await__
+      raw  = kv.get('cron:hourly-counter')
       prev = 0
       if raw
         begin
@@ -117,7 +116,7 @@ class App < Sinatra::Base
         'last_run_at'  => Time.now.to_i,
         'last_sched_t' => event.scheduled_time.to_i
       }.to_json
-      kv.put('cron:hourly-counter', payload).__await__
+      kv.put('cron:hourly-counter', payload)
     end
   end
 
@@ -189,7 +188,7 @@ class App < Sinatra::Base
           'dead_at'      => Time.now.to_i,
           'batch_index'  => i
         }
-        kv.put("queue:dlq:#{i}", record.to_json, expiration_ttl: 86_400).__await__
+        kv.put("queue:dlq:#{i}", record.to_json, expiration_ttl: 86_400)
         msg.ack
         i += 1
       end
@@ -227,7 +226,7 @@ class App < Sinatra::Base
             'consumed_at'  => Time.now.to_i,
             'batch_index'  => i
           }
-          kv.put("queue:last-consumed:#{i}", record.to_json, expiration_ttl: 86_400).__await__
+          kv.put("queue:last-consumed:#{i}", record.to_json, expiration_ttl: 86_400)
           msg.ack
         end
         i += 1
@@ -278,10 +277,10 @@ class App < Sinatra::Base
   # `/demo/do?action=peek` reads from over HTTP.
   Cloudflare::DurableObject.define('HomurabiCounterDO') do |state, request|
     path = request.path
-    prev = (state.storage.get('count').__await__ || 0).to_i
+    prev = (state.storage.get('count') || 0).to_i
     if path.end_with?('/inc')
       next_count = prev + 1
-      state.storage.put('count', next_count).__await__
+      state.storage.put('count', next_count)
       [
         200,
         { 'content-type' => 'application/json' },
@@ -294,7 +293,7 @@ class App < Sinatra::Base
         }.to_json
       ]
     elsif path.end_with?('/reset')
-      state.storage.delete('count').__await__
+      state.storage.delete('count')
       [
         200,
         { 'content-type' => 'application/json' },

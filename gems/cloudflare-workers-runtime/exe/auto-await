@@ -1,0 +1,99 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Auto-Await transformer — build-time Ruby source rewriter.
+# Scans app/**/*.rb, runs flow analysis, and inserts .__await__
+# where the receiver is a known async-tainted source.
+#
+# Usage:
+#   ruby auto-await --input app --output build/auto_await/app
+#
+# The output directory mirrors the input. Files that need no change
+# are skipped entirely (not copied), so the consumer can place the
+# output directory earlier on the Opal load path and fall back to
+# the original input for unchanged files.
+
+require 'fileutils'
+require 'pathname'
+
+# cloudflare-workers-runtime lib path resolution
+runtime_lib = ENV['CFW_RUNTIME_LIB']
+unless runtime_lib
+  spec = Gem.loaded_specs['cloudflare-workers-runtime']
+  runtime_lib = spec ? File.join(spec.full_gem_path, 'lib') : File.expand_path('../lib', __dir__)
+end
+$LOAD_PATH.unshift(runtime_lib) unless $LOAD_PATH.include?(runtime_lib)
+
+require 'cloudflare_workers/async_registry'
+require 'cloudflare_workers/auto_await/analyzer'
+require 'cloudflare_workers/auto_await/transformer'
+
+options = { input: nil, output: nil, debug: ENV['CLOUDFLARE_WORKERS_AUTO_AWAIT_DEBUG'] == '1' }
+
+ARGV.each_with_index do |arg, i|
+  case arg
+  when '--input'  then options[:input] = ARGV[i + 1]
+  when '--output' then options[:output] = ARGV[i + 1]
+  when '--debug'  then options[:debug] = true
+  end
+end
+
+abort('Usage: auto-await --input DIR --output DIR [--debug]') unless options[:input] && options[:output]
+
+input_root  = Pathname(options[:input]).expand_path
+output_root = Pathname(options[:output]).expand_path
+
+registry = CloudflareWorkers::AsyncRegistry.instance
+
+# Load project-specific async source registrations if present.
+project_async = File.join(Dir.pwd, 'lib', 'homurabi_async_sources.rb')
+require project_async if File.exist?(project_async)
+
+changed = 0
+skipped = 0
+errors  = 0
+
+paths = if File.directory?(input_root)
+  Dir.glob(input_root.join('**', '*.rb')).sort
+else
+  [input_root.to_s]
+end
+
+paths.each do |path|
+  rel = Pathname(path).relative_path_from(input_root)
+  source = File.read(path)
+
+  # If the file already has a user-written # await: magic comment we
+  # still run the analyzer (so .__await__ is inserted) but we keep
+  # the original magic comment in place.  The magic comment is only
+  # needed to tell Opal to wrap the file in an async function and to
+  # translate #__await__ calls into real JS await keywords.
+  has_magic = source.lines.first(5).any? { |l| l.match?(/#\s*await:/) }
+
+  begin
+    analyzer = CloudflareWorkers::AutoAwait::Analyzer.new(registry, debug: options[:debug])
+    buffer, nodes = analyzer.process(source, path)
+
+    if nodes.empty?
+      puts "[auto-await] skip (no changes) #{rel}" if options[:debug]
+      skipped += 1
+      next
+    end
+
+    transformed = CloudflareWorkers::AutoAwait::Transformer.transform(source, nodes, buffer)
+    unless has_magic
+      transformed = "# await: true\n" + transformed
+    end
+    out_path = output_root.join(rel)
+    FileUtils.mkdir_p(out_path.dirname)
+    File.write(out_path, transformed)
+    puts "[auto-await] write #{rel} (#{nodes.length} await#{'s' if nodes.length > 1})" if options[:debug]
+    changed += 1
+  rescue => e
+    $stderr.puts "[auto-await] ERROR #{rel}: #{e.message}"
+    errors += 1
+  end
+end
+
+puts "[auto-await] done: #{changed} changed, #{skipped} skipped, #{errors} errors"
+exit(1) if errors > 0

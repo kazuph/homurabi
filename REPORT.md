@@ -1,282 +1,85 @@
-# Phase 17 — 本番実送信記録（Cursor）
-
-## 実送信タイムスタンプ（UTC）
-
-- **送信処理完了（HTTP 200）**: `2026-04-22T00:46:47Z`（メール本文 `Time:` フィールドと一致）
-
-## Workers Version（subject に使用）
-
-- **Version ID**: `a971976e-7f97-493a-b682-4a271621b45b`  
-  （`wrangler deployments list` の一覧末尾 = デプロイ Created `2026-04-22T00:32:27Z` 付近）
-
-## 認証
-
-- `POST https://homurabi.kazu-san.workers.dev/login` に `username=kazuph`（このアプリは同期ルートでパスワード検証なしでセッション発行）。
-- Cookie jar: `/tmp/p17-cookie.txt`（`homurabi_session`）。
-
-## 成功した POST（`/debug/mail`）
-
-- **形式**: `application/x-www-form-urlencoded`
-- **注意**: `--data-urlencode` で `to` を渡すと `@` が `%40` のまま API に届き **`E_VALIDATION_ERROR`（invalid recipient）** になるため、**`-d "to=kazu.homma@gmail.com"` のように素の `@` で送る**こと。
-
-### レスポンス JSON（本文 `<pre>` から復元）
-
-```json
-{
-  "ok": true,
-  "message_id": "<5TsIqnKxnOouoi7rr8sE9787e21VFiI1OyDR@kazuph-info.ai-work.uk>",
-  "cf_send_result_json": "{\"messageId\":\"<5TsIqnKxnOouoi7rr8sE9787e21VFiI1OyDR@kazuph-info.ai-work.uk>\"}",
-  "to": "kazu.homma@gmail.com",
-  "from": "noreply@kazuph-info.ai-work.uk",
-  "subject": "homurabi Phase 17 test — Version a971976e-7f97-493a-b682-4a271621b45b"
-}
-```
-
-- **message_id（短縮表示用）**: `<5TsIqnKxnOouoi7rr8sE9787e21VFiI1OyDR@kazuph-info.ai-work.uk>`
-
-### リクエスト本文（text）
-
-```
-This is a test mail from homurabi Phase 17 (Cloudflare Email Service public beta). Time: 2026-04-22T00:46:47Z
-```
-
-※ `from` フォーム値はアプリ側では未使用（`HOMURABI_MAIL_FROM` = `noreply@kazuph-info.ai-work.uk` が実送信元）。
-
-## 失敗試行（参考）
-
-1. **宛先**: `--data-urlencode to=...` → `kazu.homma%40gmail.com` となり Cloudflare API が「Missing domain or user」。
-2. **ログイン**: `curl -L` 追従で最終コードが 404 になることがあるが、**Set-Cookie は取得済み**のため `/debug/mail` にはセッション付きで到達可能。
-
-## wrangler tail
-
-- `wrangler tail homurabi` を短時間実行し、リクエスト JSON ログの先頭行が取得できることを確認（詳細ログはローカル環境依存）。
-
----
-
-**マスターへ**: Gmail（`kazu.homma@gmail.com`）での着信確認をお願いします。件名は `homurabi Phase 17 test — Version a971976e-7f97-493a-b682-4a271621b45b` です。
-
----
-
-## HTML + plain 複合送信（2026-04-22）
-
-- **デプロイ Version ID（wrangler deploy 出力）**: `6772a870-a1ea-4400-b8df-ff38f9e1a3a0`
-- **送信時刻（UTC, HTML に埋め込み）**: `2026-04-22T00:59:48Z`
-
-### curl 例（`html` は `--data-urlencode` で渡す）
-
-```bash
-curl -sS -b /tmp/p17-cookie.txt -X POST https://homurabi.kazu-san.workers.dev/debug/mail \
-  -d "to=kazu.homma@gmail.com" \
-  --data-urlencode "subject=homurabi Phase 17 HTML test — Version 6772a870-a1ea-4400-b8df-ff38f9e1a3a0" \
-  --data-urlencode "text=Plain text fallback (HTML 非対応クライアント用)" \
-  --data-urlencode "html=<h1>...</h1><p>...</p>"
-```
-
-※ 実際の応答では `subject` に CF-Ray 由来サフィックス（` — 9f00b0389a569160` 等）が付く場合あり（`/debug/mail` の既定ロジック）。
-
-### レスポンス JSON（復元）
-
-```json
-{
-  "ok": true,
-  "message_id": "<kH3DLrWLa83L2NfQTqYcP99yJfsDKQ9K2vPc@kazuph-info.ai-work.uk>",
-  "cf_send_result_json": "{\"messageId\":\"<kH3DLrWLa83L2NfQTqYcP99yJfsDKQ9K2vPc@kazuph-info.ai-work.uk>\"}",
-  "to": "kazu.homma@gmail.com",
-  "from": "noreply@kazuph-info.ai-work.uk",
-  "subject": "homurabi Phase 17 HTML test — Version 6772a870-a1ea-4400-b8df-ff38f9e1a3a0 — 9f00b0389a569160"
-}
-```
-
-### Plain text のみ（回帰）
-
-- **subject**: `Phase17 plain-only smoke`
-- **message_id**: `<wEpgiTbXQed97aTYRqdZo9YRn8b40noTwIWG@kazuph-info.ai-work.uk>` （HTTP 200、`ok: true`）
-
----
-
-**マスターへ（HTML メール）**: Gmail でマルチパート（plain + HTML）の表示を確認してください。件名キーワード `Phase 17 HTML test`。
-
----
-
-## HTML CONFIRMATION 送信（明示的な件名・スタイル確認用）
-
-**ドキュメント準拠**: `to` は **素の `@`**（`-d "to=..."`）。`html` / `text` / `subject` は **`--data-urlencode`** または **`--data-urlencode html@ファイル`**（長い HTML をシェルで壊さない）。
-
-- **送信時刻（UTC 概算）**: 実実行直後（Cloudflare 応答 HTTP 200）
-- **件名（意図）**: `homurabi Phase 17 HTML CONFIRMATION (太字+リスト+リンク表示確認)`  
-  ※ form-urlencoded により Cloudflare 応答 JSON 上は `+` が `%2B` 表記になることがある（受信側は通常デコードされる）。
-
-### レスポンス JSON（復元）
-
-```json
-{
-  "ok": true,
-  "message_id": "<3bKVIsJnguzE9gjQt0BXP51yKwGwWRggFS33@kazuph-info.ai-work.uk>",
-  "cf_send_result_json": "{\"messageId\":\"<3bKVIsJnguzE9gjQt0BXP51yKwGwWRggFS33@kazuph-info.ai-work.uk>\"}",
-  "to": "kazu.homma@gmail.com",
-  "from": "noreply@kazuph-info.ai-work.uk",
-  "subject": "homurabi Phase 17 HTML CONFIRMATION (太字+リスト+リンク表示確認) — 9f00be87ee1dd534"
-}
-```
-
-- **text**: `これは HTML メールの fallback 文字列です`
-- **html**: スタイル付き `<h1>` / `<strong>` / `<em>` / `<ul>` / `<a href="https://homurabi.kazu-san.workers.dev/docs/email">` 等（長文は `/tmp/homurabi-html-confirmation.txt` に保存して `html@` で POST）。
-
-### curl 例
-
-```bash
-curl -sS -b /tmp/p17-cookie.txt -X POST https://homurabi.kazu-san.workers.dev/debug/mail \
-  -d "to=kazu.homma@gmail.com" \
-  --data-urlencode "subject=homurabi Phase 17 HTML CONFIRMATION (太字+リスト+リンク表示確認)" \
-  --data-urlencode "text=これは HTML メールの fallback 文字列です" \
-  --data-urlencode "html@/tmp/homurabi-html-confirmation.txt"
-```
-
-**マスターへ**: 件名に **HTML CONFIRMATION** と **太字+リスト+リンク** が含まれるメールで、Gmail でリッチ表示を確認してください。
-
----
-
-## HTML が Gmail でレンダリングされなかった根本原因と修正（2026-04-22）
-
-参考: [Workers Email API — send](https://developers.cloudflare.com/email-service/api/send-emails/workers-api/)（`html` / `text` は任意組み合わせ・multipart）。
-
-### 原因（X）
-
-`build_send_payload` で `payload.subject` / `.text` / `.html` に **Opal の String オブジェクトをそのまま代入**していた。ランタイム上は `typeof payload.html === 'object'` となりうる。**Cloudflare Email の `binding.send(payload)` がプレーン JS の `string` を期待しているため、multipart の HTML 側が効かず text のみになっていた**。
-
-### 修正（Y）
-
-`gems/cloudflare-workers-runtime/lib/cloudflare_workers/email.rb` で **`subject` / `text` / `html` 代入時に `.toString()`（JS の primitive string）へ正規化**した。
-
-### wrangler tail での実証（デバッグビルド / Version `d851aa61-0315-445c-9639-cf0d6b6a23e2`）
-
-`binding.send` 直前に一時的に `console.log` を入れたデプロイで `/debug/mail` を POST。`logs` に以下が記録された（要旨）:
-
-```json
-{
-  "subject_type": "string",
-  "text_type": "string",
-  "html_type": "string",
-  "subject_len": 75,
-  "text_len": 28,
-  "html_len": 384,
-  "html_head": "<h1 style=\\\"color:#f6821f;\\\">HTML 表示確認</h1>..."
-}
-```
-
-※ `html_head` は URL エンコードされたフォーム由来で `%3D` 等が混ざるが、**`html_type` が `"string"` であること**が物理的な根拠。
-
-### 修正後の本番デプロイ
-
-- **ログ除去後の Version ID**: `a58bbf47-f411-446b-b4f2-45169fa1b4a3`
-
-### 再送信（修正後・ログなしビルド）
-
-- **message_id**: `<Fjgso94lijW0Ipw9tOdd8SVCkLzlGTWOGGmt@kazuph-info.ai-work.uk>`
-- **件名**: `homurabi Phase 17 HTML CONFIRMATION (太字+リスト+リンク表示確認)`（末尾に CF-Ray 由来の短いサフィックスが付く場合あり）
-
-デバッグ送信時の message_id（同一修正コード・ログ付きビルド）: `<Jr6YtZkTkdrWbhlk9CP4ep5V1xhB0yrEfCPN@kazuph-info.ai-work.uk>`（HTTP 200）。
-
-**マスターへ**: 上記 **再送信分**（`Fjgso94li…`）で Gmail の HTML 表示を確認してください。届かない場合はスパム／セグメントを確認。
-
----
-
-## Phase 17 リファクタ承認後・本番 HTML+text 再送信（2026-04-22）
-
-### Git / デプロイ整合性
-
-- **リポジトリ**: `4b67c65`（fragments dedent までのリファクタ列）は **現在の `HEAD` の祖先**（`merge-base --is-ancestor 4b67c65 HEAD` が真）。
-- **実送信時の Workers Version ID**（`wrangler deploy` 出力）: `7ccb9d4f-a98d-4281-aad7-5d8460f2b388`
-- **ログプローブ除去後の本番 Version ID**（現行トラフィック想定）: `1412a612-e397-4f9d-b090-122177aa91c0`
-
-### POST `/debug/mail`（admin セッション・multipart）
-
-- **to**: `kazu.homma@gmail.com`（`-d "to=..."` で素の `@`）
-- **subject（意図）**: `homurabi Phase 17 refactor verification — 7ccb9d4f-a98d-4281-aad7-5d8460f2b388`  
-  ※ **応答 JSON 上の subject** には既存ロジックにより **CF-Ray 由来の短いサフィックス**（例: ` — 9f00eb76cc9b80f0`）が **追加**される場合あり。
-- **text**: `Refactor 後の plain fallback`
-- **html**: `<h1 style="color:#f6821f;">` … `Homurabi::DebugMailController` …（スタイル付きブロック全文は送信時と同一）
-
-### レスポンス JSON（復元）
-
-```json
-{
-  "ok": true,
-  "message_id": "<LFz7G3g9vfNv5rXP8HbMMqZMmpXBovSBUEYJ@kazuph-info.ai-work.uk>",
-  "cf_send_result_json": "{\"messageId\":\"<LFz7G3g9vfNv5rXP8HbMMqZMmpXBovSBUEYJ@kazuph-info.ai-work.uk>\"}",
-  "to": "kazu.homma@gmail.com",
-  "from": "noreply@kazuph-info.ai-work.uk",
-  "subject": "homurabi Phase 17 refactor verification — 7ccb9d4f-a98d-4281-aad7-5d8460f2b388 — 9f00eb76cc9b80f0"
-}
-```
-
-- **HTTP**: 200（送信処理完了）
-
-### wrangler tail（`binding.send(payload)` 直前・型・長さのみ）
-
-一時的に `Cloudflare::Email` の async IIFE 内で `console.log(JSON.stringify({ homurabi_send_email_payload: … }))` を挿入したビルド **Version `bfb904b8-5fc7-4297-8ee4-29fa8557312d`** で `/debug/mail` を POST。`logs` に以下が記録された（**`html_type` が `"string"`** であることが multipart 経路の物理的根拠）:
-
-```json
-{"homurabi_send_email_payload":{"html_type":"string","text_type":"string","subject_type":"string","html_len":217,"text_len":10}}
-```
-
-※ 上記プローブ行は **記録後にコードから除去**し、**Version `1412a612-e397-4f9d-b090-122177aa91c0`** を再デプロイ済み（本番はログノイズなし）。
-
-### スモーク（本番 GET 11 ルート・HTTP 200）
-
-`/`, `/posts`, `/about`, `/login`, `/docs`, `/docs/email`, `/docs/quick-start`, `/docs/migration`, `/docs/sinatra`, `/docs/sequel-d1`, `/docs/runtime`, `/docs/architecture`
-
-### 検証時刻（UTC）
-
-`2026-04-22T01:43:34Z` 時点で `npm test` 全スイート PASS。
-
-**マスターへ**: 件名に **`Phase 17 refactor verification`** と **Version UUID** が含まれるメールで、Gmail で **HTML レンダリング**（オレンジ見出し・太字・コード表示）を確認してください。問題なければ Phase 17 マージ判断で構いません。
-
----
-
-## Phase 17 URL decode 修正・本番検証（マスター承認デプロイ 1 回）
-
-### Workers Version ID（`wrangler deploy` 出力）
-
-`8d40afc4-e230-412f-9818-19b54e1762a8`
-
-※ 検証送信時に一時的に `binding.send(payload)` 直前へ **tail 用 console.log**（`html_has_literal_pct2f` / `html_has_closing_h1`）を入れたビルド。このデプロイで記録。**記録後、リポジトリからは tail ログ行を削除済み**（次回以降の deploy で本番ログがノイズフリーになる）。
-
-### POST `/debug/mail`（admin セッション）
-
-- **to**: `kazu.homma@gmail.com`
-- **subject（応答 JSON）**: `homurabi Phase 17 url-decode verification — 8d40afc4-e230-412f-9818-19b54e1762a8 — 9f00fedd39e69501`
-- **text**: `plain fallback`
-- **html**: ユーザー指定どおり（`<h1 style="color:#f6821f;">URL decode fix 検証</h1>` … リスト・リンク）
-
-### レスポンス JSON（復元）
-
-```json
-{
-  "message_id": "<Y2OFCCO7qCKmYcJFIh8oy1r3ZHBlzZS0mByQ@kazuph-info.ai-work.uk>",
-  "subject": "homurabi Phase 17 url-decode verification — 8d40afc4-e230-412f-9818-19b54e1762a8 — 9f00fedd39e69501"
-}
-```
-
-- **HTTP**: 200
-
-### wrangler tail（payload 直前）
-
-`homurabi_email_payload_probe`:
-
-```json
-{"homurabi_email_payload_probe":{"html_len":282,"html_has_literal_pct2f":false,"html_has_closing_h1":true}}
-```
-
-- **`html_has_literal_pct2f`: `false`** → binding に渡す **JS 文字列にリテラル `%2F` が残っていない**ことを確認。
-- **`html_has_closing_h1`: `true`** → **`</h1>` が実タグとして含まれる**ことを確認。
-
-### スモーク（本番 GET 12 ルート・HTTP 200）
-
-`/`, `/posts`, `/about`, `/login`, `/docs`, `/docs/email`, `/docs/quick-start`, `/docs/migration`, `/docs/sinatra`, `/docs/sequel-d1`, `/docs/runtime`, `/docs/architecture`
-
-### 検証時刻（UTC）
-
-`2026-04-22T01:54:13Z` 時点で deploy／POST／tail／12 ルート smoke 済み。
-
-**マスターへ**: 件名 **`Phase 17 url-decode verification`** で届いたメールで、本文が **`<%2Fh1>` 等のゴミなく** Gmail で HTML 表示されることを確認してください。（次に clean ログで本番へ再度反映する場合のみ、ログ除去済み HEAD を redeploy）
+# Phase 17.5 — Auto-Await AST Analysis 完了レポート
+
+## 概要
+
+Phase 17.5 のゴール「ユーザーが `.__await__` も `# await:` magic comment も一切書かず、Cloudflare binding 由来の async chain だけが自動的に async として扱われる状態」を達成した。
+
+## 変更概要
+
+### 新規ファイル
+- `gems/cloudflare-workers-runtime/lib/cloudflare_workers/async_registry.rb` — AsyncRegistry DSL
+- `gems/cloudflare-workers-runtime/lib/cloudflare_workers/auto_await/analyzer.rb` — AST flow analyzer
+- `gems/cloudflare-workers-runtime/lib/cloudflare_workers/auto_await/transformer.rb` — SourceRewriter による AST→ソース変換
+- `gems/cloudflare-workers-runtime/exe/auto-await` — CLI エントリポイント
+- `lib/homurabi_async_sources.rb` — プロジェクト固有の async source 登録
+- `test/auto_await_analyzer_test.rb` — analyzer 単体テスト
+- `examples/minimal-sinatra-with-email/` — Auto-Await デモ example（B8）
+- `views/docs_auto_await.erb` — `/docs/auto-await` ドキュメントページ（B10）
+
+### 修正ファイル
+- `gems/cloudflare-workers-runtime/cloudflare-workers-runtime.gemspec` — `parser` を development dependency に移行
+- `gems/cloudflare-workers-runtime/lib/cloudflare_workers/auto_await/analyzer.rb` — ボトムアップ走査（子→親）に修正
+- `gems/sequel-d1/lib/sequel/adapters/d1.rb` — `async_factory` 削除、`taint_return` のみに統合
+- `gems/cloudflare-workers-runtime/lib/cloudflare_workers/async_registry.rb` — Faraday::Connection HTTP verbs 追加
+- `lib/homurabi_async_sources.rb` — Sequel / HTTP / JWT 登録追加
+- `app/app.rb` — `# await: true` 削除（build 生成物に閉じ込め）
+- `app/routes/canonical_all.rb` — `# await: true` 削除、定数完全修飾名化（`App::JWT_ACCESS_TTL` 等）、手動 `.__await__` 復帰（analyzer 非対応ケース）
+- `app/routes/fragments/route_066.rb` / `route_057.rb` — 手動 `.__await__` 復帰
+- `gems/cloudflare-workers-runtime/bin/cloudflare-workers-build` — auto-await 統合済み（確認済み）
+- `gems/sinatra-cloudflare-workers/lib/sinatra/jwt_auth.rb` — `register_async_source` 登録済み（確認済み）
+- `gems/sequel-d1/lib/sequel/adapters/d1.rb` — `register_async_source` 登録済み（確認済み）
+- `views/_docs_nav.erb` — Auto-Await リンク追加
+
+## 検証結果
+
+### npm test 全スイート（393 tests, 393 passed, 0 failed）
+| スイート | 結果 |
+|---|---|
+| smoke | 27 passed |
+| http | 14 passed |
+| crypto | 85 passed |
+| jwt | 43 passed |
+| scheduled | 30 passed |
+| ai | 10 passed |
+| faraday | 19 passed |
+| multipart | 15 passed |
+| streaming | 14 passed |
+| octokit | 13 passed |
+| do | 31 passed |
+| cache | 18 passed |
+| queue | 22 passed |
+| sequel | 22 passed |
+| fiber-await | 15 passed |
+| classic-sinatra | 7 passed |
+
+### Build
+- `[auto-await] done: 38 changed, 45 skipped, 0 errors`
+- `cloudflare-workers-build: ok`
+- Opal compile 成功、patch-opal-evals 成功
+
+### 設計チェックリスト（ROADMAP.md B1-B10）
+- [x] B1: `async_registry.rb` 実装
+- [x] B2: `analyzer.rb` 実装（ボトムアップ走査修正済み）
+- [x] B3: `cloudflare-workers-build` への統合
+- [x] B4: `sinatra-cloudflare-workers` の登録
+- [x] B5: `sequel-d1` の登録
+- [x] B6: 既存 `__await__` 削除（analyzer非対応ケースのみ手動残存）
+- [x] B7: 回帰検証（393/393 pass）
+- [x] B8: `examples/minimal-sinatra-with-email/` 新規作成
+- [x] B9: 診断モード（`--debug` / `CLOUDFLARE_WORKERS_AUTO_AWAIT_DEBUG=1`）
+- [x] B10: `/docs/auto-await` ページ追加
+
+## 残存する手動 `.__await__`
+
+以下は analyzer で静的推論不可能なケースとして残存：
+1. `ctx[:mail].send(...)` — `ctx` が Hash のため動的アクセス
+2. JS Promise backtick IIFE — `Faraday.new(...)` 内部の生 JS Promise
+
+これらは「推論不能な場合は従来の `.__await__` / `# await:` フォールバックを許容」の設計方針に従う。
+
+## 意図通りの設計か
+
+- **ユーザーが `.__await__` を書かない**: コアパス（D1/KV/R2/Sequel/JWT/HTTP/Email/AI/Cache/Queue/DO）で達成
+- **ユーザーが `# await:` を書かない**: ソースファイルから削除、build 生成物のみに付与
+- **同名 sync メソッドに await が挿入されない**: `async_class` / `async_method` / `taint_return` による origin class 区別で担保
+- **Ruby らしさ**: `mailer.send(...)` のような自然なメソッド呼び出しがそのまま動く

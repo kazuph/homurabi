@@ -1,4 +1,4 @@
-# await: all, authenticate!, call, chat_verify_token!, clear_chat_history, decode, dh_compute_key, dispatch_js, dispatch_scheduled, encode, execute, execute_insert, fetch, fetch_raw, final, get_binary, get_first_row, get_response, list, load_chat_history, open, private_decrypt, public_encrypt, run, save_chat_history, send, sign, sign_pss, sleep, verify, verify_pss
+# await: true
 # frozen_string_literal: true
 
 module Homurabi
@@ -63,7 +63,7 @@ module Homurabi
         raise ArgumentError, "cache_get ttl must be > 0 (got #{ttl.inspect}); Workers refuses to store max-age=0"
       end
       c = cache
-      cached = c.match(cache_key).__await__
+      cached = c.match(cache_key)
       if cached
         cached.headers.each { |k, v| response.headers[k] = v }
         response.headers['x-homurabi-cache'] = 'HIT'
@@ -80,7 +80,7 @@ module Homurabi
           'date'             => Time.now.httpdate,
           'x-homurabi-cache' => 'MISS'
         }
-      ).__await__
+      )
       response.headers['x-homurabi-cache'] = 'MISS'
       body
     end
@@ -125,7 +125,7 @@ module Homurabi
 
     def load_chat_history(session_id)
       return [] unless kv
-      raw = kv.get(chat_kv_key(session_id)).__await__
+      raw = kv.get(chat_kv_key(session_id))
       return [] if raw.nil? || raw.empty?
       arr = JSON.parse(raw)
       arr.is_a?(Array) ? arr : []
@@ -136,12 +136,12 @@ module Homurabi
     def save_chat_history(session_id, history)
       return unless kv
       trimmed = history.last(App::CHAT_HISTORY_LIMIT)
-      kv.put(chat_kv_key(session_id), trimmed.to_json, expiration_ttl: App::CHAT_HISTORY_TTL).__await__
+      kv.put(chat_kv_key(session_id), trimmed.to_json, expiration_ttl: App::CHAT_HISTORY_TTL)
     end
 
     def clear_chat_history(session_id)
       return unless kv
-      kv.delete(chat_kv_key(session_id)).__await__
+      kv.delete(chat_kv_key(session_id))
     end
 
     def build_ai_messages(history, latest_user_text)

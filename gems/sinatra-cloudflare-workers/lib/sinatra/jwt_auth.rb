@@ -140,3 +140,10 @@ module Sinatra
   # Keep the canonical Sinatra::register-from-everywhere idiom alive.
   Base.register JwtAuth if defined?(::Sinatra::Base)
 end
+
+require 'cloudflare_workers/async_registry'
+
+CloudflareWorkers::AsyncRegistry.register_async_source do
+  async_helper :authenticate!, 'Sinatra::JwtAuth'
+  async_helper :issue_token, 'Sinatra::JwtAuth'
+end

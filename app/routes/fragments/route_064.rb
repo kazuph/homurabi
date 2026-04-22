@@ -1,21 +1,22 @@
-# await: all, authenticate!, call, chat_verify_token!, clear_chat_history, decode, dh_compute_key, dispatch_js, dispatch_scheduled, encode, execute, execute_insert, fetch, fetch_raw, final, get_binary, get_first_row, get_response, list, load_chat_history, open, private_decrypt, public_encrypt, run, save_chat_history, send, sign, sign_pss, sleep, verify, verify_pss
+# await: true
 # frozen_string_literal: true
-# Route fragment 64 — demo /docs/architecture
-get '/docs/architecture' do
-  @title = 'アーキテクチャ — homurabi Docs'
-  @docs_page = 'architecture'
-  @docs_section = :architecture
+# Route fragment 64 — demo /docs/auto-await
+get '/docs/auto-await' do
+  @title = 'Auto-Await — homurabi Docs'
+  @docs_page = 'auto-await'
+  @docs_section = :guides
   @docs_breadcrumb = [
     ['Docs', '/docs'],
-    ['Architecture', nil]
+    ['Guides', '/docs'],
+    ['Auto-Await', nil]
   ]
   @docs_toc = [
-    %w[self-host セルフホスト],
-    %w[gems 3 gem の関係],
-    %w[pipeline ビルドパイプライン],
-    %w[history Phase 15 の整理],
-    %w[diagram 依存関係 (Mermaid)]
+    %w[concept 概念],
+    %w[before-after Before / After],
+    %w[registry AsyncRegistry],
+    %w[diagnostic 診断モード],
+    %w[limits 制限とフォールバック]
   ]
-  @docs_inner = erb :docs_architecture
+  @docs_inner = erb :docs_auto_await
   erb :layout_docs
 end

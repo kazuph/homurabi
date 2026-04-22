@@ -61,7 +61,12 @@ module Sinatra
       # Halts with 401 JSON if the Bearer token is missing, malformed,
       # or fails cryptographic / claims verification. On success, sets
       # @jwt_payload / @jwt_header for use in the route body.
+      #
+      # DEPRECATED: This helper uses +halt+, which throws past Opal's
+      # async boundary in # await: true routes. Use +authenticate_or_401+
+      # instead and handle the returned +[status, body]+ tuple explicitly.
       def authenticate!
+        warn "DEPRECATION WARNING: authenticate! uses halt which is unsafe in async routes. Use authenticate_or_401 instead."
         token = extract_bearer_token
         halt_unauthorized!('missing bearer token') if token.nil?
 
@@ -85,6 +90,36 @@ module Sinatra
         @jwt_payload = payload
         @jwt_header  = header
         payload
+      end
+
+      # Safe async-friendly authentication helper.
+      # Returns +[nil, payload]+ on success, or +[401, json_body]+ on failure.
+      # Does NOT use +halt+ — the caller is responsible for checking the
+      # status and returning early with +status N; next(body)+.
+      def authenticate_or_401
+        token = extract_bearer_token
+        return [401, { 'error' => 'unauthorized', 'reason' => 'missing bearer token' }.to_json] if token.nil?
+
+        verify_key = settings.respond_to?(:jwt_verify_key) && settings.jwt_verify_key ? settings.jwt_verify_key : settings.jwt_secret
+        algorithm  = settings.respond_to?(:jwt_algorithm) ? settings.jwt_algorithm : 'HS256'
+
+        begin
+          payload, header = JWT.decode(token, verify_key, true, algorithm: algorithm).__await__
+        rescue JWT::ExpiredSignature
+          return [401, { 'error' => 'unauthorized', 'reason' => 'token expired' }.to_json]
+        rescue JWT::ImmatureSignature
+          return [401, { 'error' => 'unauthorized', 'reason' => 'token not yet valid' }.to_json]
+        rescue JWT::IncorrectAlgorithm
+          return [401, { 'error' => 'unauthorized', 'reason' => 'algorithm mismatch' }.to_json]
+        rescue JWT::VerificationError
+          return [401, { 'error' => 'unauthorized', 'reason' => 'signature verification failed' }.to_json]
+        rescue JWT::DecodeError => e
+          return [401, { 'error' => 'unauthorized', 'reason' => "invalid token: #{e.message}" }.to_json]
+        end
+
+        @jwt_payload = payload
+        @jwt_header  = header
+        [nil, payload]
       end
 
       # Mints a new token using the configured signing key + algorithm.
@@ -145,5 +180,6 @@ require 'cloudflare_workers/async_registry'
 
 CloudflareWorkers::AsyncRegistry.register_async_source do
   async_helper :authenticate!, 'Sinatra::JwtAuth'
+  async_helper :authenticate_or_401, 'Sinatra::JwtAuth'
   async_helper :issue_token, 'Sinatra::JwtAuth'
 end

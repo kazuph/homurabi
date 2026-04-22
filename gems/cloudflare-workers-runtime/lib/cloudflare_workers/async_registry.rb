@@ -65,6 +65,33 @@ module CloudflareWorkers
       def tainted_class?(class_name)
         instance.tainted_class?(class_name)
       end
+
+      def auto_load_gem_async_sources(debug: false)
+        return unless defined?(Gem) && Gem.respond_to?(:loaded_specs)
+
+        loaded = 0
+        Gem.loaded_specs.each_value do |spec|
+          next if spec.full_gem_path.nil?
+
+          lib_dir = File.join(spec.full_gem_path, 'lib')
+          next unless Dir.exist?(lib_dir)
+
+          Dir.glob(File.join(lib_dir, '**', '*.rb')).each do |path|
+            next unless File.read(path, 8192).include?('register_async_source')
+
+            require_path = path.sub(Regexp.new("^#{Regexp.escape(lib_dir)}/"), '').sub(/\.rb\z/, '')
+            begin
+              require require_path
+              loaded += 1
+              puts "[auto-await] loaded async source from #{spec.name}: #{require_path}" if debug
+            rescue LoadError, StandardError => e
+              warn "[auto-await] Warning: failed to load async source from #{spec.name}/#{require_path}: #{e.message}" if debug
+            end
+          end
+        end
+
+        puts "[auto-await] auto-loaded #{loaded} async source file(s)" if debug && loaded.positive?
+      end
     end
 
     attr_reader :async_classes, :async_methods, :async_factories, :taint_returns, :async_accessors, :async_helpers, :helper_factories

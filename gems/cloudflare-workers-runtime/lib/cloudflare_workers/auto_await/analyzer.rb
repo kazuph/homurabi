@@ -11,6 +11,7 @@ module CloudflareWorkers
         @debug = debug
         @await_nodes = []
         @env = {}
+        @method_returns = {}
       end
 
       def process(source, filename = '(auto-await)')
@@ -27,6 +28,12 @@ module CloudflareWorkers
 
       def process_node(node)
         return unless node.is_a?(Parser::AST::Node)
+
+        if node.type == :def
+          process_def(node)
+          return
+        end
+
         # Bottom-up traversal: process children first so helper-factory
         # sends (e.g. bare +db+) populate @env before their parent
         # send (e.g. +db.execute(...)+) is checked by should_await?.
@@ -55,6 +62,20 @@ module CloudflareWorkers
         _name, value = *node
         cls = infer_class(value)
         # instance variable tracking is best-effort; skip storing for now
+      end
+
+      def process_def(node)
+        method_name = node.children[0]
+        saved_env = @env
+        @env = @registry.helper_factories.dup
+
+        node.children[1..-1].each { |child| process_node(child) if child.is_a?(Parser::AST::Node) }
+
+        body = node.children[2]
+        return_cls = infer_class(body)
+        @method_returns[method_name] = return_cls if return_cls
+
+        @env = saved_env
       end
 
       def process_send(node)
@@ -86,8 +107,9 @@ module CloudflareWorkers
         case node.type
         when :send
           receiver, method_name = *node
-          if receiver.nil? && @env.key?(method_name)
-            return @env[method_name]
+          if receiver.nil?
+            return @env[method_name] if @env.key?(method_name)
+            return @method_returns[method_name] if @method_returns.key?(method_name)
           end
           infer_send_class(node)
         when :index
@@ -109,6 +131,14 @@ module CloudflareWorkers
           return const_path(receiver)
         end
         if receiver
+          if method_name == :[]
+            key_node = node.children[2]
+            if key_node&.type == :str
+              key = key_node.children[0]
+              mapped = @registry.async_accessors[[env_name(receiver), key.to_sym]]
+              return mapped if mapped
+            end
+          end
           accessor_cls = infer_env_accessor(receiver, method_name)
           return accessor_cls if accessor_cls
           recv_cls = infer_class(receiver)
@@ -118,6 +148,8 @@ module CloudflareWorkers
             ret = @registry.taint_return_class(recv_cls, method_name)
             return ret if ret
           end
+        else
+          return @method_returns[method_name] if @method_returns.key?(method_name)
         end
         nil
       end
@@ -129,8 +161,8 @@ module CloudflareWorkers
       end
 
       def infer_env_accessor(receiver_node, method_name)
-        return nil unless method_name.to_s =~ /^[A-Z]/
         if env_node?(receiver_node)
+          return nil unless method_name.to_s =~ /^[A-Z]/
           lvar = env_name(receiver_node)
           mapped = @registry.async_accessors[[lvar, method_name.to_sym]]
           return mapped if mapped
@@ -148,6 +180,7 @@ module CloudflareWorkers
             mapped = @registry.async_accessors[[lvar, method_name.to_sym]]
             return mapped if mapped
           elsif env_node?(recv)
+            return nil unless method_name.to_s =~ /^[A-Z]/
             lvar = env_name(recv)
             mapped = @registry.async_accessors[[lvar, method_name.to_sym]]
             return mapped if mapped

@@ -45,6 +45,9 @@ output_root = Pathname(options[:output]).expand_path
 
 registry = CloudflareWorkers::AsyncRegistry.instance
 
+# Auto-load async source registrations from all loaded gems.
+CloudflareWorkers::AsyncRegistry.auto_load_gem_async_sources(debug: options[:debug])
+
 # Load project-specific async source registrations if present.
 project_async = File.join(Dir.pwd, 'lib', 'homurabi_async_sources.rb')
 require project_async if File.exist?(project_async)

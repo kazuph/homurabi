@@ -178,3 +178,56 @@ curl -sS -b /tmp/p17-cookie.txt -X POST https://homurabi.kazu-san.workers.dev/de
 デバッグ送信時の message_id（同一修正コード・ログ付きビルド）: `<Jr6YtZkTkdrWbhlk9CP4ep5V1xhB0yrEfCPN@kazuph-info.ai-work.uk>`（HTTP 200）。
 
 **マスターへ**: 上記 **再送信分**（`Fjgso94li…`）で Gmail の HTML 表示を確認してください。届かない場合はスパム／セグメントを確認。
+
+---
+
+## Phase 17 リファクタ承認後・本番 HTML+text 再送信（2026-04-22）
+
+### Git / デプロイ整合性
+
+- **リポジトリ**: `4b67c65`（fragments dedent までのリファクタ列）は **現在の `HEAD` の祖先**（`merge-base --is-ancestor 4b67c65 HEAD` が真）。
+- **実送信時の Workers Version ID**（`wrangler deploy` 出力）: `7ccb9d4f-a98d-4281-aad7-5d8460f2b388`
+- **ログプローブ除去後の本番 Version ID**（現行トラフィック想定）: `1412a612-e397-4f9d-b090-122177aa91c0`
+
+### POST `/debug/mail`（admin セッション・multipart）
+
+- **to**: `kazu.homma@gmail.com`（`-d "to=..."` で素の `@`）
+- **subject（意図）**: `homurabi Phase 17 refactor verification — 7ccb9d4f-a98d-4281-aad7-5d8460f2b388`  
+  ※ **応答 JSON 上の subject** には既存ロジックにより **CF-Ray 由来の短いサフィックス**（例: ` — 9f00eb76cc9b80f0`）が **追加**される場合あり。
+- **text**: `Refactor 後の plain fallback`
+- **html**: `<h1 style="color:#f6821f;">` … `Homurabi::DebugMailController` …（スタイル付きブロック全文は送信時と同一）
+
+### レスポンス JSON（復元）
+
+```json
+{
+  "ok": true,
+  "message_id": "<LFz7G3g9vfNv5rXP8HbMMqZMmpXBovSBUEYJ@kazuph-info.ai-work.uk>",
+  "cf_send_result_json": "{\"messageId\":\"<LFz7G3g9vfNv5rXP8HbMMqZMmpXBovSBUEYJ@kazuph-info.ai-work.uk>\"}",
+  "to": "kazu.homma@gmail.com",
+  "from": "noreply@kazuph-info.ai-work.uk",
+  "subject": "homurabi Phase 17 refactor verification — 7ccb9d4f-a98d-4281-aad7-5d8460f2b388 — 9f00eb76cc9b80f0"
+}
+```
+
+- **HTTP**: 200（送信処理完了）
+
+### wrangler tail（`binding.send(payload)` 直前・型・長さのみ）
+
+一時的に `Cloudflare::Email` の async IIFE 内で `console.log(JSON.stringify({ homurabi_send_email_payload: … }))` を挿入したビルド **Version `bfb904b8-5fc7-4297-8ee4-29fa8557312d`** で `/debug/mail` を POST。`logs` に以下が記録された（**`html_type` が `"string"`** であることが multipart 経路の物理的根拠）:
+
+```json
+{"homurabi_send_email_payload":{"html_type":"string","text_type":"string","subject_type":"string","html_len":217,"text_len":10}}
+```
+
+※ 上記プローブ行は **記録後にコードから除去**し、**Version `1412a612-e397-4f9d-b090-122177aa91c0`** を再デプロイ済み（本番はログノイズなし）。
+
+### スモーク（本番 GET 11 ルート・HTTP 200）
+
+`/`, `/posts`, `/about`, `/login`, `/docs`, `/docs/email`, `/docs/quick-start`, `/docs/migration`, `/docs/sinatra`, `/docs/sequel-d1`, `/docs/runtime`, `/docs/architecture`
+
+### 検証時刻（UTC）
+
+`2026-04-22T01:43:34Z` 時点で `npm test` 全スイート PASS。
+
+**マスターへ**: 件名に **`Phase 17 refactor verification`** と **Version UUID** が含まれるメールで、Gmail で **HTML レンダリング**（オレンジ見出し・太字・コード表示）を確認してください。問題なければ Phase 17 マージ判断で構いません。

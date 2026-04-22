@@ -53,10 +53,14 @@ module Cloudflare
       payload = build_send_payload(to: to, from: from, subject: subject.to_s, text: text, html: html, reply_to: reply_to)
 
       cf = Cloudflare
-      `(async function(binding, payload, Kernel, Err, cf) {
+      # 多行 x-string をメソッド末尾に置くと Opal が Promise を返さない出力になることがあるため return を明示する。
+      return `(async function(binding, payload, Kernel, Err, cf) {
         try {
           var r = await binding.send(payload);
-          if (r == null || r === undefined) return nil;
+          if (r == null || r === undefined) {
+            var o0 = {}; o0['message_id'] = ''; o0['cf_send_result_json'] = '"void"';
+            return cf.$js_object_to_hash(o0);
+          }
           var raw = '';
           try { raw = JSON.stringify(r); } catch (x1) { raw = String(r); }
           var mid = r.messageId != null ? String(r.messageId)

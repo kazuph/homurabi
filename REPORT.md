@@ -54,3 +54,44 @@ This is a test mail from homurabi Phase 17 (Cloudflare Email Service public beta
 ---
 
 **マスターへ**: Gmail（`kazu.homma@gmail.com`）での着信確認をお願いします。件名は `homurabi Phase 17 test — Version a971976e-7f97-493a-b682-4a271621b45b` です。
+
+---
+
+## HTML + plain 複合送信（2026-04-22）
+
+- **デプロイ Version ID（wrangler deploy 出力）**: `6772a870-a1ea-4400-b8df-ff38f9e1a3a0`
+- **送信時刻（UTC, HTML に埋め込み）**: `2026-04-22T00:59:48Z`
+
+### curl 例（`html` は `--data-urlencode` で渡す）
+
+```bash
+curl -sS -b /tmp/p17-cookie.txt -X POST https://homurabi.kazu-san.workers.dev/debug/mail \
+  -d "to=kazu.homma@gmail.com" \
+  --data-urlencode "subject=homurabi Phase 17 HTML test — Version 6772a870-a1ea-4400-b8df-ff38f9e1a3a0" \
+  --data-urlencode "text=Plain text fallback (HTML 非対応クライアント用)" \
+  --data-urlencode "html=<h1>...</h1><p>...</p>"
+```
+
+※ 実際の応答では `subject` に CF-Ray 由来サフィックス（` — 9f00b0389a569160` 等）が付く場合あり（`/debug/mail` の既定ロジック）。
+
+### レスポンス JSON（復元）
+
+```json
+{
+  "ok": true,
+  "message_id": "<kH3DLrWLa83L2NfQTqYcP99yJfsDKQ9K2vPc@kazuph-info.ai-work.uk>",
+  "cf_send_result_json": "{\"messageId\":\"<kH3DLrWLa83L2NfQTqYcP99yJfsDKQ9K2vPc@kazuph-info.ai-work.uk>\"}",
+  "to": "kazu.homma@gmail.com",
+  "from": "noreply@kazuph-info.ai-work.uk",
+  "subject": "homurabi Phase 17 HTML test — Version 6772a870-a1ea-4400-b8df-ff38f9e1a3a0 — 9f00b0389a569160"
+}
+```
+
+### Plain text のみ（回帰）
+
+- **subject**: `Phase17 plain-only smoke`
+- **message_id**: `<wEpgiTbXQed97aTYRqdZo9YRn8b40noTwIWG@kazuph-info.ai-work.uk>` （HTTP 200、`ok: true`）
+
+---
+
+**マスターへ（HTML メール）**: Gmail でマルチパート（plain + HTML）の表示を確認してください。件名キーワード `Phase 17 HTML test`。

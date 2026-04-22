@@ -3,6 +3,7 @@ PATH
   specs:
     cloudflare-workers-runtime (0.1.1)
       opal (= 1.8.3.rc1)
+      parser (~> 3.3)
 
 PATH
   remote: gems/sequel-d1

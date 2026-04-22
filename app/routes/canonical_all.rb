@@ -1,4 +1,3 @@
-# await: all, authenticate!, call, chat_verify_token!, clear_chat_history, decode, dh_compute_key, dispatch_js, dispatch_scheduled, encode, execute, execute_insert, fetch, fetch_raw, final, get_binary, get_first_row, get_response, list, load_chat_history, open, private_decrypt, public_encrypt, run, save_chat_history, send, sign, sign_pss, sleep, verify, verify_pss
 # frozen_string_literal: true
 # Route table — loaded inside `class App < Sinatra::Base` (order = original hello.rb)
   get '/' do
@@ -132,8 +131,8 @@
       rows = seq_db[:users].all
       rows.is_a?(Array) && rows.all? { |r| r.is_a?(Hash) && r['id'] && r['name'] }
     }
-    run.call('DB[:users].where(id: 1).first.__await__ returns single row') {
-      row = seq_db[:users].where(id: 1).first.__await__
+    run.call('DB[:users].where(id: 1).first returns single row') {
+      row = seq_db[:users].where(id: 1).first
       row.is_a?(Hash) && row['id'].to_i == 1
     }
 
@@ -144,7 +143,7 @@
   get '/kv/:key' do
     content_type 'application/json'
     key = params['key']
-    value = kv.get(key).__await__
+    value = kv.get(key)
     if value.nil?
       status 404
       { 'error' => 'not found', 'key' => key }.to_json
@@ -156,14 +155,14 @@
     content_type 'application/json'
     key  = params['key']
     body = request.body.read
-    kv.put(key, body).__await__
+    kv.put(key, body)
     status 201
     { 'key' => key, 'value' => body, 'stored' => true }.to_json
   end
   delete '/kv/:key' do
     content_type 'application/json'
     key = params['key']
-    kv.delete(key).__await__
+    kv.delete(key)
     { 'key' => key, 'deleted' => true }.to_json
   end
   get '/images/:key' do
@@ -179,7 +178,7 @@
   get '/r2/:key' do
     content_type 'application/json'
     key    = params['key']
-    obj    = bucket.get(key).__await__
+    obj    = bucket.get(key)
     if obj.nil?
       status 404
       { 'error' => 'not found', 'key' => key }.to_json
@@ -197,14 +196,14 @@
     key             = params['key']
     body            = request.body.read rescue ''
     content_type_in = request.env['CONTENT_TYPE'] || 'application/octet-stream'
-    bucket.put(key, body, content_type_in).__await__
+    bucket.put(key, body, content_type_in)
     status 201
     { 'key' => key, 'size' => body.bytesize, 'stored' => true }.to_json
   end
   delete '/r2/:key' do
     content_type 'application/json'
     key    = params['key']
-    bucket.delete(key).__await__
+    bucket.delete(key)
     { 'key' => key, 'deleted' => true }.to_json
   end
   get '/demo/http' do
@@ -251,7 +250,7 @@
       'sub'  => username,
       'role' => body['role'] || 'user',
       'iat'  => Time.now.to_i,
-      'exp'  => Time.now.to_i + JWT_ACCESS_TTL
+      'exp'  => Time.now.to_i + App::JWT_ACCESS_TTL
     }
     access_token = JWT.encode(payload, sign_key, alg)
 
@@ -267,16 +266,16 @@
         'sub'  => username,
         'role' => body['role'] || 'user',
         'alg'  => alg,
-        'exp'  => Time.now.to_i + JWT_REFRESH_TTL
+        'exp'  => Time.now.to_i + App::JWT_REFRESH_TTL
       }
-      kv.put("refresh:#{refresh}", entry.to_json).__await__
+      kv.put("refresh:#{refresh}", entry.to_json)
     end
 
     status 201
     resp = {
       'access_token' => access_token,
       'token_type'   => 'Bearer',
-      'expires_in'   => JWT_ACCESS_TTL,
+      'expires_in'   => App::JWT_ACCESS_TTL,
       'alg'          => alg
     }
     resp['refresh_token'] = refresh if refresh
@@ -348,7 +347,7 @@
       next { 'error' => 'refresh_token required' }.to_json
     end
 
-    raw = kv.get("refresh:#{refresh}").__await__
+    raw = kv.get("refresh:#{refresh}")
     if raw.nil?
       status 401
       next { 'error' => 'unknown refresh_token' }.to_json
@@ -362,7 +361,7 @@
     end
 
     if entry['exp'].to_i < Time.now.to_i
-      kv.delete("refresh:#{refresh}").__await__
+      kv.delete("refresh:#{refresh}")
       status 401
       next { 'error' => 'refresh_token expired' }.to_json
     end
@@ -374,14 +373,14 @@
       'sub'  => sub,
       'role' => entry['role'] || 'user',
       'iat'  => Time.now.to_i,
-      'exp'  => Time.now.to_i + JWT_ACCESS_TTL
+      'exp'  => Time.now.to_i + App::JWT_ACCESS_TTL
     }
     access_token = JWT.encode(payload, sign_key, alg)
 
     {
       'access_token' => access_token,
       'token_type'   => 'Bearer',
-      'expires_in'   => JWT_ACCESS_TTL,
+      'expires_in'   => App::JWT_ACCESS_TTL,
       'alg'          => alg
     }.to_json
   end
@@ -426,11 +425,11 @@
       ct = ''
       i = 0
       while i < plain.length
-        ct = ct + e.update(plain[i, 13]).__await__; i += 13
+        ct = ct + e.update(plain[i, 13]); i += 13
       end
       ct = ct + e.final
       d = OpenSSL::Cipher.new('AES-256-CTR').decrypt; d.key = key; d.iv = iv
-      d.update(ct).__await__ + d.final == plain
+      d.update(ct) + d.final == plain
     }
     run.call('AES-128-CBC round-trip') {
       key = SecureRandom.random_bytes(16); iv = SecureRandom.random_bytes(16)
@@ -751,8 +750,8 @@
     end
 
     @title = 'homurabi /chat — Workers AI'
-    @primary_model  = CHAT_MODELS[:primary]
-    @fallback_model = CHAT_MODELS[:fallback]
+    @primary_model  = App::CHAT_MODELS[:primary]
+    @fallback_model = App::CHAT_MODELS[:fallback]
     @session_id = normalize_session_id(params['session'])
     @history = ai_demos_enabled? ? load_chat_history(@session_id) : []
     @content = erb :chat
@@ -765,23 +764,19 @@
       'demos_enabled'  => ai_demos_enabled?,
       'ai_bound'       => ai_binding?,
       'kv_bound'       => !kv.nil?,
-      'primary_model'  => CHAT_MODELS[:primary],
-      'fallback_model' => CHAT_MODELS[:fallback]
+      'primary_model'  => App::CHAT_MODELS[:primary],
+      'fallback_model' => App::CHAT_MODELS[:fallback]
     }.to_json
   end
   post '/api/chat/messages' do
     content_type 'application/json'
     gate = ai_demos_block_or_nil
     next gate if gate
-    # Inline JWT verification — early-exit with explicit `status` and
-    # `next` (the same pattern Phase 8's /api/me uses successfully).
-    # We deliberately do NOT call `Sinatra::JwtAuth#authenticate!`
-    # because that helper uses `halt` which throws past Opal's async
-    # boundary (Sinatra's `catch :halt` cannot see a JS Promise
-    # rejection). And we keep the token decode outside any helper so
-    # the `status N` call sits in the same `dispatch!` frame as the
-    # `next` — pulling it into a helper made the response leak out
-    # as 200 in earlier iterations.
+    # Inline JWT verification with dynamic algorithm detection.
+    # authenticate_or_401 is the recommended safe API for fixed-algorithm
+    # routes (see GET /api/chat/messages). This route uses inline
+    # verification because it needs to detect the algorithm from the
+    # token header (alg_from_token) to support multiple algorithms.
     auth_header = request.env['HTTP_AUTHORIZATION'].to_s
     parts = auth_header.split(' ', 2)
     if parts.length != 2 || parts[0].downcase != 'bearer'
@@ -827,8 +822,8 @@
     end
 
     requested_model = body['model'].to_s
-    primary  = CHAT_MODELS[:primary]
-    fallback = CHAT_MODELS[:fallback]
+    primary  = App::CHAT_MODELS[:primary]
+    fallback = App::CHAT_MODELS[:fallback]
     # Allow either of the two configured models. Anything else is
     # rejected so a client can't run up neuron costs on arbitrary models.
     model = if requested_model == primary || requested_model == fallback
@@ -918,13 +913,9 @@
     content_type 'application/json'
     gate = ai_demos_block_or_nil
     next gate if gate
-    auth = chat_verify_token!
-    if auth['ok'] != true
-      # See the long comment in POST /api/chat/messages for why we
-      # return [status, body] instead of using `status N; next body`
-      # — Sinatra snapshots response.status before the await resolves,
-      # so any later mutation is lost.
-      next [auth['status'].to_i, auth['body']]
+    auth_status, auth_result = authenticate_or_401
+    if auth_status
+      next [auth_status, auth_result]
     end
     session_id = normalize_session_id(params['session'])
     history = load_chat_history(session_id)
@@ -948,13 +939,9 @@
     content_type 'application/json'
     gate = ai_demos_block_or_nil
     next gate if gate
-    auth = chat_verify_token!
-    if auth['ok'] != true
-      # See the long comment in POST /api/chat/messages for why we
-      # return [status, body] instead of using `status N; next body`
-      # — Sinatra snapshots response.status before the await resolves,
-      # so any later mutation is lost.
-      next [auth['status'].to_i, auth['body']]
+    auth_status, auth_result = authenticate_or_401
+    if auth_status
+      next [auth_status, auth_result]
     end
     session_id = normalize_session_id(params['session'])
     clear_chat_history(session_id)
@@ -966,7 +953,7 @@
       status 404
       next({ 'error' => 'disabled' }.to_json)
     end
-    model = params['model'] || CHAT_MODELS[:primary]
+    model = params['model'] || App::CHAT_MODELS[:primary]
     out = Cloudflare::AI.run(
       model,
       { messages: [
@@ -996,8 +983,8 @@
     end
 
     cases = []
-    primary  = CHAT_MODELS[:primary]
-    fallback = CHAT_MODELS[:fallback]
+    primary  = App::CHAT_MODELS[:primary]
+    fallback = App::CHAT_MODELS[:fallback]
 
     # NOTE: blocks-with-`__await__` compile to async functions in Opal
     # under `# await: true`. Iterators like `Array#each_with_index`
@@ -1140,7 +1127,7 @@
         'salt_hex'    => salt.unpack1('H*'),
         'computed_at' => Time.now.to_i
       }.to_json
-    end.__await__
+    end
     elapsed_ms = ((Time.now.to_f - started) * 1000).round
     # The helper set response.headers['x-homurabi-cache'] to HIT / MISS.
     cache_state = response['X-Homurabi-Cache'] || 'UNKNOWN'
@@ -1192,7 +1179,7 @@
     recent = []
     i = 0
     while i < limit
-      raw = kv.get("queue:last-consumed:#{i}").__await__
+      raw = kv.get("queue:last-consumed:#{i}")
       break if raw.nil? || raw.empty?
       begin
         recent << JSON.parse(raw)
@@ -1234,7 +1221,7 @@
     # Open the named partition fresh per request — the JS handle is
     # cached per-isolate internally but the Ruby wrapper is cheap.
     named = ::Cloudflare::Cache.open(namespace)
-    cached = named.match(cache_key).__await__
+    cached = named.match(cache_key)
     if cached
       state = 'HIT'
       # Tiny pass-through of the cached body.
@@ -1260,7 +1247,7 @@
         'content-type'  => 'application/json',
         'cache-control' => 'public, max-age=60',
         'date'          => Time.now.httpdate
-      }).__await__
+      })
       payload.merge(
         'cache' => state,
         'elapsed_ms' => ((Time.now.to_f - started) * 1000).round
@@ -1308,7 +1295,7 @@
     recent = []
     i = 0
     while i < limit
-      raw = kv.get("queue:dlq:#{i}").__await__
+      raw = kv.get("queue:dlq:#{i}")
       break if raw.nil? || raw.empty?
       begin
         recent << JSON.parse(raw)
@@ -1383,8 +1370,8 @@
         'content-type'  => 'application/json',
         'cache-control' => 'public, max-age=30',
         'date'          => Time.now.httpdate
-      }).__await__
-      got = c.match(key).__await__
+      })
+      got = c.match(key)
       if got.nil?
         cache_case['pass'] = false
         cache_case['note'] = 'match returned nil after put (cache unavailable in this runtime?)'
@@ -1441,7 +1428,7 @@
       c.response :json
       c.headers['user-agent'] = 'homurabi-phase11a/1.0'
     end
-    res = client.get('/', { 'format' => 'json' }).__await__
+    res = client.get('/', { 'format' => 'json' })
     {
       'demo'        => 'Faraday.new(url:) { request :json; response :json }',
       'status'      => res.status,
@@ -1489,7 +1476,7 @@
     # with the existing /r2/:key demos.
     key = "phase11a/uploads/#{SecureRandom.hex(8)}-#{file_param.filename}"
     u8  = file_param.to_uint8_array
-    bucket.put(key, u8, file_param.content_type).__await__
+    bucket.put(key, u8, file_param.content_type)
 
     status 201
     {
@@ -1557,7 +1544,7 @@
       k = row['key'].to_s
       # Double-check we're still in our prefix before deleting.
       next unless k.start_with?('phase11a/uploads/')
-      bucket.delete(k).__await__
+      bucket.delete(k)
       deleted_keys << k
     end
     { 'deleted_count' => deleted_keys.length, 'deleted' => deleted_keys }.to_json
@@ -1581,7 +1568,7 @@
       status 400
       next({ 'error' => 'refusing to delete outside phase11a/uploads/', 'key' => full }.to_json)
     end
-    bucket.delete(full).__await__
+    bucket.delete(full)
     { 'deleted' => true, 'key' => full }.to_json
   end
   get '/phase11a/download/*' do
@@ -1676,7 +1663,7 @@
         conn.request :json
         conn.response :json
       end
-      res = c.get('/', { 'format' => 'json' }).__await__
+      res = c.get('/', { 'format' => 'json' })
       res.success? && res.body.is_a?(Hash) && res.body['ip']
     }
 
@@ -1689,7 +1676,7 @@
       end
       raised = nil
       begin
-        c.get('/this-path-does-not-exist-11a').__await__
+        c.get('/this-path-does-not-exist-11a')
       rescue Faraday::ResourceNotFound => e
         raised = e
       end
@@ -1876,6 +1863,25 @@
       %w[matrix できること / できないこと]
     ]
     @docs_inner = erb :docs_runtime
+    erb :layout_docs
+  end
+  get '/docs/auto-await' do
+    @title = 'Auto-Await — homurabi Docs'
+    @docs_page = 'auto-await'
+    @docs_section = :guides
+    @docs_breadcrumb = [
+      ['Docs', '/docs'],
+      ['Guides', '/docs'],
+      ['Auto-Await', nil]
+    ]
+    @docs_toc = [
+      %w[concept 概念],
+      %w[before-after Before / After],
+      %w[registry AsyncRegistry],
+      %w[diagnostic 診断モード],
+      %w[limits 制限とフォールバック]
+    ]
+    @docs_inner = erb :docs_auto_await
     erb :layout_docs
   end
   get '/docs/architecture' do

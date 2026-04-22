@@ -1,4 +1,4 @@
-# await: all, authenticate!, call, chat_verify_token!, clear_chat_history, decode, dh_compute_key, dispatch_js, dispatch_scheduled, encode, execute, execute_insert, fetch, fetch_raw, final, get_binary, get_first_row, get_response, list, load_chat_history, open, private_decrypt, public_encrypt, run, save_chat_history, send, sign, sign_pss, sleep, verify, verify_pss
+# await: true
 # frozen_string_literal: true
 # Route fragment 38 — test /test/ai
 get '/test/ai' do
@@ -13,8 +13,8 @@ get '/test/ai' do
   end
 
   cases = []
-  primary  = CHAT_MODELS[:primary]
-  fallback = CHAT_MODELS[:fallback]
+  primary  = App::CHAT_MODELS[:primary]
+  fallback = App::CHAT_MODELS[:fallback]
 
   # NOTE: blocks-with-`__await__` compile to async functions in Opal
   # under `# await: true`. Iterators like `Array#each_with_index`

@@ -1,4 +1,4 @@
-# await: all, authenticate!, call, chat_verify_token!, clear_chat_history, decode, dh_compute_key, dispatch_js, dispatch_scheduled, encode, execute, execute_insert, fetch, fetch_raw, final, get_binary, get_first_row, get_response, list, load_chat_history, open, private_decrypt, public_encrypt, run, save_chat_history, send, sign, sign_pss, sleep, verify, verify_pss
+# await: true
 # frozen_string_literal: true
 # Route fragment 50 — api /api/upload
 post '/api/upload' do
@@ -39,7 +39,7 @@ post '/api/upload' do
   # with the existing /r2/:key demos.
   key = "phase11a/uploads/#{SecureRandom.hex(8)}-#{file_param.filename}"
   u8  = file_param.to_uint8_array
-  bucket.put(key, u8, file_param.content_type).__await__
+  bucket.put(key, u8, file_param.content_type)
 
   status 201
   {

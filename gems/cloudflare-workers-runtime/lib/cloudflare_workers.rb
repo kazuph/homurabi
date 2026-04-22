@@ -797,3 +797,5 @@ require 'cloudflare_workers/cache'
 require 'cloudflare_workers/queue'
 require 'cloudflare_workers/email'
 require 'cloudflare_workers/durable_object'
+
+require 'cloudflare_workers/async_registry'

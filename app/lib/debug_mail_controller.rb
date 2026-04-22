@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 #
-# Phase 17 — `/debug/mail` の送信準備・結果整形（実際の `mail.send.__await__` はルート本体に置く。
-# Opal は `# await:` ブロック外のヘルパー内では `.__await__` が Promise を解決しない)。
+# Phase 17 — `/debug/mail` の送信準備・結果整形（実際の `mail.send` はルート本体に置く。
+# Opal は `# await: true` ブロック外のヘルパー内では `.__await__` が Promise を解決しない。
 
 require 'json'
 

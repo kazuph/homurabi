@@ -1,4 +1,4 @@
-# await: all, authenticate!, call, chat_verify_token!, clear_chat_history, decode, dh_compute_key, dispatch_js, dispatch_scheduled, encode, execute, execute_insert, fetch, fetch_raw, final, get_binary, get_first_row, get_response, list, load_chat_history, open, private_decrypt, public_encrypt, run, save_chat_history, send, sign, sign_pss, sleep, verify, verify_pss
+# await: true
 # frozen_string_literal: true
 # Route fragment 49 — demo /demo/faraday
 get '/demo/faraday' do
@@ -12,7 +12,7 @@ get '/demo/faraday' do
     c.response :json
     c.headers['user-agent'] = 'homurabi-phase11a/1.0'
   end
-  res = client.get('/', { 'format' => 'json' }).__await__
+  res = client.get('/', { 'format' => 'json' })
   {
     'demo'        => 'Faraday.new(url:) { request :json; response :json }',
     'status'      => res.status,

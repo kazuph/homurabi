@@ -1,4 +1,4 @@
-# await: all, authenticate!, call, chat_verify_token!, clear_chat_history, decode, dh_compute_key, dispatch_js, dispatch_scheduled, encode, execute, execute_insert, fetch, fetch_raw, final, get_binary, get_first_row, get_response, list, load_chat_history, open, private_decrypt, public_encrypt, run, save_chat_history, send, sign, sign_pss, sleep, verify, verify_pss
+# await: true
 # frozen_string_literal: true
 # Route fragment 44 — demo /demo/cache/named
 get '/demo/cache/named' do
@@ -28,7 +28,7 @@ get '/demo/cache/named' do
   # Open the named partition fresh per request — the JS handle is
   # cached per-isolate internally but the Ruby wrapper is cheap.
   named = ::Cloudflare::Cache.open(namespace)
-  cached = named.match(cache_key).__await__
+  cached = named.match(cache_key)
   if cached
     state = 'HIT'
     # Tiny pass-through of the cached body.
@@ -54,7 +54,7 @@ get '/demo/cache/named' do
       'content-type'  => 'application/json',
       'cache-control' => 'public, max-age=60',
       'date'          => Time.now.httpdate
-    }).__await__
+    })
     payload.merge(
       'cache' => state,
       'elapsed_ms' => ((Time.now.to_f - started) * 1000).round

@@ -1,4 +1,3 @@
-# await: true
 # frozen_string_literal: true
 # Route fragment 7 — demo /d1/users
 post '/d1/users' do

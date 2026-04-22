@@ -1,4 +1,3 @@
-# await: true
 # frozen_string_literal: true
 # Route fragment 60 — demo /docs/migration
 get '/docs/migration' do

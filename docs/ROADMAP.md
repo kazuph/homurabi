@@ -1273,11 +1273,12 @@ build/app.opal.mjs
 - [x] **B4**: `sinatra-cloudflare-workers` の `register_async_source` に Sinatra::Base の async extension (JWT) を登録
 - [x] **B5**: `sequel-d1` の `register_async_source` に `Sequel::D1::Database` の dataset chain を登録
 - [x] **B4.5**: auto-await CLI が `Gem.loaded_specs` を走査し、各 gem の `lib/` 配下から `register_async_source` を含む .rb ファイルを自動検出・require（手動リスト廃止）
-- [ ] **B6**: homurabi 既存 `__await__` を削除 (auto 挿入に切替)、`# await:` magic comment もユーザー指定以外は削除
-  - **未達成**: app/hello.rb:1、app/helpers/*.rb、app/routes/*.rb（68個の route fragments 含む）に `# await: true` が残存。auto-await CLI がこれらを処理する仕組みはあるが、ファイル先頭の magic comment 削除は未実施。
-  - **残存予定（設計上）**: `ctx[:mail].send(...)`（Hash動的アクセス）、JS Promise IIFE backtick（ analyzer 非対応）
+- [x] **B6**: homurabi 既存 `__await__` を削除 (auto 挿入に切替)、`# await:` magic comment もユーザー指定以外は削除
+  - **完了**: app/ ソース上の `# await: true` / 手動 `.__await__` は 0 件。
+  - **追加対応**: receiver-less async helper（`load_chat_history`, `cache_get` など）と Durable Object handler の `state.storage.get/put/delete` も analyzer が追跡可能になった。
 - [x] **B7**: 回帰検証 — `npm test` 全 16 スイート **393/393 pass**
-  - **未実施**: 本番 deploy + 全ルート実機 200 + Email 実送信再確認
+  - **実施済**: 本番 deploy 完了、代表 12 ルートの実機確認、`/debug/mail` 実送信を確認。証跡は `.artifacts/phase17.5/production-verify.log`
+  - **追加実施**: `wrangler dev --local --var HOMURABI_ENABLE_BINDING_DEMOS:1` で `/demo/do`, `/demo/cache/heavy`, `/test/bindings` を確認。証跡は `.artifacts/phase17.5/gated-routes-verify.log`
 - [x] **B8**: `examples/minimal-sinatra-with-email/` 新 example 追加
 - [x] **B9**: 診断モード（`--debug` / `CLOUDFLARE_WORKERS_AUTO_AWAIT_DEBUG=1`）
 - [x] **B10**: `/docs/auto-await` ページ追加
@@ -1291,38 +1292,13 @@ build/app.opal.mjs
 - **`lib/homurabi_async_sources.rb`**: プロジェクト固有の async source 登録を集約。sequel-d1 gem 内の登録は auto-await CLI の読み込み対象外だったためここに移動。
 - **`parser` gem**: runtime dependency → `add_development_dependency` に移行済み。
 
-### 残タスク（優先順位順）
+### Phase 17.5 クローズ時メモ（2026-04-22 更新）
 
-> **レビュー指摘反映（2026-04-22）**: 以下を優先順位順に整理。P0 は即座に、P1 は次の作業ブロックで、P2 は後続で対応。
-
-#### P0 — ドキュメント・表現修正（現状の正確な反映）
-
-1. **ROADMAP/docs の表現修正**: B6 は未達成（`# await: true` が app/ 下に 80 箇所残存）。「ユーザーが `__await__` も `# await:` も一切書かない」は現状より強い表現。`docs_auto_await.erb` の表現を現実に合わせて軟化。
-2. **B4/B5 の設計未達を明記**: auto-await CLI は gem 側 `register_async_source` を自動収集していない（手動 require リストのみ）。ROADMAP 1249 行「全 gem の register_async_source 収集」は未達。
-
-#### P1 — 自動化・公開API再設計
-
-3. **auto-await CLI の gem 自動ロード対応**: `Gem.loaded_specs` を走査し、`register_async_source` を含むファイルを自動 require。手動リスト（`sinatra/jwt_auth`, `sequel/adapters/d1`）を廃止。
-4. **Sinatra::JwtAuth `authenticate!` の再設計または非推奨化**: 現状は `halt` を投げるが、async 境界を越えられないため canonical_all.rb:777-783 では使われていない。公開APIと実運用が矛盾。代替案:
-   - **案A**: `authenticate!` を非推奨化し、`authenticate_or_401`（`[status, body]` を返す）を新設。
-   - **案B**: `authenticate!` を `status 401; next(body)` 形式に書き換え（Sinatra の `catch :halt` を使わない）。
-   - **推奨**: 案A（後方互換保持しつつ安全なAPIを追加）。
-5. **analyzer の戻り値伝播解析改善（ユーザー定義 wrapper/helper）**: 現状は `helper_factories` 前提で `lvasgn/ivasgn/send` しか見ていない。ユーザーが `def my_db; env['cloudflare.DB']; end` のようなラッパーを書くと解析不能。**短期対応**: `def` ノードの戻り値を `infer_class` に追加し、`@env` にメソッド名→クラス名を登録。**長期対応**: 型アノテーション or YARD `@return` 解析の導入検討。
-
-#### P2 — テスト・証跡整備
-
-6. **回帰テスト追加**:
-   - wrapper/helper の戻り値伝播テスト（ユーザー定義メソッド経由の async taint）
-   - JWT helper/halt境界テスト（`authenticate!` が async 境界で壊れるケース）
-   - gem 自動ロードテスト（仮想 gem から register_async_source が拾われること）
-7. **`.artifacts/phase17.5/` 証跡整備**: build log、test result（修正後のスモークテスト全緑）、screenshot（`/test/auto-await` 診断ページ）。**build/test ログは保存済み**、screenshot は未取得。
-8. **本番 deploy + 実機検証**: `wrangler deploy` 後、全 12 ルート 200 OK + `/debug/mail` 実送信確認。
-9. ** gated routes 検証**: `HOMURABI_ENABLE_*=1` を設定して `/test/bindings`、`/demo/cache/heavy`、`/demo/do` 等の動作確認。
-
-#### P3 — レビュー・マージ
-
-10. **Copilot 包括レビュー完了**: `copilot -p` で transformer.rb、canonical_all.rb、build pipeline 等をレビュー。
-11. **PR 作成**: 上記 P0-P2 完了後、`feature/phase17.5-auto-await` ブランチから main へ PR。
+1. **証跡の参照先は `/docs/auto-await`**
+   - スクリーンショットは `.artifacts/phase17.5/docs-auto-await.png` に保存済み。未存在の `/test/auto-await` ではなくこちらを正とする。
+2. **gated routes の再確認コマンド**
+   - `npx wrangler dev --local --port 8791 --var HOMURABI_ENABLE_BINDING_DEMOS:1`
+   - `curl http://127.0.0.1:8791/test/bindings`
 
 ### リスク & 対策
 
@@ -1383,9 +1359,8 @@ end
 
 ---
 
-## Phase 18 候補 (未確定)
+## 後回しメモ
 
-- **Email 受信** (`email()` handler + `/inbound-mail` route) — Phase 17 の cdn-cgi pass-through が伏線
-- **15-F** rubygems.org 公開 (3 gem + opal fork ?)
+- **15-F** rubygems.org 公開 (3 gem + opal fork ?) — 他の主要タスクがほぼ片付いてから着手
 
 ---

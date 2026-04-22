@@ -1,4 +1,3 @@
-# await: true
 # frozen_string_literal: true
 # Domain: login — fragment indices 29, 30, 31, 32 (documentation only; routes load via app/app.rb).
 # fragments/route_029

@@ -1,4 +1,3 @@
-# await: true
 # frozen_string_literal: true
 # Route fragment 27 — test /test/scheduled
 get '/test/scheduled' do

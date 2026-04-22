@@ -1,4 +1,3 @@
-# await: true
 # frozen_string_literal: true
 # Route fragment 63 — demo /docs/runtime
 get '/docs/runtime' do

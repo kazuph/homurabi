@@ -1,4 +1,3 @@
-# await: true
 # frozen_string_literal: true
 # Route fragment 66 — demo /debug/mail
 get '/debug/mail' do

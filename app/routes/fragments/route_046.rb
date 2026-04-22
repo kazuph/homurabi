@@ -1,4 +1,3 @@
-# await: true
 # frozen_string_literal: true
 # Route fragment 46 — demo /demo/queue/dlq-status
 get '/demo/queue/dlq-status' do

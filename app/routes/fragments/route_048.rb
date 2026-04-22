@@ -1,4 +1,3 @@
-# await: true
 # frozen_string_literal: true
 # Route fragment 48 — test /test/bindings
 get '/test/bindings' do

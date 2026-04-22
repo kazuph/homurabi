@@ -1,19 +1,14 @@
-# await: true
 # frozen_string_literal: true
 # Route fragment 34 — api /api/chat/messages
 post '/api/chat/messages' do
   content_type 'application/json'
   gate = ai_demos_block_or_nil
   next gate if gate
-  # Inline JWT verification — early-exit with explicit `status` and
-  # `next` (the same pattern Phase 8's /api/me uses successfully).
-  # We deliberately do NOT call `Sinatra::JwtAuth#authenticate!`
-  # because that helper uses `halt` which throws past Opal's async
-  # boundary (Sinatra's `catch :halt` cannot see a JS Promise
-  # rejection). And we keep the token decode outside any helper so
-  # the `status N` call sits in the same `dispatch!` frame as the
-  # `next` — pulling it into a helper made the response leak out
-  # as 200 in earlier iterations.
+  # Inline JWT verification with dynamic algorithm detection.
+  # authenticate_or_401 is the recommended safe API for fixed-algorithm
+  # routes (see GET /api/chat/messages). This route uses inline
+  # verification because it needs to detect the algorithm from the
+  # token header (alg_from_token) to support multiple algorithms.
   auth_header = request.env['HTTP_AUTHORIZATION'].to_s
   parts = auth_header.split(' ', 2)
   if parts.length != 2 || parts[0].downcase != 'bearer'
@@ -25,27 +20,22 @@ post '/api/chat/messages' do
     status 401
     next({ 'error' => 'unauthorized', 'reason' => 'missing bearer token' }.to_json)
   end
-  # JWT verify (post-await). Setting `status N` after the await would
-  # not take effect because Sinatra's `invoke` snapshots
-  # `response.status` synchronously when it sees a Promise body, so
-  # any mutation that happens later than that snapshot is lost. We
-  # work around it by returning `[status, body]` from the route — the
-  # homurabi patch in `build_js_response` detects that single-chunk
-  # shape and uses the embedded status when constructing the JS
-  # Response.
-  decode_err = `(async function(){
-    try {
-      await #{JWT.decode(auth_token, settings.jwt_secret, true, algorithm: settings.jwt_algorithm)};
-      return null;
-    } catch (e) {
-      var msg = (e && e.$message) ? e.$message() : (e && e.message) ? e.message : String(e);
-      return 'invalid token: ' + String(msg);
-    }
-  })()`.__await__
-  is_failure = `(#{decode_err} != null && #{decode_err} !== undefined)`
-  if is_failure
-    err_msg = decode_err.to_s
-    next [401, { 'error' => 'unauthorized', 'reason' => err_msg }.to_json]
+  # JWT verify may resolve asynchronously. If verification fails after
+  # the await, return `[status, body]` directly so build_js_response
+  # preserves the non-200 status instead of relying on post-await
+  # `status 401`.
+  begin
+    JWT.decode(auth_token, settings.jwt_secret, true, algorithm: settings.jwt_algorithm)
+  rescue JWT::ExpiredSignature
+    next [401, { 'error' => 'unauthorized', 'reason' => 'token expired' }.to_json]
+  rescue JWT::ImmatureSignature
+    next [401, { 'error' => 'unauthorized', 'reason' => 'token not yet valid' }.to_json]
+  rescue JWT::IncorrectAlgorithm
+    next [401, { 'error' => 'unauthorized', 'reason' => 'algorithm mismatch' }.to_json]
+  rescue JWT::VerificationError
+    next [401, { 'error' => 'unauthorized', 'reason' => 'signature verification failed' }.to_json]
+  rescue JWT::DecodeError => e
+    next [401, { 'error' => 'unauthorized', 'reason' => "invalid token: #{e.message}" }.to_json]
   end
   bgate = ai_binding_block_or_nil
   next bgate if bgate

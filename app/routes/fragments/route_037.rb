@@ -1,4 +1,3 @@
-# await: true
 # frozen_string_literal: true
 # Route fragment 37 — test /test/ai/debug
 get '/test/ai/debug' do

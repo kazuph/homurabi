@@ -1,4 +1,3 @@
-# await: true
 # frozen_string_literal: true
 # Route fragment 44 — demo /demo/cache/named
 get '/demo/cache/named' do

@@ -178,6 +178,7 @@ CloudflareWorkers::AsyncRegistry.register_async_source do
   async_factory 'Cloudflare::DurableObjectNamespace', :new
   taint_return 'Cloudflare::DurableObjectNamespace', :get, 'Cloudflare::DurableObjectStub'
   taint_return 'Cloudflare::DurableObjectNamespace', :get_by_name, 'Cloudflare::DurableObjectStub'
+  taint_return 'Cloudflare::DurableObjectState', :storage, 'Cloudflare::DurableObjectStorage'
   async_method 'Cloudflare::DurableObjectStub', :fetch
 
   async_method 'Cloudflare::DurableObjectStorage', :get

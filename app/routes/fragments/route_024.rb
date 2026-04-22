@@ -1,4 +1,3 @@
-# await: true
 # frozen_string_literal: true
 # Route fragment 24 — api /api/login/refresh
 post '/api/login/refresh' do

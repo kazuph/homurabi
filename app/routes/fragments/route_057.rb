@@ -1,4 +1,3 @@
-# await: true
 # frozen_string_literal: true
 # Route fragment 57 — test /test/foundations
 get '/test/foundations' do

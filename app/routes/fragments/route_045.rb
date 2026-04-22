@@ -1,4 +1,3 @@
-# await: true
 # frozen_string_literal: true
 # Route fragment 45 — test /test/queue/fire
 post '/test/queue/fire' do

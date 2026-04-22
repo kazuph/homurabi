@@ -1,4 +1,4 @@
-# await: all, authenticate!, call, chat_verify_token!, clear_chat_history, decode, dh_compute_key, dispatch_js, dispatch_scheduled, encode, execute, execute_insert, fetch, fetch_raw, final, get_binary, get_first_row, get_response, list, load_chat_history, open, private_decrypt, public_encrypt, run, save_chat_history, send, sign, sign_pss, sleep, verify, verify_pss
+# await: true
 # frozen_string_literal: true
 # Route fragment 57 — test /test/foundations
 get '/test/foundations' do
@@ -29,7 +29,7 @@ get '/test/foundations' do
       conn.request :json
       conn.response :json
     end
-    res = c.get('/', { 'format' => 'json' }).__await__
+    res = c.get('/', { 'format' => 'json' })
     res.success? && res.body.is_a?(Hash) && res.body['ip']
   }
 
@@ -42,7 +42,7 @@ get '/test/foundations' do
     end
     raised = nil
     begin
-      c.get('/this-path-does-not-exist-11a').__await__
+      c.get('/this-path-does-not-exist-11a')
     rescue Faraday::ResourceNotFound => e
       raised = e
     end

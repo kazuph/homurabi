@@ -90,7 +90,7 @@ def run_opal_homurabi!(root, opal_input, opal_output)
   argv = [
     'bundle', 'exec', 'opal',
     '-c', '-E', '--esm', '--no-source-map',
-    '-I', 'app',
+    '-I', 'build/auto_await/app', '-I', 'build/auto_await', '-I', 'app',
     '-I', 'gems/cloudflare-workers-runtime/lib',
     '-I', 'gems/sinatra-cloudflare-workers/lib',
     '-I', 'gems/sequel-d1/lib',
@@ -125,7 +125,7 @@ def run_opal_standalone!(root, opal_input, opal_output, with_db:)
   hv = homurabi_vendor_from_gemfile(root)
   load_paths << hv.to_s if hv
   load_paths += [
-    'app',
+    'build/auto_await/app', 'app',
     CloudflareWorkersBuild.gem_lib('cloudflare-workers-runtime'),
     CloudflareWorkersBuild.gem_lib('sinatra-cloudflare-workers')
   ]
@@ -157,6 +157,22 @@ end
 
 unless options[:standalone]
   run!(['ruby', 'bin/inline-routes-for-opal'], chdir: root)
+  run!(
+    [
+      'ruby', CloudflareWorkersBuild.exe_path('auto-await').to_s,
+      '--input', 'app',
+      '--output', 'build/auto_await/app'
+    ],
+    chdir: root
+  )
+  run!(
+    [
+      'ruby', CloudflareWorkersBuild.exe_path('auto-await').to_s,
+      '--input', 'build/routes_app_class_eval.rb',
+      '--output', 'build/auto_await/routes_app_class_eval.rb'
+    ],
+    chdir: root
+  )
   run!(
     [
       'ruby', CloudflareWorkersBuild.exe_path('compile-erb').to_s,
@@ -197,6 +213,14 @@ else
       '--input', 'public',
       '--output', 'build/app_assets.rb',
       '--namespace', 'AppAssets'
+    ],
+    chdir: root
+  )
+  run!(
+    [
+      'ruby', CloudflareWorkersBuild.exe_path('auto-await').to_s,
+      '--input', 'app',
+      '--output', 'build/auto_await/app'
     ],
     chdir: root
   )

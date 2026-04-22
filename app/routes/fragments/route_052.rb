@@ -1,4 +1,4 @@
-# await: all, authenticate!, call, chat_verify_token!, clear_chat_history, decode, dh_compute_key, dispatch_js, dispatch_scheduled, encode, execute, execute_insert, fetch, fetch_raw, final, get_binary, get_first_row, get_response, list, load_chat_history, open, private_decrypt, public_encrypt, run, save_chat_history, send, sign, sign_pss, sleep, verify, verify_pss
+# await: true
 # frozen_string_literal: true
 # Route fragment 52 — demo /phase11a/cleanup
 post '/phase11a/cleanup' do
@@ -19,7 +19,7 @@ post '/phase11a/cleanup' do
     k = row['key'].to_s
     # Double-check we're still in our prefix before deleting.
     next unless k.start_with?('phase11a/uploads/')
-    bucket.delete(k).__await__
+    bucket.delete(k)
     deleted_keys << k
   end
   { 'deleted_count' => deleted_keys.length, 'deleted' => deleted_keys }.to_json

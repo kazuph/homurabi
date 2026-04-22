@@ -1,4 +1,4 @@
-# await: all, authenticate!, call, chat_verify_token!, clear_chat_history, decode, dh_compute_key, dispatch_js, dispatch_scheduled, encode, execute, execute_insert, fetch, fetch_raw, final, get_binary, get_first_row, get_response, list, load_chat_history, open, private_decrypt, public_encrypt, run, save_chat_history, send, sign, sign_pss, sleep, verify, verify_pss
+# await: true
 # frozen_string_literal: true
 # Route fragment 41 — demo /demo/cache/heavy
 get '/demo/cache/heavy' do
@@ -30,7 +30,7 @@ get '/demo/cache/heavy' do
       'salt_hex'    => salt.unpack1('H*'),
       'computed_at' => Time.now.to_i
     }.to_json
-  end.__await__
+  end
   elapsed_ms = ((Time.now.to_f - started) * 1000).round
   # The helper set response.headers['x-homurabi-cache'] to HIT / MISS.
   cache_state = response['X-Homurabi-Cache'] || 'UNKNOWN'

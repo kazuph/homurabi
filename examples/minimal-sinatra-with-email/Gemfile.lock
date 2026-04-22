@@ -1,0 +1,44 @@
+PATH
+  remote: ../../gems/cloudflare-workers-runtime
+  specs:
+    cloudflare-workers-runtime (0.1.1)
+      opal (= 1.8.3.rc1)
+
+PATH
+  remote: ../../gems/sinatra-cloudflare-workers
+  specs:
+    sinatra-cloudflare-workers (0.1.0)
+      cloudflare-workers-runtime (>= 0.1)
+      opal (= 1.8.3.rc1)
+
+PATH
+  remote: ../../vendor/opal-gem
+  specs:
+    opal (1.8.3.rc1)
+      ast (>= 2.3.0)
+      base64 (>= 0.2.0)
+      parser (~> 3.0, >= 3.0.3.2)
+
+GEM
+  remote: https://rubygems.org/
+  specs:
+    ast (2.4.3)
+    base64 (0.3.0)
+    parser (3.3.11.1)
+      ast (~> 2.4.1)
+      racc
+    racc (1.8.1)
+
+PLATFORMS
+  arm64-darwin-25
+
+DEPENDENCIES
+  cloudflare-workers-runtime!
+  opal!
+  sinatra-cloudflare-workers!
+
+RUBY VERSION
+   ruby 3.4.9p82
+
+BUNDLED WITH
+   2.6.9

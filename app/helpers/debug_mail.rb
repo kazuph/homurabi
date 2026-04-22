@@ -26,8 +26,7 @@ module Homurabi
     private
 
     def debug_mail_forbidden_body
-      u = App::DEBUG_MAIL_ADMIN_USERNAME
-      '<!DOCTYPE html><html lang="ja"><meta charset="utf-8"><title>403 Forbidden</title><body><p>/debug/mail はデプロイ環境ではログインユーザー <code>' + u.to_s + '</code> のみが利用できます（<a href="/login">ログイン</a>）。</p></body></html>'
+      '<!DOCTYPE html><html lang="ja"><meta charset="utf-8"><title>403 Forbidden</title><body><p>Forbidden.</p></body></html>'
     end
   end
 end

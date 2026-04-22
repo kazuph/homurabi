@@ -1,7 +1,7 @@
 # await: all, authenticate!, call, chat_verify_token!, clear_chat_history, decode, dh_compute_key, dispatch_js, dispatch_scheduled, encode, execute, execute_insert, fetch, fetch_raw, final, get_binary, get_first_row, get_response, list, load_chat_history, open, private_decrypt, public_encrypt, run, save_chat_history, send, sign, sign_pss, sleep, verify, verify_pss
 # frozen_string_literal: true
 # Route fragment 31 — login /logout
-  get '/logout' do
-    response.delete_cookie(App::SESSION_COOKIE_NAME, path: '/')
-    redirect '/'
-  end
+get '/logout' do
+  response.delete_cookie(App::SESSION_COOKIE_NAME, path: '/')
+  redirect '/'
+end

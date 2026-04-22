@@ -10,5 +10,6 @@
     @form_to = (params['to'] || 'kazu.homma@gmail.com').to_s
     @form_subject = params['subject'].to_s
     @form_text = params['text'].to_s
+    @form_html = params['html'].to_s
     erb :debug_mail
   end

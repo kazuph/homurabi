@@ -1906,6 +1906,7 @@
     @form_to = (params['to'] || 'kazu.homma@gmail.com').to_s
     @form_subject = params['subject'].to_s
     @form_text = params['text'].to_s
+    @form_html = params['html'].to_s
     erb :debug_mail
   end
 
@@ -1921,6 +1922,7 @@
     # urlencoded 本文で + がスペースにならず残るクライアントがあるため表示用に正規化
     @form_subject = params['subject'].to_s.strip.tr('+', ' ')
     @form_text = params['text'].to_s.tr('+', ' ')
+    @form_html = params['html'].to_s.tr('+', ' ')
 
     final_to = @form_to.empty? ? 'kazu.homma@gmail.com' : @form_to
 
@@ -1945,15 +1947,17 @@
             "#{fs} — #{vid}"
           end
 
+        body_html = @form_html.strip.empty? ? nil : @form_html
         body_text =
           if @form_text.strip.empty?
-            'This is a test mail from homurabi'
+            body_html ? nil : 'This is a test mail from homurabi'
           else
             @form_text
           end
 
         begin
-          result = mail.send(to: final_to, from: homurabi_mail_from, subject: subject_line, text: body_text).__await__
+          result = mail.send(to: final_to, from: homurabi_mail_from, subject: subject_line, text: body_text,
+                               html: body_html).__await__
           mid_s = ''
           cf_raw = ''
           if `(#{result} == null || #{result} === undefined || #{result} === Opal.nil)`

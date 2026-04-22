@@ -31,8 +31,12 @@
       <input id="subject" name="subject" type="text" value="<%= ERB::Util.html_escape(@form_subject.to_s) %>" style="width:100%;box-sizing:border-box;">
     </p>
     <p>
-      <label for="text">本文（空ならデフォルト英文）</label><br>
+      <label for="text">Plain text（任意。<code>html</code> のみ指定時は省略可）</label><br>
       <textarea id="text" name="text" rows="8" style="width:100%;box-sizing:border-box;"><%= ERB::Util.html_escape(@form_text.to_s) %></textarea>
+    </p>
+    <p>
+      <label for="html">HTML body（任意。<code>text:</code> と併用可）</label><br>
+      <textarea id="html" name="html" rows="8" placeholder="<p>HTML body…</p>" style="width:100%;box-sizing:border-box;"><%= ERB::Util.html_escape(@form_html.to_s) %></textarea>
     </p>
     <p><button type="submit">送信</button></p>
   </form>

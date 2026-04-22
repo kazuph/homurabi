@@ -30,7 +30,8 @@ mail.send(
   to: 'you@example.com',
   from: ENV_STYLE_FROM, # 実際は vars の HOMURABI_MAIL_FROM を参照
   subject: 'Hello',
-  text: 'Plain text body'
+  text: 'Plain text body',
+  html: '&lt;p&gt;Optional rich body&lt;/p&gt;' # 省略可／text と併用可（どちらか必須）
 ).__await__
 </code></pre>
 <p>アプリ側ではヘルパー <code>send_email</code> と <code>homurabi_mail_from</code> を利用できます。</p>

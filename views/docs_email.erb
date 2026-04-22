@@ -24,8 +24,8 @@ HOMURABI_MAIL_FROM = "noreply@example.com"
 </code></pre>
 
 <h2 id="wrapper">Cloudflare::Email</h2>
-<p><code>gems/cloudflare-workers-runtime</code> が Rack 環境に <code>env['cloudflare.SEND_EMAIL']</code> を載せます。</p>
-<pre><code>mail = env['cloudflare.SEND_EMAIL']
+<p><strong>送信バインディングは Worker の <code>env.SEND_EMAIL</code> が正</strong>です。<code>worker_module.mjs</code> の <code>fetch</code> 先頭で <code>globalThis.__OPAL_WORKERS__.sendEmailBinding</code> にコピーしたうえで、Rack 側は <code>env['cloudflare.SEND_EMAIL']</code>（<code>Cloudflare::Email</code> ラッパー）として参照します。D1 / Queue などが <code>cloudflare.env</code> 経由で触るパターンとは別に、Email はこの明示注入経路が主軸です（Miniflare でも同じ JS オブジェクトを拾えるようにするため）。</p>
+<pre><code>mail = send_email # => env['cloudflare.SEND_EMAIL']（内部は env.SEND_EMAIL と同一バインディング）
 mail.send(
   to: 'you@example.com',
   from: ENV_STYLE_FROM, # 実際は vars の HOMURABI_MAIL_FROM を参照

@@ -4,6 +4,7 @@
 # Opal は `# await:` ブロック外のヘルパー内では `.__await__` が Promise を解決しない)。
 
 require 'json'
+require 'uri'
 
 module Homurabi
   module DebugMailController
@@ -76,8 +77,28 @@ module Homurabi
 
       private
 
+      # application/x-www-form-urlencoded 由来の `+` と、ツール連発などで混入しがちな
+      # 「閉じタグだけ %2F のまま」「:: が %3A%3A」のような **残留パーセントエンコード**を緩く直す。
+      # 完全なデコードは Rack が担当。ここでは最大 2 周だけ（decode 不能なら原文のまま）。
       def sanitize_form(value)
-        value.tr('+', ' ')
+        s = value.to_s.tr('+', ' ')
+        decode_percent_runaway(s)
+      end
+
+      def decode_percent_runaway(s)
+        return s unless s.include?('%')
+        out = s
+        2.times do
+          break unless /%[0-9A-Fa-f]{2}/.match?(out)
+          begin
+            d = URI.decode_www_form_component(out)
+            break if d == out
+            out = d
+          rescue ArgumentError, URI::InvalidURIError
+            break
+          end
+        end
+        out
       end
 
       def vid_from_env(env)

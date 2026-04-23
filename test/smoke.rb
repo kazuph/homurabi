@@ -24,6 +24,7 @@
 
 require 'json'
 require 'promise/v2'
+require 'sequel'
 require 'sinatra/base'
 
 class Sinatra::Request
@@ -93,8 +94,16 @@ class TestApp < Sinatra::Base
       "hi #{name}"
     end
 
+    def current_session_user
+      nil
+    end
+
     def await_tick
       `Promise.resolve(nil)`.__await__
+    end
+
+    def seq_db
+      Sequel.connect(adapter: :d1, d1: env['cloudflare.DB'])
     end
   end
 
@@ -142,6 +151,45 @@ class TestApp < Sinatra::Base
   get '/async/halt' do
     await_tick
     halt 418, 'teapot'
+  end
+
+   get '/async/json' do
+    await_tick
+    content_type 'application/json'
+    { ok: true, kind: 'async-json' }.to_json
+  end
+
+  get '/async/erb' do
+    await_tick
+    @greeting = 'hello-async-erb'
+    erb :test_template
+  end
+
+  get '/async/layout' do
+    await_tick
+    @title = 'async-layout'
+    @greeting = 'hello-async-layout'
+    @content = erb :test_template
+    erb :layout
+  end
+
+  get '/async/raw-promise' do
+    PromiseV2.value('raw-promise-ok')
+  end
+
+  get '/async/native-promise' do
+    `Promise.resolve("native-promise-ok")`
+  end
+
+  get '/async/sequel-json' do
+    content_type 'application/json'
+    { todos: seq_db[:todos].order(:id).all.__await__ }.to_json
+  end
+
+  get '/async/sequel-erb' do
+    @greeting = 'hello-sequel-erb'
+    @todos = seq_db[:todos].order(:id).all.__await__
+    erb :test_template
   end
 
   get '/pass1' do
@@ -247,6 +295,17 @@ def call_worker_app(method, path, body: '')
   [status, location, text]
 end
 
+def call_worker_app_with_env(method, path, js_env, body: '')
+  Rack::Handler::CloudflareWorkers.run(TestApp)
+  url = "https://example.test#{path}"
+  js_req = `new Request(#{url}, { method: #{method}, body: #{body} })`
+  js_resp = Rack::Handler::CloudflareWorkers.call(js_req, js_env, `({ waitUntil: function() {} })`, body).__await__
+  status = `#{js_resp}.status`
+  location = `#{js_resp}.headers.get('location') || #{js_resp}.headers.get('Location')`
+  text = `#{js_resp}.text()`.__await__
+  [status, location, text]
+end
+
 def call_worker_app_for(app, method, path, body: '')
   Rack::Handler::CloudflareWorkers.run(app)
   url = "https://example.test#{path}"
@@ -285,6 +344,46 @@ SmokeTest.assert("async redirect returns 302") { call_worker_app('GET', '/async/
 SmokeTest.assert("async redirect sets Location") { call_worker_app('GET', '/async/redirect').__await__[1].to_s.include?('/dest') }
 SmokeTest.assert("async halt returns 418") { call_worker_app('GET', '/async/halt').__await__[0] == 418 }
 SmokeTest.assert("async halt body is teapot") { call_worker_app('GET', '/async/halt').__await__[2] == 'teapot' }
+SmokeTest.assert("async json route returns JSON body after await") {
+  status, _, text = call_worker_app('GET', '/async/json').__await__
+  status == 200 && text.include?('"kind":"async-json"')
+}
+SmokeTest.assert("async erb route renders template after await") {
+  status, _, text = call_worker_app('GET', '/async/erb').__await__
+  status == 200 && text.include?('greeting=hello-async-erb')
+}
+SmokeTest.assert("async layout route renders nested erb after await") {
+  status, _, text = call_worker_app('GET', '/async/layout').__await__
+  status == 200 && text.include?('hello-async-layout') && text.include?('<!DOCTYPE html>')
+}
+SmokeTest.assert("async route returning raw Promise resolves into body") {
+  status, _, text = call_worker_app('GET', '/async/raw-promise').__await__
+  status == 200 && text == 'raw-promise-ok'
+}
+SmokeTest.assert("async route returning native JS Promise resolves into body") {
+  status, _, text = call_worker_app('GET', '/async/native-promise').__await__
+  status == 200 && text == 'native-promise-ok'
+}
+fake_d1_env = `({
+  DB: {
+    prepare: function(sql) {
+      return {
+        bind: function() { return this; },
+        all: function() { return Promise.resolve({ results: [{ id: 1, text: 'a', completed: false }] }); },
+        first: function() { return Promise.resolve({ id: 1, text: 'a', completed: false }); },
+        run: function() { return Promise.resolve({ meta: { changes: 1, last_row_id: 1 } }); }
+      };
+    }
+  }
+})`
+SmokeTest.assert("Sequel JSON route returns DB rows through worker path") {
+  status, _, text = call_worker_app_with_env('GET', '/async/sequel-json', fake_d1_env).__await__
+  status == 200 && text.include?('"todos"') && text.include?('"text":"a"')
+}
+SmokeTest.assert("Sequel ERB route renders after DB await through worker path") {
+  status, _, text = call_worker_app_with_env('GET', '/async/sequel-erb', fake_d1_env).__await__
+  status == 200 && text.include?('greeting=hello-sequel-erb')
+}
 SmokeTest.assert("promise-returning dispatch! preserves body instead of emptying response") {
   status, text = call_worker_app_for(AsyncDispatchApp, 'GET', '/').__await__
   status == 200 && text == 'async-dispatch-ok'

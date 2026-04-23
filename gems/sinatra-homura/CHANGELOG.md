@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.8 (2026-04-23)
+
+- Keep `wrap_async_halt_result`'s Promise `.catch(...)` wrapper as a real
+  expression so Opal returns the wrapped Promise instead of `undefined`,
+  fixing empty bodies for `# await: true` Sinatra routes that awaited D1 /
+  native JS Promises under `wrangler dev`.
+
 ## 0.2.7 (2026-04-23)
 
 - Guard `apply_invoke_result` against raw JS `undefined` and prioritize

@@ -334,17 +334,10 @@ module Sinatra
 
       halt_class = ::Sinatra::HaltResponse
       halt_tag = :halt
-      `#{res}.catch(function(error) {
-        try {
-          if (error != null && typeof error['$is_a?'] === 'function' && error['$is_a?'](#{halt_class})) {
-            return error['$payload']();
-          }
-          if (error != null && typeof error['$tag'] === 'function' && typeof error['$value'] === 'function' && error['$tag']() === #{halt_tag}) {
-            return error['$value']();
-          }
-        } catch (_) {}
-        throw error;
-      })`
+      # MUST keep the backtick on ONE LINE — Opal compiles a multi-line
+      # x-string as a raw statement, not an expression, so the method
+      # would otherwise return `undefined`.
+      `#{res}.catch(function(error) { try { if (error != null && typeof error['$is_a?'] === 'function' && error['$is_a?'](#{halt_class})) { return error['$payload'](); } if (error != null && typeof error['$tag'] === 'function' && typeof error['$value'] === 'function' && error['$tag']() === #{halt_tag}) { return error['$value'](); } } catch (_) {} throw error; })`
     end
     private :wrap_async_halt_result
 

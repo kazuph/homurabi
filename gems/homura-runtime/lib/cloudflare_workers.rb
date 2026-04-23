@@ -313,6 +313,18 @@ module Rack
             return `new Response(#{js_stream}, { status: #{status.to_i}, headers: #{js_headers} })`
           end
 
+          if body.is_a?(::Cloudflare::EmbeddedBinaryBody) || (body.respond_to?(:first) && body.first.is_a?(::Cloudflare::EmbeddedBinaryBody))
+            bin = body.is_a?(::Cloudflare::EmbeddedBinaryBody) ? body : body.first
+            js_stream = bin.stream
+            ct = bin.content_type
+            cc = bin.cache_control
+            js_headers = `({})`
+            headers.each { |k, v| ks = k.to_s; vs = v.to_s; `#{js_headers}[#{ks}] = #{vs}` }
+            `#{js_headers}['content-type'] = #{ct}` if ct
+            `#{js_headers}['cache-control'] = #{cc}` if cc
+            return `new Response(#{js_stream}, { status: #{status.to_i}, headers: #{js_headers} })`
+          end
+
           # Phase 10 — Workers AI streaming: a Cloudflare::AI::Stream wraps
           # a JS ReadableStream<Uint8Array> emitting SSE-formatted bytes
           # ("data: {json}\n\n"). Pass it straight through so the client
@@ -528,6 +540,35 @@ module Cloudflare
     def each; end
 
     def close; end
+  end
+
+  # EmbeddedBinaryBody carries a base64-encoded asset payload produced at
+  # build time by `compile-assets`, then reconstructs a Uint8Array in the
+  # Worker before building the Response stream.
+  class EmbeddedBinaryBody
+    attr_reader :body_base64, :content_type, :cache_control
+
+    def initialize(body_base64, content_type = 'application/octet-stream', cache_control = nil)
+      @body_base64 = body_base64 || ''
+      @content_type = content_type
+      @cache_control = cache_control
+    end
+
+    def each; end
+
+    def close; end
+
+    def raw_response(status, headers = {})
+      js_headers = `({})`
+      headers.each { |k, v| ks = k.to_s; vs = v.to_s; `#{js_headers}[#{ks}] = #{vs}` }
+      `#{js_headers}['content-type'] = #{@content_type}` if @content_type
+      `#{js_headers}['cache-control'] = #{@cache_control}` if @cache_control
+      RawResponse.new(`new Response(#{stream}, { status: #{status.to_i}, headers: #{js_headers} })`)
+    end
+
+    def stream
+      `(function(b64) { return new ReadableStream({ start(controller) { var bin = globalThis.atob(b64); var len = bin.length; var out = new Uint8Array(len); for (var i = 0; i < len; i++) { out[i] = bin.charCodeAt(i) & 0xff; } controller.enqueue(out); controller.close(); } }); })(#{@body_base64})`
+    end
   end
 
   # NOTE: the single-line backtick `...` form is used below instead of the

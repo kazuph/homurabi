@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.2 (2026-04-23)
+
+- Fix binary static asset embedding so image responses preserve exact bytes on
+  Workers instead of being mangled through text encoding.
+- Add regression coverage for binary-vs-text compile-assets output.
+- Convert shipped mascot/icon assets to real PNG payloads so their bytes match
+  their `.png` filenames and `image/png` content type.
+
 ## 0.1.1 (2026-04-23)
 
 - Fix `cloudflare-workers-build --standalone` and `exe/auto-await` to resolve only

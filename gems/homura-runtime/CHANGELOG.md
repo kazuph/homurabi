@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.4 (2026-04-23)
+
+- Teach the precompiled ERB runtime to support Sinatra-style layout blocks and
+  `<%= yield %>` in layout templates.
+- Keep legacy `@content` / `@docs_inner` layouts working as compatibility
+  fallbacks while apps migrate to the least-surprise Sinatra style.
+
 ## 0.1.3 (2026-04-23)
 
 - Fix binary static asset embedding so image responses preserve exact bytes on

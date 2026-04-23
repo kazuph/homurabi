@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.2 (2026-04-23)
+
+- Make `cloudflare-workers-erb-compile` support Sinatra-style layout blocks and
+  `<%= yield %>` in precompiled layouts.
+- Require `homura-runtime >= 0.1.4` so runtime and app-side ERB compilers stay
+  in sync on the same least-surprise layout behavior.
+
 ## 0.1.1 (2026-04-23)
 
 - Package the vendored Sinatra / Rack / Mustermann / JWT sources required for

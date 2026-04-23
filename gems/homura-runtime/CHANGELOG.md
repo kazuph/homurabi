@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.4 (2026-04-23)
+
+- Guard the Rack body close hook against raw JS `undefined` so Workers request teardown
+  does not crash when a response body is absent or non-Ruby.
+
 ## 0.2.3 (2026-04-23)
 
 - Bump the exact `opal-homura` dependency to `1.8.3.rc1.2` for the release retry after the

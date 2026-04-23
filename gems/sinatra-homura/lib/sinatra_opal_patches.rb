@@ -368,7 +368,7 @@ module Sinatra
       def force_encoding(data, encoding = default_encoding)
         return if data == settings || data.is_a?(Tempfile)
 
-        if data.respond_to?(:force_encoding)
+        if data && data.respond_to?(:force_encoding)
           data.force_encoding(encoding)
         elsif data.respond_to?(:each_value)
           data.each_value { |v| force_encoding(v, encoding) }
@@ -379,6 +379,41 @@ module Sinatra
         data
       end
     end
+
+    # -------------------------------------------------------------
+    # 12.5. Base#dispatch! (upstream base.rb:1183)
+    #
+    # Some Rack param parsing paths can leak raw JS `undefined` values
+    # into `@request.params` under Opal. Sending Ruby messages to that
+    # sentinel crashes before Sinatra gets to route dispatch. Short-
+    # circuit on falsy values so sync/async apps both survive these
+    # malformed param entries.
+    # -------------------------------------------------------------
+    def dispatch!
+      @params.merge!(@request.params).each do |key, val|
+        next unless val && val.respond_to?(:force_encoding)
+
+        val = val.dup if val.frozen?
+        @params[key] = force_encoding(val)
+      end
+
+      invoke do
+        static! if settings.static? && (request.get? || request.head?)
+        filter! :before do
+          @pinned_response = !response['content-type'].nil?
+        end
+        route!
+      end
+    rescue ::Exception => e
+      invoke { handle_exception!(e) }
+    ensure
+      begin
+        filter! :after unless env['sinatra.static_file']
+      rescue ::Exception => e
+        invoke { handle_exception!(e) } unless @env['sinatra.error']
+      end
+    end
+    private :dispatch!
   end
 
   # ---------------------------------------------------------------

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.5 (2026-04-23)
+
+- Make `Sinatra::Base#dispatch!` skip raw JS `undefined` param values before calling
+  `respond_to?`, fixing `# await: true` apps that crashed during request dispatch under
+  `wrangler dev`.
+
 ## 0.2.4 (2026-04-23)
 
 - Bump the exact `opal-homura` dependency to `1.8.3.rc1.2` for the release retry after the

@@ -25,6 +25,19 @@
 require 'json'
 require 'sinatra/base'
 
+class Sinatra::Request
+  alias __homura_smoke_original_params params
+
+  def params
+    values = __homura_smoke_original_params
+    return values unless env['HTTP_X_HOMURA_UNDEFINED_PARAM'] == '1'
+
+    values = values.dup
+    values['undefined_param'] = `undefined`
+    values
+  end
+end
+
 # =====================================================================
 # Test harness
 # =====================================================================
@@ -228,6 +241,7 @@ SmokeTest.assert("GET / returns 200") { call_app('GET', '/')[0] == 200 }
 SmokeTest.assert("GET / body includes app_name") { call_app('GET', '/')[2].include?('SmokeTestApp') }
 SmokeTest.assert("GET /hello/kazu matches :name") { call_app('GET', '/hello/kazu')[2] == 'hello:kazu' }
 SmokeTest.assert("GET /items/42 exposes params['id']") { call_app('GET', '/items/42')[2] == 'item:42' }
+SmokeTest.assert("dispatch survives undefined values in request params") { call_app('GET', '/', headers: { 'X-HOMURA-UNDEFINED-PARAM' => '1' })[0] == 200 }
 SmokeTest.assert("GET /nonexistent returns 404") { call_app('GET', '/nonexistent')[0] == 404 }
 
 $stdout.puts ""

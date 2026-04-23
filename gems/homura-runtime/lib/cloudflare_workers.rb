@@ -147,7 +147,7 @@ module Rack
         status, headers, body = @app.call(env)
         build_js_response(status, headers, body)
       ensure
-        body.close if body.respond_to?(:close) && body
+        body.close if body && body.respond_to?(:close)
       end
 
       class << self

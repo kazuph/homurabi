@@ -59,12 +59,9 @@ post '/api/chat/messages' do
             primary
           end
 
-  # Helper methods that internally call `__await__` on a binding
-  # (KV / D1 / AI) compile to async JS functions, so each helper
-  # call must be `__await__`'d at the call site to unwrap the
-  # returned Promise. Without the explicit await, `history` would
-  # be a PromiseV2 and downstream `JSON.parse` / Array iteration
-  # would crash with "undefined method `each` for PromiseV2".
+  # Auto-await knows this helper and the standard Cloudflare binding
+  # wrappers, so the source stays sync-shaped here even though the
+  # generated JS still awaits under the hood.
   history = load_chat_history(session_id)
   messages = build_ai_messages(history, user_text)
 

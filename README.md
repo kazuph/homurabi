@@ -54,17 +54,22 @@ CHAT_MODELS = {
 post '/api/chat/messages' do
   content_type 'application/json'
   # ... inline JWT verify (see source) ...
-  history = load_chat_history(session_id).__await__
+  history = load_chat_history(session_id)
   result  = Cloudflare::AI.run(
               model,
               { messages: build_ai_messages(history, user_text), max_tokens: 1024 },
               binding: env['cloudflare.AI']
-            ).__await__
+            )
   reply_text = App.extract_ai_text(result).strip
-  save_chat_history(session_id, history + [...]).__await__
+  save_chat_history(session_id, history + [...])
   { 'ok' => true, 'reply' => reply_text, 'model' => model, 'history_len' => ... }.to_json
 end
 ```
+
+Standard binding/helper calls stay sync-shaped in app source: the build step auto-inserts
+`.__await__` for registered async paths such as `db.execute`, `kv.get`,
+`Cloudflare::AI.run`, and repo-registered helpers like `load_chat_history`.
+Manual `.__await__` is mainly an escape hatch for raw Promise work outside those patterns.
 
 ```text
 # Live capture (wrangler dev → real Workers AI; full log: .artifacts/phase10-ai/api-evidence.txt)

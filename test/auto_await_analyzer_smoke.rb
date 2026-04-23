@@ -59,6 +59,8 @@ CloudflareWorkers::AsyncRegistry.register_async_source do
   helper_factory :kv,  'Cloudflare::KVNamespace'
   async_method 'Cloudflare::D1Database', :execute
   async_method 'Cloudflare::KVNamespace', :get
+  async_method 'Cloudflare::AI', :run
+  async_helper :load_chat_history, 'Homura::ChatHistoryHelpers'
 end
 
 # ------------------------------------------------------------------
@@ -147,6 +149,41 @@ SmokeTest.assert("env['cloudflare.KV'].get is awaited") do
     end
   RUBY
   analyze(source).include?("env['cloudflare.KV'].get('key')")
+end
+
+# 7. Helper body using helper_factory result
+SmokeTest.assert("helper method body using kv.get is awaited") do
+  source = <<~RUBY
+    helpers do
+      def load_todos
+        raw = kv.get('todos')
+        raw ? JSON.parse(raw) : []
+      end
+    end
+  RUBY
+  analyze(source).include?("kv.get('todos')")
+end
+
+# 8. async_helper call sites stay sync-shaped in source
+SmokeTest.assert("async_helper load_chat_history is awaited") do
+  source = <<~RUBY
+    post '/api/chat/messages' do
+      history = load_chat_history(session_id)
+      history.size
+    end
+  RUBY
+  analyze(source).include?('load_chat_history(session_id)')
+end
+
+# 9. Async class methods like Cloudflare::AI.run are awaited
+SmokeTest.assert("Cloudflare::AI.run is awaited") do
+  source = <<~RUBY
+    post '/ai' do
+      result = Cloudflare::AI.run(model, { messages: [] }, binding: env['cloudflare.AI'])
+      result.to_s
+    end
+  RUBY
+  analyze(source).include?("Cloudflare::AI.run(model, { messages: [] }, binding: env['cloudflare.AI'])")
 end
 
 SmokeTest.summary

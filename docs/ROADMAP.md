@@ -76,8 +76,10 @@ homura の価値は「Cloudflare Workers で Ruby を動かす」に加えて
    │          Migration は Ruby DSL → SQL 書き出し → `wrangler d1 migrations apply`
    ↓
 🚧 Phase 12.5 — Fiber ベース透過 await（「Ruby らしさ」回復パック）
-   │          `.__await__` をユーザーコードから消す。Fiber で Promise を sync-shaped
-   │          に見せる。`db[:users].all`（`.__await__` なし）が動くことが DoD
+   │          標準 binding/helper の call site は auto-await でかなり隠せたので、
+   │          残る raw Promise 境界も含めて `.__await__` をユーザーコードから消す。
+   │          Fiber で Promise を sync-shaped に見せる。`db[:users].all`
+   │          （`.__await__` なし）が build-time registry に頼らず動くことが DoD
    │          Phase 12 マスター指摘「Ruby らしくない点の筆頭」の潰し
    │          ※ Phase 13 前に着手。Sinatra 載せ替えの移動部分を増やす前に
    │             async semantics を先に安定化させる

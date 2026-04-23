@@ -20,9 +20,10 @@
 #      style entry point and never sees a Cloudflare-specific symbol.
 #
 #   3. Cloudflare::D1Database / KVNamespace / R2Bucket — tiny Ruby wrappers
-#      around the JS bindings. They expose the binding methods as regular
-#      Ruby method calls returning native JS Promises, which the user
-#      routes can `.__await__` inside a `# await: true` block.
+#      around the JS bindings. At the raw runtime layer they still return
+#      Promises, but homura's build-time auto-await pass rewrites the
+#      common Sinatra-facing call sites (`db.execute`, `kv.get`, etc.) so
+#      app code usually stays sync-shaped.
 #
 # Note: Opal Strings are immutable (they map to JS Strings), so this file
 # uses reassignment (`@buffer = @buffer + str`) instead of `<<` mutation.
@@ -209,8 +210,10 @@ module Rack
 
           # Expose D1 / KV / R2 bindings as plain Ruby wrapper objects.
           # The user Sinatra routes reach them via
-          # `env['cloudflare.DB']` / `.KV` / `.BUCKET`, call normal-looking
-          # Ruby methods on them, and `.__await__` the resulting JS Promise.
+          # `env['cloudflare.DB']` / `.KV` / `.BUCKET` and call ordinary
+          # Ruby methods on them. Under the hood those methods are async,
+          # but homura's auto-await build step inserts `.__await__` for the
+          # common binding/helper patterns so app source usually does not.
           js_db = `#{js_env} && #{js_env}.DB`
           js_kv = `#{js_env} && #{js_env}.KV`
           js_r2 = `#{js_env} && #{js_env}.BUCKET`
@@ -603,8 +606,10 @@ module Cloudflare
 
     # ---- sqlite3-ruby compatible high-level API ----------------------
 
-    # Execute a SQL statement with optional bind parameters and return
-    # all result rows as an Array of Hashes.
+    # Execute a SQL statement with optional bind parameters.
+    # Returns a JS Promise resolving to an Array of Hashes; the build-time
+    # auto-await pass rewrites the usual Sinatra call sites so app code can
+    # stay `db.execute(...)` instead of spelling `.__await__`.
     #
     #   db.execute("SELECT * FROM users")                           → Array<Hash>
     #   db.execute("SELECT * FROM users WHERE id = ?", [1])         → Array<Hash>
@@ -616,6 +621,7 @@ module Cloudflare
     end
 
     # Execute and return only the first row (or nil).
+    # Returns a JS Promise resolving to a Hash or nil.
     #
     #   db.get_first_row("SELECT * FROM users WHERE id = ?", [1])  → Hash or nil
     def get_first_row(sql, bind_params = [])
@@ -626,6 +632,7 @@ module Cloudflare
 
     # Execute a write statement (INSERT / UPDATE / DELETE) and return
     # a metadata Hash with `changes`, `last_row_id`, `duration`, etc.
+    # Returns a JS Promise resolving to that metadata Hash.
     #
     #   meta = db.execute_insert("INSERT INTO users (name) VALUES (?)", ["alice"])
     #   meta['last_row_id']  # → 7
@@ -636,7 +643,7 @@ module Cloudflare
     end
 
     # Execute one or more raw SQL statements separated by semicolons.
-    # Useful for schema migrations. Returns the D1 exec result.
+    # Useful for schema migrations. Returns the raw async D1 exec result.
     def execute_batch(sql)
       exec(sql)
     end
@@ -697,6 +704,7 @@ module Cloudflare
     end
 
     # KV#get returns a JS Promise resolving to a String or nil.
+    # In normal Sinatra app code, auto-await usually hides that Promise.
     def get(key)
       js_kv = @js
       err_cls = Cloudflare::KVError
@@ -705,7 +713,8 @@ module Cloudflare
 
     # Put a value. `expiration_ttl:` (seconds) maps to the Workers KV
     # `expirationTtl` option so callers can set TTLs without reaching
-    # for backticks. Returns a JS Promise.
+    # for backticks. Returns a JS Promise; common route/helper call sites
+    # are auto-awaited during the build.
     def put(key, value, expiration_ttl: nil)
       js_kv = @js
       err_cls = Cloudflare::KVError

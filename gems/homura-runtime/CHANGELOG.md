@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.2 (2026-04-23)
+
+- Package the runtime's Opal compile-time vendor shims (`digest`, `zlib`,
+  `tempfile`, `tilt`, `rubygems/version`) inside the gem.
+- Teach `cloudflare-workers-build --standalone` to add packaged gem `vendor/`
+  directories to the Opal load path, so published gems no longer depend on the
+  monorepo root `vendor/`.
+
 ## 0.1.1 (2026-04-23)
 
 - Fix `cloudflare-workers-build --standalone` and `exe/auto-await` to resolve only

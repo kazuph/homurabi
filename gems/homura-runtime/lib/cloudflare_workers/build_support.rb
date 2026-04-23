@@ -12,6 +12,13 @@ module CloudflareWorkers
         loaded_specs[name]
       end
 
+      def gem_root(name, loaded_specs: Gem.loaded_specs)
+        spec = loaded_spec(name, loaded_specs: loaded_specs)
+        return spec.full_gem_path if spec
+
+        raise("cloudflare-workers-build: gem #{name} not loaded; use bundle exec from app root")
+      end
+
       def runtime_root(current_file:, loaded_specs: Gem.loaded_specs)
         spec = loaded_spec(RUNTIME_GEM_NAME, loaded_specs: loaded_specs)
         return Pathname(spec.full_gem_path) if spec
@@ -20,10 +27,14 @@ module CloudflareWorkers
       end
 
       def gem_lib(name, loaded_specs: Gem.loaded_specs)
-        spec = loaded_spec(name, loaded_specs: loaded_specs)
-        return File.join(spec.full_gem_path, 'lib') if spec
+        File.join(gem_root(name, loaded_specs: loaded_specs), 'lib')
+      end
 
-        raise("cloudflare-workers-build: gem #{name} not loaded; use bundle exec from app root")
+      def gem_vendor(name, loaded_specs: Gem.loaded_specs)
+        vendor = File.join(gem_root(name, loaded_specs: loaded_specs), 'vendor')
+        return vendor if Dir.exist?(vendor)
+
+        nil
       end
 
       def vendor_from_gemfile(project_root)

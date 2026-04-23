@@ -28,7 +28,7 @@ Gem::Specification.new do |spec|
   # Consumer-facing snippets (e.g. templates/wrangler.toml.example) ship with the gem —
   # `templates/**/*` must remain in this glob so rubygems packaging does not omit them.
   spec.files = Dir.chdir(__dir__) do
-    Dir['lib/**/*', 'runtime/**/*', 'exe/**/*', 'bin/*', 'docs/**/*', 'templates/**/*', 'README.md', 'CHANGELOG.md'].select { |f| File.file?(f) }
+    Dir['lib/**/*', 'vendor/**/*', 'runtime/**/*', 'exe/**/*', 'bin/*', 'docs/**/*', 'templates/**/*', 'README.md', 'CHANGELOG.md'].select { |f| File.file?(f) }
   end
   spec.require_paths = ['lib']
   spec.bindir = 'bin'

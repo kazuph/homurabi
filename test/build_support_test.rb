@@ -47,6 +47,26 @@ end
 passed += 1 if ok
 failed += 1 unless ok
 
+ok = assert('resolves packaged homura-runtime vendor path') do
+  Dir.mktmpdir do |dir|
+    specs = { 'homura-runtime' => FakeSpec.new(dir) }
+    FileUtils.mkdir_p(File.join(dir, 'vendor'))
+    vendor = CloudflareWorkers::BuildSupport.gem_vendor(runtime_name, loaded_specs: specs)
+    expected = File.join(dir, 'vendor')
+    raise "expected #{expected}, got #{vendor}" unless vendor == expected
+  end
+end
+passed += 1 if ok
+failed += 1 unless ok
+
+ok = assert('returns nil when packaged vendor path is absent') do
+  specs = { 'sinatra-homura' => FakeSpec.new('/tmp/new-sinatra') }
+  vendor = CloudflareWorkers::BuildSupport.gem_vendor(sinatra_name, loaded_specs: specs)
+  raise "expected nil, got #{vendor.inspect}" unless vendor.nil?
+end
+passed += 1 if ok
+failed += 1 unless ok
+
 ok = assert('matches homura-runtime path dependency in Gemfile') do
   Dir.mktmpdir do |dir|
     FileUtils.mkdir_p(File.expand_path('../vendor', dir))
@@ -55,6 +75,27 @@ ok = assert('matches homura-runtime path dependency in Gemfile') do
     expected = File.expand_path('../vendor', dir)
     raise "expected #{expected}, got #{vendor}" unless vendor&.to_s == expected
   end
+end
+passed += 1 if ok
+failed += 1 unless ok
+
+ok = assert('homura-runtime gemspec packages vendor shims') do
+  spec = Dir.chdir(File.expand_path('../gems/homura-runtime', __dir__)) do
+    Gem::Specification.load('homura-runtime.gemspec')
+  end
+  raise 'missing vendor/digest.rb' unless spec.files.include?('vendor/digest.rb')
+  raise 'missing vendor/cgi/escape.rb' unless spec.files.include?('vendor/cgi/escape.rb')
+  raise 'missing vendor/rubygems/version.rb' unless spec.files.include?('vendor/rubygems/version.rb')
+end
+passed += 1 if ok
+failed += 1 unless ok
+
+ok = assert('sinatra-homura gemspec packages vendored sinatra sources') do
+  spec = Dir.chdir(File.expand_path('../gems/sinatra-homura', __dir__)) do
+    Gem::Specification.load('sinatra-homura.gemspec')
+  end
+  raise 'missing vendor/sinatra/base.rb' unless spec.files.include?('vendor/sinatra/base.rb')
+  raise 'missing vendor/jwt.rb' unless spec.files.include?('vendor/jwt.rb')
 end
 passed += 1 if ok
 failed += 1 unless ok

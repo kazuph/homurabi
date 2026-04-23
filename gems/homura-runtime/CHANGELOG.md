@@ -2,10 +2,9 @@
 
 ## 0.1.1 (2026-04-23)
 
-- Fix `cloudflare-workers-build --standalone` and `exe/auto-await` to resolve the
-  published gem names `homura-runtime` / `sinatra-homura`, while still accepting
-  the legacy internal gem names as fallbacks.
-- Add regression coverage for gem alias resolution and Gemfile path detection.
+- Fix `cloudflare-workers-build --standalone` and `exe/auto-await` to resolve only
+  the published gem names `homura-runtime` / `sinatra-homura`.
+- Add regression coverage for gem name resolution and Gemfile path detection.
 
 ## 0.1.0 (2026-04-20)
 

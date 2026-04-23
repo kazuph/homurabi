@@ -116,8 +116,8 @@ def run_opal_standalone!(root, opal_input, opal_output, with_db:)
   load_paths << hv.to_s if hv
   load_paths += [
     'build/auto_await/app', 'app',
-    CloudflareWorkersBuild.gem_lib(*CloudflareWorkers::BuildSupport::RUNTIME_GEM_NAMES),
-    CloudflareWorkersBuild.gem_lib(*CloudflareWorkers::BuildSupport::SINATRA_GEM_NAMES)
+    CloudflareWorkersBuild.gem_lib(CloudflareWorkers::BuildSupport::RUNTIME_GEM_NAME),
+    CloudflareWorkersBuild.gem_lib(CloudflareWorkers::BuildSupport::SINATRA_GEM_NAME)
   ]
   load_paths << CloudflareWorkersBuild.gem_lib('sequel-d1') if with_db
   load_paths << 'vendor' if root.join('vendor').directory?

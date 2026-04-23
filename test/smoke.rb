@@ -33,8 +33,10 @@ class Sinatra::Request
     return values unless env['HTTP_X_HOMURA_UNDEFINED_PARAM'] == '1'
 
     values = values.dup
-    values['undefined_param'] = `undefined`
-    values['nested_undefined_param'] = { 'inner' => `undefined` }
+    `#{values}.set('undefined_param', undefined)`
+    nested = {}
+    `#{nested}.set('inner', undefined)`
+    values['nested_undefined_param'] = nested
     values
   end
 end

@@ -274,6 +274,13 @@ module Sinatra
 
     def apply_invoke_result(res)
       res = [res] if (Integer === res) || (String === res)
+      return if `#{res} === null || #{res} === undefined || #{res} === Opal.nil`
+
+      if defined?(::Cloudflare) && ::Cloudflare.js_promise?(res)
+        body([res])
+        return
+      end
+
       if (Array === res) && (Integer === res.first)
         res = res.dup
         status(res.shift)
@@ -281,8 +288,6 @@ module Sinatra
         headers(*res)
       elsif res.respond_to?(:each)
         body(res)
-      elsif defined?(::Cloudflare) && ::Cloudflare.js_promise?(res)
-        body([res])
       end
     end
     private :apply_invoke_result
@@ -363,7 +368,8 @@ module Sinatra
       # Upstream calls `.force_encoding(encoding).encode!`. Opal's
       # String#encode! raises NotImplementedError (JS Strings are
       # immutable UTF-16). force_encoding alone is a no-op that
-      # returns the same String object. Drop encode!.
+      # returns the same String object. Drop encode! and guard raw JS
+      # null/undefined values before sending Ruby messages.
       # -----------------------------------------------------------
       def force_encoding(data, encoding = default_encoding)
         return if data == settings || data.is_a?(Tempfile)

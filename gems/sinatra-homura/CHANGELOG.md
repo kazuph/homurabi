@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.7 (2026-04-23)
+
+- Guard `apply_invoke_result` against raw JS `undefined` and prioritize
+  Promise handling before `respond_to?(:each)`, fixing the remaining
+  `$respond_to?` crash path seen by real `# await: true` apps under
+  `wrangler dev`.
+
 ## 0.2.6 (2026-04-23)
 
 - Guard nested param values against raw JS `undefined` during `force_encoding`,

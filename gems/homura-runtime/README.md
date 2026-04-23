@@ -14,7 +14,7 @@ Core Ruby + Module Worker glue for [Opal](https://opalrb.com/) on [Cloudflare Wo
 
 ## Quick start (homura monorepo)
 
-1. `Gemfile`: `gem 'homura-runtime', path: 'gems/homura-runtime'` and `gem 'opal-homura', '= 1.8.3.rc1', require: 'opal'` (path or exact pin).
+1. `Gemfile`: `gem 'homura-runtime', path: 'gems/homura-runtime'` and `gem 'opal-homura', '= 1.8.3.rc1.1', require: 'opal'` (path or exact pin).
 2. `bundle exec homura build` — writes `build/hello.no-exit.mjs` and `build/worker.entrypoint.mjs`.
 3. `wrangler.toml`: `main = "build/worker.entrypoint.mjs"`, `compatibility_flags = ["nodejs_compat"]`.
 
@@ -25,7 +25,7 @@ Core Ruby + Module Worker glue for [Opal](https://opalrb.com/) on [Cloudflare Wo
 | Ruby       | 3.4.x            |
 | Node       | ≥ 20             |
 | Wrangler   | ^3.99            |
-| Opal       | = 1.8.3.rc1      |
+| Opal       | = 1.8.3.rc1.1    |
 
 ## Wrangler config
 

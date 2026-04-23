@@ -75,6 +75,10 @@ class TestApp < Sinatra::Base
     def greet(name)
       "hi #{name}"
     end
+
+    def await_tick
+      `Promise.resolve(nil)`.__await__
+    end
   end
 
   before { @req_id = rand(9999) }
@@ -86,6 +90,10 @@ class TestApp < Sinatra::Base
 
   get '/hello/:name' do
     "hello:#{params['name']}"
+  end
+
+  get '/items/:id' do
+    "item:#{params['id']}"
   end
 
   get '/helper' do
@@ -102,6 +110,21 @@ class TestApp < Sinatra::Base
 
   get '/halt' do
     halt 403, 'forbidden'
+  end
+
+  get '/async/items/:id' do
+    await_tick
+    "async-item:#{params['id']}"
+  end
+
+  get '/async/redirect' do
+    await_tick
+    redirect '/dest'
+  end
+
+  get '/async/halt' do
+    await_tick
+    halt 418, 'teapot'
   end
 
   get '/pass1' do
@@ -182,6 +205,17 @@ def call_app(method, path, body: '', headers: {})
   [status, hdrs, body_str]
 end
 
+def call_worker_app(method, path, body: '')
+  Rack::Handler::CloudflareWorkers.run(TestApp)
+  url = "https://example.test#{path}"
+  js_req = `new Request(#{url}, { method: #{method}, body: #{body} })`
+  js_resp = Rack::Handler::CloudflareWorkers.call(js_req, `({})`, `({ waitUntil: function() {} })`, body).__await__
+  status = `#{js_resp}.status`
+  location = `#{js_resp}.headers.get('location') || #{js_resp}.headers.get('Location')`
+  text = `#{js_resp}.text()`.__await__
+  [status, location, text]
+end
+
 # =====================================================================
 # Tests
 # =====================================================================
@@ -193,6 +227,7 @@ $stdout.puts "--- Route matching ---"
 SmokeTest.assert("GET / returns 200") { call_app('GET', '/')[0] == 200 }
 SmokeTest.assert("GET / body includes app_name") { call_app('GET', '/')[2].include?('SmokeTestApp') }
 SmokeTest.assert("GET /hello/kazu matches :name") { call_app('GET', '/hello/kazu')[2] == 'hello:kazu' }
+SmokeTest.assert("GET /items/42 exposes params['id']") { call_app('GET', '/items/42')[2] == 'item:42' }
 SmokeTest.assert("GET /nonexistent returns 404") { call_app('GET', '/nonexistent')[0] == 404 }
 
 $stdout.puts ""
@@ -203,6 +238,11 @@ SmokeTest.assert("redirect returns 302") { call_app('GET', '/redirect')[0] == 30
 SmokeTest.assert("redirect sets Location") { call_app('GET', '/redirect')[1]['location'].to_s.include?('/dest') }
 SmokeTest.assert("halt returns 403") { call_app('GET', '/halt')[0] == 403 }
 SmokeTest.assert("halt body is 'forbidden'") { call_app('GET', '/halt')[2] == 'forbidden' }
+SmokeTest.assert("async params['id'] survives await boundary") { call_worker_app('GET', '/async/items/42').__await__[2] == 'async-item:42' }
+SmokeTest.assert("async redirect returns 302") { call_worker_app('GET', '/async/redirect').__await__[0] == 302 }
+SmokeTest.assert("async redirect sets Location") { call_worker_app('GET', '/async/redirect').__await__[1].to_s.include?('/dest') }
+SmokeTest.assert("async halt returns 418") { call_worker_app('GET', '/async/halt').__await__[0] == 418 }
+SmokeTest.assert("async halt body is teapot") { call_worker_app('GET', '/async/halt').__await__[2] == 'teapot' }
 SmokeTest.assert("pass falls through") { call_app('GET', '/pass1')[2] == 'second-route' }
 SmokeTest.assert("content_type sets header") { call_app('GET', '/content_type_test')[1]['content-type'].to_s.include?('application/json') }
 

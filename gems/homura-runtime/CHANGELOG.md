@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.2 (2026-04-23)
+
+- Bump the exact `opal-homura` dependency to `1.8.3.rc1.1` so published gems pick up the corrected author metadata.
+- Preserve async Sinatra responses that resolve to `[status, body]` or `[status, headers, body]`
+  so `# await: true` routes can still express `halt` / `redirect` outcomes after awaiting.
+
 ## 0.2.1 (2026-04-23)
 
 - Correct the published author metadata to "Kazuhiro Homma".

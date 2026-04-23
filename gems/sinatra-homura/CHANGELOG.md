@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.3 (2026-04-23)
+
+- Bump the exact `opal-homura` dependency to `1.8.3.rc1.1` so published gems pick up the corrected author metadata.
+- Make explicit `halt` work across Opal async boundaries by carrying a materialized Rack tuple
+  through awaited routes, which also restores conventional async `redirect` behavior.
+- Add worker-path regression coverage for `params['id']`, async `redirect`, and async `halt`.
+
 ## 0.2.2 (2026-04-23)
 
 - Correct the published author metadata to "Kazuhiro Homma".

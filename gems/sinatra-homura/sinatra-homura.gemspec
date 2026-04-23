@@ -2,7 +2,7 @@
 
 Gem::Specification.new do |spec|
   spec.name = 'sinatra-homura'
-  spec.version = '0.2.2'
+  spec.version = '0.2.3'
   spec.authors = ['Kazuhiro Homma']
   spec.summary = 'Sinatra + Opal patches and extensions for Cloudflare Workers'
   spec.description = <<~DESC
@@ -30,5 +30,5 @@ Gem::Specification.new do |spec|
   spec.executables = ['homura']
 
   spec.add_runtime_dependency 'homura-runtime', '~> 0.2', '>= 0.2.0'
-  spec.add_runtime_dependency 'opal-homura', '= 1.8.3.rc1'
+  spec.add_runtime_dependency 'opal-homura', '= 1.8.3.rc1.1'
 end

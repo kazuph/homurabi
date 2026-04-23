@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.2 (2026-04-23)
+
+- Bump the exact `opal-homura` dependency to `1.8.3.rc1.1` so published gems pick up the corrected author metadata.
+
 ## 0.2.1 (2026-04-23)
 
 - Correct the published author metadata to "Kazuhiro Homma".

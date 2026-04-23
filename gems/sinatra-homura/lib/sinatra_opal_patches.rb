@@ -37,6 +37,26 @@ module Sinatra
   end
 
   # ---------------------------------------------------------------
+  # 1.5. HaltResponse
+  #
+  # `throw :halt` cannot cross an async boundary in Opal: once a
+  # `# await: true` route has yielded to a Promise, the eventual throw
+  # resumes on a later tick and bypasses Sinatra's outer
+  # `catch(:halt)`. We therefore represent explicit `halt` calls as an
+  # Exception carrying the fully-materialized Rack tuple. Synchronous
+  # routes still terminate immediately; async routes can resolve the
+  # rejection back into a response in `invoke` / `build_js_response`.
+  # ---------------------------------------------------------------
+  class HaltResponse < ::Exception
+    attr_reader :payload
+
+    def initialize(payload)
+      @payload = payload
+      super('halt')
+    end
+  end
+
+  # ---------------------------------------------------------------
   # 2. Response#calculate_content_length? (upstream base.rb:208)
   #
   # Upstream returns true iff content-type is set, content-length is
@@ -84,6 +104,18 @@ module Sinatra
       else
         response.body
       end
+    end
+
+    # -------------------------------------------------------------
+    # 3.5. Helpers#halt (upstream base.rb:1030)
+    #
+    # Upstream uses `throw :halt`. That works for synchronous Ruby, but
+    # not once an Opal-compiled route has crossed an async boundary.
+    # Snapshot the final Rack tuple and raise a dedicated exception so
+    # both sync and async routes preserve Sinatra semantics.
+    # -------------------------------------------------------------
+    def halt(*halt_response)
+      raise HaltResponse.new(materialize_halt_payload(*halt_response))
     end
 
     # -------------------------------------------------------------
@@ -152,6 +184,36 @@ module Sinatra
 
       list.to_s.split(/\s*,\s*/).include?(response['ETag'])
     end
+
+    private
+
+    def materialize_halt_payload(*halt_response)
+      final_status = response.status
+      final_headers = response.headers.dup
+      final_body = response.body
+
+      return [final_status, final_headers, final_body] if halt_response.empty?
+
+      res = halt_response.length == 1 ? halt_response.first : halt_response
+      res = [res] if (Integer === res) || (String === res)
+
+      if (Array === res) && (Integer === res.first)
+        parts = res.dup
+        final_status = Rack::Utils.status_code(parts.shift)
+        final_body = parts.empty? ? nil : parts.pop
+        parts.each do |header_set|
+          next unless header_set.respond_to?(:each)
+
+          header_set.each { |key, value| final_headers[key.to_s] = value }
+        end
+      elsif res.respond_to?(:each)
+        final_body = res
+      else
+        final_body = res
+      end
+
+      [final_status, final_headers, final_body]
+    end
   end
 
   # ---------------------------------------------------------------
@@ -202,7 +264,15 @@ module Sinatra
     # -------------------------------------------------------------
     def invoke(&block)
       res = catch(:halt, &block)
+      apply_invoke_result(wrap_async_halt_result(res))
+      nil
+    rescue HaltResponse => e
+      apply_invoke_result(e.payload)
+      nil
+    end
+    private :invoke
 
+    def apply_invoke_result(res)
       res = [res] if (Integer === res) || (String === res)
       if (Array === res) && (Integer === res.first)
         res = res.dup
@@ -214,9 +284,27 @@ module Sinatra
       elsif defined?(::Cloudflare) && ::Cloudflare.js_promise?(res)
         body([res])
       end
-      nil
     end
-    private :invoke
+    private :apply_invoke_result
+
+    def wrap_async_halt_result(res)
+      return res unless defined?(::Cloudflare) && ::Cloudflare.js_promise?(res)
+
+      halt_class = ::Sinatra::HaltResponse
+      halt_tag = :halt
+      `#{res}.catch(function(error) {
+        try {
+          if (error != null && typeof error['$is_a?'] === 'function' && error['$is_a?'](#{halt_class})) {
+            return error['$payload']();
+          }
+          if (error != null && typeof error['$tag'] === 'function' && typeof error['$value'] === 'function' && error['$tag']() === #{halt_tag}) {
+            return error['$value']();
+          }
+        } catch (_) {}
+        throw error;
+      })`
+    end
+    private :wrap_async_halt_result
 
     # -------------------------------------------------------------
     # 9. Base.new! (upstream base.rb:1676)

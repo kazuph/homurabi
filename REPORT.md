@@ -55,13 +55,13 @@ Phase 17.5 のゴール「ユーザーが `.__await__` も `# await:` magic comm
 
 ### Build
 - `[auto-await] done: 38 changed, 45 skipped, 0 errors`
-- `cloudflare-workers-build: ok`
+- `homura build: ok`
 - Opal compile 成功、patch-opal-evals 成功
 
 ### 設計チェックリスト（ROADMAP.md B1-B10）
 - [x] B1: `async_registry.rb` 実装
 - [x] B2: `analyzer.rb` 実装（ボトムアップ走査修正済み）
-- [x] B3: `cloudflare-workers-build` への統合
+- [x] B3: `homura build` への統合
 - [x] B4: `sinatra-homura` の登録
 - [x] B5: `sequel-d1` の登録
 - [x] B6: 既存 `__await__` 削除（app/ ソース上の `# await: true` / 手動 `.__await__` は 0 件）

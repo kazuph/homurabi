@@ -30,8 +30,8 @@ For day-to-day work, copy the `-I` flags from homura `package.json` `build:opal`
 
 ```bash
 # from homura root, after bundle install
-bundle exec cloudflare-workers-migrate compile examples/minimal-sinatra-with-db/db/migrations --out examples/minimal-sinatra-with-db/db/migrations
-CLOUDFLARE_D1_DATABASE=minimal-sinatra-with-db bundle exec cloudflare-workers-migrate apply --local
+bundle exec homura db:migrate:compile examples/minimal-sinatra-with-db/db/migrations --out examples/minimal-sinatra-with-db/db/migrations
+CLOUDFLARE_D1_DATABASE=minimal-sinatra-with-db bundle exec homura db:migrate:apply
 ```
 
 ## Quick check

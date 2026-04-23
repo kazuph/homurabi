@@ -1,4 +1,4 @@
 # await: call
 # frozen_string_literal: true
-# Opal entry — loaded with `-r` chain via cloudflare-workers-build.
+# Opal entry — loaded with `-r` chain via homura build.
 require 'app'

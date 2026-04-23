@@ -18,7 +18,7 @@ module CloudflareWorkers
         spec = loaded_spec(name, loaded_specs: loaded_specs)
         return spec.full_gem_path if spec
 
-        raise("cloudflare-workers-build: gem #{name} not loaded; use bundle exec from app root")
+        raise("homura build: gem #{name} not loaded; use bundle exec from app root")
       end
 
       def runtime_root(current_file:, loaded_specs: Gem.loaded_specs)

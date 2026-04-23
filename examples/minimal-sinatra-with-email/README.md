@@ -1,7 +1,7 @@
 # Minimal Sinatra with Email — Phase 17.5 Auto-Await Demo
 
 This example shows the **Phase 17.5** user experience: you write plain
-Sinatra + Ruby, and the `cloudflare-workers-build` pipeline automatically
+Sinatra + Ruby, and the `homura build` pipeline automatically
 inserts `.__await__` where needed.
 
 ## What makes this different from pre-17.5
@@ -29,7 +29,7 @@ No `.__await__`. No `# await:` magic comment. Just Ruby.
 
 ## How it works
 
-1. `cloudflare-workers-build` parses your Ruby files with the `parser` gem
+1. `homura build` parses your Ruby files with the `parser` gem
 2. The `AsyncRegistry` knows that `env.SEND_EMAIL` returns a `Cloudflare::Email`
    binding, and that `Cloudflare::Email#send` is async
 3. The analyzer taints the receiver chain and inserts `.__await__` at the
@@ -49,7 +49,7 @@ No `.__await__`. No `# await:` magic comment. Just Ruby.
 ```bash
 cd examples/minimal-sinatra-with-email
 bundle install
-bundle exec cloudflare-workers-build --standalone
+bundle exec homura build --standalone
 npx wrangler dev --port 8787
 ```
 

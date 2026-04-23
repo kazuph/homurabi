@@ -5,11 +5,11 @@
 <ul>
   <li><code>require 'opal_patches'</code> — Rack 等との現実的な互換パッチ。</li>
   <li><code>require 'cloudflare_workers'</code> — Rack ハンドラ、KV / D1 / R2 等のバインディング。</li>
-  <li><code>bin/cloudflare-workers-build</code> — ERB → アセット → Opal → <code>patch-opal-evals.mjs</code> → <code>worker.entrypoint.mjs</code> まで一括。</li>
+  <li><code>homura build</code> — ERB → アセット → Opal → <code>patch-opal-evals.mjs</code> → <code>worker.entrypoint.mjs</code> まで一括。</li>
 </ul>
 
 <h2 id="build">ビルド CLI</h2>
-<pre><code>bundle exec cloudflare-workers-build</code></pre>
+<pre><code>bundle exec homura build</code></pre>
 <p>homura では <code>npm run build</code> がこれを呼びます。コンシューマ向けに <code>--standalone</code> があり、Gemfile の <code>path:</code> から <code>vendor/</code> を取り込みます。</p>
 
 <h2 id="entrypoint">worker.entrypoint.mjs</h2>

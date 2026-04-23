@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.0 (2026-04-23)
+
+- Remove the old `cloudflare-workers-build` public executable and expose the
+  build pipeline through `homura build`.
+- Keep the internal build implementation in the runtime gem while letting the
+  single `homura` CLI dispatch to it.
+
 ## 0.1.6 (2026-04-23)
 
 - Teach `cloudflare-workers-build --standalone --with-db` to add the packaged

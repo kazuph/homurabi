@@ -11,7 +11,7 @@ Use this skill when the task is about:
 - choosing which homura gem to install
 - setting up Sinatra on Cloudflare Workers
 - using D1 through Sequel
-- building with `cloudflare-workers-build`
+- building with `homura build`
 - understanding common Opal/Workers gotchas in this stack
 
 ## Read these companion files first
@@ -50,7 +50,7 @@ When explaining setup, prefer the published gem names and this order:
 When generating guidance or code:
 
 - use the **published gem names**, not the old internal names
-- point users at `bundle exec cloudflare-workers-build`
+- point users at `bundle exec homura build`
 - assume `wrangler.toml` `main = "build/worker.entrypoint.mjs"`
 - point users to `/llms.txt` and the docs pages when high-level orientation is needed
 

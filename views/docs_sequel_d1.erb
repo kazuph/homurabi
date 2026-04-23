@@ -14,9 +14,9 @@ end</code></pre>
 <p><code>d1:</code> には <code>prepare(sql)</code> 可能なオブジェクト（D1 の Ruby ラッパ）を渡します。homura の <code>/demo/sequel</code> や <code>/posts</code> が実コード例です。</p>
 
 <h2 id="migrate">マイグレーション</h2>
-<pre><code>bundle exec cloudflare-workers-migrate compile db/migrations
-bundle exec cloudflare-workers-migrate apply --database homura-db
-bundle exec cloudflare-workers-migrate apply --remote --database homura-db</code></pre>
+<pre><code>bundle exec homura db:migrate:compile db/migrations
+bundle exec homura db:migrate:apply --database homura-db
+bundle exec homura db:migrate:apply --remote --database homura-db</code></pre>
 <p>データベース名は <code>--database</code> または環境変数 <code>CLOUDFLARE_D1_DATABASE</code>。Wrangler バイナリは <code>WRANGLER_BIN</code> または PATH の <code>wrangler</code>。</p>
 
 <h2 id="opal">Opal ビルドパス</h2>

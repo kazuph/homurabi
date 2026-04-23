@@ -14,8 +14,8 @@ binding = "DB"
 database_name = "homura-db"
 database_id = "3a59c955-198e-478f-8f11-71d5f3eb7600"
 preview_database_id = "6642a8ca-c5d0-4277-9755-3bcee6147c11"
-# Phase 13 follow-up: Sequel migrations compiled by `bin/homura-migrate`
-# (wrapper → `cloudflare-workers-migrate`) into `.sql` files under the same path. Point
+# Phase 13 follow-up: Sequel migrations compiled by `homura db:migrate:compile`
+# into `.sql` files under the same path. Point
 # `wrangler d1 migrations apply` at the same directory so both tools
 # share one source of truth.
 migrations_dir = "db/migrations"

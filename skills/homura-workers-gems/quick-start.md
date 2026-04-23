@@ -17,7 +17,7 @@ retry with `bundle install --full-index`.
 ## Build / deploy flow
 
 1. Scaffold or write a Sinatra app.
-2. Run `bundle exec cloudflare-workers-build`.
+2. Run `bundle exec homura build`.
 3. Set `wrangler.toml` `main = "build/worker.entrypoint.mjs"`.
 4. Deploy with Wrangler.
 

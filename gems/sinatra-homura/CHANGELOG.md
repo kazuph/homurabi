@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.0 (2026-04-23)
+
+- Make `homura` the only public executable and add subcommands for build, ERB
+  precompile, migrations, and scaffolding.
+- Remove the old `cloudflare-workers-*` compatibility entrypoints instead of
+  carrying aliases before v1.
+
 ## 0.1.3 (2026-04-23)
 
 - Add the preferred `homura new` scaffold entrypoint while keeping

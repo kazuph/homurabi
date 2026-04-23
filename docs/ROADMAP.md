@@ -989,8 +989,8 @@ deploy できるようにする。
      lib/sinatra/queue.rb                  # 同上
      templates/wrangler.toml.example
      templates/Rakefile.example
-     bin/cloudflare-workers-erb-compile    # ERB precompile CLI
-     bin/cloudflare-workers-build          # 全 build orchestrator
+     homura erb:compile                    # ERB precompile CLI
+     homura build                          # 全 build orchestrator
      README.md
    ```
    - 依存: `homura-runtime` (15-B)、`sinatra` ~> 4.2、`mustermann`、`rack` ~> 3
@@ -1041,7 +1041,7 @@ deploy できるようにする。
      lib/sequel_opal_patches.rb
      lib/sequel_opal_async_dataset_patches.rb
      lib/sequel_opal_runtime_patches.rb
-     bin/cloudflare-workers-migrate         # bin/homura-migrate を generic 化
+     homura db:migrate:*                    # migration compile/apply CLI
      README.md
    ```
    - **vendor/sequel/ の inline 改変は事前に上流 PR or lib 側 monkey patch に移行済前提**
@@ -1051,7 +1051,7 @@ deploy できるようにする。
    - `Cloudflare::D1Database` を duck-typed interface として受け取る pattern に
 3. **対外 API**
    - `Sequel.connect(adapter: :d1, d1: env['cloudflare.env'].DB)`
-   - migration: `bin/cloudflare-workers-migrate compile db/migrations`
+   - migration: `homura db:migrate:compile db/migrations`
 4. **examples/minimal-sinatra-with-db/** を `examples/` に追加（Sinatra + sequel-d1 の最小例）
 5. **rubygems.org への push 検討**
    - 全 3 gem の README / CHANGELOG / version.rb 整備
@@ -1246,7 +1246,7 @@ end
 ```
 app/app.rb (ユーザーコード、__await__ 無し)
   │
-  ▼  bundle exec cloudflare-workers-build 内で
+  ▼  bundle exec homura build 内で
   ▼  1. parse → AST
   ▼  2. Async Registry ロード (全 gem の register_async_source 収集)
   ▼  3. flow analysis → tainted node 集合
@@ -1271,7 +1271,7 @@ build/app.opal.mjs
   - `parser` gem 依存（build-time only、runtime には乗らない）
   - tainting pass + insertion pass + unparse pass
   - **修正済**: ボトムアップ走査（子→親）に変更、`kv.get(key)` 等のawait漏れを解消
-- [x] **B3**: `bin/cloudflare-workers-build` 内で auto-await 変換を opal compile 前段に挿入
+- [x] **B3**: `homura build` 内で auto-await 変換を opal compile 前段に挿入
 - [x] **B4**: `sinatra-homura` の `register_async_source` に Sinatra::Base の async extension (JWT) を登録
 - [x] **B5**: `sequel-d1` の `register_async_source` に `Sequel::D1::Database` の dataset chain を登録
 - [x] **B4.5**: auto-await CLI が `Gem.loaded_specs` を走査し、各 gem の `lib/` 配下から `register_async_source` を含む .rb ファイルを自動検出・require（手動リスト廃止）
@@ -1320,7 +1320,7 @@ build/app.opal.mjs
 | 1 | `parser` gem を build dependency に追加、POC で sample AST 解析 | 1d |
 | 2 | AsyncRegistry DSL 設計 + 3 gem への実装 | 2d |
 | 3 | Analyzer (tainting + insertion + unparse) | 3d |
-| 4 | cloudflare-workers-build への統合 | 1d |
+| 4 | homura build への統合 | 1d |
 | 5 | homura 51 箇所 `__await__` 削除 + `# await:` magic 削除 | 1d |
 | 6 | 回帰検証 (npm test + deploy + 全ルート 200 + Email 実送信) | 1d |
 | 7 | 診断モード + build log | 0.5d |

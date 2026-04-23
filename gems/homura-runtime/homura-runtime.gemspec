@@ -32,7 +32,7 @@ Gem::Specification.new do |spec|
   end
   spec.require_paths = ['lib']
   spec.bindir = 'bin'
-  spec.executables = ['cloudflare-workers-build']
+  spec.executables = []
 
   # Exact pin: homura verifies against the vendored Opal fork 1.8.3.rc1 for Ruby 3.4 compatibility.
   spec.add_runtime_dependency 'opal-homura', '= 1.8.3.rc1'

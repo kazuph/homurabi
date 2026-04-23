@@ -19,9 +19,9 @@
   <li><strong>Gemfile</strong>: <code>opal-homura</code>（<code>require: 'opal'</code>）、<code>homura-runtime</code>、<code>sinatra-homura</code> を追加。D1 を使うなら <code>sequel-d1</code> も追加します。</li>
   <li><strong>エントリ</strong>: <code>app.rb</code>（またはメイン定義ファイル）の先頭付近に <code># await:</code> マジックコメントを付与（JWT / D1 / fetch など非同期が混ざるファイルは必須。Phase 15-C 教訓）。続けて <code>require 'sinatra/cloudflare_workers'</code>。</li>
   <li><strong>ルート</strong>: 既存の <code>get</code> / <code>post</code> を可能な限りそのまま移植。Sinatra の DSL は互換パッチ側で吸収。</li>
-  <li><strong>DB</strong>: <code>Sequel.connect(adapter: :d1, d1: env['cloudflare.env'].DB)</code> の形へ。マイグレーションは <code>bundle exec cloudflare-workers-migrate compile db/migrations</code> → <code>apply</code>（<code>sequel-d1</code> README 参照）。</li>
-  <li><strong>ビュー</strong>: <code>bundle exec cloudflare-workers-erb-compile --input views --output build/templates.rb --namespace …</code>（プロジェクトの Rake / npm に合わせる）。</li>
-  <li><strong>Workers 向けビルド</strong>: <code>bundle exec cloudflare-workers-build</code>（または <code>--standalone</code>）で <code>build/worker.entrypoint.mjs</code> を生成し、<code>wrangler.toml</code> の <code>main</code> と一致させて <code>wrangler deploy</code>。</li>
+  <li><strong>DB</strong>: <code>Sequel.connect(adapter: :d1, d1: env['cloudflare.env'].DB)</code> の形へ。マイグレーションは <code>bundle exec homura db:migrate:compile db/migrations</code> → <code>homura db:migrate:apply</code>（<code>sequel-d1</code> README 参照）。</li>
+  <li><strong>ビュー</strong>: <code>bundle exec homura erb:compile --input views --output build/templates.rb --namespace …</code>（プロジェクトの Rake / npm に合わせる）。</li>
+  <li><strong>Workers 向けビルド</strong>: <code>bundle exec homura build</code>（または <code>--standalone</code>）で <code>build/worker.entrypoint.mjs</code> を生成し、<code>wrangler.toml</code> の <code>main</code> と一致させて <code>wrangler deploy</code>。</li>
 </ol>
 
 <h2 id="gotchas">よくあるハマりポイント</h2>
@@ -29,7 +29,7 @@
   <li><strong><code># await:</code></strong>: ルート内で <code>__await__</code> が必要なのにマジックコメントが無いと、Promise がそのまま残って 1101 等で落ちます。</li>
   <li><strong>同期 FS</strong>: Workers ではリクエスト処理中の <code>File.read</code> は使えません。ERB／アセットはビルド時に埋め込み。</li>
   <li><strong>require パス</strong>: <code>vendor/</code> や gem <code>lib</code> を Opal の <code>-I</code> に載せる順序が重要（<code>sequel-d1</code> README のとおり <code>gems/sequel-d1/lib</code> を <code>vendor</code> より前）。</li>
-  <li><strong>direct eval</strong>: Opal の制約へはビルド後 <code>patch-opal-evals.mjs</code> が自動適用（<code>cloudflare-workers-build</code> パイプライン）。</li>
+  <li><strong>direct eval</strong>: Opal の制約へはビルド後 <code>patch-opal-evals.mjs</code> が自動適用（<code>homura build</code> パイプライン）。</li>
   <li><strong>起動 CPU</strong>: 重い定数初期化はリクエストをまたぐとタイムアウトしやすい。homura では分割・遅延初期化で対処済みの箇所あり（具体値は本番計測に依存）。</li>
   <li><strong>Cookie セッション</strong>: 本リポジトリの <code>/login</code> は署名クッキー方式。JWT も別ルートで利用可能。</li>
 </ul>

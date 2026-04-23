@@ -78,19 +78,19 @@ Dir.mktmpdir do |dir|
 
   {
     'compile-erb rejects <% yield %>' => {
-      script: File.expand_path('../gems/homura-runtime/exe/compile-erb', __dir__),
+      argv: ['ruby', File.expand_path('../gems/homura-runtime/exe/compile-erb', __dir__)],
       body: '<% yield %>'
     },
     'compile-erb rejects <%= yield(arg) %>' => {
-      script: File.expand_path('../gems/homura-runtime/exe/compile-erb', __dir__),
+      argv: ['ruby', File.expand_path('../gems/homura-runtime/exe/compile-erb', __dir__)],
       body: '<%= yield(:body) %>'
     },
-    'cloudflare-workers-erb-compile rejects <% yield %>' => {
-      script: File.expand_path('../gems/sinatra-homura/bin/cloudflare-workers-erb-compile', __dir__),
+    'homura erb:compile rejects <% yield %>' => {
+      argv: ['bundle', 'exec', 'ruby', File.expand_path('../gems/sinatra-homura/bin/homura', __dir__), 'erb:compile'],
       body: '<% yield %>'
     },
-    'cloudflare-workers-erb-compile rejects <%= yield(arg) %>' => {
-      script: File.expand_path('../gems/sinatra-homura/bin/cloudflare-workers-erb-compile', __dir__),
+    'homura erb:compile rejects <%= yield(arg) %>' => {
+      argv: ['bundle', 'exec', 'ruby', File.expand_path('../gems/sinatra-homura/bin/homura', __dir__), 'erb:compile'],
       body: '<%= yield(:body) %>'
     }
   }.each do |label, spec|
@@ -98,7 +98,7 @@ Dir.mktmpdir do |dir|
       invalid_path = File.join(views_dir, 'invalid.erb')
       File.write(invalid_path, spec[:body])
       output, status = Dir.chdir(dir) do
-        Open3.capture2e('ruby', spec[:script], invalid_path)
+        Open3.capture2e(*spec[:argv], invalid_path)
       end
       raise 'unexpected success' if status.success?
       raise output unless output.include?('Unsupported ERB yield form')

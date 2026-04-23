@@ -21,7 +21,7 @@ end
 
 ## Opal build paths
 
-`cloudflare-workers-build --standalone --with-db` now wires this up for you.
+`homura build --standalone --with-db` now wires this up for you.
 If you invoke `opal` manually, add the gem's packaged `vendor/` before its
 `lib/` so `require 'sequel'` resolves to the bundled Opal-compatible entrypoint:
 
@@ -29,19 +29,19 @@ If you invoke `opal` manually, add the gem's packaged `vendor/` before its
 -I gems/sequel-d1/vendor -I gems/sequel-d1/lib -I lib -I vendor
 ```
 
-## Migrations (`cloudflare-workers-migrate`)
+## Migrations (`homura db:migrate:*`)
 
 Compile Ruby migration files to wrangler-compatible `.sql`:
 
 ```bash
-bundle exec cloudflare-workers-migrate compile db/migrations
+bundle exec homura db:migrate:compile db/migrations
 ```
 
 Apply (uses `WRANGLER_BIN` or `wrangler`; database from `--database` or `CLOUDFLARE_D1_DATABASE`):
 
 ```bash
-bundle exec cloudflare-workers-migrate apply --database homura-db
-bundle exec cloudflare-workers-migrate apply --remote --database homura-db
+bundle exec homura db:migrate:apply --database homura-db
+bundle exec homura db:migrate:apply --remote --database homura-db
 ```
 
 ## License

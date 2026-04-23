@@ -1,17 +1,72 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
+module HomuraCLI
+  module_function
+
+  COMMANDS = {
+    'build' => {
+      gem: 'homura-runtime',
+      script: 'bin/cloudflare-workers-build',
+      argv_prefix: []
+    },
+    'erb:compile' => {
+      gem: 'sinatra-homura',
+      script: 'bin/cloudflare-workers-erb-compile',
+      argv_prefix: []
+    },
+    'db:migrate:compile' => {
+      gem: 'sequel-d1',
+      script: 'bin/cloudflare-workers-migrate',
+      argv_prefix: ['compile']
+    },
+    'db:migrate:apply' => {
+      gem: 'sequel-d1',
+      script: 'bin/cloudflare-workers-migrate',
+      argv_prefix: ['apply']
+    },
+    'new' => {
+      gem: 'sinatra-homura',
+      script: 'bin/cloudflare-workers-new',
+      argv_prefix: []
+    }
+  }.freeze
+
+  def usage
+    <<~USAGE
+      usage: homura COMMAND [args]
+
+      Commands:
+        build [options]
+        erb:compile [--input DIR] [--output FILE] [--namespace ModuleName]
+        db:migrate:compile MIGRATIONS_DIR [--out DIR]
+        db:migrate:apply [--remote] [--database NAME]
+        new APP_NAME [--with-db]
+    USAGE
+  end
+
+  def find_spec(name)
+    Gem.loaded_specs[name] || Gem::Specification.find_by_name(name)
+  rescue Gem::LoadError
+    nil
+  end
+
+  def dispatch(command)
+    entry = COMMANDS.fetch(command)
+    spec = find_spec(entry[:gem])
+    abort("homura #{command}: requires gem `#{entry[:gem]}`") unless spec
+
+    ARGV.replace(entry[:argv_prefix] + ARGV)
+    load File.join(spec.full_gem_path, entry[:script])
+  end
+end
+
 command = ARGV.shift
 
-case command
-when 'new'
-  load File.expand_path('cloudflare-workers-new', __dir__)
-else
-  warn <<~USAGE
-    usage: homura COMMAND [args]
-
-    Commands:
-      new APP_NAME [--with-db]
-  USAGE
+unless command && HomuraCLI::COMMANDS.key?(command)
+  warn "Unknown command: #{command}" if command
+  warn HomuraCLI.usage
   exit 1
 end
+
+HomuraCLI.dispatch(command)

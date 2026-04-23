@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.0 (2026-04-23)
+
+- Remove the old `cloudflare-workers-migrate` public executable and expose
+  migration compile/apply through `homura db:migrate:*`.
+
 ## 0.1.1 (2026-04-23)
 
 - Package the vendored Opal-compatible Sequel subset (`vendor/sequel.rb` and

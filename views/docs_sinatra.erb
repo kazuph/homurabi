@@ -13,7 +13,7 @@ end</code></pre>
 <p>アプリクラス内で <code>register</code> し、homura と同様に <code>require 'sequel'</code> 等はルート定義より前に置きます。</p>
 
 <h2 id="erb">ERB プリコンパイル</h2>
-<pre><code>bundle exec cloudflare-workers-erb-compile --input views --output build/templates.rb --namespace MyTemplates</code></pre>
+<pre><code>bundle exec homura erb:compile --input views --output build/templates.rb --namespace MyTemplates</code></pre>
 <p>Rake 連携例は <code>gems/sinatra-homura/templates/Rakefile.example</code> を参照。</p>
 
 <h2 id="jwt">JWT（Sinatra::JwtAuth）</h2>

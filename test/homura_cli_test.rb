@@ -22,6 +22,10 @@ ok = assert('homura CLI shows new subcommand usage') do
   output = `bundle exec ruby #{cli} 2>&1`
   raise "unexpected success" if $?.success?
   raise output unless output.include?('usage: homura COMMAND')
+  raise output unless output.include?('build [options]')
+  raise output unless output.include?('erb:compile')
+  raise output unless output.include?('db:migrate:compile')
+  raise output unless output.include?('db:migrate:apply')
   raise output unless output.include?('new APP_NAME [--with-db]')
 end
 passed += 1 if ok

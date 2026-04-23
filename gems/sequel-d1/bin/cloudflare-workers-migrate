@@ -1,13 +1,13 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 #
-# cloudflare-workers-migrate — under CRuby, compile Sequel migration DSL
+# homura db:migrate:* — under CRuby, compile Sequel migration DSL
 # files into wrangler-ready `.sql`, and optionally shell out to wrangler
 # to apply them.
 #
 # Usage:
-#   cloudflare-workers-migrate compile <migrations_dir> [--out DIR]
-#   cloudflare-workers-migrate apply [--remote] [--database NAME]
+#   homura db:migrate:compile <migrations_dir> [--out DIR]
+#   homura db:migrate:apply [--remote] [--database NAME]
 #
 # Environment:
 #   WRANGLER_BIN             wrangler executable (default: wrangler)
@@ -27,8 +27,8 @@ def usage!(msg = nil)
   warn msg if msg
   warn <<~USAGE
     Usage:
-      cloudflare-workers-migrate compile <migrations_dir> [--out DIR]
-      cloudflare-workers-migrate apply [--remote] [--database NAME]
+      homura db:migrate:compile <migrations_dir> [--out DIR]
+      homura db:migrate:apply [--remote] [--database NAME]
 
     Environment:
       WRANGLER_BIN              wrangler executable (default: wrangler)
@@ -106,8 +106,8 @@ def run_compile
   puts
   puts "✓ Compiled #{migration_files.size} migration(s) to #{out_dir}/"
   dbname = ENV['CLOUDFLARE_D1_DATABASE'] || ENV['WRANGLER_D1_DATABASE'] || '<database>'
-  puts "  Apply with: #{wrangler_executable} d1 migrations apply #{dbname} --local"
-  puts "            or: #{wrangler_executable} d1 migrations apply #{dbname} --remote"
+  puts "  Apply with: homura db:migrate:apply --database #{dbname}"
+  puts "            or: homura db:migrate:apply --remote --database #{dbname}"
 end
 
 def run_apply

@@ -30,13 +30,13 @@ flowchart LR
 ## homura 本体
 
 - `wrangler.toml` の `main` は `build/worker.entrypoint.mjs`。
-- `bundle exec cloudflare-workers-build` が ERB / assets / Opal / patch / entrypoint 生成まで一括実行。
+- `bundle exec homura build` が ERB / assets / Opal / patch / entrypoint 生成まで一括実行。
 
 ## スキャフォールド済みアプリ
 
 - プロジェクト直下に `worker.entrypoint.mjs`（`main` と一致）。
 - `cf-runtime/` に `setup-node-crypto.mjs` と `worker_module.mjs` をコピー（gem から）。
-- `bundle exec cloudflare-workers-build --standalone` が consumer 向けパイプラインを実行し、`Gemfile` の `path:` から homura の `vendor/` を追加ロードパスへ取り込み（digest / zlib 等の Workers 向け補助ファイル）。
+- `bundle exec homura build --standalone` が consumer 向けパイプラインを実行し、`Gemfile` の `path:` から homura の `vendor/` を追加ロードパスへ取り込み（digest / zlib 等の Workers 向け補助ファイル）。
 
 ## Phase 17 — Email Service（`SEND_EMAIL`）
 

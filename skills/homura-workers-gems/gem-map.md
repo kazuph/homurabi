@@ -10,21 +10,21 @@
 
 - Published name: `homura-runtime`
 - Core runtime and build surface
-- Owns `cloudflare-workers-build`
+- Owns `homura build`
 - Owns Workers bindings exposed in Rack env like `env['cloudflare.DB']`
 
 ## `sinatra-homura`
 
 - Published name: `sinatra-homura`
 - Sinatra integration layer
-- Owns `cloudflare-workers-new` and `cloudflare-workers-erb-compile`
+- Owns `homura new` and `homura erb:compile`
 - Includes JWT / Scheduled / Queue extensions used by homura
 
 ## `sequel-d1`
 
 - Published name: `sequel-d1`
 - Sequel adapter for Cloudflare D1
-- Owns `cloudflare-workers-migrate`
+- Owns `homura db:migrate:*`
 
 ## Docs entrypoints
 

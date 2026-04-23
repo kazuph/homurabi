@@ -22,13 +22,10 @@ run App # optional if `App` is defined; a fallback registers the Rack handler at
 bundle exec homura new myapp
 ```
 
-`cloudflare-workers-new` remains available as a compatibility alias, but
-`homura new` is the preferred entrypoint.
-
 ## ERB precompile
 
 ```bash
-bundle exec cloudflare-workers-erb-compile --input views --output build/templates.rb --namespace MyTemplates
+bundle exec homura erb:compile --input views --output build/templates.rb --namespace MyTemplates
 ```
 
 See `templates/Rakefile.example` for Rake integration.

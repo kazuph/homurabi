@@ -37,7 +37,7 @@ In this repo's Opal-on-Workers runtime:
 ## Build output
 
 - the Worker entrypoint is `build/worker.entrypoint.mjs`
-- `bundle exec cloudflare-workers-build` is the standard build command
+- `bundle exec homura build` is the standard build command
 
 ## Bundler / RubyGems compact index mismatch
 

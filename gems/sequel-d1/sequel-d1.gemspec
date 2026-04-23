@@ -10,7 +10,7 @@ Gem::Specification.new do |spec|
   spec.description = <<~DESC
     Sequel `:d1` adapter and Opal compatibility patches for Cloudflare D1.
     Pass a duck-typed D1 binding to `Sequel.connect(adapter: :d1, d1: binding)`.
-    Includes `cloudflare-workers-migrate` to compile Sequel migration DSL to wrangler SQL.
+    Includes the `homura db:migrate:*` tooling to compile Sequel migration DSL to wrangler SQL.
   DESC
   spec.homepage = 'https://github.com/kazuph/homura'
   spec.license = 'MIT'
@@ -29,9 +29,9 @@ Gem::Specification.new do |spec|
   end
   spec.require_paths = ['lib']
   spec.bindir = 'bin'
-  spec.executables = ['cloudflare-workers-migrate']
+  spec.executables = []
 
-  spec.add_runtime_dependency 'homura-runtime', '~> 0.1'
+  spec.add_runtime_dependency 'homura-runtime', '~> 0.2'
   spec.add_runtime_dependency 'opal-homura', '= 1.8.3.rc1'
   spec.add_runtime_dependency 'sequel', '~> 5.0'
   spec.add_runtime_dependency 'sqlite3', '~> 2.0'

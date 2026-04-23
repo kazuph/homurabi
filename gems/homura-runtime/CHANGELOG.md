@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.5 (2026-04-23)
+
+- Load Workers-only `zlib`, `tempfile`, and `tilt` shims via `require_relative`
+  so plain `opal` CLI builds can require `opal_patches` without extra vendor
+  load path wiring.
+- Recursively convert nested plain JS objects in `Cloudflare.js_object_to_hash`
+  so D1 metadata behaves like Ruby `Hash` values all the way down.
+- Pin `opal-homura` to `1.8.3.rc1.3` for the restored `digest` stdlib shim.
+
 ## 0.2.4 (2026-04-23)
 
 - Guard the Rack body close hook against raw JS `undefined` so Workers request teardown

@@ -396,14 +396,15 @@ end
 # same strength CRuby Sinatra gives you when SecureRandom is unavailable
 # (it falls back to `Kernel.rand`), so we are not reducing security
 # beyond upstream's own fallback path.
-# Ensure our Digest/Zlib/Tempfile/Tilt stubs from vendor/ are available
-# everywhere, even when a gem references `Digest::SHA1` at class body
-# time without explicitly `require 'digest'`-ing first.
+# Ensure our Digest/Zlib/Tempfile/Tilt shims are available when
+# `opal_patches` is loaded directly through the plain Opal CLI as well as
+# through `homura build`. Digest itself now lives in opal-homura stdlib;
+# the remaining Workers-specific shims stay local to this gem.
 require 'digest'
 require 'digest/sha2'
-require 'zlib'
-require 'tempfile'
-require 'tilt'
+require 'homura_vendor_zlib'
+require 'homura_vendor_tempfile'
+require 'homura_vendor_tilt'
 
 module ::SecureRandom
   # Raised when neither node:crypto.randomBytes nor Web Crypto

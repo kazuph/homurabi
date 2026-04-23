@@ -487,7 +487,9 @@ module Cloudflare
     out
   end
 
-  # Shallow copy of a JS object's own enumerable string keys into a Hash.
+  # Deep copy of a JS object's own enumerable string keys into a Hash.
+  # Recursively converts nested plain objects so Opal code can call
+  # Ruby methods (e.g. #is_a?) on every value.
   def self.js_object_to_hash(js_obj)
     h = {}
     return h if `#{js_obj} == null`
@@ -497,6 +499,8 @@ module Cloudflare
     while i < len
       k = `#{keys}[#{i}]`
       v = `#{js_obj}[#{k}]`
+      # Recurse for nested plain objects (but not Arrays, Dates, etc.)
+      v = js_object_to_hash(v) if `typeof #{v} === 'object' && #{v} != null && !Array.isArray(#{v}) && !(#{v} instanceof Date)`
       h[k] = v
       i += 1
     end

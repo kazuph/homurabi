@@ -32,7 +32,7 @@ Gem::Specification.new do |spec|
   spec.executables = []
 
   spec.add_runtime_dependency 'homura-runtime', '~> 0.2'
-  spec.add_runtime_dependency 'opal-homura', '= 1.8.3.rc1.2'
+  spec.add_runtime_dependency 'opal-homura', '= 1.8.3.rc1.3'
   spec.add_runtime_dependency 'sequel', '~> 5.0'
   spec.add_runtime_dependency 'sqlite3', '~> 2.0'
 end

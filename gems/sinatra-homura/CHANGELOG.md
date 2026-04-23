@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.9 (2026-04-23)
+
+- Pin `opal-homura` to `1.8.3.rc1.3` so apps using `sinatra-homura`,
+  `homura-runtime`, and `sequel-d1` resolve the same restored `digest`
+  stdlib shim release.
+
 ## 0.2.8 (2026-04-23)
 
 - Keep `wrap_async_halt_result`'s Promise `.catch(...)` wrapper as a real

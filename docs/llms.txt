@@ -38,7 +38,7 @@ Live demo: https://homura.kazu-san.workers.dev
 ```ruby
 source 'https://rubygems.org'
 
-gem 'opal-homura', '= 1.8.3.rc1.1', require: 'opal'
+gem 'opal-homura', '= 1.8.3.rc1.2', require: 'opal'
 gem 'homura-runtime', '~> 0.1'
 gem 'sinatra-homura', '~> 0.1'
 gem 'sequel-d1', '~> 0.1' # optional

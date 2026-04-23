@@ -22,6 +22,7 @@ Gem::Specification.new do |spec|
   spec.metadata['bug_tracker_uri'] = "#{spec.homepage}/issues"
   spec.metadata['changelog_uri'] = "#{spec.homepage}/blob/main/#{gem_path}/CHANGELOG.md"
   spec.metadata['readme_uri'] = "#{spec.homepage}/blob/main/#{gem_path}/README.md"
+  spec.metadata['documentation_uri'] = 'https://homura.kazu-san.workers.dev/docs/sequel-d1'
 
   spec.files = Dir.chdir(__dir__) do
     Dir['lib/**/*', 'bin/*', 'README.md', 'CHANGELOG.md'].select { |f| File.file?(f) }

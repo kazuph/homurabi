@@ -17,6 +17,7 @@ Gem::Specification.new do |spec|
   spec.metadata["changelog_uri"]         = "#{spec.homepage}/blob/main/#{gem_path}/CHANGELOG.md"
   spec.metadata["readme_uri"]            = "#{spec.homepage}/blob/main/#{gem_path}/README.md"
   spec.metadata["source_code_uri"]       = "#{spec.homepage}/tree/main/#{gem_path}"
+  spec.metadata["documentation_uri"]     = "https://homura.kazu-san.workers.dev/docs/architecture"
 
   # homura patch: vendor/opal-gem/ is not its own git repo (it's inside the
   # homura repo), so upstream's `git ls-files` returns files from the outer

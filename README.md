@@ -12,6 +12,31 @@ Live demo: **<https://homura.kazu-san.workers.dev>**
 
 ---
 
+## AI / agent support
+
+- **Machine-readable docs**: [`/llms.txt`](public/llms.txt) (live: <https://homura.kazu-san.workers.dev/llms.txt>)
+- **Installable agent skill**: [`skills/homura-workers-gems/`](skills/homura-workers-gems/)
+
+### Install with `gh skill`
+
+```bash
+gh skill preview kazuph/homura homura-workers-gems
+gh skill install kazuph/homura homura-workers-gems --agent github-copilot --scope user
+gh skill install kazuph/homura homura-workers-gems --agent claude-code --scope project
+```
+
+### Install with `npx skills`
+
+```bash
+npx skills add kazuph/homura --skill homura-workers-gems -a github-copilot
+npx skills add kazuph/homura --skill homura-workers-gems -a claude-code
+```
+
+The skill teaches agents how the 4 published gems fit together, which gem to pick
+for a given task, the install/build flow, and the main Workers/Opal gotchas.
+
+---
+
 ## Phase 10 hero — Sinatra `/chat` × Workers AI (Gemma 4 + gpt-oss-120b)
 
 A real Sinatra route, hosted on Cloudflare Workers, talking to **Cloudflare

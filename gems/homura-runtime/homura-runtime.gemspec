@@ -23,6 +23,7 @@ Gem::Specification.new do |spec|
   spec.metadata['bug_tracker_uri'] = "#{spec.homepage}/issues"
   spec.metadata['changelog_uri'] = "#{spec.homepage}/blob/main/#{gem_path}/CHANGELOG.md"
   spec.metadata['readme_uri'] = "#{spec.homepage}/blob/main/#{gem_path}/README.md"
+  spec.metadata['documentation_uri'] = 'https://homura.kazu-san.workers.dev/docs/runtime'
 
   # Consumer-facing snippets (e.g. templates/wrangler.toml.example) ship with the gem —
   # `templates/**/*` must remain in this glob so rubygems packaging does not omit them.

@@ -22,6 +22,10 @@ run App # optional if `App` is defined; a fallback registers the Rack handler at
 bundle exec homura new myapp
 ```
 
+Generated apps should treat `bundle exec rake build`, `bundle exec rake dev`,
+and `bundle exec rake deploy` as the primary day-to-day workflow. `homura`
+stays available as the lower-level implementation surface behind that Rakefile.
+
 ## ERB precompile
 
 ```bash

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.1 (2026-04-23)
+
+- Make generated apps Rake-first: the scaffolded `Rakefile` now owns build/dev/deploy,
+  and scaffolded `package.json` delegates back to Rake instead of exposing `homura`
+  directly as the main user workflow.
+
 ## 0.2.0 (2026-04-23)
 
 - Make `homura` the only public executable and add subcommands for build, ERB

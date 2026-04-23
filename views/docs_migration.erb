@@ -34,6 +34,15 @@
   <li><strong>Cookie セッション</strong>: 本リポジトリの <code>/login</code> は署名クッキー方式。JWT も別ルートで利用可能。</li>
 </ul>
 
+<h2 id="backend-only">既存アプリを backend だけ Cloudflare 化するなら</h2>
+<ol>
+  <li><strong>まず API 面だけ切り出す</strong>: 既存フロントはそのままにして、<code>/api/*</code> や webhook など「境界が明確な backend 仕事」から Workers に移します。最初から SSR 全面移行を狙わないほうが安全です。</li>
+  <li><strong>Rack / Sinatra の入口は維持</strong>: route 定義、params 処理、認証、service object はなるべく残し、Puma/Unicorn 前提の起動や filesystem 依存だけを先に剥がします。</li>
+  <li><strong>Rake を先に生やす</strong>: 既存 app でも generated app と同じく <code>bundle exec rake build</code> / <code>dev</code> / <code>deploy</code> を先に作り、その内部で <code>homura</code> や <code>wrangler</code> を呼ぶ形に寄せると、移行後の運用が崩れません。</li>
+  <li><strong>HTML より JSON を先に通す</strong>: backend-only 移行なら ERB を急いで載せなくてよいので、まず JSON API / 認証 / queue / cron / webhook を通し、必要になった時だけ template compile を足すのが筋です。</li>
+  <li><strong>DB 境界は最後に決める</strong>: 既存 DB を温存するなら Workers から HTTP/Service Binding 経由で寄せる、D1 に寄せられるならその時点で <code>sequel-d1</code> と migration compile を入れる、の二段で考えるのが現実的です。</li>
+</ol>
+
 <h2 id="blockers">動かない・優先度を下げる例</h2>
 <ul>
   <li>リクエスト中にローカルファイルキャッシュへ何度も読みに行く設計。</li>

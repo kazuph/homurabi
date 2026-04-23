@@ -17,9 +17,10 @@ retry with `bundle install --full-index`.
 ## Build / deploy flow
 
 1. Scaffold or write a Sinatra app.
-2. Run `bundle exec homura build`.
-3. Set `wrangler.toml` `main = "build/worker.entrypoint.mjs"`.
-4. Deploy with Wrangler.
+2. For generated apps, prefer `bundle exec rake build`, `bundle exec rake dev`, and `bundle exec rake deploy`.
+3. Use `homura` directly only when you are wiring or debugging the lower-level build surface.
+4. Set `wrangler.toml` `main = "build/worker.entrypoint.mjs"`.
+5. Deploy with Wrangler.
 
 ## Minimal runtime snippet
 

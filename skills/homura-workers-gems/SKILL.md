@@ -12,6 +12,7 @@ Use this skill when the task is about:
 - setting up Sinatra on Cloudflare Workers
 - using D1 through Sequel
 - building with `homura build`
+- migrating an existing Sinatra backend onto Workers
 - understanding common Opal/Workers gotchas in this stack
 
 ## Read these companion files first
@@ -19,6 +20,7 @@ Use this skill when the task is about:
 - `gem-map.md` — which gem owns which responsibility
 - `quick-start.md` — minimal install/build flow
 - `gotchas.md` — mistakes that repeatedly trip up agents
+- `migration-playbook.md` — existing-app migration strategy
 
 ## Package map
 
@@ -53,6 +55,7 @@ When generating guidance or code:
 - point users at `bundle exec homura build`
 - assume `wrangler.toml` `main = "build/worker.entrypoint.mjs"`
 - point users to `/llms.txt` and the docs pages when high-level orientation is needed
+- for generated apps, prefer `bundle exec rake ...` as the user-facing workflow and treat `homura` as the lower-level implementation surface
 
 ## Do not confuse these names
 

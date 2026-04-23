@@ -38,6 +38,13 @@ In this repo's Opal-on-Workers runtime:
 
 - the Worker entrypoint is `build/worker.entrypoint.mjs`
 - `bundle exec homura build` is the standard build command
+- but generated apps should expose `bundle exec rake build|dev|deploy` as the normal user workflow
+
+## Existing app migration
+
+- do not over-automate full legacy app migration with one-shot commands
+- for existing apps, move backend/API boundaries first and keep full SSR migration as a separate decision
+- add a Rake wrapper layer early so Ruby developers keep interacting with Rake instead of low-level platform commands
 
 ## Bundler / RubyGems compact index mismatch
 

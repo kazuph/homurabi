@@ -17,8 +17,9 @@ npm install</code></pre>
 <p>DB 付きサンプルが必要なら <code>--with-db</code> を付けます（<code>sequel-d1</code> とマイグレーション雛形が追加されます）。</p>
 
 <h2 id="run-local">ローカルで動かす</h2>
-<p>生成された <code>package.json</code> の dev スクリプトは次の形です（ポート <strong>8787</strong>）。</p>
-<pre><code>npm run dev
+<p>日常操作は <code>Rakefile</code> を入口にします。生成された app では、<code>homura</code> や <code>wrangler</code> は通常 Rake からしか触りません。</p>
+<pre><code>bundle exec rake dev
+# → bundle exec rake build
 # → bundle exec homura build --standalone
 # → npx wrangler dev --local --port 8787 --ip 127.0.0.1</code></pre>
 <p>別ターミナルで HTTP を確認します。</p>
@@ -26,12 +27,13 @@ npm install</code></pre>
 <p>応答が <code>200</code> であることを確認してください。</p>
 
 <h2 id="deploy">デプロイ</h2>
-<pre><code>npm run deploy</code></pre>
-<p>（<code>npm run build</code> 相当のビルドのあと <code>wrangler deploy</code> が走ります。）</p>
+<pre><code>bundle exec rake deploy</code></pre>
+<p>（Rake 側で build のあと <code>wrangler deploy</code> が走ります。）</p>
 
 <h2 id="limits">現在の制限</h2>
 <ul>
   <li><strong>rubygems</strong>: <code>opal-homura</code> / <code>homura-runtime</code> / <code>sinatra-homura</code> / <code>sequel-d1</code> の組み合わせを前提にする。</li>
   <li><strong>ERB</strong>: Workers 上では実行時 <code>eval</code> 不可のため、<code>bundle exec homura erb:compile</code> で事前コンパイルが必須。</li>
   <li><strong>Opal</strong>: <code>vendor/opal-gem</code> 固定版（Gemfile の <code>path</code>）に合わせる。</li>
+  <li><strong>日常操作</strong>: 生成 app では <code>bundle exec rake</code> 系を表の UX にし、<code>homura</code> は Rake の内部実装として扱う。</li>
 </ul>

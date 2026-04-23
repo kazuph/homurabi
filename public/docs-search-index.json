@@ -55,6 +55,11 @@
     "k": "Migration よくあるハマりポイント"
   },
   {
+    "t": "Migration — 既存アプリを backend だけ Cloudflare 化するなら",
+    "h": "/docs/migration#backend-only",
+    "k": "Migration 既存アプリを backend だけ Cloudflare 化するなら"
+  },
+  {
     "t": "Migration — 動かない・優先度を下げる例",
     "h": "/docs/migration#blockers",
     "k": "Migration 動かない・優先度を下げる例"

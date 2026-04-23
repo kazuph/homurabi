@@ -1,8 +1,33 @@
 # frozen_string_literal: true
+
+require 'rake/clean'
+
 task default: :build
+
+CLEAN.include(
+  'build/app_assets.rb',
+  'build/app_templates.rb',
+  'build/hello.no-exit.mjs',
+  'build/opal.stderr.log',
+  'worker.entrypoint.mjs'
+)
+
+def run!(*argv)
+  ok = system(*argv)
+  exit 1 unless ok
+end
 
 desc 'Opal + Workers bundle'
 task :build do
-  ok = system('bundle', 'exec', 'homura', 'build', '--standalone')
-  exit 1 unless ok
+  run!('bundle', 'exec', 'homura', 'build', '--standalone')
+end
+
+desc 'Start local Wrangler dev server'
+task dev: :build do
+  run!('npx', 'wrangler', 'dev', '--local', '--port', '8787', '--ip', '127.0.0.1')
+end
+
+desc 'Deploy the current app'
+task deploy: :build do
+  run!('npx', 'wrangler', 'deploy')
 end

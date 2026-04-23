@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'fileutils'
+require 'json'
 require 'tmpdir'
 
 passed = 0
@@ -40,6 +41,16 @@ Dir.mktmpdir do |dir|
     raise 'Gemfile missing' unless File.exist?(File.join(app_dir, 'Gemfile'))
     raise 'app/hello.rb missing' unless File.exist?(File.join(app_dir, 'app', 'hello.rb'))
     raise 'cf-runtime/setup-node-crypto.mjs missing' unless File.exist?(File.join(app_dir, 'cf-runtime', 'setup-node-crypto.mjs'))
+
+    rakefile = File.read(File.join(app_dir, 'Rakefile'))
+    raise 'Rake build task missing' unless rakefile.include?("task :build do")
+    raise 'Rake dev task missing' unless rakefile.include?("task dev: :build do")
+    raise 'Rake deploy task missing' unless rakefile.include?("task deploy: :build do")
+
+    package = JSON.parse(File.read(File.join(app_dir, 'package.json')))
+    raise 'package build script should delegate to rake' unless package.dig('scripts', 'build') == 'bundle exec rake build'
+    raise 'package dev script should delegate to rake' unless package.dig('scripts', 'dev') == 'bundle exec rake dev'
+    raise 'package deploy script should delegate to rake' unless package.dig('scripts', 'deploy') == 'bundle exec rake deploy'
   end
   passed += 1 if ok
   failed += 1 unless ok

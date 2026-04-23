@@ -12,6 +12,7 @@
 # Usage:
 #   ruby bin/compile-assets --input public --output build/homura_assets.rb --namespace HomuraAssets
 
+require 'base64'
 require 'fileutils'
 require 'optparse'
 
@@ -37,6 +38,13 @@ MIME_TYPES = {
 def mime_for(path)
   ext = File.extname(path).downcase
   MIME_TYPES[ext] || 'application/octet-stream'
+end
+
+def binary_content_type?(content_type)
+  !(content_type.start_with?('text/') ||
+    content_type.include?('javascript') ||
+    content_type.include?('json') ||
+    content_type.include?('xml'))
 end
 
 HELP = <<~USAGE
@@ -105,10 +113,19 @@ File.open(out_path, 'w') do |io|
           if (asset = #{ns}::ASSETS[path])
             headers = {
               'content-type'   => asset[:content_type],
-              'content-length' => asset[:body].bytesize.to_s,
               'cache-control'  => 'public, max-age=3600',
             }
-            [200, headers, [asset[:body]]]
+            if asset[:binary]
+              body = ::Cloudflare::EmbeddedBinaryBody.new(
+                asset[:body_base64],
+                asset[:content_type],
+                headers['cache-control']
+              )
+              [200, headers, [body.raw_response(200, headers)]]
+            else
+              headers['content-length'] = asset[:body].bytesize.to_s
+              [200, headers, [asset[:body]]]
+            end
           else
             @app.call(env)
           end
@@ -119,14 +136,20 @@ File.open(out_path, 'w') do |io|
 
   files.each do |full_path|
     rel = full_path.sub(public_dir, '')        # e.g. "/style.css"
-    content = File.read(full_path)
+    content = File.binread(full_path)
     ct = mime_for(full_path)
+    binary = binary_content_type?(ct)
 
     io.puts
     io.puts "# #{rel} (#{content.bytesize} bytes)"
     io.puts "#{ns}::ASSETS[#{rel.inspect}] = {"
     io.puts "  content_type: #{ct.inspect},"
-    io.puts "  body: #{content.inspect}"
+    io.puts "  binary: #{binary},"
+    if binary
+      io.puts "  body_base64: #{Base64.strict_encode64(content).inspect}"
+    else
+      io.puts "  body: #{content.inspect}"
+    end
     io.puts "}"
   end
 

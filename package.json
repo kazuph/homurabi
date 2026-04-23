@@ -17,7 +17,7 @@
     "test:workers": "bin/test-on-workers",
     "deploy": "npm run build && wrangler deploy",
     "build:test": "bundle exec cloudflare-workers-erb-compile --input views --output build/homura_templates.rb --namespace HomuraTemplates && ruby bin/opal-test-build test/smoke.rb build/smoke-test.mjs -r opal_patches -r cloudflare_workers -r homura_templates",
-    "test": "npm run build:test && ruby bin/node-with-runtime-setup build/smoke-test.mjs && npm run test:http && npm run test:crypto && npm run test:jwt && npm run test:scheduled && npm run test:ai && npm run test:faraday && npm run test:multipart && npm run test:streaming && npm run test:octokit && npm run test:do && npm run test:cache && npm run test:queue && npm run test:sequel && npm run test:fiber-await && npm run test:classic-sinatra && npm run test:auto-await && npm run test:build-support && npm run test:jwt-auth",
+    "test": "npm run build:test && ruby bin/node-with-runtime-setup build/smoke-test.mjs && npm run test:http && npm run test:crypto && npm run test:jwt && npm run test:scheduled && npm run test:ai && npm run test:faraday && npm run test:multipart && npm run test:streaming && npm run test:octokit && npm run test:do && npm run test:cache && npm run test:queue && npm run test:sequel && npm run test:fiber-await && npm run test:classic-sinatra && npm run test:auto-await && npm run test:build-support && npm run test:compile-assets && npm run test:jwt-auth",
     "build:classic-sinatra-test": "ruby bin/opal-test-build test/classic_sinatra_smoke.rb build/classic-sinatra-smoke.mjs -r opal_patches",
     "test:classic-sinatra": "npm run build:classic-sinatra-test && ruby bin/node-with-runtime-setup build/classic-sinatra-smoke.mjs",
     "build:fiber-await-test": "ruby bin/opal-test-build test/fiber_await_smoke.rb build/fiber-await-smoke.mjs -r opal_patches",
@@ -50,6 +50,7 @@
     "test:queue": "npm run build:queue-test && ruby bin/node-with-runtime-setup build/queue-smoke.mjs",
     "test:auto-await": "bundle exec ruby test/auto_await_analyzer_smoke.rb",
     "test:build-support": "bundle exec ruby test/build_support_test.rb",
+    "test:compile-assets": "bundle exec ruby test/compile_assets_test.rb",
     "test:jwt-auth": "bundle exec ruby test/jwt_auth_smoke.rb",
     "clean": "rm -f build/hello.no-exit.mjs build/smoke-test.mjs build/http-smoke.mjs build/crypto-smoke.mjs build/jwt-smoke.mjs build/ai-smoke.mjs build/scheduled-smoke.mjs build/faraday-smoke.mjs build/multipart-smoke.mjs build/streaming-smoke.mjs build/octokit-smoke.mjs build/do-smoke.mjs build/cache-smoke.mjs build/queue-smoke.mjs build/sequel-smoke.mjs build/homura_templates.rb build/homura_assets.rb build/opal.stderr.log"
   },

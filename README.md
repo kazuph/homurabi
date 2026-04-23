@@ -266,7 +266,7 @@ comment.
 
 | Upstream | Version vendored | Path in this repo | Upstream URL |
 |---|---|---|---|
-| **Opal** (Ruby→JS compiler + corelib + stdlib) | `1.8.3.rc1.2` (homura fork; based on upstream `1.8.3.rc1`) | `vendor/opal-gem/` | <https://github.com/opal/opal> |
+| **Opal** (Ruby→JS compiler + corelib + stdlib) | `1.8.3.rc1.3` (homura fork; based on upstream `1.8.3.rc1`) | `vendor/opal-gem/` | <https://github.com/opal/opal> |
 | **janbiedermann/sinatra** (CRuby-3 compatible fork) | fork HEAD when vendored | `vendor/sinatra/` | <https://github.com/janbiedermann/sinatra> |
 | **Rack** (patched copy shipped by the janbiedermann fork) | same | `vendor/rack/` | <https://github.com/rack/rack> |
 | **Mustermann** (Sinatra's path matcher) | same | `vendor/mustermann/` | <https://github.com/sinatra/mustermann> |

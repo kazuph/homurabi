@@ -12,6 +12,13 @@ Changes are grouped as follows:
 - **Security** to invite users to upgrade in case of vulnerabilities.
 - **Performance** changes related to speed and efficiency.
 
+## [1.8.3.rc1.3](https://github.com/kazuph/homura/tree/main/vendor/opal-gem) - 2026-04-23
+
+### Fixed
+
+- Ship a `digest` stdlib shim again so plain `require 'digest'` works during
+  Opal builds without relying on homura-runtime's private vendor load path.
+
 ## [1.8.3.rc1.2](https://github.com/kazuph/homura/tree/main/vendor/opal-gem) - 2026-04-23
 
 ### Fixed
@@ -2202,5 +2209,4 @@ This release brings a lot of performance improvements, our tests on Asciidoctor 
 
 - Implement attr_reader/writer/accessor for dynamic uses
 - Hash internals update
-
 

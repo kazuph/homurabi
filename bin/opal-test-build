@@ -1,0 +1,42 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require 'bundler/setup'
+require 'fileutils'
+
+input = ARGV.shift or abort('usage: ruby bin/opal-test-build INPUT OUTPUT [opal args...]')
+output = ARGV.shift or abort('usage: ruby bin/opal-test-build INPUT OUTPUT [opal args...]')
+extra_args = ARGV
+
+def gem_lib(name)
+  File.expand_path('lib', Gem::Specification.find_by_name(name).full_gem_path)
+end
+
+runtime_root = Gem::Specification.find_by_name('homura-runtime').full_gem_path
+
+FileUtils.mkdir_p('build')
+FileUtils.mkdir_p(File.dirname(output))
+
+opal_args = [
+  'bundle', 'exec', 'opal',
+  '-c', '-E', '--esm', '--no-source-map',
+  '-I', 'app',
+  '-I', gem_lib('homura-runtime'),
+  '-I', gem_lib('sinatra-homura'),
+  '-I', gem_lib('sequel-d1'),
+  '-I', 'lib',
+  '-I', 'vendor',
+  '-I', 'build',
+  *extra_args,
+  '-o', output,
+  input
+]
+
+stderr_path = File.expand_path('build/opal.stderr.log', Dir.pwd)
+
+success = system({ 'OPAL_PREFORK_DISABLE' => '1' }, *opal_args, err: stderr_path)
+abort('opal-test-build: opal compile failed') unless success
+
+patch_script = File.expand_path('runtime/patch-opal-evals.mjs', runtime_root)
+success = system('node', patch_script, output)
+abort('opal-test-build: patch-opal-evals failed') unless success

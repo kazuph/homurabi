@@ -1802,13 +1802,13 @@
     erb :layout_docs
   end
   get '/docs/sinatra' do
-    @title = 'sinatra-cloudflare-workers — homura Docs'
+    @title = 'sinatra-homura — homura Docs'
     @docs_page = 'sinatra'
     @docs_section = :reference
     @docs_breadcrumb = [
       ['Docs', '/docs'],
       ['API Reference', '/docs/runtime'],
-      ['sinatra-cloudflare-workers', nil]
+      ['sinatra-homura', nil]
     ]
     @docs_toc = [
       %w[overview 概要],
@@ -1841,13 +1841,13 @@
     erb :layout_docs
   end
   get '/docs/runtime' do
-    @title = 'cloudflare-workers-runtime — homura Docs'
+    @title = 'homura-runtime — homura Docs'
     @docs_page = 'runtime'
     @docs_section = :reference
     @docs_breadcrumb = [
       ['Docs', '/docs'],
       ['API Reference', '/docs/runtime'],
-      ['cloudflare-workers-runtime', nil]
+      ['homura-runtime', nil]
     ]
     @docs_toc = [
       %w[role 役割],

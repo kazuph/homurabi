@@ -1,0 +1,8 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require 'bundler/setup'
+
+setup = File.expand_path('runtime/setup-node-crypto.mjs', Gem::Specification.find_by_name('homura-runtime').full_gem_path)
+
+exec 'node', '--import', setup, *ARGV

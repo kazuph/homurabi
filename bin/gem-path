@@ -1,0 +1,19 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require 'bundler/setup'
+
+gem_name = ARGV.shift or abort('usage: ruby bin/gem-path GEM_NAME [RELATIVE_PATH]')
+relative_path = ARGV.shift
+
+spec = Gem::Specification.find_by_name(gem_name)
+path =
+  if relative_path
+    File.expand_path(relative_path, spec.full_gem_path)
+  else
+    spec.full_gem_path
+  end
+
+abort("gem-path: not found #{path}") unless File.exist?(path)
+
+puts path

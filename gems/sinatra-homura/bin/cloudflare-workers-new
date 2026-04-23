@@ -2,49 +2,36 @@
 # frozen_string_literal: true
 
 # Scaffolds a minimal Sinatra-on-Workers project (Phase 15-E).
-# Usage: cloudflare-workers-new myapp --gem-root /path/to/homura/worktree
+# Usage: cloudflare-workers-new myapp [--with-db]
 
 require 'erb'
 require 'fileutils'
 require 'optparse'
 require 'pathname'
 
-options = { with_db: false, gem_root: nil }
+options = { with_db: false }
 
 OptionParser.new do |o|
-  o.banner = 'usage: cloudflare-workers-new APP_NAME [--gem-root PATH] [--with-db]'
-  o.on('--gem-root PATH', 'homura worktree (contains gems/ and vendor/opal-gem)') { |p| options[:gem_root] = p }
+  o.banner = 'usage: cloudflare-workers-new APP_NAME [--with-db]'
   o.on('--with-db', 'Add sequel-d1 + sample migration') { options[:with_db] = true }
 end.parse!
 
 app_name = ARGV[0] or abort('cloudflare-workers-new: APP_NAME required')
 
 def sinatra_gem_dir
-  spec = Gem.loaded_specs['sinatra-cloudflare-workers']
+  spec = Gem.loaded_specs['sinatra-homura']
   return Pathname(spec.full_gem_path) if spec
   Pathname(__FILE__).expand_path.join('..', '..')
 end
 
-groot =
-  if options[:gem_root]
-    Pathname(options[:gem_root]).expand_path
-  else
-    sg = sinatra_gem_dir
-    cand = sg.join('..', '..').expand_path
-    cand.join('gems/homura-runtime').directory? ? cand : nil
-  end
+def required_spec(name)
+  Gem.loaded_specs[name] || Gem::Specification.find_by_name(name)
+end
 
-abort 'cloudflare-workers-new: could not resolve homura root; pass --gem-root' unless groot
-
-opal = groot.join('vendor/opal-gem')
-rt = groot.join('gems/homura-runtime')
-sin = groot.join('gems/sinatra-homura')
-seq = groot.join('gems/sequel-d1')
-
-abort "cloudflare-workers-new: missing #{opal}" unless opal.directory?
-abort "cloudflare-workers-new: missing #{rt}" unless rt.directory?
-abort "cloudflare-workers-new: missing #{sin}" unless sin.directory?
-abort "cloudflare-workers-new: missing #{seq}" if options[:with_db] && !seq.directory?
+opal_spec = required_spec('opal-homura')
+runtime_spec = required_spec('homura-runtime')
+sinatra_spec = required_spec('sinatra-homura')
+sequel_spec = options[:with_db] ? required_spec('sequel-d1') : nil
 
 target = Pathname(app_name).expand_path
 app_slug = target.basename.to_s
@@ -55,10 +42,10 @@ abort "cloudflare-workers-new: templates missing #{tpl_root}" unless tpl_root.di
 
 locals = {
   app_name: app_slug,
-  opal_path: opal.to_s,
-  runtime_path: rt.to_s,
-  sinatra_path: sin.to_s,
-  sequel_path: seq.to_s,
+  opal_version: opal_spec.version.to_s,
+  runtime_version: runtime_spec.version.to_s,
+  sinatra_version: sinatra_spec.version.to_s,
+  sequel_version: sequel_spec&.version&.to_s,
   with_db: options[:with_db],
   compat_date: Time.now.utc.strftime('%Y-%m-%d')
 }
@@ -85,7 +72,7 @@ end
 
 FileUtils.mkdir_p(target.join('cf-runtime'))
 %w[setup-node-crypto.mjs worker_module.mjs].each do |f|
-  FileUtils.cp(rt.join('runtime', f), target.join('cf-runtime', f))
+  FileUtils.cp(Pathname(runtime_spec.full_gem_path).join('runtime', f), target.join('cf-runtime', f))
 end
 
-puts "cloudflare-workers-new: wrote #{target} (gem-root=#{groot})"
+puts "cloudflare-workers-new: wrote #{target} (using published gems)"

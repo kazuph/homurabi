@@ -113,14 +113,12 @@ class App < Sinatra::Base
   get '/' do
     @title   = 'Hello from Sinatra'
     @users   = env['cloudflare.DB'].prepare('SELECT id, name FROM users').all.__await__
-    @content = erb :index      # ← real ERB, precompiled at build time
-    erb :layout
+    erb :index, layout: :layout
   end
 
   get '/hello/:name' do
     @name    = params['name']
-    @content = erb :hello
-    erb :layout
+    erb :hello, layout: :layout
   end
 
   get '/d1/users' do
@@ -424,6 +422,8 @@ Ruby method at build time**, in CRuby, before Opal runs. The pipeline:
    and reopens `Sinatra::Templates` to override `erb(name, ...)` so
    user code's `erb :index` transparently dispatches to the
    precompiled Proc via `instance.instance_exec(locals, &body)`.
+   Layout templates can use ordinary `<%= yield %>`; the precompiler
+   rewrites that to a helper call and passes layout blocks through.
 4. The Opal build command picks the generated file up with
    `-I build -r homura_templates`, so it runs at Worker init time,
    installs the override, and is ready before the first request.
@@ -435,9 +435,10 @@ because every ERB tag is just Ruby that Opal compiled to JS ahead of
 time. The generated `build/homura_templates.rb` is idempotent: run
 `bin/compile-erb` any time you change a view.
 
-The layout pattern works too: a route sets `@content = erb :index`
-and then `erb :layout`, which is the canonical Sinatra two-file
-rendering idiom.
+The layout pattern works too: routes can write ordinary Sinatra-style
+`erb :index, layout: :layout`, and `views/layout.erb` can use
+`<%= yield %>`. Legacy `@content` / `@docs_inner` layouts still work as
+compatibility shims while existing code is migrated.
 
 ---
 

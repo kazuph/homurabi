@@ -43,11 +43,21 @@ USAGE
 module CloudflareWorkersERB
   module_function
 
+  def normalize_fragment(fragment)
+    stripped = fragment.strip
+    return '__homura_template_yield__' if stripped == 'yield' || stripped == 'yield()'
+
+    fragment
+  end
+
   # Compile an ERB source string to a Ruby method body that assembles
   # an HTML string in a local variable `_out`. The body references
   # `@ivars` and method calls directly, so it must be run via
   # `instance_exec` on the Sinatra instance the route was dispatched
-  # on. That gives `<%= @name %>` the usual Sinatra semantics.
+  # on. That gives `<%= @name %>` the usual Sinatra semantics. Layout
+  # templates can also write `<%= yield %>` — we rewrite that specific
+  # form to an instance helper because Ruby's `yield` keyword is not
+  # valid inside the Proc body we generate here.
   def compile(source)
     ruby = +"_out = ''\n"
     cursor = 0
@@ -75,15 +85,15 @@ module CloudflareWorkersERB
       elsif inner.start_with?('==')
         # `<%== expression %>` — identical to `<%= %>` in this minimal
         # dialect (no HTML escaping yet; the author is responsible).
-        expr = inner[2..].strip
+        expr = normalize_fragment(inner[2..].strip)
         ruby << "_out = _out + ((#{expr})).to_s\n"
       elsif inner.start_with?('=')
         # `<%= expression %>`
-        expr = inner[1..].strip
+        expr = normalize_fragment(inner[1..].strip)
         ruby << "_out = _out + ((#{expr})).to_s\n"
       else
         # `<% code %>` — Ruby statement(s), emitted verbatim
-        ruby << inner.strip << "\n"
+        ruby << normalize_fragment(inner.strip) << "\n"
       end
 
       cursor = close_idx + 2
@@ -142,10 +152,16 @@ def emit_header(io, namespace)
           @templates[name.to_sym] = body
         end
 
-        def render(name, instance, locals = {})
+        def render(name, instance, locals = {}, &block)
           body = @templates[name.to_sym]
           raise "#{namespace}: no template registered for \#{name.inspect}" unless body
-          instance.instance_exec(locals, &body)
+          previous_block = instance.instance_variable_get(:@__homura_template_block__)
+          begin
+            instance.instance_variable_set(:@__homura_template_block__, block)
+            instance.instance_exec(locals, &body)
+          ensure
+            instance.instance_variable_set(:@__homura_template_block__, previous_block)
+          end
         end
 
         def registered?(name)
@@ -186,11 +202,40 @@ def emit_sinatra_patch(io, namespace)
 
     module ::Sinatra
       module Templates
+        def __homura_template_yield__
+          block = @__homura_template_block__
+          raise LocalJumpError, 'no block given' unless block
+
+          block.call
+        end
+
+        def __homura_default_template_block_for__(template)
+          case template.to_sym
+          when :layout
+            proc { @content } if defined?(@content)
+          when :layout_docs
+            proc { @docs_inner } if defined?(@docs_inner)
+          end
+        end
+
         # Precompiled-templates patch: unknown symbols raise instead of Tilt/eval.
         def erb(template, options = {}, locals = {}, &block)
           if template.is_a?(::Symbol) && ::#{namespace}.registered?(template)
             locals ||= {}
-            ::#{namespace}.render(template, self, locals)
+            block ||= __homura_default_template_block_for__(template)
+            output = ::#{namespace}.render(template, self, locals, &block)
+
+            layout = options[:layout]
+            layout = false if layout.nil? && options.include?(:layout)
+            if layout
+              layout = :layout if layout == true
+              layout = layout.to_sym
+              raise "erb layout \#{layout.inspect} not precompiled; run cloudflare-workers-erb-compile" unless ::#{namespace}.registered?(layout)
+
+              return ::#{namespace}.render(layout, self, locals) { output }
+            end
+
+            output
           else
             raise "erb \#{template.inspect} not precompiled; run cloudflare-workers-erb-compile"
           end

@@ -72,18 +72,25 @@ paths.each do |path|
   # needed to tell Opal to wrap the file in an async function and to
   # translate #__await__ calls into real JS await keywords.
   has_magic = source.lines.first(5).any? { |l| l.match?(/#\s*await:/) }
+  has_existing_await = source.include?('.__await__')
 
   begin
     analyzer = CloudflareWorkers::AutoAwait::Analyzer.new(registry, debug: options[:debug])
     buffer, nodes = analyzer.process(source, path)
+    needs_magic_only_output = has_existing_await && !has_magic
 
-    if nodes.empty?
+    if nodes.empty? && !needs_magic_only_output
       puts "[auto-await] skip (no changes) #{rel}" if options[:debug]
       skipped += 1
       next
     end
 
-    transformed = CloudflareWorkers::AutoAwait::Transformer.transform(source, nodes, buffer)
+    transformed =
+      if nodes.empty?
+        source
+      else
+        CloudflareWorkers::AutoAwait::Transformer.transform(source, nodes, buffer)
+      end
     unless has_magic
       transformed = "# await: true\n" + transformed
     end

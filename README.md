@@ -8,7 +8,7 @@
 
 Live demo: **<https://homura.kazu-san.workers.dev>**
 
-**Phase 15-F (in progress)** — The release units stay in this monorepo, but each gem is published independently from its own gemspec. The three runtime gems (`homura-runtime`, `sinatra-homura`, `sequel-d1`) and the patched Opal fork (`opal-homura`) all build cleanly as `.gem` artifacts. Consumer flow is `gem install --local` (order: opal-homura → runtime → sinatra → sequel-d1), then plain `cloudflare-workers-new myapp` and `bundle exec cloudflare-workers-build`. `homura` itself remains the showcase app / integration repo for now and is **not** part of the RubyGems publish set. Entry topology is documented in [`gems/homura-runtime/docs/ARCHITECTURE.md`](gems/homura-runtime/docs/ARCHITECTURE.md). `wrangler.toml` `main` points at **`build/worker.entrypoint.mjs`**.
+**Phase 15-F (in progress)** — The release units stay in this monorepo, but each gem is published independently from its own gemspec. The three runtime gems (`homura-runtime`, `sinatra-homura`, `sequel-d1`) and the patched Opal fork (`opal-homura`) all build cleanly as `.gem` artifacts. Consumer flow is `gem install --local` (order: opal-homura → runtime → sinatra → sequel-d1), then plain `homura new myapp` and `bundle exec cloudflare-workers-build`. `cloudflare-workers-new` remains as a compatibility alias. `homura` itself remains the showcase app / integration repo for now and is **not** part of the RubyGems publish set. Entry topology is documented in [`gems/homura-runtime/docs/ARCHITECTURE.md`](gems/homura-runtime/docs/ARCHITECTURE.md). `wrangler.toml` `main` points at **`build/worker.entrypoint.mjs`**.
 
 ---
 

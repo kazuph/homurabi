@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'fileutils'
+require 'open3'
 require 'tmpdir'
 
 passed = 0
@@ -74,6 +75,40 @@ Dir.mktmpdir do |dir|
   end
   passed += 1 if ok
   failed += 1 unless ok
+
+  {
+    'compile-erb rejects <% yield %>' => {
+      script: File.expand_path('../gems/homura-runtime/exe/compile-erb', __dir__),
+      body: '<% yield %>'
+    },
+    'compile-erb rejects <%= yield(arg) %>' => {
+      script: File.expand_path('../gems/homura-runtime/exe/compile-erb', __dir__),
+      body: '<%= yield(:body) %>'
+    },
+    'cloudflare-workers-erb-compile rejects <% yield %>' => {
+      script: File.expand_path('../gems/sinatra-homura/bin/cloudflare-workers-erb-compile', __dir__),
+      body: '<% yield %>'
+    },
+    'cloudflare-workers-erb-compile rejects <%= yield(arg) %>' => {
+      script: File.expand_path('../gems/sinatra-homura/bin/cloudflare-workers-erb-compile', __dir__),
+      body: '<%= yield(:body) %>'
+    }
+  }.each do |label, spec|
+    ok = assert(label) do
+      invalid_path = File.join(views_dir, 'invalid.erb')
+      File.write(invalid_path, spec[:body])
+      output, status = Dir.chdir(dir) do
+        Open3.capture2e('ruby', spec[:script], invalid_path)
+      end
+      raise 'unexpected success' if status.success?
+      raise output unless output.include?('Unsupported ERB yield form')
+      raise output unless output.include?('<%= yield %>') && output.include?('<%== yield %>')
+    ensure
+      FileUtils.rm_f(invalid_path)
+    end
+    passed += 1 if ok
+    failed += 1 unless ok
+  end
 end
 
 puts "\n#{passed} passed, #{failed} failed"

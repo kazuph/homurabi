@@ -44,7 +44,9 @@ options = {
   bundle_import: nil,
   worker_module_import: nil,
   entrypoint_out: nil,
-  with_db: false
+  with_db: false,
+  templates_namespace: nil,
+  assets_namespace: nil
 }
 
 OptionParser.new do |o|
@@ -63,9 +65,13 @@ OptionParser.new do |o|
   o.on('--bundle-import PATH', 'Opal bundle import in entrypoint') { |p| options[:bundle_import] = p }
   o.on('--worker-module-import PATH', 'worker_module.mjs import in entrypoint') { |p| options[:worker_module_import] = p }
   o.on('--entrypoint-out PATH', 'Where to write worker.entrypoint.mjs') { |p| options[:entrypoint_out] = p }
+  o.on('--templates-namespace NAME', 'Standalone templates module name (default: project-derived)') { |n| options[:templates_namespace] = n }
+  o.on('--assets-namespace NAME', 'Standalone assets module name (default: project-derived)') { |n| options[:assets_namespace] = n }
 end.parse!
 
 root = Pathname(options[:root]).expand_path
+options[:templates_namespace] ||= CloudflareWorkers::BuildSupport.standalone_namespace(root, 'Templates') if options[:standalone]
+options[:assets_namespace] ||= CloudflareWorkers::BuildSupport.standalone_namespace(root, 'Assets') if options[:standalone]
 
 if options[:standalone]
   Dir.chdir(root) { require 'bundler/setup' }
@@ -199,12 +205,13 @@ unless options[:standalone]
   opal_out = root.join(opal_out) unless opal_out.absolute?
   run_opal_homura!(root, opal_in.relative_path_from(root).to_s, opal_out.relative_path_from(root).to_s)
 else
+  CloudflareWorkers::BuildSupport.ensure_standalone_runtime(root, current_file: __FILE__)
   run!(
     [
       'ruby', CloudflareWorkersBuild.exe_path('compile-erb').to_s,
       '--input', 'views',
       '--output', 'build/app_templates.rb',
-      '--namespace', 'AppTemplates'
+      '--namespace', options[:templates_namespace]
     ],
     chdir: root
   )
@@ -213,7 +220,7 @@ else
       'ruby', CloudflareWorkersBuild.exe_path('compile-assets').to_s,
       '--input', 'public',
       '--output', 'build/app_assets.rb',
-      '--namespace', 'AppAssets'
+      '--namespace', options[:assets_namespace]
     ],
     chdir: root
   )

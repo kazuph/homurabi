@@ -43,11 +43,38 @@ USAGE
 module HomuraERB
   module_function
 
-  def normalize_fragment(fragment)
+  def supported_yield_fragment?(fragment)
     stripped = fragment.strip
-    return '__homura_template_yield__' if stripped == 'yield' || stripped == 'yield()'
+    stripped.match?(/\Ayield(?:\(\s*\))?\z/)
+  end
 
+  def yield_with_args_fragment?(fragment)
+    fragment.strip.match?(/\Ayield\s*\(.+\)\z/)
+  end
+
+  def normalize_fragment(fragment)
+    return '__homura_template_yield__' if supported_yield_fragment?(fragment)
     fragment
+  end
+
+  def validate_code_fragment!(fragment)
+    stripped = fragment.strip
+    return unless supported_yield_fragment?(stripped) || yield_with_args_fragment?(stripped)
+
+    raise <<~MSG.strip
+      Unsupported ERB yield form `<% #{stripped} %>`.
+      Use `<%= yield %>` or `<%== yield %>` in layout templates.
+    MSG
+  end
+
+  def validate_expression_fragment!(fragment)
+    stripped = fragment.strip
+    return unless yield_with_args_fragment?(stripped)
+
+    raise <<~MSG.strip
+      Unsupported ERB yield form `<%= #{stripped} %>`.
+      `yield(arg)` is not supported; use `<%= yield %>` or `<%== yield %>`, or pass data via ivars/locals instead.
+    MSG
   end
 
   # Compile an ERB source string to a Ruby method body that assembles
@@ -85,15 +112,21 @@ module HomuraERB
       elsif inner.start_with?('==')
         # `<%== expression %>` — identical to `<%= %>` in this minimal
         # dialect (no HTML escaping yet; the author is responsible).
-        expr = normalize_fragment(inner[2..].strip)
+        expr = inner[2..].strip
+        validate_expression_fragment!(expr)
+        expr = normalize_fragment(expr)
         ruby << "_out = _out + ((#{expr})).to_s\n"
       elsif inner.start_with?('=')
         # `<%= expression %>`
-        expr = normalize_fragment(inner[1..].strip)
+        expr = inner[1..].strip
+        validate_expression_fragment!(expr)
+        expr = normalize_fragment(expr)
         ruby << "_out = _out + ((#{expr})).to_s\n"
       else
         # `<% code %>` — Ruby statement(s), emitted verbatim
-        ruby << normalize_fragment(inner.strip) << "\n"
+        code = inner.strip
+        validate_code_fragment!(code)
+        ruby << normalize_fragment(code) << "\n"
       end
 
       cursor = close_idx + 2

@@ -16,6 +16,15 @@ end
 run App # optional if `App` is defined; a fallback registers the Rack handler at exit
 ```
 
+## Scaffolding
+
+```bash
+bundle exec homura new myapp
+```
+
+`cloudflare-workers-new` remains available as a compatibility alias, but
+`homura new` is the preferred entrypoint.
+
 ## ERB precompile
 
 ```bash

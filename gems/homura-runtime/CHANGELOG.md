@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.5 (2026-04-23)
+
+- Make `auto-await` emit rewritten files for existing hand-written `.__await__`
+  usage when the only missing piece is `# await: true`.
+- Make `cloudflare-workers-build --standalone` restore `cf-runtime/` from the
+  packaged gem and derive standalone template/asset namespaces from the project
+  name by default, with explicit override flags when needed.
+- Reject unsupported ERB yield forms like `<% yield %>` and `yield(arg)` with
+  compile-time guidance toward the supported Sinatra-style layout forms.
+
 ## 0.1.4 (2026-04-23)
 
 - Teach the precompiled ERB runtime to support Sinatra-style layout blocks and

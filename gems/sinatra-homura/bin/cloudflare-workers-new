@@ -2,7 +2,7 @@
 # frozen_string_literal: true
 
 # Scaffolds a minimal Sinatra-on-Workers project (Phase 15-E).
-# Usage: cloudflare-workers-new myapp [--with-db]
+# Preferred usage: homura new myapp [--with-db]
 
 require 'erb'
 require 'fileutils'
@@ -12,11 +12,11 @@ require 'pathname'
 options = { with_db: false }
 
 OptionParser.new do |o|
-  o.banner = 'usage: cloudflare-workers-new APP_NAME [--with-db]'
+  o.banner = 'usage: homura new APP_NAME [--with-db]'
   o.on('--with-db', 'Add sequel-d1 + sample migration') { options[:with_db] = true }
 end.parse!
 
-app_name = ARGV[0] or abort('cloudflare-workers-new: APP_NAME required')
+app_name = ARGV[0] or abort('homura new: APP_NAME required')
 
 def sinatra_gem_dir
   spec = Gem.loaded_specs['sinatra-homura']
@@ -35,10 +35,10 @@ sequel_spec = options[:with_db] ? required_spec('sequel-d1') : nil
 
 target = Pathname(app_name).expand_path
 app_slug = target.basename.to_s
-abort "cloudflare-workers-new: #{target} already exists" if target.exist?
+abort "homura new: #{target} already exists" if target.exist?
 
 tpl_root = sinatra_gem_dir.join('templates/project')
-abort "cloudflare-workers-new: templates missing #{tpl_root}" unless tpl_root.directory?
+abort "homura new: templates missing #{tpl_root}" unless tpl_root.directory?
 
 locals = {
   app_name: app_slug,
@@ -75,4 +75,4 @@ FileUtils.mkdir_p(target.join('cf-runtime'))
   FileUtils.cp(Pathname(runtime_spec.full_gem_path).join('runtime', f), target.join('cf-runtime', f))
 end
 
-puts "cloudflare-workers-new: wrote #{target} (using published gems)"
+puts "homura new: wrote #{target} (using published gems)"

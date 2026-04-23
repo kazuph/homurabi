@@ -9,7 +9,7 @@ Core Ruby + Module Worker glue for [Opal](https://opalrb.com/) on [Cloudflare Wo
 - `runtime/worker_module.mjs` — fetch / scheduled / queue / DO adapters (**no Opal bundle import**).
 - `runtime/worker.mjs` — thin bootstrap (crypto shim → bundle → `worker_module`) for legacy layouts.
 - `runtime/setup-node-crypto.mjs` — `node:crypto` on `globalThis` before the Opal bundle loads.
-- `bin/cloudflare-workers-build` — single build pipeline (ERB → assets → Opal → patch → `worker.entrypoint.mjs`). Use `--standalone` in generated apps.
+- `bin/cloudflare-workers-build` — single build pipeline (ERB → assets → Opal → patch → `worker.entrypoint.mjs`). Use `--standalone` in generated apps; it now restores `cf-runtime/` automatically and derives standalone template/asset namespaces from the project name by default.
 - `docs/ARCHITECTURE.md` — wrangler `main`, codegen entrypoint, and fixed-import policy.
 
 ## Quick start (homura monorepo)

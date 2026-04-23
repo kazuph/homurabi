@@ -79,6 +79,39 @@ end
 passed += 1 if ok
 failed += 1 unless ok
 
+ok = assert('copies standalone runtime files into cf-runtime') do
+  Dir.mktmpdir do |dir|
+    runtime_root = File.join(dir, 'runtime-gem')
+    specs = { 'homura-runtime' => FakeSpec.new(runtime_root) }
+    FileUtils.mkdir_p(File.join(runtime_root, 'runtime'))
+    File.write(File.join(runtime_root, 'runtime', 'setup-node-crypto.mjs'), "setup\n")
+    File.write(File.join(runtime_root, 'runtime', 'worker_module.mjs'), "worker\n")
+
+    target = CloudflareWorkers::BuildSupport.ensure_standalone_runtime(dir, loaded_specs: specs)
+    raise "expected #{File.join(dir, 'cf-runtime')}, got #{target}" unless target.to_s == File.join(dir, 'cf-runtime')
+    raise 'missing setup-node-crypto.mjs' unless File.read(File.join(dir, 'cf-runtime', 'setup-node-crypto.mjs')) == "setup\n"
+    raise 'missing worker_module.mjs' unless File.read(File.join(dir, 'cf-runtime', 'worker_module.mjs')) == "worker\n"
+  end
+end
+passed += 1 if ok
+failed += 1 unless ok
+
+ok = assert('derives standalone namespaces from project name') do
+  templates = CloudflareWorkers::BuildSupport.standalone_namespace('/tmp/demo-app', 'Templates')
+  assets = CloudflareWorkers::BuildSupport.standalone_namespace('/tmp/demo-app', 'Assets')
+  raise "expected DemoAppTemplates, got #{templates}" unless templates == 'DemoAppTemplates'
+  raise "expected DemoAppAssets, got #{assets}" unless assets == 'DemoAppAssets'
+end
+passed += 1 if ok
+failed += 1 unless ok
+
+ok = assert('prefixes standalone namespaces that would start with digits') do
+  namespace = CloudflareWorkers::BuildSupport.standalone_namespace('/tmp/123-app', 'Templates')
+  raise "expected App123AppTemplates, got #{namespace}" unless namespace == 'App123AppTemplates'
+end
+passed += 1 if ok
+failed += 1 unless ok
+
 ok = assert('homura-runtime gemspec packages vendor shims') do
   spec = Dir.chdir(File.expand_path('../gems/homura-runtime', __dir__)) do
     Gem::Specification.load('homura-runtime.gemspec')

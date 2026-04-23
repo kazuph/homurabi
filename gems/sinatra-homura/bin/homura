@@ -1,0 +1,17 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+command = ARGV.shift
+
+case command
+when 'new'
+  load File.expand_path('cloudflare-workers-new', __dir__)
+else
+  warn <<~USAGE
+    usage: homura COMMAND [args]
+
+    Commands:
+      new APP_NAME [--with-db]
+  USAGE
+  exit 1
+end

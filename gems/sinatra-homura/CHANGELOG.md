@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.3 (2026-04-23)
+
+- Add the preferred `homura new` scaffold entrypoint while keeping
+  `cloudflare-workers-new` as a compatibility alias.
+- Match runtime-side ERB diagnostics so unsupported yield forms fail at compile
+  time with guidance toward `<%= yield %>` / `<%== yield %>`.
+- Require `homura-runtime >= 0.1.5` so standalone build/runtime behavior stays
+  aligned.
+
 ## 0.1.2 (2026-04-23)
 
 - Make `cloudflare-workers-erb-compile` support Sinatra-style layout blocks and

@@ -79,7 +79,7 @@ module CloudflareWorkers
           next unless Dir.exist?(lib_dir)
 
           Dir.glob(File.join(lib_dir, '**', '*.rb')).each do |path|
-            next unless File.read(path, 8192).include?('register_async_source')
+            next unless File.read(path).include?('register_async_source')
 
             require_path = path.sub(Regexp.new("^#{Regexp.escape(lib_dir)}/"), '').sub(/\.rb\z/, '')
             begin

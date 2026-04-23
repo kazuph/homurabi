@@ -246,7 +246,44 @@ module Sinatra
     end
 
     # -------------------------------------------------------------
-    # 8. Base#invoke (upstream base.rb:1167)
+    # 8. Base#call! (upstream base.rb:996)
+    #
+    # Upstream wraps `dispatch!` in an outer `invoke { ... }`. On
+    # homura, `dispatch!` itself already applies route/filter results
+    # via inner `invoke` calls. If `dispatch!` returns a Promise-like
+    # completion token (e.g. async route work already materialized the
+    # Rack response and bubbles a PromiseV2/native Promise outward),
+    # the upstream outer `invoke` misclassifies that token as a route
+    # body and overwrites the real response with an empty Promise body.
+    #
+    # Call `dispatch!` directly and let it manage its own invoke/error
+    # handling. This preserves the normal Rack tuple while still
+    # allowing async route bodies to flow through `apply_invoke_result`.
+    # -------------------------------------------------------------
+    def call!(env)
+      @env      = env
+      @params   = IndifferentHash.new
+      @request  = Request.new(env)
+      @response = Response.new
+      @pinned_response = nil
+      template_cache.clear if settings.reload_templates
+
+      dispatch!
+      invoke { error_block!(response.status) } unless @env['sinatra.error']
+
+      unless @response['content-type']
+        if Array === body && body[0].respond_to?(:content_type)
+          content_type body[0].content_type
+        elsif (default = settings.default_content_type)
+          content_type default
+        end
+      end
+
+      @response.finish
+    end
+
+    # -------------------------------------------------------------
+    # 9. Base#invoke (upstream base.rb:1167)
     #
     # Upstream decides body by shape (Integer / String / Array / each).
     # homura adds a fourth case: a native JS Promise (routes with
@@ -312,7 +349,7 @@ module Sinatra
     private :wrap_async_halt_result
 
     # -------------------------------------------------------------
-    # 9. Base.new! (upstream base.rb:1676)
+    # 10. Base.new! (upstream base.rb:1676)
     #
     # Upstream uses `alias new! new unless method_defined? :new!` on
     # the singleton class. Opal's alias-into-class<<self does not
@@ -327,7 +364,7 @@ module Sinatra
       end
 
       # -----------------------------------------------------------
-      # 10. Base.setup_default_middleware (upstream base.rb:1846)
+      # 11. Base.setup_default_middleware (upstream base.rb:1846)
       #
       # Upstream invokes `setup_host_authorization` which uses IPAddr.
       # homura does not use host_authorization on Workers (the

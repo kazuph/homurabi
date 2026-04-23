@@ -23,6 +23,7 @@
 #   npm test
 
 require 'json'
+require 'promise/v2'
 require 'sinatra/base'
 
 class Sinatra::Request
@@ -191,6 +192,14 @@ class TestApp < Sinatra::Base
   end
 end
 
+class AsyncDispatchApp < Sinatra::Base
+  def dispatch!
+    content_type 'text/plain'
+    body 'async-dispatch-ok'
+    PromiseV2.value(nil)
+  end
+end
+
 # =====================================================================
 # Env builder
 # =====================================================================
@@ -232,6 +241,16 @@ def call_worker_app(method, path, body: '')
   [status, location, text]
 end
 
+def call_worker_app_for(app, method, path, body: '')
+  Rack::Handler::CloudflareWorkers.run(app)
+  url = "https://example.test#{path}"
+  js_req = `new Request(#{url}, { method: #{method}, body: #{body} })`
+  js_resp = Rack::Handler::CloudflareWorkers.call(js_req, `({})`, `({ waitUntil: function() {} })`, body).__await__
+  status = `#{js_resp}.status`
+  text = `#{js_resp}.text()`.__await__
+  [status, text]
+end
+
 # =====================================================================
 # Tests
 # =====================================================================
@@ -260,6 +279,10 @@ SmokeTest.assert("async redirect returns 302") { call_worker_app('GET', '/async/
 SmokeTest.assert("async redirect sets Location") { call_worker_app('GET', '/async/redirect').__await__[1].to_s.include?('/dest') }
 SmokeTest.assert("async halt returns 418") { call_worker_app('GET', '/async/halt').__await__[0] == 418 }
 SmokeTest.assert("async halt body is teapot") { call_worker_app('GET', '/async/halt').__await__[2] == 'teapot' }
+SmokeTest.assert("promise-returning dispatch! preserves body instead of emptying response") {
+  status, text = call_worker_app_for(AsyncDispatchApp, 'GET', '/').__await__
+  status == 200 && text == 'async-dispatch-ok'
+}
 SmokeTest.assert("pass falls through") { call_app('GET', '/pass1')[2] == 'second-route' }
 SmokeTest.assert("content_type sets header") { call_app('GET', '/content_type_test')[1]['content-type'].to_s.include?('application/json') }
 

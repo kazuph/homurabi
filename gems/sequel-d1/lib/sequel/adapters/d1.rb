@@ -16,7 +16,7 @@
 #
 #   get '/demo/sequel' do
 #     db = Sequel.connect(adapter: :d1, d1: env['cloudflare.DB'])
-#     users = db[:users].where(active: true).order(:name).limit(10).all.__await__
+#     users = db[:users].where(active: true).order(:name).limit(10).all
 #     json users
 #   end
 #
@@ -27,11 +27,12 @@
 # Sequel::D1::Database per request is fine (SingleConnectionPool
 # keeps overhead minimal).
 #
-# Async boundary: Dataset#all / #first / #count are synchronous from
+# Async boundary: Dataset#all / #first / #count look synchronous from
 # Ruby's point of view but transitively call `fetch_rows` →
-# `execute` → `.__await__(env.DB.prepare...)`. Callers in Sinatra
-# routes append `.__await__` to the Dataset call to resolve the
-# Promise, matching the D1/KV/R2 idiom already used in Phase 3-10.
+# `execute` → `.__await__(env.DB.prepare...)`. In normal homura app
+# builds, the auto-await pass rewrites those Dataset call sites so
+# Sinatra route code stays sync-shaped. Manual `.__await__` is only
+# needed when bypassing that build step.
 
 begin
   require 'cloudflare_workers'

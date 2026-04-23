@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.6 (2026-04-23)
+
+- Guard nested param values against raw JS `undefined` during `force_encoding`,
+  fixing the remaining `dispatch!` / `$respond_to?` crash under `wrangler dev`.
+
 ## 0.2.5 (2026-04-23)
 
 - Make `Sinatra::Base#dispatch!` skip raw JS `undefined` param values before calling

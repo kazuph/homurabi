@@ -34,6 +34,7 @@ class Sinatra::Request
 
     values = values.dup
     values['undefined_param'] = `undefined`
+    values['nested_undefined_param'] = { 'inner' => `undefined` }
     values
   end
 end

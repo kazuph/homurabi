@@ -368,11 +368,13 @@ module Sinatra
       def force_encoding(data, encoding = default_encoding)
         return if data == settings || data.is_a?(Tempfile)
 
-        if data && data.respond_to?(:force_encoding)
+        present = `#{data} !== null && #{data} !== undefined && #{data} !== Opal.nil`
+
+        if present && data.respond_to?(:force_encoding)
           data.force_encoding(encoding)
-        elsif data.respond_to?(:each_value)
+        elsif present && data.respond_to?(:each_value)
           data.each_value { |v| force_encoding(v, encoding) }
-        elsif data.respond_to?(:each)
+        elsif present && data.respond_to?(:each)
           data.each { |v| force_encoding(v, encoding) }
         end
 
@@ -391,7 +393,7 @@ module Sinatra
     # -------------------------------------------------------------
     def dispatch!
       @params.merge!(@request.params).each do |key, val|
-        next unless val && val.respond_to?(:force_encoding)
+        next unless `#{val} !== null && #{val} !== undefined && #{val} !== Opal.nil` && val.respond_to?(:force_encoding)
 
         val = val.dup if val.frozen?
         @params[key] = force_encoding(val)

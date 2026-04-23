@@ -1,0 +1,104 @@
+name: Release gems
+
+on:
+  push:
+    tags:
+      - 'opal-homura-v*'
+      - 'homura-runtime-v*'
+      - 'sinatra-homura-v*'
+      - 'sequel-d1-v*'
+
+jobs:
+  publish:
+    name: Publish ${{ github.ref_name }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    environment: release
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.4'
+
+      - name: Resolve gem target
+        id: target
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ref_name="${GITHUB_REF_NAME}"
+
+          case "$ref_name" in
+            opal-homura-v*)
+              gem_name="opal-homura"
+              version="${ref_name#opal-homura-v}"
+              workdir="vendor/opal-gem"
+              gemspec="opal.gemspec"
+              expected_version="$(ruby -e 'load File.expand_path("vendor/opal-gem/lib/opal/version.rb", Dir.pwd); print Opal::VERSION')"
+              ;;
+            homura-runtime-v*)
+              gem_name="homura-runtime"
+              version="${ref_name#homura-runtime-v}"
+              workdir="gems/homura-runtime"
+              gemspec="homura-runtime.gemspec"
+              expected_version="$(ruby -e 'load File.expand_path("gems/homura-runtime/lib/cloudflare_workers/version.rb", Dir.pwd); print CloudflareWorkers::VERSION')"
+              ;;
+            sinatra-homura-v*)
+              gem_name="sinatra-homura"
+              version="${ref_name#sinatra-homura-v}"
+              workdir="gems/sinatra-homura"
+              gemspec="sinatra-homura.gemspec"
+              expected_version="$(ruby -e 'spec = Gem::Specification.load("gems/sinatra-homura/sinatra-homura.gemspec"); print spec.version')"
+              ;;
+            sequel-d1-v*)
+              gem_name="sequel-d1"
+              version="${ref_name#sequel-d1-v}"
+              workdir="gems/sequel-d1"
+              gemspec="sequel-d1.gemspec"
+              expected_version="$(ruby -e 'load File.expand_path("gems/sequel-d1/lib/sequel/d1/version.rb", Dir.pwd); print Sequel::D1::VERSION')"
+              ;;
+            *)
+              echo "Unsupported tag: $ref_name" >&2
+              exit 1
+              ;;
+          esac
+
+          if [[ "$version" != "$expected_version" ]]; then
+            echo "Tag version $version does not match $gem_name version $expected_version" >&2
+            exit 1
+          fi
+
+          artifact="${gem_name}-${version}.gem"
+
+          {
+            echo "gem_name=$gem_name"
+            echo "version=$version"
+            echo "workdir=$workdir"
+            echo "gemspec=$gemspec"
+            echo "artifact=$artifact"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Configure RubyGems credentials
+        uses: rubygems/configure-rubygems-credentials@main
+
+      - name: Build gem
+        shell: bash
+        working-directory: ${{ steps.target.outputs.workdir }}
+        run: |
+          set -euo pipefail
+          gem build "${{ steps.target.outputs.gemspec }}" --output "${{ steps.target.outputs.artifact }}"
+
+      - name: Push gem
+        shell: bash
+        working-directory: ${{ steps.target.outputs.workdir }}
+        run: |
+          set -euo pipefail
+          gem push "${{ steps.target.outputs.artifact }}"

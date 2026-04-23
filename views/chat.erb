@@ -19,16 +19,23 @@
     </div>
   </header>
 
-  <div id="chat-auth-banner" class="chat-banner chat-banner-info">
-    Mint a demo token to start chatting:
-    <button id="chat-login-btn" type="button">Issue HS256 token (demo)</button>
-    <span id="chat-auth-status">no token</span>
+  <div id="chat-auth-banner" class="chat-banner <%= @ai_demos_enabled ? 'chat-banner-info' : 'chat-banner-error' %>">
+    <% if @ai_demos_enabled %>
+      Mint a demo token to start chatting:
+      <button id="chat-login-btn" type="button">Issue HS256 token (demo)</button>
+      <span id="chat-auth-status">no token</span>
+    <% else %>
+      Chat is disabled on this deployment.
+      <button id="chat-login-btn" type="button" disabled>Workers AI disabled</button>
+      <span id="chat-auth-status">HOMURA_ENABLE_AI_DEMOS=0</span>
+    <% end %>
   </div>
 
   <main class="chat-thread" id="chat-thread"
         data-session-id="<%= Rack::Utils.escape_html(@session_id) %>"
         data-primary-model="<%= Rack::Utils.escape_html(@primary_model) %>"
-        data-fallback-model="<%= Rack::Utils.escape_html(@fallback_model) %>">
+        data-fallback-model="<%= Rack::Utils.escape_html(@fallback_model) %>"
+        data-demos-enabled="<%= @ai_demos_enabled ? 'true' : 'false' %>">
     <% if @history && @history.any? %>
       <% @history.each do |msg| %>
         <% role = Rack::Utils.escape_html(msg['role'].to_s) %>
@@ -36,9 +43,14 @@
       <% end %>
     <% else %>
       <div class="chat-empty">
-        No messages yet. Say
-        <button class="chat-suggest" type="button" data-text="こんにちは！自己紹介してください">こんにちは！自己紹介してください</button>
-        to get started.
+        <% if @ai_demos_enabled %>
+          No messages yet. Say
+          <button class="chat-suggest" type="button" data-text="こんにちは！自己紹介してください">こんにちは！自己紹介してください</button>
+          to get started.
+        <% else %>
+          This deployment keeps the metered Workers AI routes closed. See
+          <a href="/api/chat/health">/api/chat/health</a> for the current status.
+        <% end %>
       </div>
     <% end %>
   </main>
@@ -47,17 +59,18 @@
     <label for="chat-input" class="chat-visually-hidden">Chat message</label>
     <textarea id="chat-input" name="content" rows="2"
               aria-label="Chat message"
-              placeholder="日本語でも英語でも。Enterで送信、Shift+Enterで改行。"></textarea>
+              placeholder="<%= @ai_demos_enabled ? '日本語でも英語でも。Enterで送信、Shift+Enterで改行。' : 'This deployment has chat disabled.' %>"
+              <%= 'disabled' unless @ai_demos_enabled %>></textarea>
     <div class="chat-composer-actions">
       <label class="chat-model-pick">
         model
-        <select id="chat-model">
+        <select id="chat-model" <%= 'disabled' unless @ai_demos_enabled %>>
           <option value="<%= @primary_model %>"><%= @primary_model %> (Gemma 4)</option>
           <option value="<%= @fallback_model %>"><%= @fallback_model %> (gpt-oss-120b)</option>
         </select>
       </label>
-      <button id="chat-send" type="submit">Send</button>
-      <button id="chat-clear" type="button">Clear history</button>
+      <button id="chat-send" type="submit" <%= 'disabled' unless @ai_demos_enabled %>>Send</button>
+      <button id="chat-clear" type="button" <%= 'disabled' unless @ai_demos_enabled %>>Clear history</button>
     </div>
   </form>
 
@@ -80,6 +93,7 @@
     var bannerEl = document.getElementById('chat-auth-banner');
     var sendBtn  = document.getElementById('chat-send');
     var sessionId = threadEl.getAttribute('data-session-id');
+    var demosEnabled = threadEl.getAttribute('data-demos-enabled') === 'true';
 
     function tokenKey() { return 'homura.chat.jwt'; }
     function getToken() { return window.localStorage.getItem(tokenKey()); }
@@ -89,6 +103,7 @@
       reflectAuth();
     }
     function reflectAuth() {
+      if (!demosEnabled) return;
       var t = getToken();
       if (t) {
         statusEl.textContent = 'token: ' + t.slice(0, 14) + '…';
@@ -101,6 +116,8 @@
       }
     }
     reflectAuth();
+
+    if (!demosEnabled) return;
 
     function authHeaders() {
       var h = { 'content-type': 'application/json' };

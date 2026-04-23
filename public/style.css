@@ -28,6 +28,7 @@ body:has(.chat-shell) { max-width: 56em; }
 .chat-banner { padding: .6em 1em; border-radius: 6px; display: flex; align-items: center; gap: .6em; flex-wrap: wrap; font-size: .9em; }
 .chat-banner-info { background: #fff8e1; border: 1px solid #f6c344; }
 .chat-banner-ok   { background: #e6f7ec; border: 1px solid #4caf7e; }
+.chat-banner-error { background: #ffe5e5; border: 1px solid #f7a3a3; }
 .chat-thread { display: flex; flex-direction: column; gap: .8em; min-height: 16em; max-height: 28em; overflow: auto; padding: 1em; border: 1px solid #ddd; border-radius: 8px; background: #fafbfc; }
 /* `white-space: pre-wrap` stays on `.chat-msg-body` only — applying
    it to the outer `.chat-msg` made the ERB whitespace between

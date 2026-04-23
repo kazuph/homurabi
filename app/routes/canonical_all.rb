@@ -752,8 +752,9 @@
     @title = 'homura /chat — Workers AI'
     @primary_model  = App::CHAT_MODELS[:primary]
     @fallback_model = App::CHAT_MODELS[:fallback]
+    @ai_demos_enabled = ai_demos_enabled?
     @session_id = normalize_session_id(params['session'])
-    @history = ai_demos_enabled? ? load_chat_history(@session_id) : []
+    @history = @ai_demos_enabled ? load_chat_history(@session_id) : []
     @content = erb :chat
     erb :layout
   end

@@ -1,8 +1,9 @@
 # Changelog
 
-## 0.2.2 (2026-04-23)
+## 0.2.3 (2026-04-23)
 
-- Bump the exact `opal-homura` dependency to `1.8.3.rc1.1` so published gems pick up the corrected author metadata.
+- Bump the exact `opal-homura` dependency to `1.8.3.rc1.2` for the release retry after the
+  previous tag push failed to trigger RubyGems publication.
 - Preserve async Sinatra responses that resolve to `[status, body]` or `[status, headers, body]`
   so `# await: true` routes can still express `halt` / `redirect` outcomes after awaiting.
 

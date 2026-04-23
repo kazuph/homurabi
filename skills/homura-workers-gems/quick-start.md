@@ -11,6 +11,9 @@ gem 'sinatra-homura', '~> 0.1'
 gem 'sequel-d1', '~> 0.1' # only if D1 / Sequel is needed
 ```
 
+If Bundler reports `revealed dependencies not in the API` for `homura-runtime`,
+retry with `bundle install --full-index`.
+
 ## Build / deploy flow
 
 1. Scaffold or write a Sinatra app.

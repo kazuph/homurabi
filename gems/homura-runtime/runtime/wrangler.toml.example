@@ -1,4 +1,4 @@
-# Example wrangler fragment for apps using cloudflare-workers-runtime.
+# Example wrangler fragment for apps using homura-runtime.
 # Copy patterns into your own wrangler.toml and set:
 #   main = "gems/homura-runtime/runtime/worker.mjs"
 # (adjust path if you vendor the gem elsewhere.)

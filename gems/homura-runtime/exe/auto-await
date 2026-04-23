@@ -15,12 +15,12 @@
 
 require 'fileutils'
 require 'pathname'
+require_relative '../lib/cloudflare_workers/build_support'
 
-# cloudflare-workers-runtime lib path resolution
+# homura-runtime lib path resolution (with legacy alias fallback)
 runtime_lib = ENV['CFW_RUNTIME_LIB']
 unless runtime_lib
-  spec = Gem.loaded_specs['cloudflare-workers-runtime']
-  runtime_lib = spec ? File.join(spec.full_gem_path, 'lib') : File.expand_path('../lib', __dir__)
+  runtime_lib = CloudflareWorkers::BuildSupport.runtime_root(current_file: __FILE__).join('lib').to_s
 end
 $LOAD_PATH.unshift(runtime_lib) unless $LOAD_PATH.include?(runtime_lib)
 

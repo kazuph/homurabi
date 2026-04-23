@@ -200,6 +200,12 @@ class AsyncDispatchApp < Sinatra::Base
   end
 end
 
+class PromiseRackApp
+  def self.call(_env)
+    PromiseV2.value([200, { 'content-type' => 'text/plain' }, ['promise-rack-ok']])
+  end
+end
+
 # =====================================================================
 # Env builder
 # =====================================================================
@@ -282,6 +288,10 @@ SmokeTest.assert("async halt body is teapot") { call_worker_app('GET', '/async/h
 SmokeTest.assert("promise-returning dispatch! preserves body instead of emptying response") {
   status, text = call_worker_app_for(AsyncDispatchApp, 'GET', '/').__await__
   status == 200 && text == 'async-dispatch-ok'
+}
+SmokeTest.assert("promise-returning rack app is awaited before response build") {
+  status, text = call_worker_app_for(PromiseRackApp, 'GET', '/').__await__
+  status == 200 && text == 'promise-rack-ok'
 }
 SmokeTest.assert("pass falls through") { call_app('GET', '/pass1')[2] == 'second-route' }
 SmokeTest.assert("content_type sets header") { call_app('GET', '/content_type_test')[1]['content-type'].to_s.include?('application/json') }

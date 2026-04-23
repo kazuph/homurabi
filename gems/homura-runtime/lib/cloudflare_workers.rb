@@ -144,7 +144,10 @@ module Rack
         raise '`run app` was never called from user code' if @app.nil?
 
         env = build_rack_env(js_req, js_env, js_ctx, body_text)
-        status, headers, body = @app.call(env)
+        result = @app.call(env)
+        result = result.__await__ if defined?(::Cloudflare) && ::Cloudflare.js_promise?(result)
+
+        status, headers, body = result
         build_js_response(status, headers, body)
       ensure
         body.close if body && body.respond_to?(:close)

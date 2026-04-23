@@ -25,7 +25,7 @@ Gem::Specification.new do |spec|
   spec.metadata['documentation_uri'] = 'https://homura.kazu-san.workers.dev/docs/sequel-d1'
 
   spec.files = Dir.chdir(__dir__) do
-    Dir['lib/**/*', 'bin/*', 'README.md', 'CHANGELOG.md'].select { |f| File.file?(f) }
+    Dir['lib/**/*', 'vendor/**/*', 'bin/*', 'README.md', 'CHANGELOG.md'].select { |f| File.file?(f) }
   end
   spec.require_paths = ['lib']
   spec.bindir = 'bin'

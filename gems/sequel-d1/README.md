@@ -21,10 +21,12 @@ end
 
 ## Opal build paths
 
-Add the gem `lib` directory to Opal `-I` **before** `vendor` so `require 'sequel'` resolves your vendored `sequel.rb`, which then loads `sequel_opal_*` and `sequel/adapters/d1` from this gem:
+`cloudflare-workers-build --standalone --with-db` now wires this up for you.
+If you invoke `opal` manually, add the gem's packaged `vendor/` before its
+`lib/` so `require 'sequel'` resolves to the bundled Opal-compatible entrypoint:
 
 ```text
--I gems/sequel-d1/lib -I lib -I vendor
+-I gems/sequel-d1/vendor -I gems/sequel-d1/lib -I lib -I vendor
 ```
 
 ## Migrations (`cloudflare-workers-migrate`)

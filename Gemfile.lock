@@ -8,7 +8,7 @@ PATH
 PATH
   remote: gems/sequel-d1
   specs:
-    sequel-d1 (0.1.0)
+    sequel-d1 (0.1.1)
       homura-runtime (~> 0.1)
       opal-homura (= 1.8.3.rc1)
       sequel (~> 5.0)

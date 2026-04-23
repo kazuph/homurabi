@@ -1,25 +1,33 @@
 PATH
   remote: gems/homura-runtime
   specs:
-    homura-runtime (0.2.1)
-      opal-homura (= 1.8.3.rc1)
+    homura-runtime (0.2.2)
+      opal-homura (= 1.8.3.rc1.1)
       parser (~> 3.3)
 
 PATH
   remote: gems/sequel-d1
   specs:
-    sequel-d1 (0.2.1)
+    sequel-d1 (0.2.2)
       homura-runtime (~> 0.2)
-      opal-homura (= 1.8.3.rc1)
+      opal-homura (= 1.8.3.rc1.1)
       sequel (~> 5.0)
       sqlite3 (~> 2.0)
 
 PATH
   remote: gems/sinatra-homura
   specs:
-    sinatra-homura (0.2.2)
+    sinatra-homura (0.2.3)
       homura-runtime (~> 0.2, >= 0.2.0)
-      opal-homura (= 1.8.3.rc1)
+      opal-homura (= 1.8.3.rc1.1)
+
+PATH
+  remote: vendor/opal-gem
+  specs:
+    opal-homura (1.8.3.rc1.1)
+      ast (>= 2.3.0)
+      base64 (>= 0.2.0)
+      parser (~> 3.0, >= 3.0.3.2)
 
 GEM
   remote: https://rubygems.org/
@@ -27,10 +35,6 @@ GEM
     ast (2.4.3)
     base64 (0.3.0)
     bigdecimal (4.1.2)
-    opal-homura (1.8.3.rc1)
-      ast (>= 2.3.0)
-      base64 (>= 0.2.0)
-      parser (~> 3.0, >= 3.0.3.2)
     parser (3.3.11.1)
       ast (~> 2.4.1)
       racc
@@ -44,7 +48,7 @@ PLATFORMS
 
 DEPENDENCIES
   homura-runtime!
-  opal-homura (= 1.8.3.rc1)
+  opal-homura!
   sequel-d1!
   sinatra-homura!
 

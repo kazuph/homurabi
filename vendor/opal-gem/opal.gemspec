@@ -7,7 +7,7 @@ Gem::Specification.new do |spec|
   spec.email        = ['elia@schito.me', 'meh@schizofreni.co']
 
   spec.summary      = %{Patched Opal compiler/runtime for Cloudflare Workers}
-  spec.description  = %{Forked Opal 1.8.3.rc1 with homura patches for Cloudflare Workers, modern Ruby 3.4 compatibility, and the Sinatra-on-Workers toolchain. Library require path remains `opal`.}
+  spec.description  = %{Forked Opal 1.8.3.rc1.1 (based on upstream 1.8.3.rc1) with homura patches for Cloudflare Workers, modern Ruby 3.4 compatibility, and the Sinatra-on-Workers toolchain. Library require path remains `opal`.}
   spec.homepage     = 'https://github.com/kazuph/homura'
   spec.license      = 'MIT'
 

@@ -12,8 +12,11 @@ Changes are grouped as follows:
 - **Security** to invite users to upgrade in case of vulnerabilities.
 - **Performance** changes related to speed and efficiency.
 
+## [1.8.3.rc1.1](https://github.com/kazuph/homura/tree/main/vendor/opal-gem) - 2026-04-23
 
+### Fixed
 
+- Correct the published author metadata to "Kazuhiro Homma".
 
 
 ## [1.8.2](https://github.com/opal/opal/compare/v1.8.1...v1.8.2) - 2023-11-23
@@ -2198,7 +2201,6 @@ This release brings a lot of performance improvements, our tests on Asciidoctor 
 
 - Implement attr_reader/writer/accessor for dynamic uses
 - Hash internals update
-
 
 
 

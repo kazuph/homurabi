@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1 (2026-04-23)
+
+- Correct the published author metadata to "Kazuhiro Homma".
+
 ## 0.2.0 (2026-04-23)
 
 - Remove the old `cloudflare-workers-build` public executable and expose the

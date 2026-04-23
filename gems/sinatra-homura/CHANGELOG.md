@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.2 (2026-04-23)
+
+- Correct the published author metadata to "Kazuhiro Homma".
+
 ## 0.2.1 (2026-04-23)
 
 - Make generated apps Rake-first: the scaffolded `Rakefile` now owns build/dev/deploy,

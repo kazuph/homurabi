@@ -31,9 +31,13 @@ class App < Sinatra::Base
   get '/users' do
     db = Sequel.connect(adapter: :d1, d1: env['cloudflare.DB'])
     content_type 'application/json'
-    db[:users].all.__await__.to_json
+    db[:users].all.to_json
   end
 end
 
 run App
 ```
+
+For the common binding/helper paths above, homura's build step auto-inserts
+`.__await__` under the hood. Manual `.__await__` is mainly for raw Promise work
+outside those registered patterns.

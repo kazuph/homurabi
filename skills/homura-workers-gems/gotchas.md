@@ -21,7 +21,18 @@ In this repo's Opal-on-Workers runtime:
 ## D1 / Sequel
 
 - `Sequel.connect(adapter: :d1, d1: env['cloudflare.DB'])`
-- `Dataset#all` resolves asynchronously on Workers, so examples often need `.__await__`
+- `Dataset#all` still resolves asynchronously under the hood, but common
+  Sinatra-facing call sites are auto-awaited at build time, so examples should
+  usually stay sync-shaped (`db[:users].all`, not `db[:users].all.__await__`)
+- keep manual `.__await__` for raw Promise work or patterns the auto-await
+  registry does not recognize yet
+
+## Layout rendering
+
+- `<%= yield %>` in precompiled layout templates is supported
+- `@content = erb :index; erb :layout` is legacy compatibility, not the preferred
+  shape for fresh examples
+- prefer Sinatra-style `erb :index, layout: :layout`
 
 ## Build output
 

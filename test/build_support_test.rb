@@ -22,6 +22,7 @@ end
 
 runtime_name = CloudflareWorkers::BuildSupport::RUNTIME_GEM_NAME
 sinatra_name = CloudflareWorkers::BuildSupport::SINATRA_GEM_NAME
+sequel_name = CloudflareWorkers::BuildSupport::SEQUEL_D1_GEM_NAME
 
 ok = assert('resolves homura-runtime from loaded specs') do
   specs = { 'homura-runtime' => FakeSpec.new('/tmp/new-runtime') }
@@ -91,6 +92,31 @@ ok = assert('copies standalone runtime files into cf-runtime') do
     raise "expected #{File.join(dir, 'cf-runtime')}, got #{target}" unless target.to_s == File.join(dir, 'cf-runtime')
     raise 'missing setup-node-crypto.mjs' unless File.read(File.join(dir, 'cf-runtime', 'setup-node-crypto.mjs')) == "setup\n"
     raise 'missing worker_module.mjs' unless File.read(File.join(dir, 'cf-runtime', 'worker_module.mjs')) == "worker\n"
+  end
+end
+passed += 1 if ok
+failed += 1 unless ok
+
+ok = assert('standalone load paths prepend packaged sequel-d1 vendor before lib when with_db') do
+  Dir.mktmpdir do |dir|
+    runtime_root = File.join(dir, 'runtime')
+    sinatra_root = File.join(dir, 'sinatra')
+    sequel_root = File.join(dir, 'sequel-d1')
+    app_root = File.join(dir, 'app')
+    [runtime_root, sinatra_root, sequel_root, app_root].each { |path| FileUtils.mkdir_p(path) }
+    FileUtils.mkdir_p(File.join(runtime_root, 'vendor'))
+    FileUtils.mkdir_p(File.join(sequel_root, 'vendor'))
+    specs = {
+      'homura-runtime' => FakeSpec.new(runtime_root),
+      'sinatra-homura' => FakeSpec.new(sinatra_root),
+      'sequel-d1' => FakeSpec.new(sequel_root)
+    }
+    load_paths = CloudflareWorkers::BuildSupport.standalone_load_paths(app_root, with_db: true, loaded_specs: specs)
+    sequel_vendor = File.join(sequel_root, 'vendor')
+    sequel_lib = File.join(sequel_root, 'lib')
+    raise "missing #{sequel_vendor}" unless load_paths.include?(sequel_vendor)
+    raise "missing #{sequel_lib}" unless load_paths.include?(sequel_lib)
+    raise "vendor should precede lib: #{load_paths.inspect}" unless load_paths.index(sequel_vendor) < load_paths.index(sequel_lib)
   end
 end
 passed += 1 if ok

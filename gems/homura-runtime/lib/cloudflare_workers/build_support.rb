@@ -7,6 +7,7 @@ module CloudflareWorkers
   module BuildSupport
     RUNTIME_GEM_NAME = 'homura-runtime'
     SINATRA_GEM_NAME = 'sinatra-homura'
+    SEQUEL_D1_GEM_NAME = 'sequel-d1'
 
     class << self
       def loaded_spec(name, loaded_specs: Gem.loaded_specs)
@@ -51,6 +52,37 @@ module CloudflareWorkers
         end
 
         target_dir
+      end
+
+      def standalone_load_paths(project_root, with_db:, loaded_specs: Gem.loaded_specs)
+        root = Pathname(project_root)
+        load_paths = []
+
+        hv = vendor_from_gemfile(root)
+        load_paths << hv.to_s if hv
+
+        load_paths += ['build/auto_await/app', 'app']
+        [
+          gem_lib(RUNTIME_GEM_NAME, loaded_specs: loaded_specs),
+          gem_vendor(RUNTIME_GEM_NAME, loaded_specs: loaded_specs),
+          gem_lib(SINATRA_GEM_NAME, loaded_specs: loaded_specs),
+          gem_vendor(SINATRA_GEM_NAME, loaded_specs: loaded_specs)
+        ].compact.each do |path|
+          load_paths << path
+        end
+
+        if with_db
+          [
+            gem_vendor(SEQUEL_D1_GEM_NAME, loaded_specs: loaded_specs),
+            gem_lib(SEQUEL_D1_GEM_NAME, loaded_specs: loaded_specs)
+          ].compact.each do |path|
+            load_paths << path
+          end
+        end
+
+        load_paths << 'vendor' if root.join('vendor').directory?
+        load_paths << 'build'
+        load_paths.uniq
       end
 
       def standalone_namespace(project_root, suffix)

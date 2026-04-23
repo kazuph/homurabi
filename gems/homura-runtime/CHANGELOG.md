@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.6 (2026-04-23)
+
+- Teach `cloudflare-workers-build --standalone --with-db` to add the packaged
+  `sequel-d1` gem `vendor/` directory to the Opal load path before the gem's
+  `lib/`, so `require 'sequel'` resolves to the bundled Opal-compatible Sequel
+  subset instead of the CRuby gem.
+
 ## 0.1.5 (2026-04-23)
 
 - Make `auto-await` emit rewritten files for existing hand-written `.__await__`

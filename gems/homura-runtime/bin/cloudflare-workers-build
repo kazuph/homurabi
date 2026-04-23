@@ -121,24 +121,7 @@ def homura_vendor_from_gemfile(project_root)
 end
 
 def run_opal_standalone!(root, opal_input, opal_output, with_db:)
-  load_paths = []
-  hv = homura_vendor_from_gemfile(root)
-  load_paths << hv.to_s if hv
-  runtime_name = CloudflareWorkers::BuildSupport::RUNTIME_GEM_NAME
-  sinatra_name = CloudflareWorkers::BuildSupport::SINATRA_GEM_NAME
-
-  load_paths += ['build/auto_await/app', 'app']
-  [
-    CloudflareWorkersBuild.gem_lib(runtime_name),
-    CloudflareWorkersBuild.gem_vendor(runtime_name),
-    CloudflareWorkersBuild.gem_lib(sinatra_name),
-    CloudflareWorkersBuild.gem_vendor(sinatra_name)
-  ].compact.each do |path|
-    load_paths << path
-  end
-  load_paths << CloudflareWorkersBuild.gem_lib('sequel-d1') if with_db
-  load_paths << 'vendor' if root.join('vendor').directory?
-  load_paths << 'build'
+  load_paths = CloudflareWorkers::BuildSupport.standalone_load_paths(root, with_db: with_db)
 
   argv = ['bundle', 'exec', 'opal', '-c', '-E', '--esm', '--no-source-map']
   load_paths.each { |p| argv.push('-I', p) }

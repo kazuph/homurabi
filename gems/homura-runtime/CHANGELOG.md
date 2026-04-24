@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.9 (2026-04-24)
+
+- Skip auto-await rewrites when the source expression is already followed by
+  `.__await__`, avoiding noisy double-application in rewritten standalone app
+  code.
+
 ## 0.2.8 (2026-04-24)
 
 - Compile standalone `config.ru` inputs from `build/auto_await/` so ordinary

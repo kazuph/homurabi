@@ -85,6 +85,7 @@ Dir.mktmpdir do |dir|
     output = File.read(manual)
     raise output unless output.start_with?("# await: true\n")
     raise output unless output.include?(".__await__")
+    raise output if output.include?('.__await__.__await__')
   end
   passed += 1 if ok
   failed += 1 unless ok

@@ -10,9 +10,14 @@ module CloudflareWorkers
         await_nodes.each do |node|
           range = node.loc.expression
           next unless range
+          next if already_awaited?(buffer, range)
           rewriter.replace(range, "#{range.source}.__await__")
         end
         rewriter.process
+      end
+
+      def self.already_awaited?(buffer, range)
+        buffer.source[range.end_pos..]&.match?(/\A\s*\.__await__\b/)
       end
     end
   end

@@ -8,7 +8,7 @@
 
 Live demo: **<https://homura.kazu-san.workers.dev>**
 
-**Current published app flow** — use the RubyGems packages `opal-homura`, `homura-runtime`, `sinatra-homura`, and optionally `sequel-d1`. The normal path is `bundle exec homura new myapp` (add `--with-db` for D1), then work through generated `bundle exec rake dev|build|deploy` tasks. Generated apps now bundle `rake` for that workflow, use standard Sinatra `config.ru` + `app/app.rb`, and let `homura build` auto-detect `config.ru`, `app/hello.rb`, then `app/app.rb` as the entrypoint. Standard `config.ru` files using `require_relative 'app/app'` are supported, ordinary `erb :index` picks up `layout.erb` by default, and ordinary Sequel dataset reads coerce D1 booleans back to Ruby `true` / `false`. Drop down to `bundle exec homura build` only when you are wiring or debugging the lower-level build pipeline. `wrangler.toml` `main` points at **`build/worker.entrypoint.mjs`**.
+**Current published app flow** — use the RubyGems packages `opal-homura`, `homura-runtime`, `sinatra-homura`, and optionally `sequel-d1`. The normal path is `bundle exec homura new myapp` (add `--with-db` for D1), then work through generated `bundle exec rake dev|build|deploy` tasks. Generated apps now bundle `rake` for that workflow, use standard Sinatra `config.ru` + `app/app.rb`, and let `homura build` auto-detect `config.ru`, `app/hello.rb`, then `app/app.rb` as the entrypoint. Standard `config.ru` files using `require_relative 'app/app'` are supported, ordinary `erb :index` picks up `layout.erb` by default, and ordinary Sequel dataset reads coerce D1 booleans back to Ruby `true` / `false`. Drop down to `bundle exec homura build` only when you are wiring or debugging the lower-level build pipeline. In generated apps, `wrangler.toml` `main` points at **`worker.entrypoint.mjs`** and `nodejs_compat` is already enabled.
 
 ---
 
@@ -1274,9 +1274,10 @@ migration ランタイム（`File.directory?` / `Dir.new` / `load` / `Mutex`
 を踏む箇所）は入らない。
 
 ```bash
-# db/migrations/0001_create_posts.rb を書く
-bin/homura-migrate compile db/migrations --out db/migrations
-wrangler d1 migrations apply homura-db --local
+# db/migrate/0001_create_posts.rb を書く
+bundle exec homura db:migrate:compile db/migrate --out db/migrate
+bundle exec homura db:migrate:apply --database homura-db
+# or: bundle exec homura db:migrate:apply --remote --database homura-db
 ```
 
 生成される SQL は SQLite 方言のため D1 が素で喰う：
@@ -1338,8 +1339,8 @@ round-trip 2）を配置。`wrangler dev` + `curl http://127.0.0.1:8787/test/seq
   adapter wiring + mock D1 round-trip + JOIN/GROUP BY/subquery +
   transactions + 識別子/schema primitives）
 - `/test/sequel` Workers self-test — 実機 D1 round-trip 8 ケース
-- `bin/homura-migrate` CLI — migration → SQL 書き出し単体で
-  `db/migrations/0001_create_posts.rb` → `0001_create_posts.sql` 動作確認済
+- `homura db:migrate:*` CLI — migration → SQL 書き出し単体で
+  `db/migrate/0001_create_posts.rb` → `0001_create_posts.sql` 動作確認済
 
 ### 非対応 (Phase 12 スコープ外)
 
@@ -1541,7 +1542,7 @@ of each phase:
 | **Phase 10** | Workers AI binding + Sinatra `/chat` UI + `/api/chat/*` JWT-gated endpoints（Gemma 4 + gpt-oss-120b、KV-backed 会話履歴、SSE streaming サポート）。 | ✅ shipped on `feature/phase10-ai`. |
 | **Phase 11A** | HTTP foundations 基礎固めパック — ① **Faraday 互換 shim** (`vendor/faraday.rb`) で `Faraday.new { \|c\| c.request :json; c.response :json, :raise_error }` 一式。② **multipart/form-data バイナリ受信** (`src/worker.mjs` + `lib/cloudflare_workers/multipart.rb`) + `Cloudflare::UploadedFile`（latin1 byte-str ↔ real Uint8Array）。③ **Sinatra streaming / SSE** (`Cloudflare::SSEStream` + `Sinatra::Streaming`) で `sse do \|out\| ... end` が Workers `ReadableStream` に直通し、`/demo/sse` で 5 秒かけて 5 tick 流れる。Workers self-test `/test/foundations` 6 ケース (`HOMURA_ENABLE_FOUNDATIONS_DEMOS=1`)。 | ✅ shipped on `feature/phase11a-http-foundations`. 34 smoke (13 faraday + 10 multipart + 11 streaming) + `/test/foundations` 6/6 実機グリーン。 |
 | **Phase 11B** | Cloudflare native bindings — **Durable Objects** (`Cloudflare::DurableObject.define` handler DSL + `DurableObjectNamespace` / `Stub` / `Storage` ラッパ)、**Cache API** (`Cloudflare::Cache` + `cache_get` helper、HIT/MISS 自動判定)、**Queues** (`Cloudflare::Queue#send` / `#send_batch` プロデューサ + `consume_queue 'q' do \|batch\| ... end` DSL + `queue(batch, env, ctx)` 配送)。`/test/bindings` セルフテストと 56 ケースの smoke suite。`HOMURA_ENABLE_BINDING_DEMOS` で default deny。 | ✅ shipped on `feature/phase11b-cf-bindings`. DO カウンタ 1→2→3→4、Cache MISS(6ms)→HIT(1ms) 同一 `derived_hex`、Queue /api/enqueue → auto 消費 → KV 書き込み round-trip を実機で実測。 |
-| **Phase 12** | **Sequel (vendored v5.103.0) + D1 adapter + migration CLI** — Sinatra ルートで `Sequel.connect(adapter: :d1, d1: env['cloudflare.DB'])` → `db[:users].where(...).order(...).limit(...).all.__await__` の完全な Dataset DSL が実機 D1 で動作。SQLite dialect 共有、SingleConnectionPool 強制、async Promise チェーン貫通（`vendor/sequel/dataset/actions.rb` に `# await: true` + 各 action に `.__await__` 差し込み）、`HomuraSqlBuffer` による String immutability 回避。`bin/homura-migrate compile` で Ruby migration DSL を SQL に書き出し → `wrangler d1 migrations apply` で反映（Opal バンドル非同梱）。`/demo/sequel` / `/demo/sequel/sql` / `/test/sequel` (8/8) を実機で実測。Dataset#count / #first / #all / #insert / #update / #delete / #transaction / JOIN / GROUP BY / subquery が緑。 | ✅ shipped on `feature/phase12-sequel`. 22 sequel smoke + 既存 341 smoke 全緑で合計 **363 tests**、bundle +800KB uncompressed (+200KB gzipped、6.3MB/1.36MB)。 |
+| **Phase 12** | **Sequel (vendored v5.103.0) + D1 adapter + migration CLI** — Sinatra ルートで `Sequel.connect(adapter: :d1, d1: env['cloudflare.DB'])` → `db[:users].where(...).order(...).limit(...).all.__await__` の完全な Dataset DSL が実機 D1 で動作。SQLite dialect 共有、SingleConnectionPool 強制、async Promise チェーン貫通（`vendor/sequel/dataset/actions.rb` に `# await: true` + 各 action に `.__await__` 差し込み）、`HomuraSqlBuffer` による String immutability 回避。`homura db:migrate:compile` で Ruby migration DSL を SQL に書き出し → `wrangler d1 migrations apply` で反映（Opal バンドル非同梱）。`/demo/sequel` / `/demo/sequel/sql` / `/test/sequel` (8/8) を実機で実測。Dataset#count / #first / #all / #insert / #update / #delete / #transaction / JOIN / GROUP BY / subquery が緑。 | ✅ shipped on `feature/phase12-sequel`. 22 sequel smoke + 既存 341 smoke 全緑で合計 **363 tests**、bundle +800KB uncompressed (+200KB gzipped、6.3MB/1.36MB)。 |
 
 ### Definition of Done (from PLAN.md §1.1)
 

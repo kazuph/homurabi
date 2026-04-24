@@ -49,9 +49,10 @@ gem 'sequel-d1', '= 0.2.7' # optional
 
 1. Scaffold with `bundle exec homura new myapp` (add `--with-db` if you want D1 through Sequel).
 2. In generated apps, use `bundle exec rake dev`, `bundle exec rake build`, and `bundle exec rake deploy`.
-3. Set `wrangler.toml` `main = "build/worker.entrypoint.mjs"`.
-4. Deploy with Wrangler.
-5. Standard layout is `app/app.rb` plus `config.ru`; `app/hello.rb` is optional compatibility, not a requirement.
+3. In generated apps, `wrangler.toml` should keep `main = "worker.entrypoint.mjs"` and `compatibility_flags = ["nodejs_compat"]`.
+4. For D1 apps, generated scaffolds also include `db:migrate:compile`, `db:migrate:local`, and `db:migrate:remote`.
+5. Deploy with Wrangler.
+6. Standard layout is `app/app.rb` plus `config.ru`; `app/hello.rb` is optional compatibility, not a requirement.
 
 ## Minimal Sinatra + D1 example
 
@@ -92,6 +93,7 @@ run App
 - Common binding/helper paths are auto-awaited at build time; keep examples sync-shaped unless you are handling a raw Promise boundary directly.
 - D1 boolean columns come back as Ruby booleans on normal dataset reads, but custom SQL/projections can still surface raw `0` / `1`.
 - For hand-wired D1/Sequel apps, use `bundle exec homura build --standalone --with-db`.
+- The supported D1 contract is `require 'sequel'` plus `Sequel.connect(adapter: :d1, d1: env['cloudflare.DB'])`; do not teach `require 'sequel/d1'` as a public entrypoint.
 - Standard Sinatra `config.ru` with `run App` is supported, including the common `require_relative 'app/app'` form.
 - Precompiled ERB follows ordinary Sinatra layout defaults: `erb :index` picks up `layout.erb` unless you pass `layout: false`.
 - Awaited Sequel/D1 routes can still `redirect` normally, and local-dev redirects keep the current host/port.

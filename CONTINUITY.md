@@ -2,13 +2,14 @@
 
 ## Goal（成功基準を含む）
 - Keep `homura-examples` conventional by fixing least-surprise runtime/gem gaps in this repo instead of pushing workarounds into app code.
-- Current success target: publish the round 6 follow-up fixes (`homura-runtime 0.2.9`, `sinatra-homura 0.2.13`) after clean-room dogfood confirmed the round-5 releases and isolated the remaining repo-side issues.
+- Current success target: verify whether any real framework issues remain after round 7, or whether the remaining friction is now mostly expected Sinatra→Workers adaptation guidance.
 
 ## Constraints/Assumptions（制約/前提）
 - Prefer least-surprise Ruby/Sinatra behavior even if the implementation underneath diverges from upstream internals.
 - Fix the owning gem/runtime layer; do not push special-case code into `homura-examples` unless a finding is clearly example-only.
 - `CONTINUITY.md` is the durable source of truth across compression; keep round status and externally verified release state here.
 - Round 6 must start only after confirming the child pane chat is cleared and `homura-examples` has no lingering dogfood artifacts or git-history-dependent state.
+- For the next round, the only allowed input app is the non-Cloudflare-adapted `sinatra-app`; treat `homura-examples` as a fresh clean-room workspace around that source app only.
 
 ## Key decisions（重要な決定）
 - Treat explicit `halt` as a dedicated exception carrying a fully materialized Rack tuple so it can cross Opal async boundaries; keep ordinary route returns on Sinatra's existing `throw :halt` path.
@@ -44,15 +45,29 @@
   - scaffolded apps now include `rake` in `Gemfile`
   - scaffold tests now lock `require_relative 'app/app'` + single `run App` ownership in `config.ru`
   - AI-facing docs now mention scaffolded apps bundle `rake`
-
-### Now（現在）
-- Round 6 triage is complete and the next step is releasing the local fixes.
-
-### Next（次）
-- Commit, tag, and push:
+- Round 6 follow-up releases were committed, tagged, pushed, and published:
   - `homura-runtime-v0.2.9`
   - `sinatra-homura-v0.2.13`
-- Confirm the corresponding `Release gems` workflows and RubyGems publication.
+- GitHub Actions `Release gems` runs for those two tags completed successfully.
+- RubyGems now serves `homura-runtime 0.2.9` and `sinatra-homura 0.2.13`.
+- User cleaned `homura-examples` further; it now contains only `sinatra-app` plus top-level housekeeping files (`.allow-main`, `.gitignore`).
+- Round 7 clean-room dogfood ran from `sinatra-app` only, using published gems (`homura-runtime 0.2.9`, `sequel-d1 0.2.7`, `sinatra-homura 0.2.13`).
+- Round 7 reported migration friction around:
+  - requiring `sinatra/cloudflare_workers` instead of plain `sinatra/base`
+  - switching the DB adapter from SQLite to D1
+  - low-level `homura-build` flag usage
+- Triage conclusion: no new repo-side blocker is confirmed yet.
+  - `require 'sinatra/cloudflare_workers'` is the intended public entrypoint for homura apps, not a bug.
+  - `Sequel.connect(adapter: :d1, ...)` with `require 'sequel'` is the intended D1 path; `require 'sequel/d1'` is not the public contract.
+  - `bundle exec homura build --standalone --with-db` is the supported workflow; low-level `homura-build` flags and manual `cf-runtime` handling are not the normal user path.
+- Round 7 production follow-up confirmed the previously suspicious `asdfasdf` rows were normal user/test data in the D1 database, not a framework/runtime bug.
+
+### Now（現在）
+- Round 7 is fully closed, including real deploy / production-path verification.
+
+### Next（次）
+- Treat the remaining work as migration guidance / UX polish unless a new deploy-only repro appears.
+- If another round is needed, focus on whether any of the remaining adaptations should become more automatic rather than fixing previously resolved runtime blockers.
 
 ## Open questions（未解決の質問、必要に応じてUNCONFIRMED）
 - Example-only follow-ups remain outside this repo:

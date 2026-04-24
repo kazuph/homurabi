@@ -5,6 +5,7 @@
 - Use `homura` and generated `rake` tasks.
 - Do not emit any `cloudflare-workers-*` command names in fresh guidance.
 - Generated apps should feel Rake-first: `bundle exec rake dev|build|deploy`.
+- For `--with-db` scaffolds, also expose `bundle exec rake db:migrate:compile|local|remote`.
 
 ## Async Sinatra routes
 
@@ -20,6 +21,7 @@ In this repo's Opal-on-Workers runtime:
 ## D1 / Sequel
 
 - `Sequel.connect(adapter: :d1, d1: env['cloudflare.DB'])`
+- Treat `require 'sequel'` as the public require path. Do not teach `require 'sequel/d1'`.
 - `Dataset#all` still resolves asynchronously under the hood, but common
   Sinatra-facing call sites are auto-awaited at build time, so examples should
   usually stay sync-shaped (`db[:users].all`, not `db[:users].all.__await__`)
@@ -43,11 +45,13 @@ In this repo's Opal-on-Workers runtime:
 
 ## Build output
 
-- the Worker entrypoint is `build/worker.entrypoint.mjs`
+- generated apps write the Worker entrypoint to `worker.entrypoint.mjs`
+- monorepo / internal builds still write `build/worker.entrypoint.mjs`
 - `bundle exec homura build` is the standard build command
 - default entrypoint discovery prefers `config.ru`, then `app/hello.rb`, then `app/app.rb`
 - Sequel/D1 standalone apps should use `bundle exec homura build --standalone --with-db`
 - generated apps should expose `bundle exec rake build|dev|deploy` as the normal user workflow
+- if you override `--output` or `--entrypoint-out`, homura now rewrites import paths relative to the actual entrypoint location
 - `compile-assets` now tolerates an empty `public/` directory; static files are optional
 - if Opal compile fails, inspect `build/opal.stderr.log`
 - standard Sinatra `config.ru` with `run App` is supported in current releases
@@ -56,6 +60,7 @@ In this repo's Opal-on-Workers runtime:
 
 - `compatibility_date` must not be in the future relative to the local machine
   date; `wrangler dev` rejects future dates
+- `nodejs_compat` is required in generated / documented apps because the runtime depends on `node:crypto`
 
 ## Bindings
 

@@ -10,10 +10,9 @@ require 'sequel'
 DB = nil
 
 get '/users' do
-  DB ||= Sequel.connect(adapter: :d1, d1: env['cloudflare.env'].DB)
+  DB ||= Sequel.connect(adapter: :d1, d1: env['cloudflare.DB'])
   content_type 'application/json'
-  # On Opal/Workers, Dataset#all returns a Promise — resolve before JSON.
-  DB[:users].order(:id).all.__await__.to_json
+  DB[:users].order(:id).all.to_json
 end
 ```
 
@@ -34,7 +33,7 @@ If you invoke `opal` manually, add the gem's packaged `vendor/` before its
 Compile Ruby migration files to wrangler-compatible `.sql`:
 
 ```bash
-bundle exec homura db:migrate:compile db/migrations
+bundle exec homura db:migrate:compile db/migrate --out db/migrate
 ```
 
 Apply (uses `WRANGLER_BIN` or `wrangler`; database from `--database` or `CLOUDFLARE_D1_DATABASE`):
@@ -43,6 +42,17 @@ Apply (uses `WRANGLER_BIN` or `wrangler`; database from `--database` or `CLOUDFL
 bundle exec homura db:migrate:apply --database homura-db
 bundle exec homura db:migrate:apply --remote --database homura-db
 ```
+
+Generated `--with-db` apps wire this up as:
+
+```bash
+bundle exec rake db:migrate:compile
+bundle exec rake db:migrate:local
+bundle exec rake db:migrate:remote
+```
+
+Generated and documented apps also keep `compatibility_flags = ["nodejs_compat"]`
+in `wrangler.toml`, because the runtime depends on `node:crypto`.
 
 ## License
 

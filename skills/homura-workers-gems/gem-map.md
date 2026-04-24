@@ -25,6 +25,7 @@
 - Published name: `sequel-d1`
 - Sequel adapter for Cloudflare D1
 - Owns `homura db:migrate:*`
+- Public app-side require stays `require 'sequel'`; connect with `adapter: :d1`
 
 ## Docs entrypoints
 

@@ -231,5 +231,117 @@ Dir.mktmpdir do |dir|
   failed += 1 unless ok
 end
 
+Dir.mktmpdir do |dir|
+  app_dir = File.join(dir, 'standalone-db-app')
+  FileUtils.mkdir_p(File.join(app_dir, 'app'))
+  FileUtils.mkdir_p(File.join(app_dir, 'views'))
+  FileUtils.mkdir_p(File.join(app_dir, 'public'))
+
+  File.write(File.join(app_dir, 'app', 'app.rb'), <<~RUBY)
+    # frozen_string_literal: true
+    require 'sinatra/cloudflare_workers'
+    require 'sequel'
+    require 'json'
+
+    class App < Sinatra::Base
+      helpers do
+        def db
+          @db ||= Sequel.connect(adapter: :d1, d1: env['cloudflare.DB'])
+        end
+      end
+
+      get '/' do
+        @todos = db[:todos].order(:id).all
+        erb :index
+      end
+
+      get '/api/todos' do
+        content_type 'application/json'
+        { todos: db[:todos].order(:id).all }.to_json
+      end
+
+      post '/toggle/:id' do
+        id = params['id'].to_i
+        todo = db[:todos].first(id: id)
+        db[:todos].where(id: id).update(completed: !todo[:completed]) if todo
+        redirect '/'
+      end
+    end
+
+    run App
+  RUBY
+
+  File.write(File.join(app_dir, 'config.ru'), <<~RUBY)
+    # frozen_string_literal: true
+    require_relative 'app/app'
+
+    run App
+  RUBY
+
+  File.write(File.join(app_dir, 'views', 'index.erb'), <<~ERB)
+    <li class="<%= 'completed' if @todos.first[:completed] %>"><%= @todos.first[:text] %></li>
+  ERB
+  File.write(File.join(app_dir, 'views', 'layout.erb'), "<main><%= yield %></main>\n")
+  File.write(File.join(app_dir, 'public', 'robots.txt'), "User-agent: *\n")
+
+  ok = assert('standalone build auto-awaits sequel routes, coerces booleans, and applies default layout') do
+    output, status = Open3.capture2e(bundle_env, 'bundle', 'exec', 'ruby', build_cli, '--root', app_dir, '--standalone', '--with-db')
+    raise output unless status.success?
+
+    node_script = <<~JS
+      const mod = await import(process.argv[2]);
+      const app = mod.default;
+      const ctx = { waitUntil() {} };
+      const env = {
+        DB: {
+          prepare(sql) {
+            return {
+              _sql: sql,
+              bind(...args) { this._bindings = args; return this; },
+              all() {
+                if (this._sql.includes('PRAGMA table_xinfo')) {
+                  return Promise.resolve({ results: [
+                    { name: 'id', type: 'integer', notnull: 1, dflt_value: null, pk: 1 },
+                    { name: 'text', type: 'text', notnull: 1, dflt_value: null, pk: 0 },
+                    { name: 'completed', type: 'boolean', notnull: 1, dflt_value: '0', pk: 0 }
+                  ] });
+                }
+                return Promise.resolve({ results: [{ id: 1, text: 'demo', completed: 0 }] });
+              },
+              run() {
+                return Promise.resolve({ success: true, meta: { changes: 1, last_row_id: 1 } });
+              }
+            };
+          }
+        }
+      };
+
+      const indexResp = await app.fetch(new Request('http://127.0.0.1:8787/'), env, ctx);
+      console.log(`GET:${indexResp.status}:${await indexResp.text()}`);
+
+      const apiResp = await app.fetch(new Request('http://127.0.0.1:8787/api/todos'), env, ctx);
+      console.log(`API:${apiResp.status}:${await apiResp.text()}`);
+
+      const postResp = await app.fetch(new Request('http://127.0.0.1:8787/toggle/1', { method: 'POST' }), env, ctx);
+      console.log(`POST:${postResp.status}:${postResp.headers.get('location')}`);
+    JS
+
+    output, status = Open3.capture2e('node', '--input-type=module', '-', File.join(app_dir, 'worker.entrypoint.mjs'), stdin_data: node_script)
+    raise output unless status.success?
+
+    lines = output.lines.map(&:strip)
+    get_line = lines.find { |line| line.start_with?('GET:') }
+    api_line = lines.find { |line| line.start_with?('API:') }
+    post_line = lines.find { |line| line.start_with?('POST:') }
+
+    raise output unless get_line&.include?('<main>')
+    raise output if get_line&.include?('class="completed"')
+    raise output unless api_line == 'API:200:{"todos":[{"id":1,"text":"demo","completed":false}]}'
+    raise output unless post_line == 'POST:303:http://127.0.0.1:8787/'
+  end
+  passed += 1 if ok
+  failed += 1 unless ok
+end
+
 puts "\n#{passed} passed, #{failed} failed"
 exit(failed.zero? ? 0 : 1)

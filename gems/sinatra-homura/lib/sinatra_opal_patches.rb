@@ -143,6 +143,27 @@ module Sinatra
     end
 
     # -------------------------------------------------------------
+    # 4.5. Helpers#redirect (upstream base.rb:309)
+    #
+    # Upstream delegates to `halt(*args)` after mutating the response.
+    # Under Opal async routes that path can degrade into a plain `[]`
+    # body after awaited Sequel calls. Raise HaltResponse directly with
+    # the fully materialized Rack tuple so both sync and async routes
+    # preserve the redirect status/location reliably.
+    # -------------------------------------------------------------
+    def redirect(uri_value, *args)
+      http_version = env['SERVER_PROTOCOL'] || env['HTTP_VERSION']
+      if (http_version == 'HTTP/1.1') && (env['REQUEST_METHOD'] != 'GET')
+        status 303
+      else
+        status 302
+      end
+
+      response['Location'] = uri(uri_value.to_s, settings.absolute_redirects?, settings.prefixed_redirects?)
+      raise HaltResponse.new(materialize_halt_payload(*args))
+    end
+
+    # -------------------------------------------------------------
     # 5. Helpers#content_type (upstream base.rb:400)
     #
     # Upstream uses `mime_type << ';'` and `mime_type << params...`.

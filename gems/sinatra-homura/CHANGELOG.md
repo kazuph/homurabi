@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.12 (2026-04-24)
+
+- Raise a materialized `HaltResponse` directly from `redirect`, keeping awaited
+  Sequel/D1 routes on the normal Sinatra 302/303 path instead of degrading to
+  `200 []`.
+- Rely on `homura-runtime >= 0.2.8` so standalone `config.ru` builds, default
+  ERB layouts, and awaited redirect tuple headers stay aligned.
+
 ## 0.2.11 (2026-04-24)
 
 - Preserve non-default ports when Sinatra builds absolute redirect locations in

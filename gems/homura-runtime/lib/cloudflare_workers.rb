@@ -405,7 +405,7 @@ module Rack
             # used for 101 WebSocket upgrades where the Workers
             # runtime's own Response carries runtime-only properties
             # (`.webSocket`) that a reconstructed Response would lose.
-            `Promise.all(#{js_chunks}).then(function(resolved) { var bodyToText = function(v) { if (v == null) { return ''; } if (Array.isArray(v)) { var joined = ''; for (var j = 0; j < v.length; j++) { joined += bodyToText(v[j]); } return joined; } if (typeof v === 'string') { return v; } if (v != null && v.$$is_string) { return v.toString(); } try { return JSON.stringify(v); } catch (e) { return String(v); } }; for (var i = 0; i < resolved.length; i++) { var r = resolved[i]; if (r != null && typeof r === 'object' && typeof r['$raw_response?'] === 'function' && typeof r['$js_response'] === 'function') { try { if (r['$raw_response?']()) { return r['$js_response'](); } } catch (_) {} } } for (var i = 0; i < resolved.length; i++) { var r = resolved[i]; if (r != null && r.stream != null && r.content_type != null) { var bh = {}; bh['content-type'] = r.content_type; if (r.cache_control) bh['cache-control'] = r.cache_control; return new Response(r.stream, { status: #{status_int}, headers: bh }); } } if (resolved.length === 1 && resolved[0] != null && Array.isArray(resolved[0]) && resolved[0].length >= 1 && typeof resolved[0][0] === 'number') { var ov = resolved[0]; var ovs = ov[0]|0; var ovh = #{js_headers}; var ovb = ''; if (ov.length >= 3 && ov[1] != null && typeof ov[1] === 'object' && !Array.isArray(ov[1])) { ovh = {}; var keys = Object.keys(ov[1]); for (var k = 0; k < keys.length; k++) { var key = keys[k]; ovh[key] = String(ov[1][key]); } ovb = bodyToText(ov[2]); } else if (ov.length >= 2) { ovb = bodyToText(ov[ov.length - 1]); } return new Response(ovb, { status: ovs, headers: ovh }); } var parts = []; for (var i = 0; i < resolved.length; i++) { var r = resolved[i]; if (r == null) { parts.push(''); continue; } if (typeof r === 'string') { parts.push(r); continue; } if (r != null && r.$$is_string) { parts.push(r.toString()); continue; } try { parts.push(JSON.stringify(r)); } catch (e) { parts.push(String(r)); } } return new Response(parts.join(''), { status: #{status_int}, headers: #{js_headers} }); })`
+            `Promise.all(#{js_chunks}).then(function(resolved) { var bodyToText = function(v) { if (v == null) { return ''; } if (Array.isArray(v)) { var joined = ''; for (var j = 0; j < v.length; j++) { joined += bodyToText(v[j]); } return joined; } if (typeof v === 'string') { return v; } if (v != null && v.$$is_string) { return v.toString(); } try { return JSON.stringify(v); } catch (e) { return String(v); } }; for (var i = 0; i < resolved.length; i++) { var r = resolved[i]; if (r != null && typeof r === 'object' && typeof r['$raw_response?'] === 'function' && typeof r['$js_response'] === 'function') { try { if (r['$raw_response?']()) { return r['$js_response'](); } } catch (_) {} } } for (var i = 0; i < resolved.length; i++) { var r = resolved[i]; if (r != null && r.stream != null && r.content_type != null) { var bh = {}; bh['content-type'] = r.content_type; if (r.cache_control) bh['cache-control'] = r.cache_control; return new Response(r.stream, { status: #{status_int}, headers: bh }); } } if (resolved.length === 1 && resolved[0] != null && Array.isArray(resolved[0]) && resolved[0].length >= 1 && typeof resolved[0][0] === 'number') { var ov = resolved[0]; var ovs = ov[0]|0; var ovh = #{Cloudflare}.$headers_to_js(nil, #{js_headers}); var ovb = ''; if (ov.length >= 3 && ov[1] != null) { ovh = #{Cloudflare}.$headers_to_js(ov[1], #{js_headers}); ovb = bodyToText(ov[2]); } else if (ov.length >= 2) { ovb = bodyToText(ov[ov.length - 1]); } return new Response(ovb, { status: ovs, headers: ovh }); } var parts = []; for (var i = 0; i < resolved.length; i++) { var r = resolved[i]; if (r == null) { parts.push(''); continue; } if (typeof r === 'string') { parts.push(r); continue; } if (r != null && r.$$is_string) { parts.push(r.toString()); continue; } try { parts.push(JSON.stringify(r)); } catch (e) { parts.push(String(r)); } } return new Response(parts.join(''), { status: #{status_int}, headers: #{js_headers} }); })`
           else
             body_str = ''
             chunks.each { |c| body_str = body_str + c.to_s }
@@ -510,6 +510,21 @@ module Cloudflare
       i += 1
     end
     h
+  end
+
+  def self.headers_to_js(headers, fallback = nil)
+    return fallback || `({})` if headers.nil?
+    return headers if `#{headers} != null && #{headers}.constructor === Object`
+
+    js_headers = fallback || `({})`
+    if headers.respond_to?(:each)
+      headers.each do |key, value|
+        ks = key.to_s
+        vs = value.to_s
+        `#{js_headers}[#{ks}] = #{vs}`
+      end
+    end
+    js_headers
   end
 
   # RawResponse wraps an already-constructed JS `Response` so routes

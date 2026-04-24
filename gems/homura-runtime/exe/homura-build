@@ -163,7 +163,10 @@ def prepare_opal_input(root, input_path)
   rel = root.join(rel).relative_path_from(root) if rel.absolute?
   return [rel.to_s, nil] unless rel.extname == '.ru'
 
-  tmp = root.join(".homura-build-#{rel.basename}.rb")
+  tmp_dir = root.join('build', 'auto_await')
+  tmp_dir = root unless tmp_dir.directory?
+  tmp = tmp_dir.join(".homura-build-#{rel.basename}.rb")
+  FileUtils.mkdir_p(tmp.dirname)
   File.write(tmp, root.join(rel).read)
   [tmp.relative_path_from(root).to_s, tmp]
 end

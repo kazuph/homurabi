@@ -264,6 +264,9 @@ def emit_sinatra_patch(io, namespace)
 
             layout = options[:layout]
             layout = false if layout.nil? && options.include?(:layout)
+            if layout.nil? && template.to_sym != :layout && ::#{namespace}.registered?(:layout)
+              layout = :layout
+            end
             if layout
               layout = :layout if layout == true
               layout = layout.to_sym

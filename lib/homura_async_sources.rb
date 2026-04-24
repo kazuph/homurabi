@@ -25,7 +25,7 @@ CloudflareWorkers::AsyncRegistry.register_async_source do
   async_accessor :env, :'cloudflare.JOBS_QUEUE', 'Cloudflare::Queue'
   async_accessor :env, :'cloudflare.DO_COUNTER', 'Cloudflare::DurableObjectNamespace'
 
-  helper_factory :db, 'Cloudflare::D1Database'
+  helper_factory :db, 'Sequel::D1::Database'
   helper_factory :kv, 'Cloudflare::KVNamespace'
   helper_factory :bucket, 'Cloudflare::R2Bucket'
   helper_factory :ai_binding, 'Cloudflare::AI'

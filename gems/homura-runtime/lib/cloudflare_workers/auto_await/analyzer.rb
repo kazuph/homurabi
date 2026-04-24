@@ -144,16 +144,20 @@ module CloudflareWorkers
         when :send
           receiver, method_name = *node
           if receiver.nil?
-            return @env[method_name] if @env.key?(method_name)
             return @method_returns[method_name] if @method_returns.key?(method_name)
+            return @env[method_name] if @env.key?(method_name)
           end
           infer_send_class(node)
         when :index
           infer_index_class(node)
+        when :begin
+          infer_class(node.children.last)
         when :lvar
           @env[node.children[0]]
         when :ivar
           nil
+        when :or_asgn
+          infer_class(node.children.last)
         when :const
           const_path(node)
         else

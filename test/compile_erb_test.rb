@@ -6,6 +6,8 @@ require 'tmpdir'
 
 passed = 0
 failed = 0
+repo_root = File.expand_path('..', __dir__)
+bundle_env = { 'BUNDLE_GEMFILE' => File.join(repo_root, 'Gemfile') }
 
 def assert(label)
   yield
@@ -49,10 +51,19 @@ Dir.mktmpdir do |dir|
   passed += 1 if ok
   failed += 1 unless ok
 
-  ok = assert('erb keeps default no-layout behavior for compatibility') do
+  ok = assert('erb applies layout.erb by default like Sinatra') do
     app = app_class.new
     app.instance_variable_set(:@name, 'homura')
     html = app.erb(:index)
+    raise html unless html == '<main><p>Hello homura</p></main>'
+  end
+  passed += 1 if ok
+  failed += 1 unless ok
+
+  ok = assert('erb still supports layout: false opt-out') do
+    app = app_class.new
+    app.instance_variable_set(:@name, 'homura')
+    html = app.erb(:index, layout: false)
     raise html unless html == '<p>Hello homura</p>'
   end
   passed += 1 if ok
@@ -70,7 +81,7 @@ Dir.mktmpdir do |dir|
   ok = assert('legacy @docs_inner layout fallback still works') do
     app = app_class.new
     app.instance_variable_set(:@docs_inner, '<section>docs</section>')
-    html = app.erb(:layout_docs)
+    html = app.erb(:layout_docs, layout: false)
     raise html unless html == '<article><section>docs</section></article>'
   end
   passed += 1 if ok
@@ -98,7 +109,7 @@ Dir.mktmpdir do |dir|
       invalid_path = File.join(views_dir, 'invalid.erb')
       File.write(invalid_path, spec[:body])
       output, status = Dir.chdir(dir) do
-        Open3.capture2e(*spec[:argv], invalid_path)
+        spec[:argv].first == 'bundle' ? Open3.capture2e(bundle_env, *spec[:argv], invalid_path) : Open3.capture2e(*spec[:argv], invalid_path)
       end
       raise 'unexpected success' if status.success?
       raise output unless output.include?('Unsupported ERB yield form')

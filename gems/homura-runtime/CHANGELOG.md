@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.8 (2026-04-24)
+
+- Compile standalone `config.ru` inputs from `build/auto_await/` so ordinary
+  `require_relative 'app/app'` entrypoints pick up the auto-awaited app copy
+  instead of silently falling back to the original source.
+- Teach the auto-await analyzer to prefer locally inferred helper return types
+  over generic registry defaults, and infer memoized `foo ||= ...` helper bodies.
+- Preserve redirect headers when awaited routes resolve to Rack tuples through
+  the Promise response builder.
+- Add `layout.erb` by default in the precompiled ERB runtime so `erb :index`
+  behaves like ordinary Sinatra unless the app passes `layout: false`.
+
 ## 0.2.7 (2026-04-24)
 
 - Auto-detect standalone app entrypoints from `config.ru`, `app/hello.rb`, then

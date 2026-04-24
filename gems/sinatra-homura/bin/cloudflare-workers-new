@@ -55,6 +55,7 @@ FileUtils.mkdir_p(target)
 Dir.glob(tpl_root.join('**', '*'), File::FNM_DOTMATCH).sort.each do |src|
   rel = Pathname(src).relative_path_from(tpl_root)
   next if rel.to_s == '.'
+  next if !options[:with_db] && rel.each_filename.first == 'db'
 
   dest = target.join(rel)
   if File.directory?(src)

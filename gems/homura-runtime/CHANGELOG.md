@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.10 (2026-04-24)
+
+- Derive `worker.entrypoint.mjs` import paths relative to the actual
+  `--entrypoint-out` location, so standalone builds keep working when apps move
+  the bundle and entrypoint under custom output directories.
+
 ## 0.2.9 (2026-04-24)
 
 - Skip auto-await rewrites when the source expression is already followed by

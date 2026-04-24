@@ -5,7 +5,10 @@
   "scripts": {
     "build": "bundle exec rake build",
     "dev": "bundle exec rake dev",
-    "deploy": "bundle exec rake deploy"
+    "deploy": "bundle exec rake deploy"<% if with_db %>,
+    "db:migrate:compile": "bundle exec rake db:migrate:compile",
+    "db:migrate:local": "bundle exec rake db:migrate:local",
+    "db:migrate:remote": "bundle exec rake db:migrate:remote"<% end %>
   },
   "devDependencies": {
     "wrangler": "^3.99.0"

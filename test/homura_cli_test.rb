@@ -75,8 +75,82 @@ Dir.mktmpdir do |dir|
       system('bundle', 'exec', 'ruby', cli, 'new', app_dir, '--with-db') or raise 'homura new --with-db failed'
     end
 
+    gemfile = File.read(File.join(app_dir, 'Gemfile'))
+    raise 'Gemfile should include sequel-d1' unless gemfile.include?("gem 'sequel-d1'")
+
     rakefile = File.read(File.join(app_dir, 'Rakefile'))
     raise 'Rake build task should pass --with-db' unless rakefile.include?("'homura', 'build', '--standalone', '--with-db'")
+    raise 'Rake db:migrate:compile task missing' unless rakefile.include?("task :compile do")
+    raise 'Rake db:migrate:local task missing' unless rakefile.include?("task local: :compile do")
+    raise 'Rake db:migrate:remote task missing' unless rakefile.include?("task remote: :compile do")
+
+    wrangler = File.read(File.join(app_dir, 'wrangler.toml'))
+    raise 'wrangler.toml should include nodejs_compat' unless wrangler.include?('compatibility_flags = ["nodejs_compat"]')
+    raise 'wrangler.toml should include D1 binding' unless wrangler.include?('[[d1_databases]]')
+    raise 'wrangler.toml should include migrations_dir' unless wrangler.include?('migrations_dir = "db/migrate"')
+
+    migration = File.read(File.join(app_dir, 'db', 'migrate', '001_create_users.rb'))
+    raise 'sample migration should create users table' unless migration.include?('create_table?(:users)')
+
+    package = JSON.parse(File.read(File.join(app_dir, 'package.json')))
+    raise 'package migrate compile script missing' unless package.dig('scripts', 'db:migrate:compile') == 'bundle exec rake db:migrate:compile'
+    raise 'package migrate local script missing' unless package.dig('scripts', 'db:migrate:local') == 'bundle exec rake db:migrate:local'
+    raise 'package migrate remote script missing' unless package.dig('scripts', 'db:migrate:remote') == 'bundle exec rake db:migrate:remote'
+  end
+  passed += 1 if ok
+  failed += 1 unless ok
+end
+
+Dir.mktmpdir do |dir|
+  app_dir = File.join(dir, 'custom-entrypoint-app')
+  FileUtils.mkdir_p(File.join(app_dir, 'app'))
+  FileUtils.mkdir_p(File.join(app_dir, 'views'))
+  FileUtils.mkdir_p(File.join(app_dir, 'public'))
+
+  File.write(File.join(app_dir, 'app', 'app.rb'), <<~RUBY)
+    # frozen_string_literal: true
+    require 'sinatra/cloudflare_workers'
+
+    class App < Sinatra::Base
+      get('/') { 'custom-entrypoint-ok' }
+    end
+  RUBY
+
+  File.write(File.join(app_dir, 'config.ru'), <<~RUBY)
+    # frozen_string_literal: true
+    require_relative 'app/app'
+
+    run App
+  RUBY
+
+  File.write(File.join(app_dir, 'views', 'index.erb'), "ok\n")
+  File.write(File.join(app_dir, 'public', 'robots.txt'), "User-agent: *\n")
+
+  ok = assert('standalone build derives relative entrypoint imports for custom output paths') do
+    output, status = Open3.capture2e(
+      bundle_env, 'bundle', 'exec', 'ruby', build_cli,
+      '--root', app_dir,
+      '--standalone',
+      '--output', 'build/bundle.mjs',
+      '--entrypoint-out', 'build/worker.entrypoint.mjs'
+    )
+    raise output unless status.success?
+
+    entrypoint = File.read(File.join(app_dir, 'build', 'worker.entrypoint.mjs'))
+    raise entrypoint unless entrypoint.include?('import "../cf-runtime/setup-node-crypto.mjs";')
+    raise entrypoint unless entrypoint.include?('import "./bundle.mjs";')
+    raise entrypoint unless entrypoint.include?('from "../cf-runtime/worker_module.mjs";')
+
+    node_script = <<~JS
+      const mod = await import(process.argv[2]);
+      const app = mod.default;
+      const ctx = { waitUntil() {} };
+      const resp = await app.fetch(new Request('https://example.test/'), {}, ctx);
+      console.log(`${resp.status}:${await resp.text()}`);
+    JS
+    output, status = Open3.capture2e('node', '--input-type=module', '-', File.join(app_dir, 'build', 'worker.entrypoint.mjs'), stdin_data: node_script)
+    raise output unless status.success?
+    raise output unless output.lines.map(&:strip).include?('200:custom-entrypoint-ok')
   end
   passed += 1 if ok
   failed += 1 unless ok

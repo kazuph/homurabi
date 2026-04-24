@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.14 (2026-04-24)
+
+- Scaffold `--with-db` apps with a first-class D1 migration flow: a starter
+  `db/migrate/` file, `rake db:migrate:{compile,local,remote}` tasks, matching
+  package.json scripts, and a `[[d1_databases]]` wrangler block.
+- Rely on `homura-runtime >= 0.2.10` so generated apps inherit the standalone
+  entrypoint-relative import fix.
+
 ## 0.2.13 (2026-04-24)
 
 - Add `rake` to generated app Gemfiles so the scaffolded `bundle exec rake

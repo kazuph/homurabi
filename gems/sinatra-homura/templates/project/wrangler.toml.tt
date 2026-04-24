@@ -2,3 +2,12 @@ name = "<%= app_name %>"
 main = "worker.entrypoint.mjs"
 compatibility_date = "<%= compat_date %>"
 compatibility_flags = ["nodejs_compat"]
+<% if with_db %>
+
+# Replace database_id after `wrangler d1 create <%= app_name %>`.
+[[d1_databases]]
+binding = "DB"
+database_name = "<%= app_name %>"
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "db/migrate"
+<% end %>

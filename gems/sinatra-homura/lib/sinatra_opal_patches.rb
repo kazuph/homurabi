@@ -342,6 +342,72 @@ module Sinatra
     private :wrap_async_halt_result
 
     # -------------------------------------------------------------
+    # 9.4. Base#route_eval (upstream base.rb:1090)
+    #
+    # For `# await: true` routes the block returns a JS Promise immediately.
+    # Before throwing :halt with the Promise, mark env so that
+    # process_route#ensure knows not to delete route params from @params —
+    # the async continuation still needs them when the Promise resolves.
+    # -------------------------------------------------------------
+    def route_eval
+      result = yield
+      env['homura.async_route_active'] = true if defined?(::Cloudflare) && ::Cloudflare.js_promise?(result)
+      throw :halt, result
+    end
+    private :route_eval
+
+    # -------------------------------------------------------------
+    # 9.5. Base#process_route (upstream base.rb:1100)
+    #
+    # Upstream always deletes route params from @params in ensure after
+    # the block returns. On Opal `# await: true` routes the block returns
+    # a Promise immediately, so ensure runs before the async continuation
+    # reads `params['id']`.
+    #
+    # route_eval sets env['homura.async_route_active'] before throwing
+    # :halt when the result is a Promise. We check that flag here in
+    # ensure to skip the @params cleanup, letting @params survive until
+    # the Promise resolves and the continuation reads its params.
+    #
+    # Sinatra app instances are per-request (`dup.call!`), so skipping
+    # the cleanup cannot leak route params across requests.
+    # -------------------------------------------------------------
+    def process_route(pattern, conditions, block = nil, values = [])
+      route = @request.path_info
+      route = '/' if route.empty? && !settings.empty_path_info?
+      route = route[0..-2] if !settings.strict_paths? && route != '/' && route.end_with?('/')
+
+      params = pattern.params(route)
+      return unless params
+
+      params.delete('ignore')
+      force_encoding(params)
+      @params = @params.merge(params) { |_k, v1, v2| v2 || v1 } if params.any?
+
+      regexp_exists = pattern.is_a?(Mustermann::Regular) ||
+                      (pattern.respond_to?(:patterns) && pattern.patterns.any? { |subpattern| subpattern.is_a?(Mustermann::Regular) })
+      if regexp_exists
+        captures = pattern.match(route).captures.map { |c| URI_INSTANCE.unescape(c) if c }
+        values += captures
+        @params[:captures] = force_encoding(captures) unless captures.nil? || captures.empty?
+      else
+        values += params.values.flatten
+      end
+
+      catch(:pass) do
+        conditions.each { |c| throw :pass if c.bind(self).call == false }
+        block ? block[self, values] : yield(self, values)
+      end
+    rescue StandardError
+      @env['sinatra.error.params'] = @params
+      raise
+    ensure
+      params ||= {}
+      params.each { |k, _| @params.delete(k) } unless @env['sinatra.error.params'] || @env['homura.async_route_active']
+    end
+    private :process_route
+
+    # -------------------------------------------------------------
     # 10. Base.new! (upstream base.rb:1676)
     #
     # Upstream uses `alias new! new unless method_defined? :new!` on

@@ -15,8 +15,12 @@ Do not introduce the old names in fresh guidance unless explicitly explaining hi
 
 In this repo's Opal-on-Workers runtime:
 
-- `halt` / `throw :halt` is unsafe across async boundaries
-- in async flows, prefer returning values or `[status, body]`
+- current releases support ordinary Sinatra `redirect` / `halt` across async
+  boundaries
+- explicit Rack tuples such as `[status, body]` and `[status, headers, body]`
+  also work in async routes
+- if a downstream app still shows empty bodies or broken redirects, verify it is
+  actually using the latest published gems before changing app code
 
 ## D1 / Sequel
 
@@ -24,8 +28,16 @@ In this repo's Opal-on-Workers runtime:
 - `Dataset#all` still resolves asynchronously under the hood, but common
   Sinatra-facing call sites are auto-awaited at build time, so examples should
   usually stay sync-shaped (`db[:users].all`, not `db[:users].all.__await__`)
+- current releases also support Sequel write DSL on D1 (`insert`, `update`,
+  `delete`) without dropping to raw D1 bindings
 - keep manual `.__await__` for raw Promise work or patterns the auto-await
   registry does not recognize yet
+- helper methods in the same file can also become async through auto-await
+  propagation, but dynamic metaprogramming still may need manual `.__await__`
+- simple-table D1 / SQLite boolean columns now coerce back to Ruby booleans on
+  normal dataset reads (`db[:todos].all`, `first`, etc.)
+- custom SQL / custom projections that lose schema context can still surface raw
+  `0` / `1`, so be explicit there if needed
 
 ## Layout rendering
 
@@ -38,7 +50,15 @@ In this repo's Opal-on-Workers runtime:
 
 - the Worker entrypoint is `build/worker.entrypoint.mjs`
 - `bundle exec homura build` is the standard build command
+- Sequel/D1 standalone apps should use `bundle exec homura build --standalone --with-db`
 - but generated apps should expose `bundle exec rake build|dev|deploy` as the normal user workflow
+- `compile-assets` now tolerates an empty `public/` directory; static files are optional
+- if Opal compile fails, inspect `build/opal.stderr.log`
+
+## Wrangler compatibility date
+
+- `compatibility_date` must not be in the future relative to the local machine
+  date; `wrangler dev` rejects future dates
 
 ## Existing app migration
 

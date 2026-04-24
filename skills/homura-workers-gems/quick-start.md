@@ -5,10 +5,10 @@
 ```ruby
 source 'https://rubygems.org'
 
-gem 'opal-homura', '= 1.8.3.rc1', require: 'opal'
-gem 'homura-runtime', '~> 0.1'
-gem 'sinatra-homura', '~> 0.1'
-gem 'sequel-d1', '~> 0.1' # only if D1 / Sequel is needed
+gem 'opal-homura', '= 1.8.3.rc1.3', require: 'opal'
+gem 'homura-runtime', '~> 0.2'
+gem 'sinatra-homura', '~> 0.2'
+gem 'sequel-d1', '~> 0.2' # only if D1 / Sequel is needed
 ```
 
 If Bundler reports `revealed dependencies not in the API` for `homura-runtime`,
@@ -19,8 +19,11 @@ retry with `bundle install --full-index`.
 1. Scaffold or write a Sinatra app.
 2. For generated apps, prefer `bundle exec rake build`, `bundle exec rake dev`, and `bundle exec rake deploy`.
 3. Use `homura` directly only when you are wiring or debugging the lower-level build surface.
-4. Set `wrangler.toml` `main = "build/worker.entrypoint.mjs"`.
-5. Deploy with Wrangler.
+4. If the app uses D1 through Sequel, build with `bundle exec homura build --standalone --with-db`.
+5. Set `wrangler.toml` `main = "build/worker.entrypoint.mjs"`.
+6. Deploy with Wrangler.
+
+If `homura build` fails during Opal compile, read `build/opal.stderr.log` first.
 
 ## Minimal runtime snippet
 

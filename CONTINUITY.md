@@ -1,63 +1,58 @@
 # Continuity Ledger
 
 ## Goal（成功基準を含む）
-- Finish the queued standalone/build ergonomics fixes and release them as one patch bump for `homura-runtime` and `sinatra-homura`.
-- Success means the next session can resume from this file alone and know that implementation is done, validation passed, and only release monitoring / follow-up remains.
+- Keep `homura-examples` conventional by fixing blocker-class runtime/gem gaps in this repo instead of pushing workarounds into app code.
+- Current success target: publish the remaining round-3 least-surprise fixes, then dogfood round 4 against the freshly published gems.
 
 ## Constraints/Assumptions（制約/前提）
-- Priority order is fixed for now: 1 > 3 > 2 > 4.
-- Prefer least-surprise behavior for ordinary Ruby/Sinatra developers.
-- Build CLI should absorb platform-specific setup when possible instead of forcing app authors into special-case steps.
+- Prefer least-surprise Ruby/Sinatra behavior even if the implementation underneath must diverge from upstream internals.
+- Fix the owning gem/runtime layer; do not push special-case code into `homura-examples`.
+- `CONTINUITY.md` is the durable source of truth across compression; keep blocker status here.
 
 ## Key decisions（重要な決定）
-- P1 / auto-await: fix auto-await itself. If a file already contains `.__await__`, generate output and add `# await: true` even when analysis would otherwise produce no inserted await nodes. `--force` may exist for debugging, but should not be required in normal operation. Do not solve this by making `homura build --standalone` bypass auto-await.
-- P1 / cf-runtime assets: `homura build --standalone` should ensure/copy `cf-runtime/setup-node-crypto.mjs` and `cf-runtime/worker_module.mjs` from the packaged gem. `homura new` may also scaffold them, but final responsibility belongs to the build CLI.
-- P2 / ERB layout yield: port homura-runtime's yield support into `sinatra-homura`'s `homura erb:compile` path so both compilers match. Add diagnostics: support `<%= yield %>` and `<%== yield %>`, but make `<% yield %>` and `yield(arg)` compile errors that point users toward supported layout patterns. Prefer errors over warnings.
-- P3 / standalone namespaces: stop hardcoding `AppTemplates` / `AppAssets` in standalone build defaults. Either derive names from the project (for example `HomuraAppTemplates`) or add CLI flags such as `--templates-namespace` / `--assets-namespace`.
-- CLI naming: make `homura` the only public CLI surface. Do not keep old `cloudflare-workers-*` names as compatibility aliases before v1.
+- Treat explicit `halt` as a dedicated exception carrying a fully materialized Rack tuple so it can cross Opal async boundaries; keep ordinary route returns on Sinatra's existing `throw :halt` path.
+- Let `redirect` continue calling `halt`; the new `halt` snapshot logic captures post-mutation status/headers/body so redirect semantics stay conventional in both sync and async routes.
+- Strengthen regression coverage in the worker-path smoke instead of trusting direct `app.call` only.
+- For `sequel-d1`, keep vendored Sequel packaging and add a subprocess regression that `vendor/` + `lib/` alone can `require 'sequel'` and register the `:d1` adapter.
+- For async standalone Sinatra routes, preserve route params by marking Promise-returning `route_eval` paths and skipping `process_route` cleanup for that per-request app instance.
+- For D1 booleans, coerce only simple-table result columns identified as `BOOLEAN` / `BOOL` via SQLite schema metadata; leave ordinary integer columns untouched.
 
 ## State（状態）
 
 ### Done（完了）
-- Handoff memo received and preserved.
-- Parent pane notified via `tmux send-keys -t %170 '[%172] 受領: 4点の優先度と解決方針を保持'`.
-- `auto-await` now emits output for files that already contain `.__await__` when the missing piece is only `# await: true`.
-- `homura build --standalone` now restores `cf-runtime/` from the packaged runtime gem.
-- Both ERB compilers now reject unsupported yield forms (`<% yield %>`, `yield(arg)`) with compile-time guidance.
-- Standalone template/asset namespaces now derive from the project name by default, with explicit override flags.
-- `homura` is now the only public CLI; build / ERB compile / migrations / scaffolding all dispatch through it.
-- Repo build and full test suite passed after the changes and patch-version bumps.
+- Released and pushed `opal-homura-v1.8.3.rc1.1` from commit `e2fdab6`.
+- Released and pushed `homura-runtime-v0.2.2`, `sinatra-homura-v0.2.3`, and `sequel-d1-v0.2.2` from commit `38a1faa`.
+- Added worker-path smoke coverage for `params['id']` on both sync and async routes.
+- Added worker-path smoke coverage for async `redirect` and async `halt`.
+- Patched `sinatra_opal_patches.rb` so explicit `halt` snapshots a full Rack tuple and async Promise rejections resolve back into Sinatra-compatible responses.
+- Extended `build_js_response` so resolved async tuples handle `[status, body]` and `[status, headers, body]`.
+- Added `sequel_d1_packaging_test.rb` coverage that packaged `vendor/` + `lib/` can `require 'sequel'` and register the `:d1` adapter.
+- Implemented the remaining round-3 blocker fixes in the local tree:
+  - `homura build --with-db` now implies standalone
+  - standalone async Sinatra routes keep `params['id']`
+  - simple-table D1 boolean columns coerce to Ruby booleans
+  - Sequel DML string quoting regression is covered and fixed
+- Current full `npm test` passed on the release-candidate tree.
 
 ### Now（現在）
-- Release metadata is updated locally (`homura-runtime 0.1.5`, `sinatra-homura 0.1.3`).
-- Next concrete step is commit / push / tag push, then monitor the release workflow.
+- Release commits for `homura-runtime 0.2.6`, `sequel-d1 0.2.5`, and `sinatra-homura 0.2.10` are prepared locally.
+- Tags, gem pushes, and git pushes are the remaining step before round 4.
 
 ### Next（次）
-- Commit the completed changes.
-- Push `main`.
-- Create and push the final patch release tags.
-- Monitor the release workflow and RubyGems propagation if requested.
+- Build/push the three updated gems and push their git tags.
+- Run dogfood round 4 against the freshly published gems.
 
 ## Open questions（未解決の質問、必要に応じてUNCONFIRMED）
-- None for implementation. Release monitoring remains operational work only.
+- None for implementation in this repo once the releases are published.
 
 ## Working set（作業セット：ファイル/ID/コマンド）
-- Likely files:
-  - `gems/homura-runtime/exe/auto-await`
-  - `gems/homura-runtime/bin/cloudflare-workers-build`
-  - `gems/homura-runtime/lib/cloudflare_workers/build_support.rb`
-  - `gems/homura-runtime/runtime/setup-node-crypto.mjs`
-  - `gems/homura-runtime/runtime/worker_module.mjs`
-  - `gems/homura-runtime/lib/cloudflare_workers/version.rb`
-  - `gems/sinatra-homura/bin/cloudflare-workers-erb-compile`
-  - `gems/sinatra-homura/bin/homura`
-  - `gems/sinatra-homura/bin/cloudflare-workers-new`
-  - `gems/sinatra-homura/sinatra-homura.gemspec`
-  - `README.md`
-  - `gems/homura-runtime/README.md`
-  - `test/auto_await_cli_test.rb`
-  - `test/build_support_test.rb`
-  - `test/compile_erb_test.rb`
+- Files:
+  - `gems/homura-runtime/exe/homura-build`
+  - `gems/homura-runtime/lib/cloudflare_workers/auto_await/analyzer.rb`
+  - `gems/sinatra-homura/lib/sinatra_opal_patches.rb`
+  - `gems/sequel-d1/lib/sequel/adapters/d1.rb`
+  - `gems/sequel-d1/lib/sequel_opal_runtime_patches.rb`
   - `test/homura_cli_test.rb`
-- Reminder command already executed:
-  - `tmux send-keys -t %170 '[%172] 受領: 4点の優先度と解決方針を保持' && sleep 0.1 && tmux send-keys -t %170 Enter`
+  - `test/sequel_smoke.rb`
+- Validation:
+  - `npm test`

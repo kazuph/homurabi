@@ -33,25 +33,42 @@
   - simple-table D1 boolean columns coerce to Ruby booleans
   - Sequel DML string quoting regression is covered and fixed
 - Current full `npm test` passed on the release-candidate tree.
+- Pushed `main` and release tags for `homura-runtime-v0.2.6`, `sequel-d1-v0.2.5`, and `sinatra-homura-v0.2.10`.
+- GitHub Actions `release-gems.yml` runs for those three tags completed successfully.
+- Cleaned AI-facing docs/skills to the current command surface:
+  - removed stale `cloudflare-workers-*` guidance
+  - removed the migration playbook from the skill bundle
+  - refreshed `README.md`, `public/llms.txt`, and `skills/homura-workers-gems/*` to the modern Rake-first flow
+- Implemented round-4 blocker fixes in the local tree:
+  - D1 adapter now initializes SQLite integer booleans correctly, so Sequel writes use `0/1`
+  - boolean coercion regression coverage now includes string-backed `t/f` rows
+  - Rack request authority parsing now preserves non-default ports for redirects in local dev
+  - standalone build now auto-detects `config.ru`, `app/hello.rb`, then `app/app.rb`
+  - scaffolded apps now use standard `config.ru` + `app/app.rb`, without requiring `app/hello.rb`
+- Current full `npm test` passed after the round-4 fixes.
 
 ### Now（現在）
-- Release commits for `homura-runtime 0.2.6`, `sequel-d1 0.2.5`, and `sinatra-homura 0.2.10` are prepared locally.
-- Tags, gem pushes, and git pushes are the remaining step before round 4.
+- Round-4 blocker fixes are implemented locally; next meaningful step is publishing them.
 
 ### Next（次）
-- Build/push the three updated gems and push their git tags.
-- Run dogfood round 4 against the freshly published gems.
+- Publish the round-4 blocker fixes in the next gem release set.
+- Run the next dogfood pass against those freshly published gems.
 
 ## Open questions（未解決の質問、必要に応じてUNCONFIRMED）
-- None for implementation in this repo once the releases are published.
+- None in local code; release/publish timing is the next external step.
 
 ## Working set（作業セット：ファイル/ID/コマンド）
 - Files:
   - `gems/homura-runtime/exe/homura-build`
+  - `gems/homura-runtime/lib/cloudflare_workers/build_support.rb`
   - `gems/homura-runtime/lib/cloudflare_workers/auto_await/analyzer.rb`
+  - `gems/homura-runtime/lib/cloudflare_workers.rb`
   - `gems/sinatra-homura/lib/sinatra_opal_patches.rb`
   - `gems/sequel-d1/lib/sequel/adapters/d1.rb`
   - `gems/sequel-d1/lib/sequel_opal_runtime_patches.rb`
+  - `gems/sinatra-homura/templates/project/config.ru.tt`
+  - `gems/sinatra-homura/templates/project/app/app.rb.tt`
+  - `vendor/rack/request.rb`
   - `test/homura_cli_test.rb`
   - `test/sequel_smoke.rb`
 - Validation:

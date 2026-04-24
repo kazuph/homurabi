@@ -8,7 +8,7 @@
 
 Live demo: **<https://homura.kazu-san.workers.dev>**
 
-**Phase 15-F (in progress)** — The release units stay in this monorepo, but each gem is published independently from its own gemspec. The three runtime gems (`homura-runtime`, `sinatra-homura`, `sequel-d1`) and the patched Opal fork (`opal-homura`) all build cleanly as `.gem` artifacts. Consumer flow is `gem install --local` (order: opal-homura → runtime → sinatra → sequel-d1), then plain `homura new myapp` and `bundle exec homura build`. `homura` itself remains the showcase app / integration repo for now and is **not** part of the RubyGems publish set. Entry topology is documented in [`gems/homura-runtime/docs/ARCHITECTURE.md`](gems/homura-runtime/docs/ARCHITECTURE.md). `wrangler.toml` `main` points at **`build/worker.entrypoint.mjs`**.
+**Current published app flow** — use the RubyGems packages `opal-homura`, `homura-runtime`, `sinatra-homura`, and optionally `sequel-d1`. The normal path is `bundle exec homura new myapp` (add `--with-db` for D1), then work through generated `bundle exec rake dev|build|deploy` tasks. Generated apps use standard Sinatra `config.ru` + `app/app.rb`, and `homura build` auto-detects `config.ru`, `app/hello.rb`, then `app/app.rb` as the entrypoint. Drop down to `bundle exec homura build` only when you are wiring or debugging the lower-level build pipeline. `wrangler.toml` `main` points at **`build/worker.entrypoint.mjs`**.
 
 ---
 
@@ -111,13 +111,15 @@ response so you can spot model-specific schema drift.
 ---
 
 ```ruby
-# app/hello.rb — literal Sinatra DSL, no Cloudflare imports, no backtick JS.
+# app/app.rb — literal Sinatra DSL, no Cloudflare imports, no backtick JS.
 require 'sinatra/base'
+require 'sequel'
 
 class App < Sinatra::Base
   get '/' do
     @title   = 'Hello from Sinatra'
-    @users   = env['cloudflare.DB'].prepare('SELECT id, name FROM users').all.__await__
+    db       = Sequel.connect(adapter: :d1, d1: env['cloudflare.DB'])
+    @users   = db[:users].select(:id, :name).all
     erb :index, layout: :layout
   end
 
@@ -127,10 +129,16 @@ class App < Sinatra::Base
   end
 
   get '/d1/users' do
+    db = Sequel.connect(adapter: :d1, d1: env['cloudflare.DB'])
     content_type 'application/json'
-    env['cloudflare.DB'].prepare('SELECT id, name FROM users').all.__await__.to_json
+    db[:users].select(:id, :name).all.to_json
   end
 end
+```
+
+```ruby
+# config.ru
+require_relative 'app/app'
 
 run App
 ```
@@ -138,6 +146,10 @@ run App
 `views/index.erb`, `views/layout.erb`, etc. are plain ERB. `bin/compile-erb`
 translates them to Ruby methods at build time, so the Workers sandbox
 never sees an `eval` / `new Function` at request time.
+
+For normal Sinatra/D1 code paths, the build step keeps app code sync-shaped and
+inserts `.__await__` only where the runtime actually needs it. For app setup,
+Homura now prefers the standard Sinatra split of `config.ru` and `app/app.rb`.
 
 That file is compiled by Opal to a 580 KiB (gzip) ESM Module Worker and
 deployed straight to Cloudflare's edge. The Sinatra routes call D1, KV,
@@ -550,7 +562,7 @@ homura/
 ├── src/
 │   └── worker.mjs               ← 30-line Module Worker fetch handler.
 ├── vendor/
-│   ├── opal-gem/                ← Opal fork 1.8.3.rc1.2 (based on upstream 1.8.3.rc1).
+│   ├── opal-gem/                ← Opal fork 1.8.3.rc1.3 (based on upstream 1.8.3.rc1).
 │   ├── sinatra/                 ← janbiedermann/sinatra fork. 6 homura patches
 │   │                              in base.rb.
 │   ├── rack/                    ← Rack + Rack::Protection (patched).

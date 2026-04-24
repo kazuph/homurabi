@@ -28,10 +28,8 @@
 
 ## Docs entrypoints
 
-- Overview: `/docs`
-- Quick start: `/docs/quick-start`
-- Runtime: `/docs/runtime`
-- Sinatra: `/docs/sinatra`
-- Sequel D1: `/docs/sequel-d1`
-- Architecture: `/docs/architecture`
-- Machine-readable summary: `/llms.txt`
+- Human overview: `README.md`
+- Machine-readable summary: `public/llms.txt`
+- Setup guide: `skills/homura-workers-gems/quick-start.md`
+- Common pitfalls: `skills/homura-workers-gems/gotchas.md`
+- Runtime internals: `docs/TOOLCHAIN_CONTRACT.md`

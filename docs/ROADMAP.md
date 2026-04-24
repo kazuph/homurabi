@@ -1,5 +1,10 @@
 # homura ロードマップ
 
+> **Historical engineering roadmap.** This file is for project planning and past
+> implementation context, not for current app setup guidance. For the current
+> user-facing flow, prefer `README.md`, `public/llms.txt`, and
+> `skills/homura-workers-gems/`.
+
 > Phase 1〜7 完了。Phase 8 以降が中長期計画。
 > Phase 1〜5（コア基盤・D1/KV/R2 バインディング・ERB プリコンパイル・回帰 25 件）
 > および Phase 6（HTTP fetch シム）、Phase 7（フル暗号スイート）は ship 済み。

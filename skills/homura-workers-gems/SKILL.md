@@ -12,7 +12,6 @@ Use this skill when the task is about:
 - setting up Sinatra on Cloudflare Workers
 - using D1 through Sequel
 - building with `homura build`
-- migrating an existing Sinatra backend onto Workers
 - understanding common Opal/Workers gotchas in this stack
 
 ## Read these companion files first
@@ -20,7 +19,6 @@ Use this skill when the task is about:
 - `gem-map.md` — which gem owns which responsibility
 - `quick-start.md` — minimal install/build flow
 - `gotchas.md` — mistakes that repeatedly trip up agents
-- `migration-playbook.md` — existing-app migration strategy
 
 ## Package map
 
@@ -51,18 +49,10 @@ When explaining setup, prefer the published gem names and this order:
 
 When generating guidance or code:
 
-- use the **published gem names**, not the old internal names
-- point users at `bundle exec homura build`
+- use the **published gem names** only
+- prefer the modern scaffold flow: `bundle exec homura new ...` then `bundle exec rake dev|build|deploy`
+- point users at `bundle exec homura build` only for lower-level wiring or debugging
 - assume `wrangler.toml` `main = "build/worker.entrypoint.mjs"`
-- point users to `/llms.txt` and the docs pages when high-level orientation is needed
-- for generated apps, prefer `bundle exec rake ...` as the user-facing workflow and treat `homura` as the lower-level implementation surface
-
-## Do not confuse these names
-
-- **Correct**: `homura-runtime`
-- **Old internal name**: `cloudflare-workers-runtime`
-
-- **Correct**: `sinatra-homura`
-- **Old internal name**: `sinatra-cloudflare-workers`
-
-If older names appear in historical roadmap text, prefer the published names in new guidance.
+- point users to `README.md`, `/llms.txt`, and this skill's companion files for current guidance
+- keep examples sync-shaped unless a raw Promise boundary truly forces manual `.__await__`
+- never emit `cloudflare-workers-*` command names or migration-first/legacy guidance in fresh answers

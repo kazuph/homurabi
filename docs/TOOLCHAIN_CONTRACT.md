@@ -41,14 +41,14 @@ Homura’s production bundle is built with:
 
 - `-I gems/homura-runtime/lib -I lib -I vendor -I build`
 - `-r opal_patches -r cloudflare_workers -r homura_templates -r homura_assets`
-- Entry: `app/hello.rb` (overridable)
+- Entry: auto-detected from `config.ru`, `app/hello.rb`, then `app/app.rb` (overridable)
 - Output: `build/hello.no-exit.mjs` (overridable)
 
 ### Environment overrides (`npm run build:opal`)
 
 | Variable | Default | Meaning |
 |----------|---------|---------|
-| `HOMURA_OPAL_INPUT` | `app/hello.rb` | Opal entry file |
+| `HOMURA_OPAL_INPUT` | auto-detect (`config.ru` → `app/hello.rb` → `app/app.rb`) | Opal entry file |
 | `HOMURA_OPAL_OUTPUT` | `build/hello.no-exit.mjs` | ESM bundle path |
 | `HOMURA_OPAL_PATCH_INPUT` | same as `HOMURA_OPAL_OUTPUT` | Target for `bin/patch-opal-evals.mjs` |
 

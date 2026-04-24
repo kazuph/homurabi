@@ -19,12 +19,12 @@ Live demo: https://homura.kazu-san.workers.dev
 
 - sinatra-homura
   - Sinatra integration layer.
-  - Owns `cloudflare-workers-new` and `cloudflare-workers-erb-compile`.
+  - Owns `homura new` and `homura erb:compile`.
   - Includes JWT / Scheduled / Queue helpers.
 
 - sequel-d1
   - Sequel adapter for Cloudflare D1.
-  - Owns `cloudflare-workers-migrate`.
+  - Owns `homura db:migrate:*`.
 
 ## Install order
 
@@ -38,22 +38,24 @@ Live demo: https://homura.kazu-san.workers.dev
 ```ruby
 source 'https://rubygems.org'
 
-gem 'opal-homura', '= 1.8.3.rc1', require: 'opal'
-gem 'homura-runtime', '~> 0.1'
-gem 'sinatra-homura', '~> 0.1'
-gem 'sequel-d1', '~> 0.1' # optional
+gem 'opal-homura', '= 1.8.3.rc1.3', require: 'opal'
+gem 'homura-runtime', '= 0.2.7'
+gem 'sinatra-homura', '= 0.2.11'
+gem 'sequel-d1', '= 0.2.6' # optional
 ```
 
 ## Minimal flow
 
-1. Create or scaffold a Sinatra app.
-2. Build with `bundle exec homura build`.
+1. Scaffold with `bundle exec homura new myapp` (add `--with-db` if you want D1 through Sequel).
+2. In generated apps, use `bundle exec rake dev`, `bundle exec rake build`, and `bundle exec rake deploy`.
 3. Set `wrangler.toml` `main = "build/worker.entrypoint.mjs"`.
 4. Deploy with Wrangler.
+5. Standard layout is `app/app.rb` plus `config.ru`; `app/hello.rb` is optional compatibility, not a requirement.
 
 ## Minimal Sinatra + D1 example
 
 ```ruby
+# app/app.rb
 require 'sinatra/cloudflare_workers'
 require 'sequel'
 
@@ -61,28 +63,35 @@ class App < Sinatra::Base
   get '/users' do
     db = Sequel.connect(adapter: :d1, d1: env['cloudflare.DB'])
     content_type 'application/json'
-    db[:users].all.__await__.to_json
+    db[:users].all.to_json
   end
 end
+```
+
+```ruby
+# config.ru
+require_relative 'app/app'
 
 run App
 ```
 
 ## Key docs
 
-- /docs
-- /docs/quick-start
-- /docs/runtime
-- /docs/sinatra
-- /docs/sequel-d1
-- /docs/architecture
+- README.md
+- /llms.txt
+- skills/homura-workers-gems/quick-start.md
+- skills/homura-workers-gems/gotchas.md
+- docs/TOOLCHAIN_CONTRACT.md
 
 ## Important gotchas
 
-- Prefer the published names `homura-runtime` and `sinatra-homura`. Older internal docs may still mention `cloudflare-workers-runtime` or `sinatra-cloudflare-workers`.
-- In async Sinatra routes on this stack, `halt` / `throw :halt` is unsafe across async boundaries. Return a value or `[status, body]` instead.
+- Use `homura` and generated `rake` tasks; do not emit `cloudflare-workers-*` command names.
+- Current releases support ordinary Sinatra `redirect`, `halt`, route params, ERB layout `yield`, and Sequel CRUD on D1.
 - Workers bindings are exposed through Rack env keys such as `env['cloudflare.DB']`, `env['cloudflare.KV']`, `env['cloudflare.BUCKET']`, and `env['cloudflare.AI']`.
-- `Sequel::Dataset#all` resolves asynchronously on Workers, so examples often need `.__await__`.
+- Common binding/helper paths are auto-awaited at build time; keep examples sync-shaped unless you are handling a raw Promise boundary directly.
+- D1 boolean columns come back as Ruby booleans on normal dataset reads, but custom SQL/projections can still surface raw `0` / `1`.
+- For hand-wired D1/Sequel apps, use `bundle exec homura build --standalone --with-db`.
+- Standard Sinatra `config.ru` with `run App` is supported, and `redirect` keeps the current host/port in local dev.
 
 ## Agent skill
 

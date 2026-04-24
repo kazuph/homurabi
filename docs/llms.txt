@@ -15,7 +15,7 @@ Live demo: https://homura.kazu-san.workers.dev
 
 - homura-runtime
   - Core runtime, Rack adapter, Workers bindings, build pipeline.
-  - Owns `cloudflare-workers-build`.
+  - Owns `homura build`.
 
 - sinatra-homura
   - Sinatra integration layer.
@@ -47,7 +47,7 @@ gem 'sequel-d1', '~> 0.1' # optional
 ## Minimal flow
 
 1. Create or scaffold a Sinatra app.
-2. Build with `bundle exec cloudflare-workers-build`.
+2. Build with `bundle exec homura build`.
 3. Set `wrangler.toml` `main = "build/worker.entrypoint.mjs"`.
 4. Deploy with Wrangler.
 

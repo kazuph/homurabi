@@ -77,5 +77,27 @@ Dir.mktmpdir do |dir|
   failed += 1 unless ok
 end
 
+Dir.mktmpdir do |dir|
+  public_dir = File.join(dir, 'public')
+  out_path = File.join(dir, 'embedded_assets.rb')
+  FileUtils.mkdir_p(public_dir)
+
+  script = File.expand_path('../gems/homura-runtime/exe/compile-assets', __dir__)
+  Dir.chdir(dir) do
+    system('ruby', script, '--input', 'public', '--output', 'embedded_assets.rb', '--namespace', 'EmptyCompileAssetsTest') or abort('compile-assets failed for empty dir')
+  end
+
+  ok = assert('empty public directory still emits pass-through middleware') do
+    load out_path
+    app = ->(_env) { [404, {}, ['miss']] }
+    status, headers, body = EmptyCompileAssetsTest::Middleware.new(app).call('PATH_INFO' => '/missing.txt')
+    raise "status=#{status}" unless status == 404
+    raise "headers=#{headers.inspect}" unless headers == {}
+    raise "body=#{body.inspect}" unless body == ['miss']
+  end
+  passed += 1 if ok
+  failed += 1 unless ok
+end
+
 puts "\n#{passed} passed, #{failed} failed"
 exit(failed.zero? ? 0 : 1)

@@ -18,6 +18,8 @@ CloudflareWorkers::AsyncRegistry::Builder.new(registry).instance_eval do
   taint_return 'Sequel::Dataset', :limit, 'Sequel::Dataset'
   async_factory 'Cloudflare::Email', :new
   async_method 'Cloudflare::Email', :send
+  helper_factory :kv, 'Cloudflare::KVNamespace'
+  async_method 'Cloudflare::KVNamespace', :get
   taint_return 'Cloudflare::DurableObjectState', :storage, 'Cloudflare::DurableObjectStorage'
   async_method 'Cloudflare::DurableObjectStorage', :get
   async_method 'Cloudflare::DurableObjectStorage', :put
@@ -180,6 +182,18 @@ src10 = <<~RUBY
   end
 RUBY
 ok, _ = assert_transform(src10, ["state.storage.get('count')", "state.storage.put('count', prev + 1)"], registry)
+passed += 1 if ok
+failed += 1 unless ok
+
+# Test 11: local helper methods that become async are awaited at call sites
+src11 = <<~RUBY
+  def load_rows
+    kv.get('todos')
+  end
+
+  payload = load_rows
+RUBY
+ok, _ = assert_transform(src11, ["kv.get('todos')", 'load_rows'], registry)
 passed += 1 if ok
 failed += 1 unless ok
 

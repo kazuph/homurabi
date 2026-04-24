@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 # Phase 15-A — thin wrappers around the generic build CLIs.
-# `npm run build` / `bundle exec cloudflare-workers-build` is the primary entry point.
+# `npm run build` / `bundle exec homura build` is the primary entry point.
 
 GEM_ERB = 'gems/homura-runtime/exe/compile-erb'
 PATCH   = 'gems/homura-runtime/runtime/patch-opal-evals.mjs'
@@ -40,7 +40,7 @@ end
 
 desc 'Full homura build (ERB + assets + Opal + patch + worker.entrypoint.mjs)'
 task :build do
-  sh 'bundle', 'exec', 'cloudflare-workers-build'
+  sh 'bundle', 'exec', 'homura', 'build'
 end
 
 desc 'Regenerate docs search index (public/docs-search-index.json)'

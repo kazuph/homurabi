@@ -82,10 +82,6 @@ end
 ns = options[:namespace]
 
 files = Dir.glob(File.join(public_dir, '**', '*')).select { |f| File.file?(f) }.sort
-if files.empty?
-  warn 'compile-assets: directory is empty'
-  exit 1
-end
 
 out_path = options[:output]
 FileUtils.mkdir_p(File.dirname(out_path))

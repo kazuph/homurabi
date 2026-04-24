@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.6 (2026-04-24)
+
+- Remove the shipped `cloudflare-workers-build` filename entirely and keep the
+  build implementation under `exe/homura-build`, matching the `homura build`
+  public surface.
+- Make `homura build --with-db` imply the consumer-safe standalone path so D1 /
+  Sequel apps do not need to remember both flags.
+- Let `compile-assets` succeed for an empty `public/` directory and improve the
+  auto-await analyzer so async local helper methods are awaited at their call
+  sites.
+
 ## 0.2.5 (2026-04-23)
 
 - Load Workers-only `zlib`, `tempfile`, and `tilt` shims via `require_relative`
@@ -27,14 +38,14 @@
 
 ## 0.2.0 (2026-04-23)
 
-- Remove the old `cloudflare-workers-build` public executable and expose the
+- Remove the old standalone build executable and expose the
   build pipeline through `homura build`.
 - Keep the internal build implementation in the runtime gem while letting the
   single `homura` CLI dispatch to it.
 
 ## 0.1.6 (2026-04-23)
 
-- Teach `cloudflare-workers-build --standalone --with-db` to add the packaged
+- Teach `homura build --standalone --with-db` to add the packaged
   `sequel-d1` gem `vendor/` directory to the Opal load path before the gem's
   `lib/`, so `require 'sequel'` resolves to the bundled Opal-compatible Sequel
   subset instead of the CRuby gem.
@@ -43,7 +54,7 @@
 
 - Make `auto-await` emit rewritten files for existing hand-written `.__await__`
   usage when the only missing piece is `# await: true`.
-- Make `cloudflare-workers-build --standalone` restore `cf-runtime/` from the
+- Make `homura build --standalone` restore `cf-runtime/` from the
   packaged gem and derive standalone template/asset namespaces from the project
   name by default, with explicit override flags when needed.
 - Reject unsupported ERB yield forms like `<% yield %>` and `yield(arg)` with
@@ -68,12 +79,12 @@
 
 - Package the runtime's Opal compile-time vendor shims (`digest`, `zlib`,
   `tempfile`, `tilt`, `rubygems/version`) inside the gem.
-- Teach `cloudflare-workers-build --standalone` to add packaged gem `vendor/`
+- Teach `homura build --standalone` to add packaged gem `vendor/`
   directories to the Opal load path, so published gems no longer depend on the
   monorepo root `vendor/`.
 ## 0.1.1 (2026-04-23)
 
-- Fix `cloudflare-workers-build --standalone` and `exe/auto-await` to resolve only
+- Fix `homura build --standalone` and `exe/auto-await` to resolve only
   the published gem names `homura-runtime` / `sinatra-homura`.
 - Add regression coverage for gem name resolution and Gemfile path detection.
 

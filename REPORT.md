@@ -26,7 +26,7 @@ Phase 17.5 のゴール「ユーザーが `.__await__` も `# await:` magic comm
 - `app/routes/canonical_all.rb` — `# await: true` / 手動 `.__await__` を撤去、定数完全修飾名化（`App::JWT_ACCESS_TTL` 等）、`cache_get` を auto-await 可能な形へ整理
 - `app/app.rb` — Durable Object handler の `state.storage` access が auto-await されるよう analyzer 対応
 - `app/routes/fragments/route_034.rb` / `route_041.rb` / `route_067.rb` — canonical source 再生成結果を反映
-- `gems/homura-runtime/bin/cloudflare-workers-build` — auto-await 統合済み（確認済み）
+- `gems/homura-runtime/exe/homura-build` — auto-await 統合済み（確認済み）
 - `gems/sinatra-homura/lib/sinatra/jwt_auth.rb` — `register_async_source` 登録済み（確認済み）
 - `gems/sequel-d1/lib/sequel/adapters/d1.rb` — `register_async_source` 登録済み（確認済み）
 - `views/_docs_nav.erb` — Auto-Await リンク追加

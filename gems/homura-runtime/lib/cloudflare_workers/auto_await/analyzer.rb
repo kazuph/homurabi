@@ -2,6 +2,7 @@
 
 require 'parser/current'
 require 'parser/source/tree_rewriter'
+require 'set'
 
 module CloudflareWorkers
   module AutoAwait
@@ -12,6 +13,7 @@ module CloudflareWorkers
         @await_nodes = []
         @env = {}
         @method_returns = {}
+        @async_local_methods = Set.new
       end
 
       def process(source, filename = '(auto-await)')
@@ -19,13 +21,21 @@ module CloudflareWorkers
         buffer.source = source
         parser = Parser::CurrentRuby.new
         ast = parser.parse(buffer)
-        @await_nodes = []
-        @env = {}
-        process_node(ast)
+        @method_returns = {}
+        @async_local_methods = Set.new
+
+        analyze_pass(ast)
+        analyze_pass(ast)
         [buffer, @await_nodes]
       end
 
       private
+
+      def analyze_pass(ast)
+        @await_nodes = []
+        @env = {}
+        process_node(ast)
+      end
 
       def process_node(node)
         return unless node.is_a?(Parser::AST::Node)
@@ -72,6 +82,7 @@ module CloudflareWorkers
       def process_def(node)
         method_name = node.children[0]
         saved_env = @env
+        before_awaits = @await_nodes.length
         @env = @registry.helper_factories.dup
 
         node.children[1..-1].each { |child| process_node(child) if child.is_a?(Parser::AST::Node) }
@@ -79,6 +90,10 @@ module CloudflareWorkers
         body = node.children[2]
         return_cls = infer_class(body)
         @method_returns[method_name] = return_cls if return_cls
+        body_source = node.loc.expression&.source.to_s
+        if @await_nodes.length > before_awaits || body_source.include?('.__await__')
+          @async_local_methods << method_name
+        end
 
         @env = saved_env
       end
@@ -119,6 +134,7 @@ module CloudflareWorkers
         # Receiver-less calls (implicit self) — check helpers.
         helpers = @registry.async_helpers[method_name]
         return true if helpers && !helpers.empty?
+        return true if @async_local_methods.include?(method_name)
         false
       end
 

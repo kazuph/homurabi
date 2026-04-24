@@ -203,6 +203,9 @@ SequelSmoke.assert('database_type is :sqlite (shared dialect)') { db.database_ty
 SequelSmoke.assert('SingleConnectionPool is used') do
   db.pool.class.name == 'Sequel::SingleConnectionPool'
 end
+SequelSmoke.assert('integer_booleans defaults to true for D1') do
+  db.integer_booleans == true
+end
 
 $stdout.puts ''
 $stdout.puts '--- Mock D1 round-trip ---'
@@ -237,6 +240,14 @@ SequelSmoke.assert_equal(
   'Dataset#all leaves integer columns untouched',
   0,
   rows.first['priority']
+)
+
+mock.rows = [{ 'id' => 2, 'completed' => 't', 'priority' => 1 }]
+rows = db[:todos].all.__await__
+SequelSmoke.assert_equal(
+  'Dataset#all coerces string-backed true booleans from D1 schema',
+  true,
+  rows.first['completed']
 )
 
 mock.rows = []
@@ -339,6 +350,18 @@ SequelSmoke.assert_equal(
   'Dataset#insert_sql quotes String values',
   "INSERT INTO `users` (`name`) VALUES ('carol')",
   db[:users].insert_sql(name: 'carol')
+)
+
+SequelSmoke.assert_equal(
+  'Dataset#insert_sql emits integer-backed boolean true',
+  'INSERT INTO `todos` (`completed`) VALUES (1)',
+  db[:todos].insert_sql(completed: true)
+)
+
+SequelSmoke.assert_equal(
+  'Dataset#insert_sql emits integer-backed boolean false',
+  'INSERT INTO `todos` (`completed`) VALUES (0)',
+  db[:todos].insert_sql(completed: false)
 )
 
 SequelSmoke.assert_equal(

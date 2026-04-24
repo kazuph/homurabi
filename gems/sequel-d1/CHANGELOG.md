@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.6 (2026-04-24)
+
+- Initialize SQLite's `integer_booleans` setting for the D1 adapter so Sequel
+  boolean writes stay integer-backed (`0` / `1`) instead of drifting to `f` / `t`.
+- Keep boolean result coercion resilient when D1 rows surface string-backed
+  `t` / `f` values for boolean columns.
+
 ## 0.2.5 (2026-04-24)
 
 - Fix Opal/D1 SQL generation for Sequel `insert`, `update`, and `delete` so

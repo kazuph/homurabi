@@ -237,6 +237,7 @@ module Sequel
         @single_threaded = true
         @default_transaction_mode = :deferred
         @opts[:single_threaded] = true
+        set_integer_booleans
       end
 
       def database_error_classes

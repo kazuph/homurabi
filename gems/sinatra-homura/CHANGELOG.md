@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.13 (2026-04-24)
+
+- Add `rake` to generated app Gemfiles so the scaffolded `bundle exec rake
+  build|dev|deploy` workflow works under Bundler out of the box.
+- Rely on `homura-runtime >= 0.2.9` so fresh apps pick up the auto-await
+  double-application fix.
+
 ## 0.2.12 (2026-04-24)
 
 - Raise a materialized `HaltResponse` directly from `redirect`, keeping awaited

@@ -45,10 +45,14 @@ Dir.mktmpdir do |dir|
     raise 'cf-runtime/setup-node-crypto.mjs missing' unless File.exist?(File.join(app_dir, 'cf-runtime', 'setup-node-crypto.mjs'))
 
     config_ru = File.read(File.join(app_dir, 'config.ru'))
+    raise 'config.ru should require app/app relatively' unless config_ru.include?("require_relative 'app/app'")
     raise 'config.ru should run App' unless config_ru.include?('run App')
 
     app_rb = File.read(File.join(app_dir, 'app', 'app.rb'))
     raise 'app/app.rb should not call run App directly' if app_rb.include?('run App')
+
+    gemfile = File.read(File.join(app_dir, 'Gemfile'))
+    raise 'Gemfile should include rake for generated tasks' unless gemfile.include?("gem 'rake'")
 
     rakefile = File.read(File.join(app_dir, 'Rakefile'))
     raise 'Rake build task missing' unless rakefile.include?("task :build do")

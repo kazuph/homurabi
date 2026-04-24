@@ -3,6 +3,7 @@ source 'https://rubygems.org'
 
 ruby '>= 3.4.0'
 
+gem 'rake'
 gem 'opal-homura', '= <%= opal_version %>', require: 'opal'
 gem 'homura-runtime', '= <%= runtime_version %>'
 gem 'sinatra-homura', '= <%= sinatra_version %>'

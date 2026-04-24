@@ -1,75 +1,74 @@
 # Continuity Ledger
 
 ## Goal（成功基準を含む）
-- Keep `homura-examples` conventional by fixing blocker-class runtime/gem gaps in this repo instead of pushing workarounds into app code.
-- Current success target: publish the remaining round-3 least-surprise fixes, then dogfood round 4 against the freshly published gems.
+- Keep `homura-examples` conventional by fixing least-surprise runtime/gem gaps in this repo instead of pushing workarounds into app code.
+- Current success target: publish the round 6 follow-up fixes (`homura-runtime 0.2.9`, `sinatra-homura 0.2.13`) after clean-room dogfood confirmed the round-5 releases and isolated the remaining repo-side issues.
 
 ## Constraints/Assumptions（制約/前提）
-- Prefer least-surprise Ruby/Sinatra behavior even if the implementation underneath must diverge from upstream internals.
-- Fix the owning gem/runtime layer; do not push special-case code into `homura-examples`.
-- `CONTINUITY.md` is the durable source of truth across compression; keep blocker status here.
+- Prefer least-surprise Ruby/Sinatra behavior even if the implementation underneath diverges from upstream internals.
+- Fix the owning gem/runtime layer; do not push special-case code into `homura-examples` unless a finding is clearly example-only.
+- `CONTINUITY.md` is the durable source of truth across compression; keep round status and externally verified release state here.
+- Round 6 must start only after confirming the child pane chat is cleared and `homura-examples` has no lingering dogfood artifacts or git-history-dependent state.
 
 ## Key decisions（重要な決定）
 - Treat explicit `halt` as a dedicated exception carrying a fully materialized Rack tuple so it can cross Opal async boundaries; keep ordinary route returns on Sinatra's existing `throw :halt` path.
-- Let `redirect` continue calling `halt`; the new `halt` snapshot logic captures post-mutation status/headers/body so redirect semantics stay conventional in both sync and async routes.
-- Strengthen regression coverage in the worker-path smoke instead of trusting direct `app.call` only.
-- For `sequel-d1`, keep vendored Sequel packaging and add a subprocess regression that `vendor/` + `lib/` alone can `require 'sequel'` and register the `:d1` adapter.
-- For async standalone Sinatra routes, preserve route params by marking Promise-returning `route_eval` paths and skipping `process_route` cleanup for that per-request app instance.
+- Override `redirect` in the Opal patch layer so awaited routes can end with an ordinary Sinatra-style redirect without degrading into `200 []`.
+- Keep standalone consumer apps conventional: ordinary `config.ru` + `require_relative 'app/app'` must pick up the auto-awaited copy under `build/auto_await`.
+- Keep precompiled ERB behavior Sinatra-like: `layout.erb` applies by default unless `layout: false` is passed.
 - For D1 booleans, coerce only simple-table result columns identified as `BOOLEAN` / `BOOL` via SQLite schema metadata; leave ordinary integer columns untouched.
+- Expose Sequel async registrations from a lightweight file (`lib/sequel/d1_async_source.rb`) so consumer standalone builds can load them during analyzer bootstrap.
 
 ## State（状態）
 
 ### Done（完了）
-- Released and pushed `opal-homura-v1.8.3.rc1.1` from commit `e2fdab6`.
-- Released and pushed `homura-runtime-v0.2.2`, `sinatra-homura-v0.2.3`, and `sequel-d1-v0.2.2` from commit `38a1faa`.
-- Added worker-path smoke coverage for `params['id']` on both sync and async routes.
-- Added worker-path smoke coverage for async `redirect` and async `halt`.
-- Patched `sinatra_opal_patches.rb` so explicit `halt` snapshots a full Rack tuple and async Promise rejections resolve back into Sinatra-compatible responses.
-- Extended `build_js_response` so resolved async tuples handle `[status, body]` and `[status, headers, body]`.
-- Added `sequel_d1_packaging_test.rb` coverage that packaged `vendor/` + `lib/` can `require 'sequel'` and register the `:d1` adapter.
-- Implemented the remaining round-3 blocker fixes in the local tree:
-  - `homura build --with-db` now implies standalone
-  - standalone async Sinatra routes keep `params['id']`
-  - simple-table D1 boolean columns coerce to Ruby booleans
-  - Sequel DML string quoting regression is covered and fixed
-- Current full `npm test` passed on the release-candidate tree.
-- Pushed `main` and release tags for `homura-runtime-v0.2.6`, `sequel-d1-v0.2.5`, and `sinatra-homura-v0.2.10`.
-- GitHub Actions `release-gems.yml` runs for those three tags completed successfully.
-- Cleaned AI-facing docs/skills to the current command surface:
-  - removed stale `cloudflare-workers-*` guidance
-  - removed the migration playbook from the skill bundle
-  - refreshed `README.md`, `public/llms.txt`, and `skills/homura-workers-gems/*` to the modern Rake-first flow
-- Implemented round-4 blocker fixes in the local tree:
-  - D1 adapter now initializes SQLite integer booleans correctly, so Sequel writes use `0/1`
-  - boolean coercion regression coverage now includes string-backed `t/f` rows
-  - Rack request authority parsing now preserves non-default ports for redirects in local dev
-  - standalone build now auto-detects `config.ru`, `app/hello.rb`, then `app/app.rb`
-  - scaffolded apps now use standard `config.ru` + `app/app.rb`, without requiring `app/hello.rb`
-- Current full `npm test` passed after the round-4 fixes.
+- Round 5 release set was committed, tagged, pushed, and published:
+  - `homura-runtime-v0.2.8`
+  - `sequel-d1-v0.2.7`
+  - `sinatra-homura-v0.2.12`
+- GitHub Actions `Release gems` runs for those three tags completed successfully.
+- RubyGems now serves `homura-runtime 0.2.8`, `sequel-d1 0.2.7`, and `sinatra-homura 0.2.12`.
+- Child pane `%174` was confirmed idle and then cleared with `/clear` before round 6.
+- `homura-examples` was reset to a clean-room starting point:
+  - no top-level `.git` repository / git history
+  - removed `REPORT_DOGFOOD_174_ROUND3.md`, `REPORT_DOGFOOD_174_ROUND4.md`, `REPORT_DOGFOOD_174_ROUND5.md`
+  - removed `homura-app-round3` and `homura-app-round4-backup`
+  - removed generated `homura-app/.wrangler`, `homura-app/build`, `homura-app/cf-runtime`, and `homura-app/worker.entrypoint.mjs`
+- Round 6 clean-room dogfood completed against published gems (`homura-runtime 0.2.8`, `sequel-d1 0.2.7`, `sinatra-homura 0.2.12`).
+- Round 6 verified the released-stack fixes for:
+  - standalone auto-await through ordinary `config.ru`
+  - D1 boolean reads
+  - awaited redirects
+  - default ERB layout behavior
+- Round 6 repo-side follow-up fixes are implemented locally:
+  - `homura-runtime` no longer auto-appends `.__await__` when the source already has it
+  - scaffolded apps now include `rake` in `Gemfile`
+  - scaffold tests now lock `require_relative 'app/app'` + single `run App` ownership in `config.ru`
+  - AI-facing docs now mention scaffolded apps bundle `rake`
 
 ### Now（現在）
-- Round-4 blocker fixes are implemented locally; next meaningful step is publishing them.
+- Round 6 triage is complete and the next step is releasing the local fixes.
 
 ### Next（次）
-- Publish the round-4 blocker fixes in the next gem release set.
-- Run the next dogfood pass against those freshly published gems.
+- Commit, tag, and push:
+  - `homura-runtime-v0.2.9`
+  - `sinatra-homura-v0.2.13`
+- Confirm the corresponding `Release gems` workflows and RubyGems publication.
 
 ## Open questions（未解決の質問、必要に応じてUNCONFIRMED）
-- None in local code; release/publish timing is the next external step.
+- Example-only follow-ups remain outside this repo:
+  - existing `homura-examples` app docs / local files may still need cleanup
+  - existing `homura-app/app/app.rb` still contains a trailing `run App`, even though the scaffold template already avoids that
 
 ## Working set（作業セット：ファイル/ID/コマンド）
-- Files:
-  - `gems/homura-runtime/exe/homura-build`
-  - `gems/homura-runtime/lib/cloudflare_workers/build_support.rb`
-  - `gems/homura-runtime/lib/cloudflare_workers/auto_await/analyzer.rb`
-  - `gems/homura-runtime/lib/cloudflare_workers.rb`
-  - `gems/sinatra-homura/lib/sinatra_opal_patches.rb`
-  - `gems/sequel-d1/lib/sequel/adapters/d1.rb`
-  - `gems/sequel-d1/lib/sequel_opal_runtime_patches.rb`
-  - `gems/sinatra-homura/templates/project/config.ru.tt`
-  - `gems/sinatra-homura/templates/project/app/app.rb.tt`
-  - `vendor/rack/request.rb`
+- Core repo files for the round 6 follow-up release:
+  - `gems/homura-runtime/lib/cloudflare_workers/auto_await/transformer.rb`
+  - `gems/homura-runtime/lib/cloudflare_workers/version.rb`
+  - `gems/homura-runtime/CHANGELOG.md`
+  - `gems/sinatra-homura/templates/project/Gemfile.tt`
+  - `gems/sinatra-homura/sinatra-homura.gemspec`
+  - `gems/sinatra-homura/CHANGELOG.md`
+  - `test/auto_await_cli_test.rb`
   - `test/homura_cli_test.rb`
-  - `test/sequel_smoke.rb`
-- Validation:
-  - `npm test`
+  - `README.md`
+  - `public/llms.txt`
+  - `skills/homura-workers-gems/quick-start.md`

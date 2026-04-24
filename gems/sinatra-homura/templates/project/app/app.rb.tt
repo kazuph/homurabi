@@ -7,5 +7,3 @@ class App < Sinatra::Base
     '<%= app_name %>: ok'
   end
 end
-
-run App

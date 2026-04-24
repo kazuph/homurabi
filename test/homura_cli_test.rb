@@ -42,8 +42,13 @@ Dir.mktmpdir do |dir|
       system('bundle', 'exec', 'ruby', cli, 'new', app_dir) or raise 'homura new failed'
     end
     raise 'Gemfile missing' unless File.exist?(File.join(app_dir, 'Gemfile'))
-    raise 'app/hello.rb missing' unless File.exist?(File.join(app_dir, 'app', 'hello.rb'))
     raise 'cf-runtime/setup-node-crypto.mjs missing' unless File.exist?(File.join(app_dir, 'cf-runtime', 'setup-node-crypto.mjs'))
+
+    config_ru = File.read(File.join(app_dir, 'config.ru'))
+    raise 'config.ru should run App' unless config_ru.include?('run App')
+
+    app_rb = File.read(File.join(app_dir, 'app', 'app.rb'))
+    raise 'app/app.rb should not call run App directly' if app_rb.include?('run App')
 
     rakefile = File.read(File.join(app_dir, 'Rakefile'))
     raise 'Rake build task missing' unless rakefile.include?("task :build do")
@@ -68,6 +73,99 @@ Dir.mktmpdir do |dir|
 
     rakefile = File.read(File.join(app_dir, 'Rakefile'))
     raise 'Rake build task should pass --with-db' unless rakefile.include?("'homura', 'build', '--standalone', '--with-db'")
+  end
+  passed += 1 if ok
+  failed += 1 unless ok
+end
+
+Dir.mktmpdir do |dir|
+  app_dir = File.join(dir, 'config-ru-app')
+  FileUtils.mkdir_p(File.join(app_dir, 'app'))
+  FileUtils.mkdir_p(File.join(app_dir, 'views'))
+  FileUtils.mkdir_p(File.join(app_dir, 'public'))
+
+  File.write(File.join(app_dir, 'app', 'app.rb'), <<~RUBY)
+    # frozen_string_literal: true
+    require 'sinatra/cloudflare_workers'
+
+    class App < Sinatra::Base
+      get('/') { 'ok-from-config-ru' }
+
+      post '/create' do
+        redirect '/'
+      end
+    end
+  RUBY
+
+  File.write(File.join(app_dir, 'config.ru'), <<~RUBY)
+    # frozen_string_literal: true
+    require_relative 'app/app'
+
+    run App
+  RUBY
+
+  File.write(File.join(app_dir, 'views', 'index.erb'), "ok\n")
+  File.write(File.join(app_dir, 'public', 'robots.txt'), "User-agent: *\n")
+
+  ok = assert('standalone build uses config.ru without app/hello.rb and preserves redirect port') do
+    output, status = Open3.capture2e(bundle_env, 'bundle', 'exec', 'ruby', build_cli, '--root', app_dir, '--standalone')
+    raise output unless status.success?
+
+    node_script = <<~JS
+      const mod = await import(process.argv[2]);
+      const app = mod.default;
+      const ctx = { waitUntil() {} };
+
+      const getResp = await app.fetch(new Request('http://127.0.0.1:8787/'), {}, ctx);
+      console.log(`GET:${getResp.status}:${await getResp.text()}`);
+
+      const postResp = await app.fetch(new Request('http://127.0.0.1:8787/create', { method: 'POST' }), {}, ctx);
+      console.log(`POST:${postResp.status}:${postResp.headers.get('location')}`);
+    JS
+    output, status = Open3.capture2e('node', '--input-type=module', '-', File.join(app_dir, 'worker.entrypoint.mjs'), stdin_data: node_script)
+    raise output unless status.success?
+    lines = output.lines.map(&:strip)
+    raise output unless lines.include?('GET:200:ok-from-config-ru')
+    raise output unless lines.include?('POST:303:http://127.0.0.1:8787/')
+  end
+  passed += 1 if ok
+  failed += 1 unless ok
+end
+
+Dir.mktmpdir do |dir|
+  app_dir = File.join(dir, 'app-rb-entry')
+  FileUtils.mkdir_p(File.join(app_dir, 'app'))
+  FileUtils.mkdir_p(File.join(app_dir, 'views'))
+  FileUtils.mkdir_p(File.join(app_dir, 'public'))
+
+  File.write(File.join(app_dir, 'app', 'app.rb'), <<~RUBY)
+    # frozen_string_literal: true
+    require 'sinatra/cloudflare_workers'
+
+    class App < Sinatra::Base
+      get('/') { 'ok-from-app-rb' }
+    end
+
+    run App
+  RUBY
+
+  File.write(File.join(app_dir, 'views', 'index.erb'), "ok\n")
+  File.write(File.join(app_dir, 'public', 'robots.txt'), "User-agent: *\n")
+
+  ok = assert('standalone build falls back to app/app.rb without app/hello.rb') do
+    output, status = Open3.capture2e(bundle_env, 'bundle', 'exec', 'ruby', build_cli, '--root', app_dir, '--standalone')
+    raise output unless status.success?
+
+    node_script = <<~JS
+      const mod = await import(process.argv[2]);
+      const app = mod.default;
+      const ctx = { waitUntil() {} };
+      const resp = await app.fetch(new Request('https://example.test/'), {}, ctx);
+      console.log(`${resp.status}:${await resp.text()}`);
+    JS
+    output, status = Open3.capture2e('node', '--input-type=module', '-', File.join(app_dir, 'worker.entrypoint.mjs'), stdin_data: node_script)
+    raise output unless status.success?
+    raise output unless output.lines.map(&:strip).include?('200:ok-from-app-rb')
   end
   passed += 1 if ok
   failed += 1 unless ok

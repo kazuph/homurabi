@@ -353,10 +353,10 @@ module Rack
 
       def port
         if authority = self.authority
-          _, _, port = split_authority(authority)
+          _, _, authority_port = split_authority(authority)
         end
 
-        port || forwarded_port&.last || DEFAULT_PORTS[scheme] || server_port
+        authority_port || forwarded_port&.last || DEFAULT_PORTS[scheme] || server_port
       end
 
       def forwarded_for
@@ -723,13 +723,47 @@ module Rack
 
       def split_authority(authority)
         return [] if authority.nil?
-        return [] unless match = AUTHORITY.match(authority)
-        host = match[:host]
-        # homura patch: re-derive `address` from `host`. Bracketed
-        # hosts (`[ipv6]`) yield the inner address, anything else uses
-        # the host verbatim.
-        address = host && host.start_with?('[') && host.end_with?(']') ? host[1..-2] : host
-        return host, address, match[:port]&.to_i
+        authority = authority.to_s
+
+        host = nil
+        port = nil
+
+        if authority.start_with?('[')
+          closing = authority.index(']')
+          return [] unless closing
+
+          host = authority[0..closing]
+          rest = authority[(closing + 1)..]
+          if rest && !rest.empty?
+            return [] unless rest.start_with?(':')
+            port_str = rest[1..]
+            return [] unless port_str.match?(/\A\d+\z/)
+
+            port = port_str.to_i
+          end
+        else
+          first_colon = authority.index(':')
+          last_colon = authority.rindex(':')
+
+          if first_colon && first_colon == last_colon
+            candidate_host = authority[0...last_colon]
+            candidate_port = authority[(last_colon + 1)..]
+
+            if !candidate_host.empty? && candidate_port.match?(/\A\d+\z/)
+              host = candidate_host
+              port = candidate_port.to_i
+            else
+              host = authority
+            end
+          else
+            host = authority
+          end
+        end
+
+        return [] if host.nil? || host.empty?
+
+        address = host.start_with?('[') && host.end_with?(']') ? host[1..-2] : host
+        [host, address, port]
       end
 
       FORWARDED_SCHEME_HEADERS = {

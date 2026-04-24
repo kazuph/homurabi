@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.11 (2026-04-24)
+
+- Preserve non-default ports when Sinatra builds absolute redirect locations in
+  standalone / local-dev flows.
+- Scaffold apps with standard `config.ru` + `app/app.rb`, and stop requiring an
+  `app/hello.rb` wrapper in freshly generated projects.
+- Require `homura-runtime >= 0.2.7` so scaffolded `config.ru` entrypoints and
+  standalone build detection stay aligned.
+
 ## 0.2.10 (2026-04-24)
 
 - Preserve `params['id']` and other route params across async / awaited routes

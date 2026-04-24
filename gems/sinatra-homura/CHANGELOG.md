@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.10 (2026-04-24)
+
+- Preserve `params['id']` and other route params across async / awaited routes
+  in standalone-built Sinatra apps.
+- Scaffold `--with-db` apps so their generated build task passes
+  `--standalone --with-db` by default.
+- Require `homura-runtime >= 0.2.6` so the `homura build` dispatch target and
+  standalone DB build defaults stay aligned.
+
 ## 0.2.9 (2026-04-23)
 
 - Pin `opal-homura` to `1.8.3.rc1.3` so apps using `sinatra-homura`,

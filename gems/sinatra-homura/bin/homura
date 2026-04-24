@@ -7,7 +7,7 @@ module HomuraCLI
   COMMANDS = {
     'build' => {
       gem: 'homura-runtime',
-      script: 'bin/cloudflare-workers-build',
+      script: 'exe/homura-build',
       argv_prefix: []
     },
     'erb:compile' => {

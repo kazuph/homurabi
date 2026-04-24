@@ -19,7 +19,9 @@ end
 
 desc 'Opal + Workers bundle'
 task :build do
-  run!('bundle', 'exec', 'homura', 'build', '--standalone')
+  run!(
+    'bundle', 'exec', 'homura', 'build', '--standalone'<%= ", '--with-db'" if with_db %>
+  )
 end
 
 desc 'Start local Wrangler dev server'

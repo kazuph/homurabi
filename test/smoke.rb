@@ -153,6 +153,11 @@ class TestApp < Sinatra::Base
     halt 418, 'teapot'
   end
 
+  get '/async/tuple-redirect' do
+    await_tick
+    [302, { 'location' => '/dest' }, []]
+  end
+
    get '/async/json' do
     await_tick
     content_type 'application/json'
@@ -344,6 +349,9 @@ SmokeTest.assert("async redirect returns 302") { call_worker_app('GET', '/async/
 SmokeTest.assert("async redirect sets Location") { call_worker_app('GET', '/async/redirect').__await__[1].to_s.include?('/dest') }
 SmokeTest.assert("async halt returns 418") { call_worker_app('GET', '/async/halt').__await__[0] == 418 }
 SmokeTest.assert("async halt body is teapot") { call_worker_app('GET', '/async/halt').__await__[2] == 'teapot' }
+SmokeTest.assert("async tuple redirect returns 302") { call_worker_app('GET', '/async/tuple-redirect').__await__[0] == 302 }
+SmokeTest.assert("async tuple redirect sets Location") { call_worker_app('GET', '/async/tuple-redirect').__await__[1].to_s.include?('/dest') }
+SmokeTest.assert("async tuple redirect keeps empty body") { call_worker_app('GET', '/async/tuple-redirect').__await__[2] == '' }
 SmokeTest.assert("async json route returns JSON body after await") {
   status, _, text = call_worker_app('GET', '/async/json').__await__
   status == 200 && text.include?('"kind":"async-json"')

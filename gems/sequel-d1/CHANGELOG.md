@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.7 (2026-04-24)
+
+- Load auto-await registrations from a lightweight standalone file so consumer
+  builds can infer Sequel D1 dataset calls without loading the full adapter at
+  analyzer bootstrap time.
+- Coerce boolean columns from ordinary D1 dataset reads by querying
+  `PRAGMA table_xinfo('table')` with Opal-safe quoting instead of the
+  unsupported `db.literal(...)` path.
+
 ## 0.2.6 (2026-04-24)
 
 - Initialize SQLite's `integer_booleans` setting for the D1 adapter so Sequel

@@ -140,7 +140,11 @@ class MockD1Database
 
   def all_results(sql, bindings)
     if sql.include?('PRAGMA table_xinfo')
-      @schema_rows.fetch(bindings.first.to_s, [])
+      table = bindings.first
+      if table.nil? && (m = sql.match(/PRAGMA\s+table_xinfo\((['"]?)([^'")]+)\1\)/i))
+        table = m[2]
+      end
+      @schema_rows.fetch(table.to_s, [])
     else
       @rows
     end

@@ -276,7 +276,49 @@ module Sequel
         # block-exit throws (break/next/return) bind to this local
         # each rather than to some outer async continuation.
         rows = execute(sql).__await__
-        rows.each(&block)
+        boolean_columns = homura_boolean_columns.__await__
+        rows.each do |row|
+          homura_coerce_boolean_row!(row, boolean_columns) if boolean_columns
+          block.call(row)
+        end
+      end
+
+      private
+
+      def homura_boolean_columns
+        from = opts[:from]
+        return nil if !from || from.length != 1 || opts.include?(:join) || opts.include?(:sql)
+
+        table = first_source_table
+        pragma_rows = db.execute('PRAGMA table_xinfo(?)', arguments: [table.to_s]).__await__
+        columns = {}
+        pragma_rows.each do |row|
+          name = row['name'] || row[:name]
+          db_type = row['type'] || row[:type]
+          next unless name && db_type
+          next unless db.send(:schema_column_type, db_type) == :boolean
+
+          columns[name] = true
+          columns[name.to_sym] = true
+        end
+        columns.empty? ? nil : columns
+      rescue ::Exception
+        nil
+      end
+
+      def homura_coerce_boolean_row!(row, boolean_columns)
+        return row unless row.is_a?(::Hash)
+
+        boolean_columns.each_key do |key|
+          next unless row.key?(key)
+
+          value = row[key]
+          next if value.nil? || value == true || value == false
+
+          row[key] = db.send(:typecast_value_boolean, value)
+        end
+
+        row
       end
     end
   end

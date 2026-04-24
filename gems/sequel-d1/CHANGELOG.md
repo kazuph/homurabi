@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.5 (2026-04-24)
+
+- Fix Opal/D1 SQL generation for Sequel `insert`, `update`, and `delete` so
+  string values are quoted as SQL literals instead of identifiers.
+- Coerce simple-table D1 boolean result columns back to Ruby booleans using
+  SQLite schema metadata, while leaving ordinary integer columns untouched.
+
 ## 0.2.4 (2026-04-23)
 
 - Pin `opal-homura` to `1.8.3.rc1.3` so standalone Opal builds resolve the

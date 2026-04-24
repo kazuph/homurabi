@@ -92,12 +92,12 @@ class MockD1Statement
   end
 
   def all
-    r = @parent.rows
+    r = @parent.all_results(@sql, @bindings)
     `Promise.resolve(#{r})`
   end
 
   def first
-    r = @parent.rows.first
+    r = @parent.all_results(@sql, @bindings).first
     `Promise.resolve(#{r})`
   end
 
@@ -115,9 +115,10 @@ class MockD1Database
     @statements = []
     @rows = []
     @run_meta = { 'last_row_id' => 42, 'changes' => 1 }
+    @schema_rows = {}
   end
 
-  attr_accessor :rows, :run_meta
+  attr_accessor :rows, :run_meta, :schema_rows
 
   def prepare(sql)
     stmt = MockD1Statement.new(sql, self)
@@ -135,6 +136,14 @@ class MockD1Database
 
   def statements
     @statements
+  end
+
+  def all_results(sql, bindings)
+    if sql.include?('PRAGMA table_xinfo')
+      @schema_rows.fetch(bindings.first.to_s, [])
+    else
+      @rows
+    end
   end
 end
 
@@ -208,8 +217,26 @@ SequelSmoke.assert_equal(
 
 SequelSmoke.assert_include(
   'underlying prepared SQL reached mock binding',
-  mock.last_statement.sql,
+  mock.statements.map(&:sql).join("\n"),
   'SELECT * FROM `users`'
+)
+
+mock.schema_rows['todos'] = [
+  { 'name' => 'id', 'type' => 'integer', 'notnull' => 1, 'dflt_value' => nil, 'pk' => 1 },
+  { 'name' => 'completed', 'type' => 'boolean', 'notnull' => 1, 'dflt_value' => '0', 'pk' => 0 },
+  { 'name' => 'priority', 'type' => 'integer', 'notnull' => 1, 'dflt_value' => '0', 'pk' => 0 }
+]
+mock.rows = [{ 'id' => 1, 'completed' => 0, 'priority' => 0 }]
+rows = db[:todos].all.__await__
+SequelSmoke.assert_equal(
+  'Dataset#all coerces boolean columns from D1 schema',
+  false,
+  rows.first['completed']
+)
+SequelSmoke.assert_equal(
+  'Dataset#all leaves integer columns untouched',
+  0,
+  rows.first['priority']
 )
 
 mock.rows = []
@@ -309,9 +336,27 @@ SequelSmoke.assert_include(
 )
 
 SequelSmoke.assert_equal(
+  'Dataset#insert_sql quotes String values',
+  "INSERT INTO `users` (`name`) VALUES ('carol')",
+  db[:users].insert_sql(name: 'carol')
+)
+
+SequelSmoke.assert_equal(
+  'Dataset#update_sql quotes String values in SET/WHERE',
+  "UPDATE `users` SET `name` = 'carol' WHERE (`id` = '1')",
+  db[:users].where(id: '1').update_sql(name: 'carol')
+)
+
+SequelSmoke.assert_equal(
   'Dataset#delete_sql emits DELETE FROM',
   "DELETE FROM `users` WHERE (`id` = 1)",
   db[:users].where(id: 1).delete_sql
+)
+
+SequelSmoke.assert_equal(
+  'Dataset#delete_sql quotes String values in WHERE',
+  "DELETE FROM `users` WHERE (`id` = '1')",
+  db[:users].where(id: '1').delete_sql
 )
 
 $stdout.puts ''

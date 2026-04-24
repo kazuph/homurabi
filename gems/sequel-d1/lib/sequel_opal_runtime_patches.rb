@@ -48,10 +48,35 @@ end
 # HomuraSqlBuffer, which implements the Sequel-expected subset of
 # String (from lib/sequel_opal_patches.rb).
 # ------------------------------------------------------------------
+class ::HomuraSqlStringLiteral
+  def initialize(value)
+    @value = value.to_s
+  end
+
+  def sql_literal_append(dataset, sql)
+    dataset.literal_string_append(sql, @value)
+  end
+
+  def sql_literal_allow_caching?(_dataset)
+    true
+  end
+end
+
 class Sequel::Dataset
   def sql_string_origin
     ::HomuraSqlBuffer.new
   end
+
+  def homura_sql_value(value)
+    if value.is_a?(::String) &&
+       !value.is_a?(::Sequel::LiteralString) &&
+       !value.is_a?(::Sequel::SQL::Blob)
+      ::HomuraSqlStringLiteral.new(value)
+    else
+      value
+    end
+  end
+  private :homura_sql_value
 
   # upstream literal_append Symbol branch:
   #   l = String.new
@@ -62,7 +87,9 @@ class Sequel::Dataset
   # cache without re-creating a Buffer.
   alias_method :__homura_orig_literal_append, :literal_append
   def literal_append(sql, v)
-    if v.is_a?(Symbol)
+    if v.is_a?(::HomuraSqlStringLiteral)
+      v.sql_literal_append(self, sql)
+    elsif v.is_a?(Symbol)
       if skip_symbol_cache?
         literal_symbol_append(sql, v)
       else
@@ -75,6 +102,35 @@ class Sequel::Dataset
       end
     else
       __homura_orig_literal_append(sql, v)
+    end
+  end
+
+  alias_method :__homura_orig_update_sql_values_hash, :update_sql_values_hash
+  def update_sql_values_hash(sql, values)
+    values = values.each_with_object({}) { |(k, v), acc| acc[k] = homura_sql_value(v) }
+    __homura_orig_update_sql_values_hash(sql, values)
+  end
+
+  alias_method :__homura_orig__insert_values_sql, :_insert_values_sql
+  def _insert_values_sql(sql, values)
+    if values.is_a?(Array)
+      values = values.map { |v| homura_sql_value(v) }
+    end
+    __homura_orig__insert_values_sql(sql, values)
+  end
+end
+
+class Sequel::SQL::BooleanExpression
+  class << self
+    alias_method :__homura_orig_from_value_pair, :from_value_pair
+
+    def from_value_pair(l, r)
+      if r.is_a?(::String) &&
+         !r.is_a?(::Sequel::LiteralString) &&
+         !r.is_a?(::Sequel::SQL::Blob)
+        r = ::HomuraSqlStringLiteral.new(r)
+      end
+      __homura_orig_from_value_pair(l, r)
     end
   end
 end

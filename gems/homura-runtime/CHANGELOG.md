@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.7 (2026-04-24)
+
+- Auto-detect standalone app entrypoints from `config.ru`, `app/hello.rb`, then
+  `app/app.rb`, and accept `config.ru` inputs by compiling a temporary Ruby copy
+  under the hood.
+- Add the project root to standalone Opal load paths so standard
+  `require_relative 'app/app'` config.ru setups compile without extra wrappers.
+- Synthesize `HTTP_HOST` from the request URL inside the Rack env so absolute
+  redirects preserve the current host and non-default port in local dev.
+
 ## 0.2.6 (2026-04-24)
 
 - Remove the shipped `cloudflare-workers-build` filename entirely and keep the

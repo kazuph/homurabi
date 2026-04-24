@@ -61,7 +61,7 @@ module CloudflareWorkers
         hv = vendor_from_gemfile(root)
         load_paths << hv.to_s if hv
 
-        load_paths += ['build/auto_await/app', 'app']
+        load_paths += ['.', 'build/auto_await/app', 'app']
         [
           gem_lib(RUNTIME_GEM_NAME, loaded_specs: loaded_specs),
           gem_vendor(RUNTIME_GEM_NAME, loaded_specs: loaded_specs),

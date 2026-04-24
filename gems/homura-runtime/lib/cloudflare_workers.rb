@@ -204,6 +204,11 @@ module Rack
           }
 
           copy_headers_into_env(js_req, env)
+          env['HTTP_HOST'] = if port == (scheme == 'https' ? '443' : '80')
+                               host
+                             else
+                               "#{host}:#{port}"
+                             end
 
           # Cloudflare-specific extras under their own namespace, per the
           # Rack convention that env keys other than the standard ones

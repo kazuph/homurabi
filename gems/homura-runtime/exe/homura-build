@@ -37,7 +37,7 @@ end
 options = {
   root: Dir.pwd,
   standalone: false,
-  opal_input: ENV['HOMURA_OPAL_INPUT'] || 'app/hello.rb',
+  opal_input: ENV['HOMURA_OPAL_INPUT'],
   opal_output: ENV['HOMURA_OPAL_OUTPUT'] || 'build/hello.no-exit.mjs',
   patch_input: ENV['HOMURA_OPAL_PATCH_INPUT'],
   setup_import: nil,
@@ -100,6 +100,7 @@ def run_opal_homura!(root, opal_input, opal_output)
   argv = [
     'bundle', 'exec', 'opal',
     '-c', '-E', '--esm', '--no-source-map',
+    '-I', '.',
     '-I', 'build/auto_await/app', '-I', 'build/auto_await', '-I', 'app',
     '-I', 'gems/homura-runtime/lib',
     '-I', 'gems/sinatra-homura/lib',
@@ -147,6 +148,26 @@ def write_entrypoint!(root, out_path, setup:, bundle:, worker_mod:)
   File.write(root.join(out_path), body)
 end
 
+def resolve_opal_input(root, explicit_input)
+  return explicit_input if explicit_input
+
+  candidates = ['config.ru', 'app/hello.rb', 'app/app.rb']
+  found = candidates.find { |path| root.join(path).file? }
+  return found if found
+
+  abort("homura build: no default entrypoint found (looked for #{candidates.join(', ')})")
+end
+
+def prepare_opal_input(root, input_path)
+  rel = Pathname(input_path)
+  rel = root.join(rel).relative_path_from(root) if rel.absolute?
+  return [rel.to_s, nil] unless rel.extname == '.ru'
+
+  tmp = root.join(".homura-build-#{rel.basename}.rb")
+  File.write(tmp, root.join(rel).read)
+  [tmp.relative_path_from(root).to_s, tmp]
+end
+
 unless options[:standalone]
   run!(['ruby', 'bin/inline-routes-for-opal'], chdir: root)
   run!(
@@ -184,11 +205,16 @@ unless options[:standalone]
     chdir: root
   )
 
-  opal_in = Pathname(options[:opal_input])
+  opal_in = Pathname(resolve_opal_input(root, options[:opal_input]))
   opal_out = Pathname(options[:opal_output])
   opal_in = root.join(opal_in) unless opal_in.absolute?
   opal_out = root.join(opal_out) unless opal_out.absolute?
-  run_opal_homura!(root, opal_in.relative_path_from(root).to_s, opal_out.relative_path_from(root).to_s)
+  prepared_in, temp_input = prepare_opal_input(root, opal_in)
+  begin
+    run_opal_homura!(root, prepared_in, opal_out.relative_path_from(root).to_s)
+  ensure
+    FileUtils.rm_f(temp_input) if temp_input
+  end
 else
   CloudflareWorkers::BuildSupport.ensure_standalone_runtime(root, current_file: __FILE__)
   run!(
@@ -218,12 +244,17 @@ else
     chdir: root
   )
 
-  opal_in = Pathname(options[:opal_input])
+  opal_in = Pathname(resolve_opal_input(root, options[:opal_input]))
   opal_out = Pathname(options[:opal_output])
   opal_in = root.join(opal_in) unless opal_in.absolute?
   opal_out = root.join(opal_out) unless opal_out.absolute?
-  run_opal_standalone!(root, opal_in.relative_path_from(root).to_s, opal_out.relative_path_from(root).to_s,
-                       with_db: options[:with_db])
+  prepared_in, temp_input = prepare_opal_input(root, opal_in)
+  begin
+    run_opal_standalone!(root, prepared_in, opal_out.relative_path_from(root).to_s,
+                         with_db: options[:with_db])
+  ensure
+    FileUtils.rm_f(temp_input) if temp_input
+  end
 end
 
 patch_rel = Pathname(patch_target)

@@ -39,9 +39,9 @@ Live demo: https://homura.kazu-san.workers.dev
 source 'https://rubygems.org'
 
 gem 'opal-homura', '= 1.8.3.rc1.3', require: 'opal'
-gem 'homura-runtime', '= 0.2.7'
-gem 'sinatra-homura', '= 0.2.11'
-gem 'sequel-d1', '= 0.2.6' # optional
+gem 'homura-runtime', '= 0.2.8'
+gem 'sinatra-homura', '= 0.2.12'
+gem 'sequel-d1', '= 0.2.7' # optional
 ```
 
 ## Minimal flow
@@ -91,7 +91,9 @@ run App
 - Common binding/helper paths are auto-awaited at build time; keep examples sync-shaped unless you are handling a raw Promise boundary directly.
 - D1 boolean columns come back as Ruby booleans on normal dataset reads, but custom SQL/projections can still surface raw `0` / `1`.
 - For hand-wired D1/Sequel apps, use `bundle exec homura build --standalone --with-db`.
-- Standard Sinatra `config.ru` with `run App` is supported, and `redirect` keeps the current host/port in local dev.
+- Standard Sinatra `config.ru` with `run App` is supported, including the common `require_relative 'app/app'` form.
+- Precompiled ERB follows ordinary Sinatra layout defaults: `erb :index` picks up `layout.erb` unless you pass `layout: false`.
+- Awaited Sequel/D1 routes can still `redirect` normally, and local-dev redirects keep the current host/port.
 
 ## Agent skill
 

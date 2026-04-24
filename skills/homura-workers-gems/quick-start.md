@@ -14,9 +14,9 @@
 source 'https://rubygems.org'
 
 gem 'opal-homura', '= 1.8.3.rc1.3', require: 'opal'
-gem 'homura-runtime', '= 0.2.7'
-gem 'sinatra-homura', '= 0.2.11'
-gem 'sequel-d1', '= 0.2.6' # only if D1 / Sequel is needed
+gem 'homura-runtime', '= 0.2.8'
+gem 'sinatra-homura', '= 0.2.12'
+gem 'sequel-d1', '= 0.2.7' # only if D1 / Sequel is needed
 ```
 
 ## Build / deploy flow
@@ -53,5 +53,9 @@ run App
 ```
 
 For the common binding/helper paths above, homura's build step auto-inserts
-`.__await__` under the hood. Manual `.__await__` is mainly for raw Promise work
+`.__await__` under the hood. That includes the common Sequel helper shape
+`def db; Sequel.connect(adapter: :d1, d1: env['cloudflare.DB']); end`, normal
+`config.ru` files with `require_relative 'app/app'`, default `layout.erb`
+application for `erb :index`, and awaited Sequel/D1 routes that still finish
+with an ordinary `redirect`. Manual `.__await__` is mainly for raw Promise work
 outside those registered patterns.

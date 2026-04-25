@@ -60,6 +60,13 @@ module SequelSmoke
     end
   end
 
+  def self.assert_matrix(label_prefix, cases, &block)
+    cases.each_with_index do |test_case, idx|
+      label = "#{label_prefix} [#{idx + 1}] #{test_case[:label]}"
+      assert(label) { block.call(test_case) }
+    end
+  end
+
   def self.report
     total = @passed + @failed
     $stdout.puts ""
@@ -70,6 +77,20 @@ module SequelSmoke
     end
     @failed == 0
   end
+end
+
+def build_js_row(pairs)
+  js = `({})`
+  pairs.each do |key, value|
+    if `(typeof #{value} === 'string' && #{value} === '__HOMURA_SENTINEL_UNDEFINED__')`
+      `#{js}[#{key}] = undefined`
+    elsif `(typeof #{value} === 'string' && #{value} === '__HOMURA_SENTINEL_NULL__')`
+      `#{js}[#{key}] = null`
+    else
+      `#{js}[#{key}] = #{value}`
+    end
+  end
+  js
 end
 
 # ---------------------------------------------------------------------
@@ -269,6 +290,116 @@ SequelSmoke.assert_equal(
   'js_rows_to_ruby preserves row ordering when first row has undefined due_date',
   [1, 2],
   mixed_rows.map { |row| row['id'] }
+)
+
+row_conversion_cases = [
+  {
+    label: 'undefined first key does not poison sibling fields',
+    pairs: [['due_date', '__HOMURA_SENTINEL_UNDEFINED__'], ['id', 11], ['created_at', 1_700_000_000]],
+    nil_key: 'due_date',
+    preserved: { 'id' => 11, 'created_at' => 1_700_000_000 }
+  },
+  {
+    label: 'undefined middle key does not poison sibling fields',
+    pairs: [['id', 12], ['due_date', '__HOMURA_SENTINEL_UNDEFINED__'], ['created_at', 1_700_000_100]],
+    nil_key: 'due_date',
+    preserved: { 'id' => 12, 'created_at' => 1_700_000_100 }
+  },
+  {
+    label: 'null middle key does not poison sibling fields',
+    pairs: [['id', 13], ['due_date', '__HOMURA_SENTINEL_NULL__'], ['created_at', 1_700_000_200]],
+    nil_key: 'due_date',
+    preserved: { 'id' => 13, 'created_at' => 1_700_000_200 }
+  },
+  {
+    label: 'different nullable key also normalizes undefined',
+    pairs: [['id', 14], ['archived_at', '__HOMURA_SENTINEL_UNDEFINED__'], ['priority', 3]],
+    nil_key: 'archived_at',
+    preserved: { 'id' => 14, 'priority' => 3 }
+  },
+  {
+    label: 'falsy values survive alongside undefined nullable keys',
+    pairs: [['id', 15], ['due_date', '__HOMURA_SENTINEL_UNDEFINED__'], ['completed', false], ['priority', 0], ['note', '']],
+    nil_key: 'due_date',
+    preserved: { 'id' => 15, 'completed' => false, 'priority' => 0, 'note' => '' }
+  }
+]
+
+SequelSmoke.assert_matrix('js_object_to_hash matrix', row_conversion_cases) do |test_case|
+  row = Cloudflare.js_object_to_hash(build_js_row(test_case[:pairs]))
+  next false unless row[test_case[:nil_key]].nil?
+
+  test_case[:preserved].all? { |k, v| row[k] == v }
+end
+
+mixed_row_cases = [
+  {
+    label: 'first row undefined nullable field, second row concrete',
+    rows: [
+      [['id', 21], ['due_date', '__HOMURA_SENTINEL_UNDEFINED__'], ['created_at', 1_700_000_300]],
+      [['id', 22], ['due_date', 1_735_689_600], ['created_at', 1_700_000_301]]
+    ],
+    nil_key: 'due_date',
+    nil_row_id: 21,
+    valued_row_id: 22,
+    valued_key: 'due_date',
+    valued_value: 1_735_689_600
+  },
+  {
+    label: 'first row null nullable field, second row concrete different key',
+    rows: [
+      [['id', 23], ['archived_at', '__HOMURA_SENTINEL_NULL__'], ['priority', 0]],
+      [['id', 24], ['archived_at', 1_735_689_601], ['priority', 1]]
+    ],
+    nil_key: 'archived_at',
+    nil_row_id: 23,
+    valued_row_id: 24,
+    valued_key: 'archived_at',
+    valued_value: 1_735_689_601
+  },
+  {
+    label: 'multiple nullable keys in first row do not poison second row falsy values',
+    rows: [
+      [['id', 25], ['due_date', '__HOMURA_SENTINEL_UNDEFINED__'], ['archived_at', '__HOMURA_SENTINEL_NULL__'], ['created_at', 1_700_000_400]],
+      [['id', 26], ['due_date', 1_735_689_602], ['archived_at', '__HOMURA_SENTINEL_NULL__'], ['completed', false], ['priority', 0]]
+    ],
+    nil_key: 'archived_at',
+    nil_row_id: 25,
+    valued_row_id: 26,
+    valued_key: 'due_date',
+    valued_value: 1_735_689_602,
+    extra_checks: { 'completed' => false, 'priority' => 0, 'archived_at' => nil }
+  }
+]
+
+SequelSmoke.assert_matrix('js_rows_to_ruby matrix', mixed_row_cases) do |test_case|
+  js_rows = `[]`
+  test_case[:rows].each do |pairs|
+    `#{js_rows}.push(#{build_js_row(pairs)})`
+  end
+  rows = Cloudflare.js_rows_to_ruby(js_rows)
+  nil_row = rows.find { |row| row['id'] == test_case[:nil_row_id] }
+  valued_row = rows.find { |row| row['id'] == test_case[:valued_row_id] }
+  rows.map { |row| row['id'] } == [test_case[:nil_row_id], test_case[:valued_row_id]] &&
+    nil_row[test_case[:nil_key]].nil? &&
+    valued_row[test_case[:valued_key]] == test_case[:valued_value] &&
+    (test_case[:extra_checks] || {}).all? { |k, v| valued_row[k] == v }
+end
+
+nested_js_row = build_js_row([
+  ['id', 31],
+  ['meta', build_js_row([['due_date', '__HOMURA_SENTINEL_UNDEFINED__'], ['completed', false], ['priority', 0]])]
+])
+nested_row = Cloudflare.js_object_to_hash(nested_js_row)
+SequelSmoke.assert_equal(
+  'js_object_to_hash normalizes undefined inside nested plain objects',
+  nil,
+  nested_row['meta']['due_date']
+)
+SequelSmoke.assert_equal(
+  'js_object_to_hash preserves nested falsy values',
+  [false, 0],
+  [nested_row['meta']['completed'], nested_row['meta']['priority']]
 )
 
 mock.schema_rows['todos'] = [

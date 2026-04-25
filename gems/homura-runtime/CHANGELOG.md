@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.11 (2026-04-25)
+
+- Normalize bare JS `undefined` / `null` values to Ruby `nil` while converting
+  D1 rows into Ruby Hashes, preventing first-row crashes when a nullable column
+  is present in the result shape.
+
 ## 0.2.10 (2026-04-24)
 
 - Derive `worker.entrypoint.mjs` import paths relative to the actual

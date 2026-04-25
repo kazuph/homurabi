@@ -504,8 +504,13 @@ module Cloudflare
     while i < len
       k = `#{keys}[#{i}]`
       v = `#{js_obj}[#{k}]`
+      # Normalize bare JS null/undefined to Ruby nil before storing them.
+      if `#{v} == null`
+        v = nil
       # Recurse for nested plain objects (but not Arrays, Dates, etc.)
-      v = js_object_to_hash(v) if `typeof #{v} === 'object' && #{v} != null && !Array.isArray(#{v}) && !(#{v} instanceof Date)`
+      elsif `typeof #{v} === 'object' && !Array.isArray(#{v}) && !(#{v} instanceof Date)`
+        v = js_object_to_hash(v)
+      end
       h[k] = v
       i += 1
     end

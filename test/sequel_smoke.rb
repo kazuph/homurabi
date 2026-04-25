@@ -10,6 +10,7 @@
 # test suite remains hermetic (no real Cloudflare runtime required).
 
 require 'json'
+require 'cloudflare_workers'
 require 'sequel'
 
 # ---------------------------------------------------------------------
@@ -226,6 +227,48 @@ SequelSmoke.assert_include(
   'underlying prepared SQL reached mock binding',
   mock.statements.map(&:sql).join("\n"),
   'SELECT * FROM `users`'
+)
+
+$stdout.puts ''
+$stdout.puts '--- JS row conversion guards ---'
+
+js_row_with_undefined = `({ id: 1, due_date: undefined, created_at: 1700000000 })`
+row_with_undefined = Cloudflare.js_object_to_hash(js_row_with_undefined)
+SequelSmoke.assert_equal(
+  'js_object_to_hash normalizes undefined properties to nil',
+  nil,
+  row_with_undefined['due_date']
+)
+SequelSmoke.assert_equal(
+  'js_object_to_hash preserves sibling integer fields when one property is undefined',
+  1,
+  row_with_undefined['id']
+)
+SequelSmoke.assert_equal(
+  'js_object_to_hash preserves later integer fields when one property is undefined',
+  1_700_000_000,
+  row_with_undefined['created_at']
+)
+
+js_rows_mixed = `[
+  { id: 1, due_date: undefined, created_at: 1700000000 },
+  { id: 2, due_date: 1735689600, created_at: 1700000100 }
+]`
+mixed_rows = Cloudflare.js_rows_to_ruby(js_rows_mixed)
+SequelSmoke.assert_equal(
+  'js_rows_to_ruby keeps first-row undefined values as nil',
+  nil,
+  mixed_rows.first['due_date']
+)
+SequelSmoke.assert_equal(
+  'js_rows_to_ruby keeps later non-nil due_date values intact',
+  1_735_689_600,
+  mixed_rows[1]['due_date']
+)
+SequelSmoke.assert_equal(
+  'js_rows_to_ruby preserves row ordering when first row has undefined due_date',
+  [1, 2],
+  mixed_rows.map { |row| row['id'] }
 )
 
 mock.schema_rows['todos'] = [

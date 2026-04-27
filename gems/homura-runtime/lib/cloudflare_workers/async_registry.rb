@@ -148,6 +148,13 @@ CloudflareWorkers::AsyncRegistry.register_async_source do
   async_method 'Cloudflare::D1Statement', :all
   async_method 'Cloudflare::D1Statement', :first
   async_method 'Cloudflare::D1Statement', :run
+  # `bind` returns a new D1Statement for further chaining. Tainting the
+  # return preserves the type so the auto-await pass keeps chaining
+  # `.run` / `.all` / `.first` on the bound statement (otherwise
+  # `db.prepare(sql).bind(...).run` drops await on `.run` and
+  # `flatten_meta` ends up receiving a JS Promise instead of the
+  # metadata Hash).
+  taint_return 'Cloudflare::D1Statement', :bind, 'Cloudflare::D1Statement'
 
   async_method 'Cloudflare::KVNamespace', :get
   async_method 'Cloudflare::KVNamespace', :get_with_metadata

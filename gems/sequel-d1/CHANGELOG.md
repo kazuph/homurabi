@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.2.10 (2026-04-27)
+
+- Fix `update(col: Sequel.lit('expr'))` (and `insert(col: Sequel.lit(...))`)
+  emitting the literal value as a backtick-quoted identifier on D1, e.g.
+  ``UPDATE `todos` SET `done` = `1 - done` `` → SQLite "no such column"
+  (homura issue #31). Root cause: in Opal, `Symbol` is the same constant as
+  `String`, so `Sequel::LiteralString` and `Sequel::SQL::Blob` (both `String`
+  subclasses) match upstream Sequel's `case v when Symbol` branch and get
+  routed through `literal_symbol_append`. The homura `literal_append` patch
+  now branches on `Sequel::LiteralString` / `Sequel::SQL::Blob` *before* the
+  Symbol branch so they take the literal-string / literal-blob paths the way
+  CRuby would.
+
 ## 0.2.7 (2026-04-24)
 
 - Load auto-await registrations from a lightweight standalone file so consumer

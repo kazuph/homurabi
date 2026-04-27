@@ -87,8 +87,27 @@ class Sequel::Dataset
   # cache without re-creating a Buffer.
   alias_method :__homura_orig_literal_append, :literal_append
   def literal_append(sql, v)
+    # IMPORTANT: in Opal, `Symbol` is the same constant as `String`
+    # (`Symbol = String`), so `String#<` subclasses such as
+    # `Sequel::LiteralString` and `Sequel::SQL::Blob` ALSO satisfy
+    # `is_a?(Symbol)`. Upstream Sequel's `case v when Symbol` therefore
+    # captures these subclasses and routes them through
+    # `literal_symbol_append`, which interprets the value as a column
+    # identifier (`Sequel.lit('1 - done')` becomes `` `1 - done` ``).
+    # This was the root cause of homura issue #31:
+    #
+    #   db[:todos].where(id: 1).update(done: Sequel.lit('1 - done'))
+    #   # SQLite error: no such column: 1 - done
+    #
+    # We branch on the Sequel SQL types FIRST, before Symbol, so they
+    # take the literal path that upstream Ruby would hit naturally
+    # (where `Symbol` and `String` are distinct classes).
     if v.is_a?(::HomuraSqlStringLiteral)
       v.sql_literal_append(self, sql)
+    elsif v.is_a?(::Sequel::LiteralString)
+      literal_literal_string_append(sql, v)
+    elsif defined?(::Sequel::SQL::Blob) && v.is_a?(::Sequel::SQL::Blob)
+      literal_blob_append(sql, v)
     elsif v.is_a?(Symbol)
       if skip_symbol_cache?
         literal_symbol_append(sql, v)

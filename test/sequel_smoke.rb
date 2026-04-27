@@ -560,5 +560,39 @@ SequelSmoke.assert_equal(
   db[:users].where(id: '1').delete_sql
 )
 
+# homura issue #31 — update(col: Sequel.lit('expr')) must inline the
+# expression as raw SQL, not quote it as an identifier. In Opal,
+# `Symbol` is the same constant as `String`, so without an explicit
+# guard the upstream `case v when Symbol` branch swallows
+# `Sequel::LiteralString` (a `String` subclass) and routes the value
+# through `literal_symbol_append`, which produces backticks:
+#   UPDATE `todos` SET `done` = `1 - done`   ← buggy
+# The fix lives in lib/sequel_opal_runtime_patches.rb (literal_append
+# tests for LiteralString / SQL::Blob before falling into the Symbol
+# branch).
+SequelSmoke.assert_equal(
+  'Dataset#update_sql inlines Sequel.lit value as raw SQL (issue #31)',
+  'UPDATE `todos` SET `done` = 1 - done WHERE (`id` = 1)',
+  db[:todos].where(id: 1).update_sql(done: ::Sequel.lit('1 - done'))
+)
+
+SequelSmoke.assert_equal(
+  'Dataset#update_sql inlines Sequel.lit alongside literal value (issue #31)',
+  "UPDATE `todos` SET `done` = 1 - done, `title` = 'x' WHERE (`id` = 1)",
+  db[:todos].where(id: 1).update_sql(done: ::Sequel.lit('1 - done'), title: 'x')
+)
+
+SequelSmoke.assert_equal(
+  'Dataset#update_sql inlines Sequel::SQL::Function (issue #31)',
+  'UPDATE `users` SET `created_at` = CURRENT_TIMESTAMP() WHERE (`id` = 1)',
+  db[:users].where(id: 1).update_sql(created_at: ::Sequel.function(:CURRENT_TIMESTAMP))
+)
+
+SequelSmoke.assert_equal(
+  'Dataset#insert_sql inlines Sequel.lit values as raw SQL (issue #31 sibling)',
+  "INSERT INTO `todos` (`done`) VALUES (1 - done)",
+  db[:todos].insert_sql(done: ::Sequel.lit('1 - done'))
+)
+
 $stdout.puts ''
 SequelSmoke.report ? exit(0) : exit(1)

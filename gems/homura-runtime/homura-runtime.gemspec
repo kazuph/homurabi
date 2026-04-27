@@ -34,8 +34,8 @@ Gem::Specification.new do |spec|
   spec.bindir = 'bin'
   spec.executables = []
 
-  # Exact pin: homura verifies against the vendored Opal fork 1.8.3.rc1.4 for Ruby 3.4 compatibility.
-  spec.add_runtime_dependency 'opal-homura', '= 1.8.3.rc1.4'
+  # Exact pin: homura verifies against the vendored Opal fork 1.8.3.rc1.5 for Ruby 3.4 compatibility.
+  spec.add_runtime_dependency 'opal-homura', '= 1.8.3.rc1.5'
 
   # parser is required by the build pipeline (auto-await analyzer).
   spec.add_runtime_dependency 'parser', '~> 3.3'

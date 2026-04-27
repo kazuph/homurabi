@@ -238,6 +238,84 @@ module Sinatra
   end
 
   # ---------------------------------------------------------------
+  # 6.5. Re-pin patched helpers on Sinatra::Base directly.
+  #
+  # Background: `module Helpers; def uri ...; end; end` reopens above
+  # work fine on CRuby — the next call resolves the patched body via
+  # the Helpers ancestor chain. On Opal-on-Workers, however, the
+  # build pipeline can end up shipping *both* the upstream body
+  # (vendor/sinatra_upstream/base.rb) and our patched body in the same
+  # bundle, with the upstream one winning at runtime in some lookup
+  # paths (uri / redirect were observed to crash with
+  # `String#<< not supported` even with the Helpers reopen above).
+  #
+  # The fix is belt-and-suspenders: re-declare the same method bodies
+  # directly on `Sinatra::Base` (and indirectly via Application etc.,
+  # which all subclass Base). Methods defined on the class itself sit
+  # closer in the ancestor chain than module mixins, so this guarantees
+  # the patched body is the one Sinatra dispatches to.
+  # ---------------------------------------------------------------
+  class Base
+    def uri(addr = nil, absolute = true, add_script_name = true)
+      return addr if addr.to_s =~ /\A[a-z][a-z0-9+.\-]*:/i
+
+      host = ''
+      if absolute
+        host = host + "http#{'s' if request.secure?}://"
+        host = host + if request.forwarded? || (request.port != (request.secure? ? 443 : 80))
+                        request.host_with_port
+                      else
+                        request.host
+                      end
+      end
+      uri = [host]
+      uri << request.script_name.to_s if add_script_name
+      uri << (addr || request.path_info).to_s
+      File.join(uri)
+    end
+    alias_method :url, :uri
+    alias_method :to,  :uri
+
+    def redirect(uri_value, *args)
+      http_version = env['SERVER_PROTOCOL'] || env['HTTP_VERSION']
+      if (http_version == 'HTTP/1.1') && (env['REQUEST_METHOD'] != 'GET')
+        status 303
+      else
+        status 302
+      end
+
+      response['Location'] = uri(uri_value.to_s, settings.absolute_redirects?, settings.prefixed_redirects?)
+      raise HaltResponse.new(materialize_halt_payload(*args))
+    end
+
+    def content_type(type = nil, params = {})
+      return response['content-type'] unless type
+
+      default = params.delete :default
+      mime_type = mime_type(type) || default
+      raise format('Unknown media type: %p', type) if mime_type.nil?
+
+      mime_type = mime_type.dup
+      unless params.include?(:charset) || settings.add_charset.all? { |p| !(p === mime_type) }
+        params[:charset] = params.delete('charset') || settings.default_encoding
+      end
+      params.delete(:charset) if mime_type.include?('charset')
+      unless params.empty?
+        mime_type += (mime_type.include?(';') ? ', ' : ';')
+        mime_type += params.map do |key, val|
+          val = val.inspect if val =~ /[";,]/
+          "#{key}=#{val}"
+        end.join(', ')
+      end
+      response['content-type'] = mime_type
+    end
+
+    def halt(*halt_response)
+      raise HaltResponse.new(materialize_halt_payload(*halt_response))
+    end
+  end
+
+  # ---------------------------------------------------------------
   # 7. Base#static! (upstream base.rb:1147)
   #
   # Upstream: URI_INSTANCE.unescape — URI_INSTANCE is defined in

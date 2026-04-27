@@ -54,66 +54,43 @@ class ::Random
       num.abs.to_f / 0x7fffffff
     end
 
+    # Note: this implementation used to be a single `%x{...}` JS block
+    # with `function randomFloat() { return #{random_float}; }` at the
+    # top, which on Opal compiles to a JS function that captures the
+    # *first* result of `self.$random_float()` and never reruns the Ruby
+    # interpolation — leaving `SecureRandom.random_number(N)` pinned to
+    # whatever value the first call returned (often 0 because of the
+    # earlier integer-division bug in `random_float`). Implementing the
+    # branching in Ruby calls `random_float` properly on every invocation.
     def random_number(limit = undefined)
-      %x{
-        function randomFloat() {
-          return #{random_float};
-        }
+      return random_float if `#{limit} == null`
 
-        function randomInt(max) {
-          return Math.floor(randomFloat() * max);
-        }
+      if `#{limit}.$$is_range`
+        min = limit.begin
+        max = limit.end
+        return nil if `#{min} === nil || #{max} === nil`
 
-        function randomRange() {
-          var min = limit.begin,
-              max = limit.end;
+        length = max - min
+        return nil if length < 0
+        return min if length == 0
 
-          if (min === nil || max === nil) {
-            return nil;
-          }
+        if max.is_a?(::Integer) && min.is_a?(::Integer) && !limit.exclude_end?
+          length += 1
+        end
 
-          var length = max - min;
+        return (random_float * length).floor + min
+      end
 
-          if (length < 0) {
-            return nil;
-          }
+      if `#{limit}.$$is_number`
+        ::Kernel.raise ::ArgumentError, "invalid argument - #{limit}" if limit <= 0
+        return (random_float * limit).floor if `#{limit} % 1 === 0`
 
-          if (length === 0) {
-            return min;
-          }
+        return random_float * limit
+      end
 
-          if (max % 1 === 0 && min % 1 === 0 && !limit.excl) {
-            length++;
-          }
-
-          return randomInt(length) + min;
-        }
-
-        if (limit == null) {
-          return randomFloat();
-        } else if (limit.$$is_range) {
-          return randomRange();
-        } else if (limit.$$is_number) {
-          if (limit <= 0) {
-            #{::Kernel.raise ::ArgumentError, "invalid argument - #{limit}"}
-          }
-
-          if (limit % 1 === 0) {
-            // integer
-            return randomInt(limit);
-          } else {
-            return randomFloat() * limit;
-          }
-        } else {
-          limit = #{::Opal.coerce_to!(limit, ::Integer, :to_int)};
-
-          if (limit <= 0) {
-            #{::Kernel.raise ::ArgumentError, "invalid argument - #{limit}"}
-          }
-
-          return randomInt(limit);
-        }
-      }
+      limit = ::Opal.coerce_to!(limit, ::Integer, :to_int)
+      ::Kernel.raise ::ArgumentError, "invalid argument - #{limit}" if limit <= 0
+      (random_float * limit).floor
     end
 
     def alphanumeric(count = nil)

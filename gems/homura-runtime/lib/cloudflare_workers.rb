@@ -685,7 +685,19 @@ module Cloudflare
     # Flatten common keys from `result['meta']` to the top of the hash so
     # callers can write `meta['last_row_id']` without descending into the
     # nested D1 metadata object. Preserves the original shape unchanged.
+    #
+    # The gem's own Ruby sources are NOT processed by the build's
+    # auto-await pass — only user app code is. So when `execute_insert`
+    # passes the result of `stmt.run` here, `result` may still be a JS
+    # Promise. Await it explicitly so the flatten branch actually runs;
+    # otherwise the early `unless result.is_a?(Hash)` would short-circuit
+    # and `meta['last_row_id']` would come back as nil at the call site
+    # (the caller's auto-await resolves the Promise *after* this method
+    # returns).
     def self.flatten_meta(result)
+      if defined?(::Cloudflare) && ::Cloudflare.js_promise?(result)
+        result = result.__await__
+      end
       return result unless result.is_a?(Hash)
       nested = result['meta']
       return result unless nested.is_a?(Hash)

@@ -456,10 +456,12 @@ module ::SecureRandom
     padding ? s : s.delete('=')
   end
 
-  def self.random_number(n = 0)
-    # Not used at class-init time; real implementations welcome.
-    0
-  end
+  # NOTE: `SecureRandom.random_number` is provided by `Random::Formatter`
+  # (extended into `SecureRandom` by stdlib/securerandom.rb). Defining a
+  # `self.random_number` stub here used to shadow that real implementation
+  # and pin the result to `0`, which silently broke any caller that did
+  # the canonical `format('%06d', SecureRandom.random_number(1_000_000))`.
+  # Leave the formatter implementation alone; do NOT redefine here.
 
   # Returns a hex string of `n` random bytes, or nil when no entropy
   # source is available. Tries node:crypto.randomBytes first (works

@@ -28,6 +28,10 @@ Dir.mktmpdir do |dir|
   File.write(File.join(views_dir, 'index.erb'), '<p>Hello <%= @name %></p>')
   File.write(File.join(views_dir, 'layout.erb'), '<main><%= yield %></main>')
   File.write(File.join(views_dir, 'layout_docs.erb'), '<article><%= yield %></article>')
+  File.write(File.join(views_dir, 'cvars.erb'),
+             "<ul>\n<% @@todos.each do |t| %>\n  <li><%= t %></li>\n<% end %>\n</ul>\n<p><%= @@todos.length %></p>")
+  File.write(File.join(views_dir, 'cvars_assign.erb'),
+             "<% @@count = @@count + 1 %><span><%= @@count %></span>")
   File.write(File.join(load_path_dir, 'sinatra', 'base.rb'), "module Sinatra\n  module Templates\n  end\nend\n")
 
   script = File.expand_path('../gems/homura-runtime/exe/compile-erb', __dir__)
@@ -83,6 +87,37 @@ Dir.mktmpdir do |dir|
     app.instance_variable_set(:@docs_inner, '<section>docs</section>')
     html = app.erb(:layout_docs, layout: false)
     raise html unless html == '<article><section>docs</section></article>'
+  end
+  passed += 1 if ok
+  failed += 1 unless ok
+
+  # `@@cvar` references in templates must work via instance_exec without
+  # blowing up Opal's `$$cvars` lookup path (issue #28). The compile-erb
+  # pass rewrites `@@foo` reads/writes into explicit
+  # `class_variable_get` / `class_variable_set` calls on the instance's
+  # class, which works the same under CRuby and Opal.
+  ok = assert('templates can read class variables via @@cvar') do
+    cvar_class = Class.new do
+      include Sinatra::Templates
+    end
+    cvar_class.class_variable_set(:@@todos, %w[a b c])
+    html = cvar_class.new.erb(:cvars, layout: false)
+    expected = "<ul>\n\n  <li>a</li>\n\n  <li>b</li>\n\n  <li>c</li>\n\n</ul>\n<p>3</p>"
+    raise html unless html == expected
+  end
+  passed += 1 if ok
+  failed += 1 unless ok
+
+  ok = assert('templates can assign and re-read class variables via @@cvar') do
+    cvar_class = Class.new do
+      include Sinatra::Templates
+    end
+    cvar_class.class_variable_set(:@@count, 0)
+    inst = cvar_class.new
+    first = inst.erb(:cvars_assign, layout: false)
+    raise first unless first == '<span>1</span>'
+    second = inst.erb(:cvars_assign, layout: false)
+    raise second unless second == '<span>2</span>'
   end
   passed += 1 if ok
   failed += 1 unless ok

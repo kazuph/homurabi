@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.2.17 (2026-04-27)
+
+- Rewrite class-variable references (`@@foo`) inside precompiled ERB
+  templates into explicit `class_variable_get` / `class_variable_set`
+  calls on the instance's class. Opal evaluates compiled template
+  bodies via `instance_exec` on a Sinatra instance whose `$$cvars`
+  slot is undefined at that runtime path, so the previous build emit
+  blew up with `TypeError: Cannot read properties of undefined (reading
+  '$$cvars')` whenever a template touched `<%= @@todos %>` or
+  `<% @@todos.each ... %>` directly. Templates can now use the
+  natural Sinatra style (`@@cvar` reads, `@@cvar = expr` and compound
+  `@@cvar op= expr` assignments) without route-level `@todos = @@todos`
+  shims. Fixes #28.
+
 ## 0.2.11 (2026-04-25)
 
 - Normalize bare JS `undefined` / `null` values to Ruby `nil` while converting

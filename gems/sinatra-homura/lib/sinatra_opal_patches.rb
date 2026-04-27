@@ -23,6 +23,60 @@ require 'sinatra/base'
 
 module Sinatra
   # ---------------------------------------------------------------
+  # 0. Rack::Utils.parse_cookies_header — keep `+` literal in cookie values.
+  #
+  # Upstream (vendor/rack/utils.rb:247 in our shim) routes the cookie
+  # value through `Rack::Utils.unescape` → `URI.decode_www_form_component`
+  # → `s.tr('+', ' ')`. Cookies are NOT form-encoded; that `+`-to-space
+  # conversion is a form-data convention. Combined with Opal's
+  # `CGI.escape` (= `encodeURI`) which leaves `+` UNescaped on write,
+  # any cookie value containing a literal `+` (e.g. an email like
+  # `demo+foo@example.com`) round-trips as `demo foo@example.com`.
+  #
+  # Upstream MRI Rack happens to round-trip correctly because its
+  # `URI.encode_www_form_component` does escape `+` to `%2B`, so the
+  # wire never carries a raw `+`. On the Opal stack the asymmetry is
+  # visible. Fix it on the read side by decoding cookie values with
+  # `CGI.unescapeURIComponent` (≈ JS `decodeURIComponent`), which
+  # decodes every percent-encoded octet (including `%2B`/`%40`) but
+  # leaves a literal `+` untouched.
+  # ---------------------------------------------------------------
+  module ::Rack
+    module Utils
+      class << self
+        def parse_cookies_header(value)
+          return {} if value.nil?
+
+          value.split(/; */n).each_with_object({}) do |cookie, cookies|
+            next if cookie.empty?
+            key, val = cookie.split('=', 2)
+            next if key.nil?
+
+            decoded = if val.nil?
+                        nil
+                      else
+                        begin
+                          # decodeURIComponent semantics: decode every
+                          # percent-encoded octet but DO NOT touch literal `+`.
+                          # Cookies are not form-encoded, so the form-data
+                          # convention of mapping `+` to space does not apply.
+                          ::CGI.unescapeURIComponent(val)
+                        rescue ::StandardError
+                          val
+                        end
+                      end
+            cookies[key] = decoded unless cookies.key?(key)
+          end
+        end
+
+        def parse_cookies(env)
+          parse_cookies_header(env[Rack::HTTP_COOKIE])
+        end
+      end
+    end
+  end
+
+  # ---------------------------------------------------------------
   # 1. Request#forwarded? (upstream base.rb:66)
   #
   # Upstream: `!forwarded_authority.nil?` — checks a Rack 3.1 helper
@@ -447,13 +501,61 @@ module Sinatra
     # Before throwing :halt with the Promise, mark env so that
     # process_route#ensure knows not to delete route params from @params —
     # the async continuation still needs them when the Promise resolves.
+    #
+    # Also: when the user route sets `content_type` / `status` / `headers`
+    # *inside* the awaited block, those mutations land on `@response`
+    # AFTER `route_eval` has already returned a bare Promise.
+    # `Rack::Handler::CloudflareWorkers#build_js_response` snapshots the
+    # response headers/status BEFORE awaiting the body promise, so the
+    # in-route mutations would be silently dropped. Wrap the Promise so it
+    # resolves to a fully-materialized Rack triple
+    # `[response.status, response.headers, [resolved_body]]` which the
+    # handler's "first element is Integer" branch picks up unchanged.
     # -------------------------------------------------------------
     def route_eval
       result = yield
-      env['homura.async_route_active'] = true if defined?(::Cloudflare) && ::Cloudflare.js_promise?(result)
+      if defined?(::Cloudflare) && ::Cloudflare.js_promise?(result)
+        env['homura.async_route_active'] = true
+        result = capture_final_response_after(result)
+      end
       throw :halt, result
     end
     private :route_eval
+
+    # Promise<resolved> -> Promise<[status, headers, [body]]> using the
+    # mutated state of `@response` at resolution time. HaltResponse short
+    # circuits to its precomputed payload (already a triple). Errors thrown
+    # from inside the awaited block propagate untouched so `dispatch!` can
+    # still rescue and route them to handle_exception!.
+    def capture_final_response_after(promise)
+      this_app = self
+      halt_class = ::Sinatra::HaltResponse
+      # MUST keep the backtick on ONE LINE — Opal compiles a multi-line
+      # x-string as a raw statement, not an expression, so the method
+      # would otherwise return `undefined`.
+      `#{promise}.then(function(resolved) { try { if (resolved != null && typeof resolved['$is_a?'] === 'function' && resolved['$is_a?'](halt_class)) { return #{this_app}['$__homura_normalize_halt_triple__'](resolved['$payload']()); } } catch (_) {} try { if (Array.isArray(resolved) && resolved.length >= 1 && typeof resolved[0] === 'number') { return #{this_app}['$__homura_normalize_halt_triple__'](resolved); } } catch (_) {} var st = #{this_app}.$response().$status(); var hd = #{this_app}.$response().$headers(); var bd; if (resolved == null || resolved === Opal.nil) { bd = []; } else if (Array.isArray(resolved)) { bd = resolved; } else if (resolved != null && resolved.$$is_string) { bd = [resolved.toString()]; } else if (typeof resolved === 'string') { bd = [resolved]; } else if (resolved != null && typeof resolved['$each'] === 'function') { bd = resolved; } else { bd = [resolved]; } return [st, hd, bd]; }, function(error) { try { if (error != null && typeof error['$is_a?'] === 'function' && error['$is_a?'](halt_class)) { return #{this_app}['$__homura_normalize_halt_triple__'](error['$payload']()); } } catch (_) {} throw error; })`
+    end
+    private :capture_final_response_after
+
+    # Normalize a Rack triple before handing it to build_js_response from
+    # the awaited continuation. The Sinatra `halt`/`redirect` plumbing
+    # leaves `body` as `nil` when the user did not pass an explicit body
+    # (e.g. `redirect to('/'), 303`). build_js_response's bodyToText then
+    # JSON-stringifies Opal's nil sentinel and the client sees garbage
+    # like `{"$$id":4,"$$frozen":true,...}`. Fold nil/Opal.nil down to an
+    # empty array up front so the JS-side bodyToText returns ''.
+    def __homura_normalize_halt_triple__(triple)
+      return triple unless `Array.isArray(#{triple})`
+      return triple unless triple.length >= 3
+
+      body = triple[2]
+      if body.nil? || `#{body} === null || #{body} === undefined || #{body} === Opal.nil`
+        triple = triple.dup
+        triple[2] = []
+      end
+      triple
+    end
+    private :__homura_normalize_halt_triple__
 
     # -------------------------------------------------------------
     # 9.5. Base#process_route (upstream base.rb:1100)

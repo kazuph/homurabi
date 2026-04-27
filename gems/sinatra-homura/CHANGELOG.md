@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.2.17 (2026-04-27)
+
+- Preserve `content_type`, `headers`, and `status` set inside async / `await: true`
+  routes. The Cloudflare Workers Rack handler snapshots the response triple
+  before awaiting the body promise, so any `content_type 'application/json'` or
+  `status 404` mutation that lands AFTER the route block returned its Promise
+  was silently dropped (final response defaulted to `text/html`, status 200).
+  `route_eval` now wraps the Promise so it resolves to a fully-materialized
+  `[response.status, response.headers, [body]]` triple, which the handler's
+  existing "first element is Integer" branch picks up unchanged.
+- Patch `Rack::Utils.parse_cookies_header` to decode cookie values with
+  `decodeURIComponent` semantics. Opal's `URI.encode_www_form_component` does
+  not escape `+`, so cookie values containing a literal `+` (e.g.
+  `demo+foo@example.com`) were round-tripping as `demo foo@example.com`
+  because the read path went through the form-encoded `+`-to-space mapping.
+
+## 0.2.16 (2026-04-25)
+
+- Internal alignment with the homura-runtime 0.2.13 release set.
+
+## 0.2.15 (2026-04-24)
+
+- Align gem dependencies with the new release set (homura-runtime / opal-homura
+  bumps).
+
 ## 0.2.14 (2026-04-24)
 
 - Scaffold `--with-db` apps with a first-class D1 migration flow: a starter

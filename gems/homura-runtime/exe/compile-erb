@@ -287,11 +287,21 @@ def emit_header(io, namespace)
           body = @templates[name.to_sym]
           raise "#{namespace}: no template registered for \#{name.inspect}" unless body
           previous_block = instance.instance_variable_get(:@__homura_template_block__)
+          previous_locals = instance.instance_variable_get(:@__homura_template_locals__)
           begin
             instance.instance_variable_set(:@__homura_template_block__, block)
+            # Stack locals so nested `erb :_partial, locals: {...}` calls
+            # restore the outer scope on the way out — Sinatra's standard
+            # `locals[:t]` -> bare `t` lookup is implemented via
+            # method_missing on the Sinatra instance (see Sinatra::Base
+            # patch installed by emit_sinatra_patch).
+            stack = previous_locals.is_a?(::Array) ? previous_locals.dup : []
+            stack.push(locals || {})
+            instance.instance_variable_set(:@__homura_template_locals__, stack)
             instance.instance_exec(locals, &body)
           ensure
             instance.instance_variable_set(:@__homura_template_block__, previous_block)
+            instance.instance_variable_set(:@__homura_template_locals__, previous_locals)
           end
         end
 
@@ -340,6 +350,61 @@ def emit_sinatra_patch(io, namespace)
 
           block.call
         end
+
+        # Resolve a Sinatra-style local variable reference.
+        # `erb :_partial, locals: { t: row }` causes the precompiled body
+        # to reference a bare `t`. Stock Sinatra uses Ruby's `binding`
+        # eval to install locals into the template's scope; we don't have
+        # `binding` under Opal/Workers, so we hand-roll the lookup
+        # through method_missing against the locals stack maintained by
+        # the renderer.
+        def __homura_template_local__(name)
+          stack = @__homura_template_locals__
+          return nil unless stack.is_a?(::Array)
+          key = name.to_sym
+          stack.reverse_each do |frame|
+            next unless frame.is_a?(::Hash)
+            return frame[key] if frame.key?(key)
+            sk = name.to_s
+            return frame[sk] if frame.key?(sk)
+          end
+          nil
+        end
+
+        def __homura_template_local_defined?(name)
+          stack = @__homura_template_locals__
+          return false unless stack.is_a?(::Array)
+          key = name.to_sym
+          sk = name.to_s
+          stack.reverse_each do |frame|
+            next unless frame.is_a?(::Hash)
+            return true if frame.key?(key) || frame.key?(sk)
+          end
+          false
+        end
+      end
+    end
+
+    # Method-missing fallback that surfaces template locals as bare names.
+    # Installed on Sinatra::Base so `<%= t['title'] %>` inside a
+    # precompiled partial Just Works without the user having to write
+    # `<%= locals[:t]['title'] %>`.
+    class ::Sinatra::Base
+      def method_missing(name, *args, &block)
+        if args.empty? && block.nil? && __homura_template_local_defined?(name)
+          return __homura_template_local__(name)
+        end
+        super
+      end
+
+      def respond_to_missing?(name, include_private = false)
+        return true if __homura_template_local_defined?(name)
+        super
+      end
+    end
+
+    module ::Sinatra
+      module Templates
 
         def __homura_default_template_block_for__(template)
           case template.to_sym

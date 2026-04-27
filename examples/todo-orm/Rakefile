@@ -1,0 +1,68 @@
+# frozen_string_literal: true
+
+require 'rake/clean'
+
+task default: :build
+
+CLEAN.include(
+  'build/app_assets.rb',
+  'build/app_templates.rb',
+  'build/hello.no-exit.mjs',
+  'build/opal.stderr.log',
+  'worker.entrypoint.mjs'
+)
+
+def run!(*argv)
+  ok = system(*argv)
+  exit 1 unless ok
+end
+
+desc 'Opal + Workers bundle'
+task :build do
+  run!(
+    'bundle', 'exec', 'homura', 'build', '--standalone', '--with-db'
+  )
+end
+
+desc 'Start local dev server through portless (no port collisions)'
+task dev: :build do
+  app_name = File.basename(__dir__)
+  exec('portless', app_name, 'bash', '-c',
+       'exec npx wrangler dev --local --port=$PORT --ip 127.0.0.1')
+end
+
+desc 'Deploy the current app'
+task deploy: :build do
+  run!('npx', 'wrangler', 'deploy')
+end
+
+
+namespace :db do
+  namespace :migrate do
+    def d1_database_name
+      ENV['CLOUDFLARE_D1_DATABASE'] || 'todo-orm'
+    end
+
+    desc 'Compile Sequel migrations to Wrangler SQL in db/migrate/'
+    task :compile do
+      run!(
+        'bundle', 'exec', 'homura', 'db:migrate:compile', 'db/migrate', '--out', 'db/migrate'
+      )
+    end
+
+    desc 'Apply compiled D1 migrations locally'
+    task local: :compile do
+      run!(
+        'bundle', 'exec', 'homura', 'db:migrate:apply', '--database', d1_database_name
+      )
+    end
+
+    desc 'Apply compiled D1 migrations remotely'
+    task remote: :compile do
+      run!(
+        'bundle', 'exec', 'homura', 'db:migrate:apply', '--remote', '--database', d1_database_name
+      )
+    end
+  end
+end
+

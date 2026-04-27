@@ -1,0 +1,18 @@
+<h1>Login</h1>
+
+<% if @notice == 'logged-out' %>
+  <div class="notice">ログアウトしました。</div>
+<% end %>
+
+<% if @login_error %>
+  <div class="error"><%= h @login_error %></div>
+<% end %>
+
+<p>メールアドレスを入力すると、6桁のワンタイムコードを発行し mailpit 経由でメール送信します。
+mailpit Web UI: <a href="http://127.0.0.1:8025/" target="_blank">http://127.0.0.1:8025/</a></p>
+
+<form method="post" action="/login">
+  <label for="email">Email</label>
+  <input type="email" id="email" name="email" required value="<%= h(@form_email) %>">
+  <p><button type="submit">Send OTP</button></p>
+</form>

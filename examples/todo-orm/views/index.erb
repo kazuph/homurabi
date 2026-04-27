@@ -1,0 +1,22 @@
+<form class="new" method="post" action="/todos">
+  <input type="text" name="title" placeholder="やることを入力" autofocus>
+  <button type="submit">追加</button>
+</form>
+
+<% if @todos.nil? || @todos.empty? %>
+  <p class="empty">まだTODOはありません。</p>
+<% else %>
+  <ul>
+    <% @todos.each do |todo| %>
+      <li class="<%= todo[:done].to_i == 1 ? 'done' : '' %>">
+        <span class="title"><%= h(todo[:title]) %></span>
+        <form method="post" action="/todos/<%= todo[:id] %>/toggle">
+          <button type="submit"><%= todo[:done].to_i == 1 ? '戻す' : '完了' %></button>
+        </form>
+        <form method="post" action="/todos/<%= todo[:id] %>/delete">
+          <button type="submit" class="delete">削除</button>
+        </form>
+      </li>
+    <% end %>
+  </ul>
+<% end %>

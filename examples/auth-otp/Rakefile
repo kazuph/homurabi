@@ -1,0 +1,265 @@
+# frozen_string_literal: true
+
+require 'rake/clean'
+
+task default: :build
+
+CLEAN.include(
+  'build/app_assets.rb',
+  'build/app_templates.rb',
+  'build/hello.no-exit.mjs',
+  'build/opal.stderr.log',
+  'worker.entrypoint.mjs'
+)
+
+def run!(*argv)
+  ok = system(*argv)
+  exit 1 unless ok
+end
+
+desc 'Opal + Workers bundle'
+task :build do
+  run!(
+    'bundle', 'exec', 'homura', 'build', '--standalone', '--with-db'
+  )
+end
+
+desc 'Start local dev server through portless (no port collisions)'
+task dev: :build do
+  app_name = File.basename(__dir__)
+  exec('portless', app_name, 'bash', '-c',
+       'exec npx wrangler dev --local --port=$PORT --ip 127.0.0.1')
+end
+
+desc 'Deploy the current app'
+task deploy: :build do
+  run!('npx', 'wrangler', 'deploy')
+end
+
+
+namespace :db do
+  namespace :migrate do
+    def d1_database_name
+      ENV['CLOUDFLARE_D1_DATABASE'] || 'auth-otp'
+    end
+
+    desc 'Compile Sequel migrations to Wrangler SQL in db/migrate/'
+    task :compile do
+      run!(
+        'bundle', 'exec', 'homura', 'db:migrate:compile', 'db/migrate', '--out', 'db/migrate'
+      )
+    end
+
+    desc 'Apply compiled D1 migrations locally'
+    task local: :compile do
+      run!(
+        'bundle', 'exec', 'homura', 'db:migrate:apply', '--database', d1_database_name
+      )
+    end
+
+    desc 'Apply compiled D1 migrations remotely'
+    task remote: :compile do
+      run!(
+        'bundle', 'exec', 'homura', 'db:migrate:apply', '--remote', '--database', d1_database_name
+      )
+    end
+  end
+end
+
+
+namespace :mailpit do
+  pid_file = '/tmp/auth-otp-mailpit.pid'
+  log_file = '/tmp/auth-otp-mailpit.log'
+
+  def mailpit_alive?(pid_file)
+    return false unless File.exist?(pid_file)
+    pid = File.read(pid_file).to_i
+    return false if pid <= 0
+    Process.kill(0, pid)
+    true
+  rescue Errno::ESRCH, Errno::EPERM
+    false
+  end
+
+  desc 'Start mailpit (SMTP:1025, Web UI / API:8025)'
+  task :start do
+    if mailpit_alive?(pid_file)
+      puts "mailpit already running (pid=#{File.read(pid_file)})"
+      next
+    end
+    pid = Process.spawn(
+      '/opt/homebrew/bin/mailpit',
+      '--smtp', '127.0.0.1:1025',
+      '--listen', '127.0.0.1:8025',
+      out: log_file, err: log_file
+    )
+    Process.detach(pid)
+    File.write(pid_file, pid.to_s)
+    sleep 1
+    puts "mailpit started pid=#{pid} (web/api: http://127.0.0.1:8025)"
+  end
+
+  desc 'Stop mailpit'
+  task :stop do
+    next unless File.exist?(pid_file)
+    pid = File.read(pid_file).to_i
+    begin
+      Process.kill('TERM', pid)
+    rescue Errno::ESRCH, Errno::EPERM
+      # already gone
+    end
+    File.delete(pid_file)
+    puts 'mailpit stopped'
+  end
+
+  desc 'Clear all messages in mailpit'
+  task :clear do
+    require 'net/http'
+    Net::HTTP.start('127.0.0.1', 8025) { |h| h.delete('/api/v1/messages') }
+    puts 'mailpit messages cleared'
+  end
+end
+
+desc 'End-to-end smoke against portless+mailpit'
+task :e2e do
+  require 'net/http'
+  require 'json'
+  require 'uri'
+
+  base  = ENV['E2E_BASE'] || 'http://auth-otp.localhost:1355'
+  # `+` 入り email を使って sinatra-homura 0.2.17 の cookie `+` percent-decode 修正を検証する
+  email = ENV['E2E_EMAIL'] || "demo+#{Time.now.to_i}@example.com"
+
+  puts "[e2e] base=#{base} email=#{email}"
+
+  # 0) clear mailpit so we can find OUR mail unambiguously
+  Net::HTTP.start('127.0.0.1', 8025) { |h| h.delete('/api/v1/messages') }
+
+  # 1) /login で OTP を発行 → mailpit に届く
+  resp = Net::HTTP.post_form(URI("#{base}/login"), 'email' => email)
+  unless resp.is_a?(Net::HTTPSuccess) || resp.is_a?(Net::HTTPRedirection)
+    raise "login failed: #{resp.code} #{resp.body[0, 300]}"
+  end
+  puts "[e2e] /login → #{resp.code}"
+
+  # 2) mailpit からメール取得 → OTP 抽出
+  msgs = JSON.parse(Net::HTTP.get(URI('http://127.0.0.1:8025/api/v1/messages?limit=10')))
+  msg_summary = msgs['messages'].find do |m|
+    (m['To'] || []).any? { |t| t['Address'] == email }
+  end
+  raise "no mail in mailpit for #{email}: #{msgs.inspect}" unless msg_summary
+
+  msg = JSON.parse(Net::HTTP.get(URI("http://127.0.0.1:8025/api/v1/message/#{msg_summary['ID']}")))
+  body_text = msg['Text'] || msg['HTML']
+  code = body_text[/\d{6}/] or raise "no 6-digit OTP in mail: #{body_text.inspect}"
+  puts "[e2e] mailpit mail received id=#{msg_summary['ID']} otp=#{code}"
+
+  # 3) /verify で検証 → cookie 取得
+  uri = URI("#{base}/verify")
+  http = Net::HTTP.new(uri.host, uri.port)
+  req = Net::HTTP::Post.new(uri).tap { |r| r.set_form_data('email' => email, 'code' => code) }
+  resp = http.request(req)
+  unless resp.is_a?(Net::HTTPRedirection) || resp.code.to_i == 303
+    raise "verify failed: #{resp.code} #{resp.body[0, 300]}"
+  end
+  raw_cookie = resp['set-cookie'] or raise 'no session cookie'
+  # Strip cookie attributes (path=/, max-age=..., httponly, samesite=...).
+  # We send only `<name>=<value>` back as the Cookie request header.
+  cookie = raw_cookie.split(';').first.to_s.strip
+  raise 'no session=... cookie' unless cookie.start_with?('session=')
+  puts "[e2e] /verify → #{resp.code} cookie=#{cookie[0, 60]}..."
+
+  # 4) ログイン後 / で email が見える
+  body = Net::HTTP.get(URI("#{base}/"), 'Cookie' => cookie)
+  unless body.include?(email)
+    raise "after login / unexpected: #{body[0, 300]}"
+  end
+  puts "[e2e] / shows logged-in email"
+
+  # 5) /logout
+  req = Net::HTTP::Post.new(URI("#{base}/logout"))
+  req['Cookie'] = cookie
+  resp = http.request(req)
+  unless resp.is_a?(Net::HTTPRedirection) || resp.code.to_i == 303
+    raise "logout failed: #{resp.code} #{resp.body[0, 300]}"
+  end
+  puts "[e2e] /logout → #{resp.code}"
+
+  puts "E2E OK: email=#{email}, otp=#{code}"
+end
+
+desc 'End-to-end smoke through real browser (headed)'
+task 'e2e:headed' do
+  require 'playwright'
+  require 'net/http'
+  require 'json'
+  require 'uri'
+  require 'fileutils'
+
+  base = ENV['BASE_URL'] || 'http://auth-otp.localhost:1355'
+  email = ENV['E2E_EMAIL'] || "demo+#{Time.now.to_i}@example.com"
+  artifacts = File.expand_path('tmp/e2e-headed', __dir__)
+  FileUtils.mkdir_p(artifacts)
+
+  cli = File.expand_path('node_modules/.bin/playwright', __dir__)
+  unless File.executable?(cli)
+    raise "playwright CLI not found at #{cli}. Run `npm install` and `npx playwright install chromium`."
+  end
+
+  # mailpit clear
+  Net::HTTP.start('127.0.0.1', 8025) { |h| h.delete('/api/v1/messages') }
+
+  Playwright.create(playwright_cli_executable_path: cli) do |pw|
+    pw.chromium.launch(headless: false, slowMo: 350) do |browser|
+      ctx = browser.new_context(record_video_dir: artifacts, viewport: { width: 1024, height: 720 })
+      page = ctx.new_page
+      page.goto("#{base}/")
+      page.screenshot(path: File.join(artifacts, '01-top-unauth.png'))
+
+      page.goto("#{base}/login")
+      page.fill('input[name=email]', email)
+      page.screenshot(path: File.join(artifacts, '02-login-filled.png'))
+      page.click('button[type=submit]')
+      page.wait_for_load_state(state: 'networkidle')
+      page.screenshot(path: File.join(artifacts, '03-after-login.png'))
+
+      # mailpit から OTP 取得
+      msgs = nil
+      summary = nil
+      30.times do
+        sleep 0.3
+        msgs = JSON.parse(Net::HTTP.get(URI('http://127.0.0.1:8025/api/v1/messages?limit=10')))
+        summary = (msgs['messages'] || []).find do |m|
+          (m['To'] || []).any? { |t| t['Address'] == email }
+        end
+        break if summary
+      end
+      raise "mailpit にメールが届かなかった (email=#{email})" unless summary
+
+      msg = JSON.parse(Net::HTTP.get(URI("http://127.0.0.1:8025/api/v1/message/#{summary['ID']}")))
+      body_text = msg['Text'] || msg['HTML']
+      code = body_text[/\d{6}/]
+      raise "OTP 抽出失敗: #{body_text.inspect}" unless code
+      puts "[e2e:headed] mailpit OTP=#{code}"
+
+      page.goto("#{base}/verify?email=#{URI.encode_www_form_component(email)}")
+      page.fill('input[name=code]', code)
+      page.screenshot(path: File.join(artifacts, '04-verify-filled.png'))
+      page.click('button[type=submit]')
+      page.wait_for_load_state(state: 'networkidle')
+      page.screenshot(path: File.join(artifacts, '05-after-verify.png'))
+
+      raise '/ にログイン後 email が見えない' unless page.content.include?(email)
+
+      # logout
+      page.click("form[action='/logout'] button[type=submit]")
+      page.wait_for_load_state(state: 'networkidle')
+      page.screenshot(path: File.join(artifacts, '06-after-logout.png'))
+
+      sleep (ENV['HOLD'] || 4).to_i # マスターに目視時間
+      ctx.close
+    end
+  end
+
+  puts "[e2e:headed] artifacts → #{artifacts}"
+end

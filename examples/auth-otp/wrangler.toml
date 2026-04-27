@@ -1,0 +1,13 @@
+name = "auth-otp"
+main = "worker.entrypoint.mjs"
+compatibility_date = "2026-04-27"
+compatibility_flags = ["nodejs_compat"]
+
+
+# Replace database_id after `wrangler d1 create auth-otp`.
+[[d1_databases]]
+binding = "DB"
+database_name = "auth-otp"
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "db/migrate"
+

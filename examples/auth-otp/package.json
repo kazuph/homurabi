@@ -1,0 +1,17 @@
+{
+  "name": "auth-otp",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "bundle exec rake build",
+    "dev": "bundle exec rake dev",
+    "deploy": "bundle exec rake deploy"
+  },
+  "devDependencies": {
+    "playwright": "^1.59.0",
+    "wrangler": "^3.99.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

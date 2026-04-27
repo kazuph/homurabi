@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>hotwire-todo</title>
+  <script type="importmap">
+  { "imports": {
+    "@hotwired/turbo": "https://esm.sh/@hotwired/turbo@8.0.13",
+    "@hotwired/stimulus": "https://esm.sh/@hotwired/stimulus@3.2.2"
+  }}
+  </script>
+  <script type="module" src="/assets/hotwire-app.js"></script>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; max-width: 640px; margin: 2rem auto; padding: 0 1rem; }
+    h1 { font-size: 1.4rem; }
+    #todo-form { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+    #todo-form input[name=title] { flex: 1; padding: 0.4rem; }
+    #todos-list { list-style: none; padding: 0; }
+    #todos-list li { padding: 0.4rem 0; border-bottom: 1px solid #eee; display: flex; align-items: center; gap: 0.5rem; }
+    button { cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>hotwire-todo</h1>
+  <%= yield %>
+</body>
+</html>

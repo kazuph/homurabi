@@ -1,0 +1,34 @@
+<h1>Verify OTP</h1>
+
+<% if @mail_notice %>
+  <div class="notice"><%= h @mail_notice %></div>
+<% end %>
+
+<% if @mail_error %>
+  <div class="error">メール送信に失敗したため、開発フォールバックで画面表示します: <%= h @mail_error %></div>
+<% end %>
+
+<% if @issued_code %>
+  <div class="otp-banner">
+    開発モード: OTP=<%= h @issued_code %>
+    （<%= h @issued_email %> 宛に発行。通常は mailpit にメール送信されます）
+  </div>
+<% end %>
+
+<% if @verify_error %>
+  <div class="error"><%= h @verify_error %></div>
+<% end %>
+
+<p>受信したコードを入力してください。</p>
+
+<form method="post" action="/verify">
+  <label for="email">Email</label>
+  <input type="email" id="email" name="email" required value="<%= h(@issued_email) %>">
+
+  <label for="code">OTP (6桁)</label>
+  <input type="text" id="code" name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required>
+
+  <p><button type="submit">Verify</button></p>
+</form>
+
+<p><a href="/login">別のメールでやり直す</a></p>

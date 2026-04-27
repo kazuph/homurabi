@@ -1,0 +1,9 @@
+<li id="todo-<%= t['id'] %>">
+  <form action="/todos/<%= t['id'] %>/toggle" method="post" style="display:inline">
+    <button type="submit"><%= t['done'].to_i == 1 ? '↩' : '✓' %></button>
+  </form>
+  <span style="<%= t['done'].to_i == 1 ? 'text-decoration:line-through' : '' %>"><%= t['title'] %></span>
+  <form action="/todos/<%= t['id'] %>/delete" method="post" style="display:inline">
+    <button type="submit">削除</button>
+  </form>
+</li>

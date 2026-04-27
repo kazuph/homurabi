@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>homura blog</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Hiragino Sans", sans-serif;
+           max-width: 720px; margin: 2rem auto; padding: 0 1rem; line-height: 1.7; color: #222; }
+    header { border-bottom: 1px solid #ddd; padding-bottom: .5rem; margin-bottom: 1.5rem; }
+    header h1 a { color: #222; text-decoration: none; }
+    .meta { color: #888; font-size: .85rem; }
+    .post-list { list-style: none; padding: 0; }
+    .post-list li { margin-bottom: .8rem; }
+    .post-list a { font-size: 1.1rem; }
+    .actions { margin: 1rem 0; }
+    .actions a, .actions button { display: inline-block; padding: .4rem .8rem;
+           border: 1px solid #888; border-radius: 4px; text-decoration: none; color: #222;
+           background: #f7f7f7; cursor: pointer; }
+    form label { display: block; margin: .8rem 0 .2rem; font-weight: bold; }
+    form input[type=text], form textarea { width: 100%; padding: .5rem; font-size: 1rem;
+           border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+    form textarea { min-height: 8rem; }
+    article .body { margin-top: 1rem; padding: 1rem; background: #fafafa;
+           border: 1px solid #eee; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1><a href="/">homura blog</a></h1>
+  </header>
+  <%= yield %>
+</body>
+</html>

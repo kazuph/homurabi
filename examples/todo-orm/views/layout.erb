@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>TODO (sequel-d1 + D1)</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif; max-width: 640px; margin: 2rem auto; padding: 0 1rem; color: #222; }
+    h1 { font-size: 1.4rem; border-bottom: 1px solid #ddd; padding-bottom: .4rem; }
+    form.new { display: flex; gap: .5rem; margin: 1rem 0 1.5rem; }
+    form.new input[type=text] { flex: 1; padding: .5rem; font-size: 1rem; border: 1px solid #ccc; border-radius: 4px; }
+    form.new button { padding: .5rem 1rem; font-size: 1rem; background: #2563eb; color: #fff; border: 0; border-radius: 4px; cursor: pointer; }
+    ul { list-style: none; padding: 0; }
+    li { display: flex; align-items: center; gap: .5rem; padding: .5rem .25rem; border-bottom: 1px solid #eee; }
+    li.done .title { text-decoration: line-through; color: #888; }
+    li .title { flex: 1; }
+    li form { margin: 0; }
+    li button { padding: .25rem .6rem; font-size: .85rem; border: 1px solid #ccc; background: #fafafa; border-radius: 4px; cursor: pointer; }
+    li button.delete { color: #b91c1c; border-color: #f1c0c0; }
+    .empty { color: #888; font-style: italic; }
+    .meta { color: #666; font-size: .8rem; }
+  </style>
+</head>
+<body>
+  <h1>TODO <span class="meta">(sequel-d1 + D1)</span></h1>
+  <%= yield %>
+</body>
+</html>

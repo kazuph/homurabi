@@ -1,0 +1,13 @@
+name = "todo-orm"
+main = "worker.entrypoint.mjs"
+compatibility_date = "2026-04-27"
+compatibility_flags = ["nodejs_compat"]
+
+
+# Replace database_id after `wrangler d1 create todo-orm`.
+[[d1_databases]]
+binding = "DB"
+database_name = "todo-orm"
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "db/migrate"
+

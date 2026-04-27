@@ -1,0 +1,6 @@
+<%= erb :_form, layout: false %>
+<ul id="todos-list">
+  <% @todos.each do |t| %>
+    <%= erb :_todo, layout: false, locals: { t: t } %>
+  <% end %>
+</ul>

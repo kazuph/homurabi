@@ -1,0 +1,16 @@
+{
+  "name": "todo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "bundle exec rake build",
+    "dev": "bundle exec rake dev",
+    "deploy": "bundle exec rake deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^3.99.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

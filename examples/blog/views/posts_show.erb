@@ -1,0 +1,12 @@
+<article>
+  <h2><%= h(@post[:title] || @post['title']) %></h2>
+  <div class="meta"><%= fmt_time(@post[:created_at] || @post['created_at']) %></div>
+  <div class="body"><%= h(@post[:body] || @post['body'].to_s).gsub("\n", "<br>") %></div>
+</article>
+
+<div class="actions">
+  <a href="/">← 一覧へ戻る</a>
+  <form method="post" action="/posts/<%= @post[:id] || @post['id'] %>/delete" style="display:inline;">
+    <button type="submit" class="delete">削除</button>
+  </form>
+</div>

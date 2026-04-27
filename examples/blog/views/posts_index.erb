@@ -1,0 +1,19 @@
+<div class="actions">
+  <a href="/posts/new">新規投稿</a>
+</div>
+
+<% if @posts.nil? || @posts.empty? %>
+  <p>まだ投稿がありません。</p>
+<% else %>
+  <ul class="post-list">
+    <% @posts.each do |post| %>
+      <li>
+        <a href="/posts/<%= post[:id] || post['id'] %>"><%= h(post[:title] || post['title']) %></a>
+        <div class="meta"><%= fmt_time(post[:created_at] || post['created_at']) %></div>
+        <form method="post" action="/posts/<%= post[:id] || post['id'] %>/delete" style="display:inline;">
+          <button type="submit" class="delete">削除</button>
+        </form>
+      </li>
+    <% end %>
+  </ul>
+<% end %>

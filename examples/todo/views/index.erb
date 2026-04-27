@@ -1,0 +1,24 @@
+<h1>homura todo</h1>
+
+<form class="new-todo" action="/todos" method="post">
+  <input type="text" name="title" placeholder="やること" required>
+  <button type="submit">追加</button>
+</form>
+
+<% if @todos.empty? %>
+  <p>まだTODOはありません。</p>
+<% else %>
+  <ul class="todos">
+    <% @todos.each do |t| %>
+      <li class="<%= t['done'].to_i == 1 ? 'done' : '' %>">
+        <form action="/todos/<%= t['id'] %>/toggle" method="post">
+          <button type="submit"><%= t['done'].to_i == 1 ? '元に戻す' : '完了' %></button>
+        </form>
+        <span class="title">[<%= t['id'] %>] <%= h(t['title']) %></span>
+        <form action="/todos/<%= t['id'] %>/delete" method="post">
+          <button type="submit">削除</button>
+        </form>
+      </li>
+    <% end %>
+  </ul>
+<% end %>

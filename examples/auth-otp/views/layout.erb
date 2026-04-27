@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title><%= @title || 'auth-otp demo' %></title>
+    <style>
+      :root { color-scheme: light dark; }
+      body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+             max-width: 32rem; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; }
+      h1 { font-size: 1.5rem; margin-bottom: 1rem; }
+      form { margin: 1rem 0; padding: 1rem; border: 1px solid #ccc; border-radius: 8px; }
+      label { display: block; margin: 0.5rem 0 0.25rem; font-weight: 600; }
+      input[type=email], input[type=text] {
+        width: 100%; padding: 0.5rem; font-size: 1rem; box-sizing: border-box;
+        border: 1px solid #999; border-radius: 4px;
+      }
+      button { padding: 0.5rem 1rem; font-size: 1rem; cursor: pointer;
+               border: 1px solid #333; border-radius: 4px; background: #f5f5f5; }
+      button:hover { background: #e8e8e8; }
+      .notice { padding: 0.75rem 1rem; background: #eef; border-left: 4px solid #66f;
+                border-radius: 4px; margin: 1rem 0; }
+      .error { padding: 0.75rem 1rem; background: #fee; border-left: 4px solid #c33;
+               border-radius: 4px; margin: 1rem 0; }
+      .otp-banner { padding: 0.75rem 1rem; background: #ffd; border-left: 4px solid #cc0;
+                    border-radius: 4px; margin: 1rem 0; font-family: ui-monospace, monospace; }
+      nav { margin-bottom: 1rem; font-size: 0.9em; color: #666; }
+      nav a { color: inherit; }
+      footer { margin-top: 3rem; font-size: 0.85em; color: #888; }
+    </style>
+  </head>
+  <body>
+    <nav>
+      <a href="/">/</a> &middot; <a href="/login">/login</a>
+    </nav>
+    <%= yield %>
+    <footer>
+      auth-otp demo (homura on Cloudflare Workers + D1 + mailpit).
+      ローカル開発では OTP を mailpit (<a href="http://127.0.0.1:8025/" target="_blank">http://127.0.0.1:8025/</a>) に送信します。
+      mailpit が落ちている場合のみ、開発フォールバックで画面に OTP を表示します。
+    </footer>
+  </body>
+</html>

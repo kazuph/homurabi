@@ -1,0 +1,11 @@
+<h1>auth-otp demo</h1>
+
+<% if @email %>
+  <p>Hello <strong><%= h @email %></strong>!</p>
+  <form method="post" action="/logout">
+    <button type="submit">Logout</button>
+  </form>
+<% else %>
+  <p>未ログインです。</p>
+  <p><a href="/login">/login へ進む</a></p>
+<% end %>

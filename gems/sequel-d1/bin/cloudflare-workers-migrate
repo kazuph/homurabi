@@ -82,9 +82,21 @@ def run_compile
     db = Sequel.sqlite(logger: Logger.new(nil))
     db.sql_log_level = :info
 
+    # Sequel's sqlite adapter emits internal probes that have no place
+    # in a wrangler migration file:
+    #   * `SELECT sqlite_version();`             — connection bring-up
+    #   * `SELECT NULL AS 'nil' FROM <t> LIMIT 1` — `create_table?` probe
+    # Cloudflare D1 forbids both (`not authorized to use function:
+    # sqlite_version`, `no such table` for the probe), so the entire
+    # `.sql` fails to apply. Filter them out at capture time.
+    skip_re = Regexp.union(
+      /\ASELECT\s+sqlite_version\s*\(\s*\)/i,
+      /\ASELECT\s+NULL\s+AS\s+'nil'\s+FROM\s+/i,
+      /\APRAGMA\b/i
+    )
     sqls = captured
     db.define_singleton_method(:log_connection_yield) do |sql, _conn, *, &blk|
-      sqls << sql unless sql.strip.start_with?('PRAGMA')
+      sqls << sql unless sql.strip.match?(skip_re)
       blk.call
     end
 

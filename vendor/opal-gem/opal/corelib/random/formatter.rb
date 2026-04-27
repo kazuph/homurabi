@@ -45,7 +45,13 @@ class ::Random
         num <<= 8
         num |= bs[i].ord
       end
-      num.abs / 0x7fffffff
+      # `Integer / Integer` is integer division on both CRuby and Opal,
+      # so the previous `num.abs / 0x7fffffff` collapsed to 0 (or rarely 1)
+      # and turned `SecureRandom.random_number(N)` into a constant 0.
+      # Force the divisor to a Float so we get a true [0, 1) float, then
+      # the caller's `Math.floor(randomFloat() * N)` produces a real
+      # uniform distribution.
+      num.abs.to_f / 0x7fffffff
     end
 
     def random_number(limit = undefined)

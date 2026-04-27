@@ -117,5 +117,20 @@ module Sequel
         value
       end
     end
+
+    # Sqlite3-ruby / homura-runtime D1Database compatibility shim.
+    # Mirrors the `db.get_first_row(sql, [params])` shape exposed by
+    # `Cloudflare::D1Database` so code that mixes the two layers (or
+    # follows that documentation style) works on `Sequel::Dataset` too.
+    #
+    #   db[:users].where(id: 1).get_first_row    # → Hash or nil
+    #   db[:users].get_first_row('id = ?', 1)    # accepts the same
+    #                                              # params as #where.
+    #
+    # Implemented as a thin wrapper over `Dataset#first`, which already
+    # crosses the async boundary correctly via the patches in this file.
+    def get_first_row(*conds, &block)
+      conds.empty? && block.nil? ? first : first(*conds, &block)
+    end
   end
 end

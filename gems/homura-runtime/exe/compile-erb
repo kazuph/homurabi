@@ -136,10 +136,13 @@ module HomuraERB
   end
 
   # Wrap the compiled body in a `#{namespace}.register` call.
+  # `template_name` may be a Symbol whose name contains a `/`
+  # (e.g. `:"posts/index"`); use `inspect` so the literal serialises
+  # as `:"posts/index"` and is parseable by Opal.
   def wrap(template_name, compiled_body, namespace)
     indented = compiled_body.each_line.map { |l| "    #{l}" }.join
     <<~RUBY
-      #{namespace}.register(:#{template_name}) do |locals = {}|
+      #{namespace}.register(#{template_name.inspect}) do |locals = {}|
       #{indented.chomp}
       end
     RUBY
@@ -151,11 +154,19 @@ end
 # ---------------------------------------------------------------------------
 
 def default_inputs_for(dir)
-  Dir.glob(File.join(dir, '*.erb')).sort
+  # Recursive so `views/posts/index.erb` becomes `:'posts/index'`,
+  # matching upstream Sinatra's subdirectory convention.
+  Dir.glob(File.join(dir, '**', '*.erb')).sort
 end
 
-def template_name_for(path)
-  File.basename(path, '.erb').to_sym
+def template_name_for(path, root)
+  rel = path.dup
+  if root
+    root_with_sep = root.end_with?('/') ? root : "#{root}/"
+    rel = rel[root_with_sep.length..] if rel.start_with?(root_with_sep)
+  end
+  rel = File.basename(rel) unless rel.include?('/')
+  rel.delete_suffix('.erb').to_sym
 end
 
 def emit_header(io, namespace)
@@ -209,13 +220,13 @@ def emit_header(io, namespace)
   RUBY
 end
 
-def emit_templates(io, inputs, namespace)
+def emit_templates(io, inputs, namespace, root)
   inputs.each do |path|
-    name = template_name_for(path)
+    name = template_name_for(path, root)
     source = File.read(path)
     compiled = HomuraERB.compile(source)
     io.puts
-    io.puts "# ---- #{path} -> :#{name} --------------------------------------"
+    io.puts "# ---- #{path} -> :#{name.inspect} --------------------------------------"
     io.puts HomuraERB.wrap(name, compiled, namespace)
   end
 end
@@ -256,9 +267,14 @@ def emit_sinatra_patch(io, namespace)
         # have one. Unknown symbols raise a clear message instead of
         # wandering into upstream Tilt, which would blow up on
         # Workers with "Code generation from strings disallowed".
+        #
+        # Sinatra's idiom `erb :foo, locals: { x: 1 }` passes locals via
+        # `options[:locals]` rather than the third positional argument;
+        # merge them so both forms work.
         def erb(template, options = {}, locals = {}, &block)
+          template = template.to_sym if template.is_a?(::String)
           if template.is_a?(::Symbol) && ::#{namespace}.registered?(template)
-            locals ||= {}
+            locals = (options[:locals] || {}).merge(locals || {})
             block ||= __homura_default_template_block_for__(template)
             output = ::#{namespace}.render(template, self, locals, &block)
 
@@ -315,10 +331,12 @@ namespace = options[:namespace]
 
 inputs =
   if positional.any?
-    positional.flat_map { |a| File.directory?(a) ? Dir.glob(File.join(a, '*.erb')).sort : [a] }
+    positional.flat_map { |a| File.directory?(a) ? Dir.glob(File.join(a, '**', '*.erb')).sort : [a] }
   else
     default_inputs_for(options[:input_dir])
   end
+
+template_root = positional.find { |a| File.directory?(a) } || options[:input_dir]
 
 if inputs.empty?
   warn "bin/compile-erb: no .erb files found (under #{options[:input_dir]}/ or from args)"
@@ -332,12 +350,12 @@ if write_file
   FileUtils.mkdir_p(File.dirname(out_path))
   File.open(out_path, 'w') do |io|
     emit_header(io, namespace)
-    emit_templates(io, inputs, namespace)
+    emit_templates(io, inputs, namespace, template_root)
     emit_sinatra_patch(io, namespace)
   end
   warn "compile-erb: wrote #{out_path} (#{inputs.size} templates)"
 else
   emit_header($stdout, namespace)
-  emit_templates($stdout, inputs, namespace)
+  emit_templates($stdout, inputs, namespace, template_root)
   emit_sinatra_patch($stdout, namespace)
 end

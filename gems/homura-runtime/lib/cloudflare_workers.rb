@@ -666,12 +666,34 @@ module Cloudflare
     # a metadata Hash with `changes`, `last_row_id`, `duration`, etc.
     # Returns a JS Promise resolving to that metadata Hash.
     #
+    # The raw D1 `run()` payload nests these fields under `meta`:
+    #   { 'success' => true, 'meta' => { 'last_row_id' => 7, ... }, 'results' => [...] }
+    # sqlite3-ruby exposes them at the top level. To keep the documented
+    # "sqlite3-ruby compatible" surface and still leave the raw shape
+    # available, flatten the common keys to the top level.
+    #
     #   meta = db.execute_insert("INSERT INTO users (name) VALUES (?)", ["alice"])
-    #   meta['last_row_id']  # → 7
+    #   meta['last_row_id']          # → 7  (flattened convenience)
+    #   meta['meta']['last_row_id']  # → 7  (raw D1 shape)
     def execute_insert(sql, bind_params = [])
       stmt = prepare(sql)
       stmt = stmt.bind(*bind_params) unless bind_params.empty?
-      stmt.run
+      raw = stmt.run
+      D1Database.flatten_meta(raw)
+    end
+
+    # Flatten common keys from `result['meta']` to the top of the hash so
+    # callers can write `meta['last_row_id']` without descending into the
+    # nested D1 metadata object. Preserves the original shape unchanged.
+    def self.flatten_meta(result)
+      return result unless result.is_a?(Hash)
+      nested = result['meta']
+      return result unless nested.is_a?(Hash)
+
+      %w[last_row_id changes duration size_after rows_read rows_written].each do |k|
+        result[k] = nested[k] unless result.key?(k)
+      end
+      result
     end
 
     # Execute one or more raw SQL statements separated by semicolons.

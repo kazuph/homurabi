@@ -21,7 +21,11 @@ module Mustermann
     # @see (see Mustermann::Pattern#initialize)
     def initialize(string, check_anchors: true, **options)
       string = $1 if string.to_s =~ /\A\(\?\-mix\:(.*)\)\Z/ && string.inspect == "/#$1/"
-      string = string.source.gsub!(/(?<!\\)(?:\s|#.*$)/, '') if extended_regexp?(string)
+      # homura: upstream uses `gsub!` (mutating) on a literal-frozen
+      # String under Opal, which raises `String#gsub! not supported`.
+      # Switching to non-mutating `gsub` is functionally identical here
+      # (the assigned return value is what matters).
+      string = string.source.gsub(/(?<!\\)(?:\s|#.*$)/, '') if extended_regexp?(string)
       @check_anchors = check_anchors
       super(string, **options)
     end

@@ -14,6 +14,7 @@ idiom works the way the upstream docs say it does.
 
 | Example | Stack | Highlights |
 |---|---|---|
+| [`todo-simple/`](todo-simple/) | Sinatra (in-memory) | **The smallest example.** One `app.rb`, no `views/`, no D1 — heredoc HTML right next to the routes. Use it when you want to see how little homura needs. |
 | [`todo/`](todo/) | Sinatra + D1 (no ORM) | Smallest D1 CRUD. `env['cloudflare.DB']` and the `Cloudflare::D1Database#execute` / `execute_insert` API directly — no Sequel. |
 | [`todo-orm/`](todo-orm/) | Sinatra + D1 + Sequel | Same TODO domain through `sequel-d1`. Datasets, `.first`, `.update(... Sequel.lit ...)`, migration DSL → wrangler-ready SQL. |
 | [`auth-otp/`](auth-otp/) | Sinatra + D1 + mailpit + Playwright | Email OTP login backed by a [mailpit](https://mailpit.axllent.org/) sink in development. HMAC-signed session cookie. `rake e2e` (Net::HTTP) and `rake e2e:headed` (real Chromium) for end-to-end verification. |

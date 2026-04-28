@@ -1,0 +1,6 @@
+# Smallest viable Workers config — no D1, no KV, just a Worker that
+# runs a single-file Sinatra app.
+name = "todo-simple"
+main = "worker.entrypoint.mjs"
+compatibility_date = "2026-04-28"
+compatibility_flags = ["nodejs_compat"]

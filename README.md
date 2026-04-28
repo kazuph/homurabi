@@ -192,6 +192,7 @@ fixtures behind the latest gem releases.
 
 | Example | What it shows |
 |---|---|
+| [`todo-simple`](examples/todo-simple/) | **The smallest example.** One `app.rb`, no `views/` directory, no D1 — HTML written as Ruby heredocs. The thing to copy when "how little does homura need" is the question. |
 | [`todo`](examples/todo/) | D1-backed CRUD without an ORM — `env['cloudflare.DB']` and `Cloudflare::D1Database` directly. |
 | [`todo-orm`](examples/todo-orm/) | The same TODO app, this time through `sequel-d1`: migrations, dataset chains, `.first` / `.update`. |
 | [`auth-otp`](examples/auth-otp/) | Email OTP login. Sends through [mailpit](https://mailpit.axllent.org/) in development; HMAC-signed session cookie; full headed Playwright E2E in `rake e2e:headed`. |

@@ -4,7 +4,7 @@ GEM
     ast (2.4.3)
     base64 (0.3.0)
     bigdecimal (4.1.2)
-    homura-runtime (0.2.22)
+    homura-runtime (0.2.23)
       opal-homura (= 1.8.3.rc1.5)
       parser (~> 3.3)
     opal-homura (1.8.3.rc1.5)
@@ -23,8 +23,8 @@ GEM
       opal-homura (= 1.8.3.rc1.5)
       sequel (~> 5.0)
       sqlite3 (~> 2.0)
-    sinatra-homura (0.2.19)
-      homura-runtime (~> 0.2, >= 0.2.12)
+    sinatra-homura (0.2.20)
+      homura-runtime (~> 0.2, >= 0.2.23)
       opal-homura (= 1.8.3.rc1.5)
     sqlite3 (2.9.3-aarch64-linux-gnu)
     sqlite3 (2.9.3-aarch64-linux-musl)
@@ -50,12 +50,12 @@ PLATFORMS
   x86_64-linux-musl
 
 DEPENDENCIES
-  homura-runtime (= 0.2.22)
+  homura-runtime (= 0.2.23)
   opal-homura (= 1.8.3.rc1.5)
   rake
   sequel (~> 5.0)
   sequel-d1 (= 0.2.10)
-  sinatra-homura (= 0.2.19)
+  sinatra-homura (= 0.2.20)
   sqlite3 (>= 2.0)
 
 RUBY VERSION

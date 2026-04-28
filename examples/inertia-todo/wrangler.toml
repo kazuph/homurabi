@@ -1,5 +1,5 @@
 name = "inertia-todo"
-main = "worker.entrypoint.mjs"
+main = "build/worker.entrypoint.mjs"
 compatibility_date = "2026-04-27"
 compatibility_flags = ["nodejs_compat"]
 

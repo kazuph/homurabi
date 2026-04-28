@@ -17,7 +17,7 @@ PATH
 PATH
   remote: gems/sinatra-homura
   specs:
-    sinatra-homura (0.2.18)
+    sinatra-homura (0.2.19)
       homura-runtime (~> 0.2, >= 0.2.12)
       opal-homura (= 1.8.3.rc1.5)
 

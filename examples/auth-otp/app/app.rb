@@ -81,9 +81,43 @@ class App < Sinatra::Base
         host.end_with?('.localhost')
     end
 
-    # Send the OTP to mailpit's HTTP Send API. Returns [ok, error_message].
-    # Worker → 127.0.0.1:8025 fetch works in `wrangler dev --local` mode.
+    # Read a Cloudflare Workers env var / secret. Wrangler `[vars]` and
+    # `wrangler secret put` both surface as plain JS properties on the
+    # bound env object (`env['cloudflare.env']`). Returns '' when the
+    # binding hasn't been configured.
+    def cf_env_var(name)
+      cf_env = env['cloudflare.env']
+      return '' unless cf_env
+      `(#{cf_env}[#{name}] || '')`.to_s.strip
+    end
+
+    # Should we actually send mail to `email`? Reads `HOMURA_MAIL_ALLOWLIST`
+    # (comma-separated, configured with `wrangler secret put`) as the
+    # production allowlist. In dev we always send (mailpit is local-only).
+    # When the allowlist is empty we send to anyone (so a fresh fork
+    # without env config still works in dev).
+    def mail_allowed?(email)
+      return true if dev_host?
+      list = cf_env_var('HOMURA_MAIL_ALLOWLIST').split(',').map { |s| s.strip.downcase }.reject(&:empty?)
+      return true if list.empty?
+      list.include?(email.to_s.strip.downcase)
+    end
+
+    # Send the OTP. In development (`*.localhost` / 127.0.0.1) we POST to
+    # the local mailpit HTTP Send API so the demo stays self-contained;
+    # in production we go through the Cloudflare Email Workers binding
+    # (`env.SEND_EMAIL` → `Cloudflare::Email`) so a real email arrives in
+    # the user's inbox. Returns [ok, error_message].
     def send_otp_email(email, code)
+      if dev_host?
+        send_otp_via_mailpit(email, code)
+      else
+        send_otp_via_cloudflare_email(email, code)
+      end
+    end
+
+    # Worker → 127.0.0.1:8025 fetch works in `wrangler dev --local` mode.
+    def send_otp_via_mailpit(email, code)
       payload = {
         'From' => { 'Email' => 'no-reply@auth-otp.localhost', 'Name' => 'auth-otp demo' },
         'To'   => [{ 'Email' => email }],
@@ -101,6 +135,28 @@ class App < Sinatra::Base
       [false, "mailpit #{resp.status}: #{resp.body[0, 200]}"]
     rescue => e
       [false, "mailpit fetch failed: #{e.message}"]
+    end
+
+    # Production: Cloudflare Email Workers send via the SEND_EMAIL binding.
+    # The destination address must be verified in Cloudflare Email Routing,
+    # and the `from` address must come from a domain you've added there.
+    def send_otp_via_cloudflare_email(email, code)
+      mailer = env['cloudflare.SEND_EMAIL']
+      return [false, 'SEND_EMAIL binding missing'] unless mailer && mailer.available?
+
+      from = cf_env_var('HOMURA_MAIL_FROM')
+      from = 'noreply@example.com' if from.empty?
+      mailer.send(
+        to: email,
+        from: from,
+        subject: 'Your one-time code',
+        text: "Your code: #{code} (valid 5min)\n\nIf you did not request this, ignore this email.\n"
+      )
+      [true, nil]
+    rescue Cloudflare::Email::Error => e
+      [false, "Cloudflare Email send failed: #{e.message}"]
+    rescue => e
+      [false, "Cloudflare Email send failed: #{e.message}"]
     end
   end
 
@@ -157,26 +213,34 @@ class App < Sinatra::Base
       [email, code, expires_at]
     )
 
-    ok, err = send_otp_email(email, code)
     @title = 'Verify OTP — auth-otp demo'
     @issued_email = email
+    @issued_code  = nil
 
-    if ok
-      @issued_code = nil
-      @mail_notice = if dev_host?
-                       "メールを確認してください (#{email})。届かない場合は mailpit Web UI で確認: http://127.0.0.1:8025/"
-                     else
-                       "メールを確認してください (#{email})。"
-                     end
-    elsif dev_host?
-      # Dev-only fallback: show the OTP on screen so the demo keeps working
-      # even if mailpit is offline. NEVER do this in production — it leaks
-      # the one-time code to anyone watching the response.
-      @issued_code = code
-      @mail_error  = err
+    if mail_allowed?(email)
+      ok, err = send_otp_email(email, code)
+      if ok
+        @mail_notice = if dev_host?
+                         "メールを確認してください (#{email})。届かない場合は mailpit Web UI で確認: http://127.0.0.1:8025/"
+                       else
+                         "メールを確認してください (#{email})。"
+                       end
+      elsif dev_host?
+        # Dev-only fallback: show the OTP on screen so the demo keeps working
+        # even if mailpit is offline. NEVER do this in production — it leaks
+        # the one-time code.
+        @issued_code = code
+        @mail_error  = err
+      else
+        @mail_error = 'メール送信に失敗しました。しばらくしてからもう一度お試しください。'
+      end
     else
-      @issued_code = nil
-      @mail_error  = 'メール送信に失敗しました。しばらくしてからもう一度お試しください。'
+      # Address not on the allowlist (or no allowlist configured in dev
+      # → see mail_allowed? for the dev policy). Render the same
+      # success-shaped UI as a real send so we never leak whether an
+      # address is permitted. The OTP row was already inserted, so
+      # /verify still rejects mismatched codes naturally.
+      @mail_notice = "メールを確認してください (#{email})。"
     end
 
     erb :verify, layout: :layout

@@ -11,3 +11,18 @@ database_name = "auth-otp"
 database_id = "659ffe79-dbeb-42b3-a4e4-5e35d1d743a6"
 migrations_dir = "db/migrate"
 
+# Cloudflare Email Workers — used in production by Cloudflare::Email.
+# In dev (`*.localhost` / 127.0.0.1) the app falls back to mailpit instead.
+# NOTE: destination addresses must be verified in your Cloudflare Email
+# Routing dashboard, and the `from` address must come from a domain
+# you've added to Email Routing too.
+[[send_email]]
+name = "SEND_EMAIL"
+
+# Two secrets are read at runtime; set them with `wrangler secret put`,
+# never in this file:
+#   HOMURA_MAIL_FROM       — verified `from` address for Cloudflare::Email
+#   HOMURA_MAIL_ALLOWLIST  — comma-separated `to` addresses the demo will
+#                            actually send to. Anything else gets a fake
+#                            success UI so we don't leak who's allowed.
+

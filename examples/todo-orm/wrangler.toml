@@ -8,6 +8,6 @@ compatibility_flags = ["nodejs_compat"]
 [[d1_databases]]
 binding = "DB"
 database_name = "todo-orm"
-database_id = "00000000-0000-0000-0000-000000000000"
+database_id = "b1e3a6f0-2f68-4823-986f-d66436ac1315"
 migrations_dir = "db/migrate"
 

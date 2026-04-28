@@ -8,5 +8,5 @@ compatibility_flags = ["nodejs_compat"]
 [[d1_databases]]
 binding = "DB"
 database_name = "todo"
-database_id = "00000000-0000-0000-0000-000000000000"
+database_id = "753df7cf-873b-4a7d-ae05-ab27a42f48b0"
 migrations_dir = "db/migrate"

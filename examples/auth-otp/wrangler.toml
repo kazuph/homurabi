@@ -8,6 +8,6 @@ compatibility_flags = ["nodejs_compat"]
 [[d1_databases]]
 binding = "DB"
 database_name = "auth-otp"
-database_id = "00000000-0000-0000-0000-000000000000"
+database_id = "659ffe79-dbeb-42b3-a4e4-5e35d1d743a6"
 migrations_dir = "db/migrate"
 

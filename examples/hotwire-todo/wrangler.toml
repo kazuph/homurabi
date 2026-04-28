@@ -8,5 +8,5 @@ compatibility_flags = ["nodejs_compat"]
 [[d1_databases]]
 binding = "DB"
 database_name = "hotwire-todo"
-database_id = "00000000-0000-0000-0000-000000000000"
+database_id = "2052ba28-fd8f-4642-81f6-176fb0e0a6c2"
 migrations_dir = "db/migrate"

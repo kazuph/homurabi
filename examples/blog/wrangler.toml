@@ -8,5 +8,5 @@ compatibility_flags = ["nodejs_compat"]
 [[d1_databases]]
 binding = "DB"
 database_name = "blog"
-database_id = "00000000-0000-0000-0000-000000000000"
+database_id = "097a304e-781b-45db-98b3-ac8f8e15dbc9"
 migrations_dir = "db/migrate"

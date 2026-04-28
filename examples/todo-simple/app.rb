@@ -12,7 +12,6 @@
 # Reach for `examples/todo` (D1, no ORM) or `examples/todo-orm`
 # (D1 through Sequel) when you need persistence.
 
-require 'sinatra/cloudflare_workers'
 require 'sinatra'
 
 TODOS = []

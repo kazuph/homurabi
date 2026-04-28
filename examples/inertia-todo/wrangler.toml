@@ -8,5 +8,5 @@ compatibility_flags = ["nodejs_compat"]
 [[d1_databases]]
 binding = "DB"
 database_name = "inertia-todo"
-database_id = "00000000-0000-0000-0000-000000000000"
+database_id = "0d469d3c-665d-4764-ab28-4e75cbb0ad95"
 migrations_dir = "db/migrate"

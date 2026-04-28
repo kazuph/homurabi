@@ -245,14 +245,32 @@ else
     ],
     chdir: root
   )
-  run!(
-    [
-      'ruby', CloudflareWorkersBuild.exe_path('auto-await').to_s,
-      '--input', 'app',
-      '--output', 'build/auto_await/app'
-    ],
-    chdir: root
-  )
+  # auto-await pass: project layouts that don't have an `app/`
+  # directory (e.g. a single-file classic Sinatra example with a
+  # top-level `app.rb`) are still valid — feed the lone file to
+  # auto-await so its `db.execute` / `kv.get` / etc. still get
+  # `__await__` inserted.
+  if root.join('app').directory?
+    run!(
+      [
+        'ruby', CloudflareWorkersBuild.exe_path('auto-await').to_s,
+        '--input', 'app',
+        '--output', 'build/auto_await/app'
+      ],
+      chdir: root
+    )
+  elsif root.join('app.rb').file?
+    run!(
+      [
+        'ruby', CloudflareWorkersBuild.exe_path('auto-await').to_s,
+        '--input', 'app.rb',
+        '--output', 'build/auto_await/app.rb'
+      ],
+      chdir: root
+    )
+  else
+    warn 'homura build: no app/ directory or top-level app.rb — skipping auto-await'
+  end
 
   opal_in = Pathname(resolve_opal_input(root, options[:opal_input]))
   opal_out = Pathname(options[:opal_output])

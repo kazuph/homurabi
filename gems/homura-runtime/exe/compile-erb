@@ -415,6 +415,16 @@ def emit_sinatra_patch(io, namespace)
           end
         end
 
+        # A template is "layout-like" if its name is `:layout` or starts
+        # with `layout_` (e.g. `:layout_docs`). The auto-layout pass in
+        # `erb` skips wrapping such templates in `:layout` so that
+        # rendering `:layout_docs` doesn't end up nested inside `:layout`,
+        # which would otherwise produce a duplicate header / nav.
+        def __homura_layout_template?(template)
+          name = template.to_sym
+          name == :layout || name.to_s.start_with?('layout_')
+        end
+
         # homura patch: dispatch to precompiled templates when we
         # have one. Unknown symbols raise a clear message instead of
         # wandering into upstream Tilt, which would blow up on
@@ -432,7 +442,7 @@ def emit_sinatra_patch(io, namespace)
 
             layout = options[:layout]
             layout = false if layout.nil? && options.include?(:layout)
-            if layout.nil? && template.to_sym != :layout && ::#{namespace}.registered?(:layout)
+            if layout.nil? && !__homura_layout_template?(template) && ::#{namespace}.registered?(:layout)
               layout = :layout
             end
             if layout

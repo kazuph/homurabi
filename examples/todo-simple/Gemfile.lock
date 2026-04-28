@@ -15,7 +15,7 @@ GEM
       racc
     racc (1.8.1)
     rake (13.4.2)
-    sinatra-homura (0.2.17)
+    sinatra-homura (0.2.19)
       homura-runtime (~> 0.2, >= 0.2.12)
       opal-homura (= 1.8.3.rc1.5)
 
@@ -27,7 +27,7 @@ DEPENDENCIES
   homura-runtime (= 0.2.22)
   opal-homura (= 1.8.3.rc1.5)
   rake
-  sinatra-homura (= 0.2.17)
+  sinatra-homura (= 0.2.19)
 
 RUBY VERSION
    ruby 3.4.9p82

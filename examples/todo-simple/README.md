@@ -1,7 +1,10 @@
+> 🇯🇵 日本語版: [README.ja.md](README.ja.md)
+
 # todo-simple
 
 > The smallest possible homura example. **One Ruby file**, no
-> `views/` directory, no D1, no migrations — HTML written as Ruby
+> `Sinatra::Base` subclass, no `views/` directory, no D1, no
+> migrations — classic-style top-level DSL with HTML written as Ruby
 > heredocs right next to the routes.
 
 ## What this shows
@@ -11,7 +14,8 @@ This is the example to copy when you want to demonstrate
 
 | | `todo/` | `todo-simple/` |
 |---|---|---|
-| Code split | `app/app.rb` + `views/*.erb` | one `app.rb` |
+| Code shape | `class App < Sinatra::Base` (modular) | classic top-level DSL |
+| Code split | `app/app.rb` + `views/*.erb` | one `app.rb` at the project root |
 | Persistence | Cloudflare D1 | a Ruby array (in-memory) |
 | Migrations | yes | none |
 | Templates | precompiled ERB | inline Ruby heredocs |
@@ -22,33 +26,34 @@ It is otherwise the same Sinatra you'd write on Puma:
 
 ```ruby
 require 'sinatra/cloudflare_workers'
+require 'sinatra'
 
-class App < Sinatra::Base
-  TODOS = []
-  NEXT_ID = [1]
+TODOS = []
+NEXT_ID = [1]
 
-  get '/' do
-    page <<~HTML
-      <h1>todo-simple</h1>
-      ...
-      #{todos_html}
-    HTML
-  end
-
-  post '/todos' do
-    TODOS << { id: NEXT_ID[0], title: params[:title], done: false }
-    NEXT_ID[0] += 1
-    redirect '/'
-  end
-  # ...
+get '/' do
+  page <<~HTML
+    <h1>todo-simple</h1>
+    ...
+    #{todos_html}
+  HTML
 end
 
-run App
+post '/todos' do
+  TODOS << { id: NEXT_ID[0], title: params[:title], done: false }
+  NEXT_ID[0] += 1
+  redirect '/'
+end
+# ...
+
+run Sinatra::Application
 ```
 
-Data lives in `App::TODOS`, which means **the Worker isolate's
-lifetime is the data's lifetime**. Restart `wrangler dev` and your
-todos are gone. This is the price you pay for "no setup".
+Routes are registered straight on the top-level Sinatra `main`
+delegator — exactly the shape you'd see on a vanilla Sinatra README.
+Data lives in a top-level `TODOS` array, which means **the Worker
+isolate's lifetime is the data's lifetime**. Restart `wrangler dev`
+and your todos are gone. This is the price you pay for "no setup".
 
 ## Layout
 

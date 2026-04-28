@@ -5,7 +5,7 @@
 | レイヤ | 役割 |
 |--------|------|
 | `wrangler.toml` の `main` | **Workers Module のエントリ**（`fetch` / `scheduled` / `queue` / DO クラスを export） |
-| `worker.entrypoint.mjs`（生成物） | `setup-node-crypto` → **Opal bundle（副作用）** → `worker_module.mjs` の順で import。import path は entrypoint 出力位置からの **相対パス** に自動調整される |
+| `build/worker.entrypoint.mjs`（生成物） | `setup-node-crypto` → **Opal bundle（副作用）** → `worker_module.mjs` の順で import。import path は entrypoint 出力位置からの **相対パス** に自動調整される |
 | Opal bundle（例: `build/hello.no-exit.mjs`） | **ビルド成果物**。Rack ディスパッチャ等を `globalThis` に登録 |
 | `worker_module.mjs`（gem 同梱） | Rack / Cron / Queue / DO への **純粋な JS アダプタ**（Opal bundle を import しない） |
 
@@ -21,7 +21,7 @@ flowchart LR
     W1[worker.mjs] -->|hard-coded| B1[../../../build/hello.mjs]
   end
   subgraph after["After (Phase 15-E)"]
-    E[worker.entrypoint.mjs] --> S[setup-node-crypto.mjs]
+    E[build/worker.entrypoint.mjs] --> S[setup-node-crypto.mjs]
     E --> O[build/*.mjs Opal bundle]
     E --> M[worker_module.mjs]
   end
@@ -34,7 +34,7 @@ flowchart LR
 
 ## スキャフォールド済みアプリ
 
-- プロジェクト直下に `worker.entrypoint.mjs`（`main` と一致）。
+- プロジェクト直下に `build/worker.entrypoint.mjs`（`main` と一致）。
 - `cf-runtime/` に `setup-node-crypto.mjs` と `worker_module.mjs` をコピー（gem から）。
 - `bundle exec homura build --standalone` が consumer 向けパイプラインを実行し、`Gemfile` の `path:` から homura の `vendor/` を追加ロードパスへ取り込み（digest / zlib 等の Workers 向け補助ファイル）。
 - low-level `--output` / `--entrypoint-out` を変えても、entrypoint 内 import は出力先からの相対パスに自動調整される。

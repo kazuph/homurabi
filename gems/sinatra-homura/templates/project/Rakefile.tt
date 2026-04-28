@@ -9,7 +9,7 @@ CLEAN.include(
   'build/app_templates.rb',
   'build/hello.no-exit.mjs',
   'build/opal.stderr.log',
-  'worker.entrypoint.mjs'
+  'build/worker.entrypoint.mjs'
 )
 
 def run!(*argv)

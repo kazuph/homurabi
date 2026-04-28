@@ -130,9 +130,9 @@
     "k": "cloudflare-workers-runtime ビルド CLI"
   },
   {
-    "t": "cloudflare-workers-runtime — worker.entrypoint.mjs",
+    "t": "cloudflare-workers-runtime — build/worker.entrypoint.mjs",
     "h": "/docs/runtime#entrypoint",
-    "k": "cloudflare-workers-runtime worker.entrypoint.mjs"
+    "k": "cloudflare-workers-runtime build/worker.entrypoint.mjs"
   },
   {
     "t": "cloudflare-workers-runtime — できること / できないこと",

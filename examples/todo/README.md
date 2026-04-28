@@ -1,34 +1,113 @@
-# todo (homura example)
+# todo
 
-公開gemのみで動く、Cloudflare Workers 上の Sinatra による in-memory TODO アプリです。
+> The smallest **D1-backed CRUD** in the homura family — no ORM, just
+> `env['cloudflare.DB']` and the `Cloudflare::D1Database` API.
 
-## 構成
+## What this shows
 
-- `app/app.rb` — Sinatraアプリ本体（`@@todos` クラス変数で保持）
-- `views/layout.erb` — レイアウト + inline CSS
-- `views/index.erb` — 一覧 + 追加/トグル/削除フォーム
-- `config.ru` — `run App`
-- `Gemfile` — `opal-homura` / `homura-runtime` / `sinatra-homura` の公開gemのみ
+- A `Sinatra::Base` subclass built with the published homura gems only
+  (no `path:` references).
+- Reading and writing **Cloudflare D1** with the sqlite3-ruby-shaped
+  wrapper that ships in `homura-runtime` (`db.execute`,
+  `db.execute_insert`).
+- Sequel migrations compiled to wrangler-ready SQL via
+  `homura db:migrate:compile` — but no Sequel at runtime.
+- Standard Sinatra `redirect '/'`, no `[303, ...]` Rack-tuple workarounds.
+- A two-template ERB setup (`views/layout.erb` + `views/index.erb`)
+  precompiled at build time.
 
-## ルート
+## Routes
 
-| Method | Path | 説明 |
-| --- | --- | --- |
-| GET  | `/` | 一覧表示 + 追加フォーム |
-| POST | `/todos` | `title` を新規追加 |
-| POST | `/todos/:id/toggle` | done フラグの反転 |
-| POST | `/todos/:id/delete` | 削除 |
+| Method | Path | What it does |
+|---|---|---|
+| `GET`  | `/` | List all todos and render the new-todo form. |
+| `POST` | `/todos` | Insert `params[:title]` into D1, then `redirect '/'`. |
+| `POST` | `/todos/:id/toggle` | Flip the `done` column on the row. |
+| `POST` | `/todos/:id/delete` | Delete the row. |
 
-## 使い方
+## Layout
 
-```bash
-bundle install
-bundle exec rake build
-npx wrangler dev --local --port 8787 --ip 127.0.0.1
+```
+todo/
+├── Gemfile             # opal-homura / homura-runtime / sinatra-homura / sequel-d1*
+├── Rakefile            # build / dev / deploy / db:migrate:{compile,local,remote}
+├── config.ru           # require_relative 'app/app'; run App
+├── wrangler.toml       # D1 binding "DB" → database "todo"
+├── app/app.rb          # the Sinatra app
+├── views/
+│   ├── layout.erb
+│   └── index.erb
+├── db/migrate/
+│   ├── 001_create_todos.rb     # Sequel migration DSL
+│   └── 001_create_todos.sql    # compiled by `homura db:migrate:compile`
+└── public/robots.txt
 ```
 
-## 注意
+`sequel-d1` is in the Gemfile only to drive the migration compile under
+CRuby; the runtime app does not `require 'sequel'`.
 
-データは Worker isolate のメモリ上にしか存在しません。デプロイ、isolateの再起動、
-リクエストが別 isolate に振り分けられた場合などで簡単に消えます。永続化したい場合は
-`--with-db` で生成される D1 例や、KV を使う構成を参照してください。
+## How D1 access looks
+
+```ruby
+class App < Sinatra::Base
+  helpers do
+    def db
+      env['cloudflare.DB']
+    end
+  end
+
+  get '/' do
+    @todos = db.execute('SELECT id, title, done, created_at FROM todos ORDER BY id')
+    erb :index
+  end
+
+  post '/todos' do
+    db.execute_insert(
+      'INSERT INTO todos (title, done, created_at) VALUES (?, ?, ?)',
+      [params[:title].to_s.strip, 0, Time.now.to_i]
+    )
+    redirect '/'
+  end
+end
+```
+
+D1 row hashes have **string keys** (`t['title']`, not `t[:title]`), and
+`done` is an integer (`0` / `1`) — those two facts are the only places
+the `views/index.erb` differs from a CRuby SQLite version.
+
+## Run it
+
+```bash
+cd examples/todo
+bundle install
+npm install
+
+# Apply the migration to the local D1 sqlite shim.
+bundle exec rake db:migrate:local
+
+# Build the Worker bundle.
+bundle exec rake build
+
+# Start wrangler dev (through portless if installed).
+bundle exec rake dev
+# → http://todo.localhost:1355/  (portless)
+# or http://127.0.0.1:8787/      (plain wrangler dev fallback)
+```
+
+Test with curl:
+
+```bash
+curl -sS -i http://todo.localhost:1355/
+curl -sS -i -X POST http://todo.localhost:1355/todos -d 'title=Buy milk'
+curl -sS -i -X POST http://todo.localhost:1355/todos/1/toggle
+curl -sS -i -X POST http://todo.localhost:1355/todos/1/delete
+```
+
+## Deploy
+
+```bash
+npx wrangler d1 create todo                  # one-time; copy the database_id
+# paste it into wrangler.toml under [[d1_databases]]
+bundle exec rake db:migrate:remote
+bundle exec rake deploy
+```

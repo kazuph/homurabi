@@ -1,93 +1,171 @@
-# auth-otp — メールOTPログイン (D1 + mailpit)
+# auth-otp
 
-homura (Sinatra on Cloudflare Workers) で構築した、メールOTPログインの実装例です。
-**OTP は D1 に永続化し、mailpit (ローカルSMTP/HTTP API) にメール送信します。**
-本番デプロイ時は mailpit URL を SES / SendGrid / Resend / Cloudflare Email Workers などへ差し替えてください。
+> Email OTP login on Cloudflare Workers — OTP rows in **D1**, mail
+> through [**mailpit**](https://mailpit.axllent.org/) in development,
+> session via an **HMAC-signed cookie**.
 
-## 構成
+In production you swap the mailpit HTTP endpoint for SES / SendGrid /
+Resend / Cloudflare Email Workers; everything else is the same code.
 
-- セッション: 署名Cookie `session = "<hex(email)>.<HMAC-SHA256(email, SECRET)>"`
-  - `OpenSSL::HMAC.hexdigest('SHA256', SECRET, email)` で 16進署名
-  - email 部分は hex エンコード（Rack の cookie 読み書きが `+` などをデコードして HMAC が壊れるのを回避）
-  - HMAC は homura-runtime の Web Crypto bridge で sync 動作するため、`redirect` を使う sync ルートで安全
-- OTPストア: D1 テーブル `otps (id, email, code, expires_at)`
-  - `expires_at` は UNIX 秒。`/verify` は `expires_at >= now` の最新行を取得
-  - 検証成功で `DELETE FROM otps WHERE email = ?`（同 email の古い行ごとワンショット失効）
-- メール送信: Worker から mailpit の HTTP Send API (`POST http://127.0.0.1:8025/api/v1/send`) を `Cloudflare::HTTP.fetch` でコール
-  - `wrangler dev --local` モードでは Worker → 127.0.0.1:8025 への fetch が直接到達できる
-  - 失敗時は dev フォールバックとして OTP を画面表示
-- セッションシークレット: `ENV['SESSION_SECRET']` → なければ `'dev-secret-change-me'`
+## What this shows
 
-## ルート
+- A Sinatra app handling a real auth flow (`/login` → `/verify` → `/`).
+- D1-backed OTP storage with TTL via the `expires_at` column.
+- `format('%06d', SecureRandom.random_number(1_000_000))` — the canonical
+  Ruby idiom; **really returns a uniform 6-digit OTP** on Workers, not
+  always-zero like older opal-homura builds.
+- HMAC-signed session cookie with a `+`-containing email — round-trips
+  intact thanks to `sinatra-homura` 0.2.17's `parse_cookies_header`
+  patch (`CGI.unescapeURIComponent`, no form-data `+` → space).
+- Worker → mailpit transport via `Cloudflare::HTTP.fetch` to the local
+  HTTP API (`POST http://127.0.0.1:8025/api/v1/send`).
+- Two end-to-end harnesses, both Ruby:
+  - `rake e2e` (Net::HTTP) for CI-friendly smoke.
+  - `rake e2e:headed` (`playwright-ruby-client` + Chromium) for visual
+    confirmation, with PNG snapshots and a `.webm` recording per run.
 
-| Method | Path | 内容 |
+## Routes
+
+| Method | Path | What it does |
 |---|---|---|
-| GET  | `/` | Cookie検証。ログイン中は "Hello <email>" + Logoutボタン、未ログインは /login へリンク |
-| GET  | `/login` | email入力フォーム |
-| POST | `/login` | OTPを D1 に保存し、mailpit 経由でメール送信。成功で /verify ページへ |
-| GET  | `/verify` | email + code入力フォーム |
-| POST | `/verify` | OTP照合。成功で署名Cookieセット → `/` に 303 redirect |
-| POST | `/logout` | Cookie削除 → `/login` に 303 redirect |
+| `GET`  | `/` | Logged-in: `Hello <email>!` + logout button. Logged-out: link to `/login`. |
+| `GET`  | `/login` | Email entry form. |
+| `POST` | `/login` | Issue a 6-digit OTP, persist `(email, code, expires_at)` in D1, send a mail through mailpit, redirect to `/verify?email=...`. |
+| `GET`  | `/verify` | Form for the 6-digit code. |
+| `POST` | `/verify` | Match the latest non-expired row for `email`; on success, set a signed `session` cookie and redirect to `/`. |
+| `POST` | `/logout` | Drop the cookie, redirect to `/login`. |
 
-## 初期セットアップ
+## Layout
+
+```
+auth-otp/
+├── Gemfile                       # + playwright-ruby-client (development)
+├── Rakefile                      # build/dev/deploy + db:migrate:* + mailpit:* + e2e + e2e:headed
+├── wrangler.toml                 # D1 binding "DB" → database "auth-otp"
+├── app/app.rb                    # routes + signed-cookie helpers
+├── views/{layout,index,login,verify}.erb
+├── db/migrate/
+│   ├── 001_create_otps.rb        # Sequel DSL
+│   └── 001_create_otps.sql       # compiled output
+├── public/robots.txt
+└── tmp/e2e-headed/               # screenshots + .webm from `rake e2e:headed`
+```
+
+## End-to-end flow
+
+```
+                  ┌────────────────────┐  fetch http://127.0.0.1:8025/api/v1/send
+       /login ───►│  Cloudflare Worker │ ──────────────────────────────────────────►  mailpit (8025)
+                  │  (Sinatra, D1)     │                                                 │
+                  └────────────────────┘                                                 │
+                          │                                                              │
+                  insert OTP into D1                                                     │
+                          │                                                              │
+                       redirect /verify?email=...                                        │
+                          │                                                              ▼
+       /verify ─► validate code → set Set-Cookie: session=<email>.<HMAC> → redirect /
+```
+
+## Code highlights
+
+```ruby
+def generate_otp
+  format('%06d', SecureRandom.random_number(1_000_000))   # standard Ruby idiom
+end
+
+def sign_email(email)
+  OpenSSL::HMAC.hexdigest('SHA256', SESSION_SECRET, email)
+end
+
+def encode_session_token(email)
+  "#{email}.#{sign_email(email)}"                          # plain email, no hex shim
+end
+
+post '/login' do
+  email = params[:email].to_s.strip
+  halt 422, 'invalid email' unless email.match?(EMAIL_RE)
+  code = generate_otp
+  db.execute_insert(
+    'INSERT INTO otps (email, code, expires_at) VALUES (?, ?, ?)',
+    [email, code, Time.now.to_i + 300]
+  )
+  send_otp_via_mailpit(email, code)
+  redirect "/verify?email=#{Rack::Utils.escape(email)}"
+end
+```
+
+## Run it (development)
 
 ```bash
+cd examples/auth-otp
 bundle install
+npm install
 
-# D1 ローカルマイグレーション
-bundle exec rake db:migrate:local
-
-# Opal + Workers バンドル
+bundle exec rake db:migrate:local         # create otps table in local D1
+bundle exec rake mailpit:start            # spawns mailpit on 127.0.0.1:1025/8025
 bundle exec rake build
-
-# portless プロキシ起動 (常駐)
-portless proxy start
-
-# mailpit 起動 (SMTP:1025, Web UI/API:8025)
-bundle exec rake mailpit:start
+bundle exec rake dev                      # http://auth-otp.localhost:1355/
 ```
 
-## 起動と動作確認
+Now:
+
+- Open <http://auth-otp.localhost:1355/login>, type any email, submit.
+- Open <http://127.0.0.1:8025> (mailpit web UI) and copy the 6-digit code
+  out of the received message.
+- Paste it into `/verify`, hit submit, you're logged in.
+
+## End-to-end with Net::HTTP
 
 ```bash
-# dev サーバを portless 経由で起動 (http://auth-otp.localhost:1355/)
-nohup bundle exec rake dev > /tmp/auth-otp-dev.log 2>&1 &
-sleep 18
-
-# E2E スモークテスト (portless + mailpit + D1)
 bundle exec rake e2e
+# [e2e] base=http://auth-otp.localhost:1355 email=demo+1777289470@example.com
+# [e2e] /login → 200
+# [e2e] mailpit mail received id=... otp=310597
+# [e2e] /verify → 303
+# [e2e] / shows logged-in email
+# [e2e] /logout → 303
+# E2E OK: email=demo+1777289470@example.com, otp=310597
 ```
 
-mailpit Web UI: http://127.0.0.1:8025/
+Run it twice in a row and the OTPs are different — proof that
+`SecureRandom.random_number` is producing real entropy.
 
-`rake e2e` は次を行います:
+## End-to-end with a real browser (headed)
 
-1. `/login` に email を POST して OTP を発行
-2. mailpit HTTP API からメールを取得し、本文から 6 桁 OTP を抽出
-3. `/verify` に email + code を POST し、Set-Cookie を取得
-4. cookie 付きで `/` を GET し、`Hello <email>` が出ることを確認
-5. `/logout` で Cookie 削除
+```bash
+bundle exec rake e2e:headed
+```
 
-## 公開gem構成
+This launches Chromium through `playwright-ruby-client`, runs the
+exact same flow with `slowMo: 350` so you can see it, and writes:
 
-`Gemfile` は `path:` / `git:` を一切使わず、rubygems.org で公開されている
-`opal-homura` / `homura-runtime` / `sinatra-homura` / `sequel-d1` / `sequel` / `sqlite3` のみを使用しています。
+- `tmp/e2e-headed/01-top-unauth.png`
+- `tmp/e2e-headed/02-login-filled.png`
+- `tmp/e2e-headed/03-after-login.png`
+- `tmp/e2e-headed/04-verify-filled.png`
+- `tmp/e2e-headed/05-after-verify.png`  ← `Hello demo+...@example.com!`
+- `tmp/e2e-headed/06-after-logout.png`
+- `tmp/e2e-headed/page@<hash>.webm`     ← full recording
 
-## 実装上の注意 (Opal/Workers環境)
+## Production switch-over
 
-- **OTP生成**: `SecureRandom.random_number(1_000_000)` は現在の Opal ビルドで
-  常に `0` を返す（`Random::Formatter#random_float` が integer division で 0 になる）。
-  代わりに `SecureRandom.hex(4).to_i(16) % 1_000_000` で 6 桁を作っている。
-- **Cookie形式**: 値は `<hex(email)>.<HMAC-hex64>`。email を hex エンコードする理由:
-  Rack の cookie 書き込みは生の `+` を許容する一方、読み込み側 (`request.cookies`) は
-  値を percent-decode するため、`demo+foo@x.com` のような email がラウンドトリップで
-  `demo foo@x.com` に化け、HMAC 検証が落ちる。hex 化で `[0-9a-f]` のみに揃えて回避。
-- **`halt` 禁止**: async Sinatra では `halt` の `:halt` throw が async boundary を
-  跨げない。本例は同期ルートと、`# await:` 指定の D1 / fetch 呼び出しで構成し、
-  画面遷移は `redirect path, 303` を使う。
-- **D1 マイグレーション**: `db:migrate:compile` で Sequel migration を SQL に変換した後、
-  D1 (local sqlite shim) が拒否する probe 文 (`SELECT sqlite_version()`,
-  `SELECT NULL AS 'nil' FROM <table> LIMIT 1`) を Rakefile 側で除去している。
-- **mailpit fetch**: Worker → `127.0.0.1:8025` への HTTP は `wrangler dev --local`
-  モードであれば host network 経由で素直に通る。本番では mailpit URL を外部 SMTP HTTP
-  サービス (Resend など) に差し替える。
+Two changes are enough for production:
+
+1. **Mail transport.** Replace the body of `send_otp_via_mailpit` with a
+   call to your provider — SES / SendGrid / Resend / Cloudflare Email
+   Workers — through `Cloudflare::HTTP.fetch`.
+
+2. **`SESSION_SECRET`.** Set it as a Wrangler secret:
+
+   ```bash
+   npx wrangler secret put SESSION_SECRET
+   ```
+
+The remote D1 setup is the standard `homura new --with-db` flow:
+
+```bash
+npx wrangler d1 create auth-otp                     # one-time
+# paste the database_id into wrangler.toml
+bundle exec rake db:migrate:remote
+bundle exec rake deploy
+```

@@ -8,14 +8,15 @@ require 'json'
 module Homura
   module DebugMailController
     class << self
-      DEFAULT_TO = 'kazu.homma@gmail.com'
-
       SUBJECT_HAS_FULL_VERSION =
         /homura Phase 17 test.{0,3}Version\s+[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z/i
 
-      def parse_form_params(params, default_to: false)
+      # Default `to` recipient for /debug/mail comes from a Wrangler secret
+      # (HOMURA_MAIL_DEFAULT_TO). Never hard-coded — the route helper passes
+      # it in so this module stays free of personal address strings.
+      def parse_form_params(params, default_to: nil)
         to = sanitize_form(params['to']).strip
-        to = DEFAULT_TO if default_to && to.empty?
+        to = default_to.to_s if to.empty? && default_to
         {
           to: to,
           subject: sanitize_form(params['subject']).strip,
@@ -26,9 +27,10 @@ module Homura
 
       # バリデーション済みコンテキスト。`:error_result` があれば送信しない。
       def prepare_send(params, env, route, mail)
-        form = parse_form_params(params, default_to: false)
+        default_to = route.respond_to?(:homura_mail_default_to) ? route.homura_mail_default_to : ''
+        form = parse_form_params(params, default_to: default_to)
         mail_from = route.homura_mail_from
-        final_to = form[:to].empty? ? DEFAULT_TO : form[:to]
+        final_to = form[:to].empty? ? default_to.to_s : form[:to]
 
         if mail_from.empty?
           return { error_result: error_result(form, mail_from, nil, 'HOMURA_MAIL_FROM が未設定です。ドメイン onboarding 後に wrangler [vars] で verified の送信元アドレスを設定してください。') }

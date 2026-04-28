@@ -48,11 +48,19 @@ module Homura
       env['cloudflare.SEND_EMAIL']
     end
 
-    # Phase 17 — verified sender after Cloudflare Email Service domain onboarding (`wrangler.toml` [vars]).
+    # Phase 17 — verified sender, sourced from a Wrangler secret.
     def homura_mail_from
       cf_env = env['cloudflare.env']
       return '' unless cf_env
       `(#{cf_env}.HOMURA_MAIL_FROM || '')`.to_s.strip
+    end
+
+    # /debug/mail default recipient, sourced from a Wrangler secret so we
+    # never commit a real address to source.
+    def homura_mail_default_to
+      cf_env = env['cloudflare.env']
+      return '' unless cf_env
+      `(#{cf_env}.HOMURA_MAIL_DEFAULT_TO || '')`.to_s.strip
     end
 
     def cache_get(cache_key, ttl: 60, content_type_override: nil, &block)

@@ -79,8 +79,11 @@ HOMURA_ENABLE_SCHEDULED_DEMOS = "0"
 # external JSON API (ipify) and writes to R2 under phase11a/, so we
 # keep the pattern: default OFF, flip to "1" only in dev.
 HOMURA_ENABLE_FOUNDATIONS_DEMOS = "0"
-# Phase 17 — verified From address (domain kazuph-info.ai-work.uk onboarded 2026-04-21).
-HOMURA_MAIL_FROM = "noreply@kazuph-info.ai-work.uk"
+# Phase 17 — verified From address. Set with:
+#   wrangler secret put HOMURA_MAIL_FROM
+# Same for HOMURA_MAIL_DEFAULT_TO (used as the /debug/mail default
+# recipient) and HOMURA_MAIL_ALLOWLIST. Never commit those values
+# to wrangler.toml.
 
 # Phase 9 — Cloudflare Workers Cron Triggers.
 #
@@ -187,7 +190,7 @@ HOMURA_ENABLE_CRYPTO_DEMOS = "0"
 HOMURA_ENABLE_AI_DEMOS = "0"
 HOMURA_ENABLE_BINDING_DEMOS = "0"
 HOMURA_ENABLE_SCHEDULED_DEMOS = "0"
-HOMURA_MAIL_FROM = "noreply@kazuph-info.ai-work.uk"
+# HOMURA_MAIL_FROM lives in Wrangler secrets, not in this file.
 
 [[env.dlq-demo.d1_databases]]
 binding = "DB"

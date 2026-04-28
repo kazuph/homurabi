@@ -44,7 +44,13 @@ module CloudflareWorkers
       end
 
       def ensure_standalone_runtime(project_root, current_file: __FILE__, loaded_specs: Gem.loaded_specs)
-        target_dir = Pathname(project_root).join('cf-runtime')
+        # The homura runtime needs two .mjs glue files alongside the
+        # generated `worker.entrypoint.mjs`. Until 0.2.22 we wrote them
+        # to `cf-runtime/` at the project root, which made every Ruby
+        # repo carry two opaque JS files in source control. Hide them
+        # under `build/cf-runtime/` so the build artifact tree owns
+        # them — `build/` is already in the example .gitignore template.
+        target_dir = Pathname(project_root).join('build', 'cf-runtime')
         FileUtils.mkdir_p(target_dir)
 
         %w[setup-node-crypto.mjs worker_module.mjs].each do |name|

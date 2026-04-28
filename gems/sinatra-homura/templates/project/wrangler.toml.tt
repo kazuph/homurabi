@@ -1,5 +1,5 @@
 name = "<%= app_name %>"
-main = "worker.entrypoint.mjs"
+main = "build/worker.entrypoint.mjs"
 compatibility_date = "<%= compat_date %>"
 compatibility_flags = ["nodejs_compat"]
 <% if with_db %>

@@ -77,10 +77,13 @@ options[:assets_namespace] ||= CloudflareWorkers::BuildSupport.standalone_namesp
 
 if options[:standalone]
   Dir.chdir(root) { require 'bundler/setup' }
-  options[:setup_import] ||= 'cf-runtime/setup-node-crypto.mjs'
+  # Both .mjs glue files and the entrypoint live under `build/` from
+  # 0.2.23 on. write_entrypoint! resolves these as project-root
+  # relative paths and computes the entrypoint-relative import spec.
+  options[:setup_import] ||= 'build/cf-runtime/setup-node-crypto.mjs'
   options[:bundle_import] ||= options[:opal_output]
-  options[:worker_module_import] ||= 'cf-runtime/worker_module.mjs'
-  options[:entrypoint_out] ||= 'worker.entrypoint.mjs'
+  options[:worker_module_import] ||= 'build/cf-runtime/worker_module.mjs'
+  options[:entrypoint_out] ||= 'build/worker.entrypoint.mjs'
 else
   options[:setup_import] ||= 'gems/homura-runtime/runtime/setup-node-crypto.mjs'
   options[:bundle_import] ||= options[:opal_output]

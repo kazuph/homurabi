@@ -71,9 +71,10 @@ Dir.glob(tpl_root.join('**', '*'), File::FNM_DOTMATCH).sort.each do |src|
   end
 end
 
-FileUtils.mkdir_p(target.join('cf-runtime'))
-%w[setup-node-crypto.mjs worker_module.mjs].each do |f|
-  FileUtils.cp(Pathname(runtime_spec.full_gem_path).join('runtime', f), target.join('cf-runtime', f))
-end
+# NOTE: from 0.2.20 onward the runtime .mjs files (setup-node-crypto /
+# worker_module) live under `build/cf-runtime/` and are written by
+# `homura build` itself, so the scaffolder no longer pollutes the
+# project root with two opaque JavaScript files. Run `bundle exec
+# rake build` (or `homura build`) once before the first wrangler dev.
 
 puts "homura new: wrote #{target} (using published gems)"

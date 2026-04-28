@@ -5,7 +5,13 @@
 <% end %>
 
 <% if @mail_error %>
-  <div class="error">メール送信に失敗したため、開発フォールバックで画面表示します: <%= h @mail_error %></div>
+  <div class="error">
+    <% if @issued_code %>
+      メール送信に失敗したため、開発フォールバックで画面表示します: <%= h @mail_error %>
+    <% else %>
+      <%= h @mail_error %>
+    <% end %>
+  </div>
 <% end %>
 
 <% if @issued_code %>

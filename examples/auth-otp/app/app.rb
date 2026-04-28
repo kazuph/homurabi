@@ -71,6 +71,16 @@ class App < Sinatra::Base
       format('%06d', SecureRandom.random_number(1_000_000))
     end
 
+    # Are we serving from a local dev hostname (`*.localhost` via portless,
+    # `127.0.0.1`, plain `localhost`)? Used to gate the mailpit-related copy
+    # and the OTP-on-screen fallback so production never leaks them.
+    def dev_host?
+      host = request.host.to_s
+      host == 'localhost' ||
+        host == '127.0.0.1' ||
+        host.end_with?('.localhost')
+    end
+
     # Send the OTP to mailpit's HTTP Send API. Returns [ok, error_message].
     # Worker → 127.0.0.1:8025 fetch works in `wrangler dev --local` mode.
     def send_otp_email(email, code)
@@ -148,20 +158,27 @@ class App < Sinatra::Base
     )
 
     ok, err = send_otp_email(email, code)
-    unless ok
-      # Dev fallback: surface the OTP on screen so the demo keeps working
-      # even if mailpit is offline. The error is shown above the code.
-      @title = 'Verify OTP — auth-otp demo'
-      @issued_email = email
-      @issued_code  = code
-      @mail_error   = err
-      next erb :verify, layout: :layout
-    end
-
     @title = 'Verify OTP — auth-otp demo'
     @issued_email = email
-    @issued_code  = nil
-    @mail_notice  = "メールを確認してください (#{email})。届かない場合はmailpit Web UIで確認: http://127.0.0.1:8025/"
+
+    if ok
+      @issued_code = nil
+      @mail_notice = if dev_host?
+                       "メールを確認してください (#{email})。届かない場合は mailpit Web UI で確認: http://127.0.0.1:8025/"
+                     else
+                       "メールを確認してください (#{email})。"
+                     end
+    elsif dev_host?
+      # Dev-only fallback: show the OTP on screen so the demo keeps working
+      # even if mailpit is offline. NEVER do this in production — it leaks
+      # the one-time code to anyone watching the response.
+      @issued_code = code
+      @mail_error  = err
+    else
+      @issued_code = nil
+      @mail_error  = 'メール送信に失敗しました。しばらくしてからもう一度お試しください。'
+    end
+
     erb :verify, layout: :layout
   end
 

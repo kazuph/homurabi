@@ -8,8 +8,12 @@
   <div class="error"><%= h @login_error %></div>
 <% end %>
 
-<p>メールアドレスを入力すると、6桁のワンタイムコードを発行し mailpit 経由でメール送信します。
-mailpit Web UI: <a href="http://127.0.0.1:8025/" target="_blank">http://127.0.0.1:8025/</a></p>
+<% if dev_host? %>
+  <p>メールアドレスを入力すると、6桁のワンタイムコードを発行し mailpit 経由でメール送信します。
+  mailpit Web UI: <a href="http://127.0.0.1:8025/" target="_blank">http://127.0.0.1:8025/</a></p>
+<% else %>
+  <p>メールアドレスを入力すると、6桁のワンタイムコードをメールでお送りします。</p>
+<% end %>
 
 <form method="post" action="/login">
   <label for="email">Email</label>

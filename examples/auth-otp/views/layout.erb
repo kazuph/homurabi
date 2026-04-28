@@ -35,9 +35,13 @@
     </nav>
     <%= yield %>
     <footer>
-      auth-otp demo (homura on Cloudflare Workers + D1 + mailpit).
-      ローカル開発では OTP を mailpit (<a href="http://127.0.0.1:8025/" target="_blank">http://127.0.0.1:8025/</a>) に送信します。
-      mailpit が落ちている場合のみ、開発フォールバックで画面に OTP を表示します。
+      <% if dev_host? %>
+        auth-otp demo (homura on Cloudflare Workers + D1 + mailpit).
+        ローカル開発では OTP を mailpit (<a href="http://127.0.0.1:8025/" target="_blank">http://127.0.0.1:8025/</a>) に送信します。
+        mailpit が落ちている場合のみ、開発フォールバックで画面に OTP を表示します。
+      <% else %>
+        auth-otp demo (homura on Cloudflare Workers + D1).
+      <% end %>
     </footer>
   </body>
 </html>

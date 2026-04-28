@@ -425,6 +425,15 @@ def emit_sinatra_patch(io, namespace)
           name == :layout || name.to_s.start_with?('layout_')
         end
 
+        # Rails-/Sinatra-flavoured partial convention: a template name
+        # starting with `_` is treated as a partial (e.g. `_docs_nav`),
+        # so the auto-layout pass leaves it alone. Without this, calling
+        # `<%= erb :_docs_nav %>` from inside a layout template would
+        # rewrap the partial in `:layout`, doubling header/nav output.
+        def __homura_partial_template?(template)
+          template.to_s.start_with?('_')
+        end
+
         # homura patch: dispatch to precompiled templates when we
         # have one. Unknown symbols raise a clear message instead of
         # wandering into upstream Tilt, which would blow up on
@@ -442,7 +451,10 @@ def emit_sinatra_patch(io, namespace)
 
             layout = options[:layout]
             layout = false if layout.nil? && options.include?(:layout)
-            if layout.nil? && !__homura_layout_template?(template) && ::#{namespace}.registered?(:layout)
+            if layout.nil? &&
+               !__homura_layout_template?(template) &&
+               !__homura_partial_template?(template) &&
+               ::#{namespace}.registered?(:layout)
               layout = :layout
             end
             if layout

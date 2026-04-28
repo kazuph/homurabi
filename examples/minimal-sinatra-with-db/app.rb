@@ -2,28 +2,27 @@
 # frozen_string_literal: true
 
 require 'sinatra/cloudflare_workers'
+require 'sinatra'
 require 'sequel'
 
-class App < Sinatra::Base
-  get '/' do
-    content_type 'text/plain; charset=utf-8'
-    'minimal sinatra + sequel-d1 — try GET /users'
-  end
-
-  get '/users' do
-    content_type 'application/json; charset=utf-8'
-    # Prefer the Ruby D1 wrapper from cloudflare-workers-runtime.
-    # Raw `env['cloudflare.env'].DB` is also valid for duck-typed `d1:`.
-    d1 = env['cloudflare.DB']
-    unless d1
-      status 503
-      next({ 'error' => 'D1 binding missing (configure wrangler D1)' }.to_json)
-    end
-
-    db = Sequel.connect(adapter: :d1, d1: d1)
-    rows = db[:users].order(:id).all
-    { 'users' => rows }.to_json
-  end
+get '/' do
+  content_type 'text/plain; charset=utf-8'
+  'minimal sinatra + sequel-d1 — try GET /users'
 end
 
-run App
+get '/users' do
+  content_type 'application/json; charset=utf-8'
+  # Prefer the Ruby D1 wrapper from cloudflare-workers-runtime.
+  # Raw `env['cloudflare.env'].DB` is also valid for duck-typed `d1:`.
+  d1 = env['cloudflare.DB']
+  unless d1
+    status 503
+    next({ 'error' => 'D1 binding missing (configure wrangler D1)' }.to_json)
+  end
+
+  db = Sequel.connect(adapter: :d1, d1: d1)
+  rows = db[:users].order(:id).all
+  { 'users' => rows }.to_json
+end
+
+run Sinatra::Application

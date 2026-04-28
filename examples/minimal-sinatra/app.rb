@@ -1,11 +1,10 @@
 # frozen_string_literal: true
 require 'sinatra/cloudflare_workers'
+require 'sinatra'
 
-class App < Sinatra::Base
-  get '/' do
-    content_type 'text/plain; charset=utf-8'
-    'minimal sinatra on cloudflare workers'
-  end
+get '/' do
+  content_type 'text/plain; charset=utf-8'
+  'minimal sinatra on cloudflare workers'
 end
 
-run App
+run Sinatra::Application

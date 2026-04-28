@@ -512,13 +512,17 @@ inputs =
 
 template_root = positional.find { |a| File.directory?(a) } || options[:input_dir]
 
-if inputs.empty?
-  warn "bin/compile-erb: no .erb files found (under #{options[:input_dir]}/ or from args)"
-  exit 1
-end
-
 write_file = !options[:stdout] && (positional.empty? || options[:output])
 out_path = options[:output]
+
+# An app with zero ERB templates (e.g. an example that builds HTML
+# inline with Ruby heredocs) is a valid case: still emit the registry
+# header + Sinatra dispatcher patch so `erb :foo` raises a clear error
+# at runtime instead of silently disappearing, and so the build
+# pipeline doesn't fail when there is nothing to compile.
+if inputs.empty?
+  warn "compile-erb: no .erb files under #{options[:input_dir]}/ — writing empty registry"
+end
 
 if write_file
   FileUtils.mkdir_p(File.dirname(out_path))

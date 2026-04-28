@@ -6,7 +6,7 @@
 2. Add `--with-db` if the app should use D1 through Sequel.
 3. In generated apps, use `bundle exec rake dev`, `bundle exec rake build`, and `bundle exec rake deploy`.
 4. For `--with-db` scaffolds, use `bundle exec rake db:migrate:compile`, `bundle exec rake db:migrate:local`, and `bundle exec rake db:migrate:remote`.
-5. Generated apps keep `wrangler.toml` `main = "worker.entrypoint.mjs"` and `compatibility_flags = ["nodejs_compat"]`.
+5. Generated apps keep `wrangler.toml` `main = "build/worker.entrypoint.mjs"` and `compatibility_flags = ["nodejs_compat"]`.
 6. Drop down to `bundle exec homura build` only when you are debugging the lower-level build pipeline.
 7. Standard layout is `app/app.rb` plus `config.ru`; `app/hello.rb` is no longer required.
 
@@ -27,7 +27,7 @@ gem 'sequel-d1', '= 0.2.7' # only if D1 / Sequel is needed
 1. Scaffold or write a Sinatra app.
 2. Prefer generated Rake tasks as the user-facing workflow.
 3. If you are wiring a D1/Sequel app by hand, use `bundle exec homura build --standalone --with-db`.
-4. In generated apps, keep `wrangler.toml` `main = "worker.entrypoint.mjs"` and `compatibility_flags = ["nodejs_compat"]`.
+4. In generated apps, keep `wrangler.toml` `main = "build/worker.entrypoint.mjs"` and `compatibility_flags = ["nodejs_compat"]`.
 5. For D1, prefer `require 'sequel'` plus `Sequel.connect(adapter: :d1, d1: env['cloudflare.DB'])`.
 6. Deploy with Wrangler.
 

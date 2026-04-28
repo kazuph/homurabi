@@ -62,7 +62,7 @@ todo-simple/
 ├── Gemfile           # opal-homura, homura-runtime, sinatra-homura — that's it
 ├── Rakefile          # build / dev / deploy
 ├── config.ru         # require_relative 'app'
-├── wrangler.toml     # main = "worker.entrypoint.mjs", no bindings
+├── wrangler.toml     # main = "build/worker.entrypoint.mjs", no bindings
 ├── package.json      # devDep: wrangler
 ├── app.rb            # ← everything happens here
 └── public/robots.txt

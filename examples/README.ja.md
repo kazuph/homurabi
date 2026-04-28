@@ -39,7 +39,7 @@ bundle exec rake dev        # wrangler dev (portless が利用可能なら経由
 
 | Task | 内容 |
 |---|---|
-| `rake build` | Workers ビルド一式（Opal コンパイル、ERB プリコンパイル、アセット埋め込み、auto-await 書き換え）を実行する。出力: `worker.entrypoint.mjs`。 |
+| `rake build` | Workers ビルド一式（Opal コンパイル、ERB プリコンパイル、アセット埋め込み、auto-await 書き換え）を実行する。出力: `build/worker.entrypoint.mjs`。 |
 | `rake dev` | `wrangler dev --local` を `portless` 配下で起動し、アプリを `http://<example-name>.localhost:1355/` でアクセス可能にする。 |
 | `rake deploy` | 自身の Cloudflare アカウントへ `wrangler deploy` する（事前に `wrangler.toml` をセットアップしておくこと）。 |
 | `rake db:migrate:compile` *(D1 の example)* | `homura db:migrate:compile` を実行し、`db/migrate/` 配下の Sequel マイグレーション DSL を wrangler 対応 SQL に変換する。 |
@@ -59,14 +59,17 @@ example/
 ├── Rakefile             # build / dev / deploy / db:migrate:*
 ├── config.ru            # require_relative 'app/app'; run App
 ├── package.json         # devDep: wrangler
-├── wrangler.toml        # main = "worker.entrypoint.mjs"; bindings はここ
+├── wrangler.toml        # main = "build/worker.entrypoint.mjs"; bindings はここ
 ├── app/
 │   └── app.rb           # Sinatra::Base のサブクラス — ルート定義
 ├── views/               # *.erb (ビルド時にプリコンパイル)
 ├── public/              # 静的アセット (ビルド時に埋め込み)
-├── db/migrate/          # *.rb Sequel マイグレーション + コンパイル済み *.sql (D1 のみ)
-└── cf-runtime/          # worker entrypoint が必要とする小さな mjs ファイル群
+└── db/migrate/          # *.rb Sequel マイグレーション + コンパイル済み *.sql (D1 のみ)
 ```
+
+`bundle exec rake build` を走らせると、生成される `worker.entrypoint.mjs`
+とその `cf-runtime/` グルーは別ディレクトリ `build/` に置かれる。`build/`
+は gitignore 対象なので、どちらもソース管理には現れない。
 
 `app/` と `views/` 配下の Ruby は、CRuby Sinatra で書くのとまったく同じ Ruby そのものだ。ビルドパイプラインが `__await__` 呼び出しを書き換え、ERB をプリコンパイルし、`public/` をビルド時に埋め込むので、ランタイムは Workers にファイルシステムが存在しないことを意識しなくて済む。
 
@@ -76,6 +79,6 @@ example/
 
 ## これらの example をいじる
 
-各 example は独自の `Gemfile.lock` を保持しているので、新規に `bundle install` すれば、その example が最後に検証された時点の gem バージョンに正確にピン留めされる。Ruby コードを変更したあとは `bundle exec rake build` で `worker.entrypoint.mjs` を再ビルドすれば、`wrangler dev` がファイル変更でホットリロードする。
+各 example は独自の `Gemfile.lock` を保持しているので、新規に `bundle install` すれば、その example が最後に検証された時点の gem バージョンに正確にピン留めされる。Ruby コードを変更したあとは `bundle exec rake build` で `build/worker.entrypoint.mjs` を再ビルドすれば、`wrangler dev` がファイル変更でホットリロードする。
 
 表示された URL でブラウザを開き、アプリを操作し、実際に何が永続化されたかを確認したければ `.wrangler/state/v3/d1/` 配下のローカル D1 ファイルを覗いてみるとよい。

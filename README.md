@@ -30,7 +30,7 @@ run App
 ```toml
 # wrangler.toml — exactly what Cloudflare expects.
 name = "myapp"
-main = "worker.entrypoint.mjs"
+main = "build/worker.entrypoint.mjs"
 compatibility_date = "2026-04-27"
 compatibility_flags = ["nodejs_compat"]
 ```
@@ -78,7 +78,7 @@ expect, that is a bug in homura, not a quirk of the stack. The
 ```
                          CRuby (build host)               Cloudflare Workers (V8)
                 ┌────────────────────────────────┐        ┌──────────────────────────┐
- your Ruby ───► │  bundle exec rake build         │ ─────► │   worker.entrypoint.mjs  │
+ your Ruby ───► │  bundle exec rake build         │ ─────► │   build/worker.entrypoint.mjs  │
  your views ───►│   ├─ Opal compile (Ruby → JS)   │        │   (loaded by wrangler)   │
  your migrate ─►│   ├─ ERB precompile             │        │   ├─ homura runtime      │
                 │   ├─ public/ asset embed        │        │   ├─ your compiled app   │
@@ -95,7 +95,7 @@ Four gems own the work:
 | [`sinatra-homura`](https://rubygems.org/gems/sinatra-homura) | Sinatra port + Opal-compatibility patches, scaffolder (`homura new`), JWT / Scheduled / Queue helpers, ERB precompiler. |
 | [`sequel-d1`](https://rubygems.org/gems/sequel-d1) | Sequel adapter for Cloudflare D1, migration compiler (`homura db:migrate:*`). |
 
-The build output is a **single `worker.entrypoint.mjs`** plus the embedded
+The build output is a **single `build/worker.entrypoint.mjs`** plus the embedded
 asset bundle. `wrangler deploy` ships that file straight to the edge.
 
 ---
@@ -167,7 +167,7 @@ If you already have Ruby and want to ship it to Workers:
    entrypoint). Keep your routes; replace `require 'sinatra'` with
    `require 'sinatra/cloudflare_workers'`. Subclass `Sinatra::Base`.
 
-3. **Add `wrangler.toml`** pointing `main` at `worker.entrypoint.mjs` and
+3. **Add `wrangler.toml`** pointing `main` at `build/worker.entrypoint.mjs` and
    declaring the bindings you need (D1 / KV / R2 / AI / Queue).
 
 4. **Build and run** with `bundle exec rake build && bundle exec rake dev`.

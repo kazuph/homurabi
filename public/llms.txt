@@ -49,7 +49,7 @@ gem 'sequel-d1', '= 0.2.7' # optional
 
 1. Scaffold with `bundle exec homura new myapp` (add `--with-db` if you want D1 through Sequel).
 2. In generated apps, use `bundle exec rake dev`, `bundle exec rake build`, and `bundle exec rake deploy`.
-3. In generated apps, `wrangler.toml` should keep `main = "worker.entrypoint.mjs"` and `compatibility_flags = ["nodejs_compat"]`.
+3. In generated apps, `wrangler.toml` should keep `main = "build/worker.entrypoint.mjs"` and `compatibility_flags = ["nodejs_compat"]`.
 4. For D1 apps, generated scaffolds also include `db:migrate:compile`, `db:migrate:local`, and `db:migrate:remote`.
 5. Deploy with Wrangler.
 6. Standard layout is `app/app.rb` plus `config.ru`; `app/hello.rb` is optional compatibility, not a requirement.

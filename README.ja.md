@@ -32,7 +32,7 @@ run App
 ```toml
 # wrangler.toml — Cloudflare がそのまま期待する形。
 name = "myapp"
-main = "worker.entrypoint.mjs"
+main = "build/worker.entrypoint.mjs"
 compatibility_date = "2026-04-27"
 compatibility_flags = ["nodejs_compat"]
 ```
@@ -83,7 +83,7 @@ homura はそのギャップを埋めるための糊だ。
 ```
                          CRuby (ビルドホスト)               Cloudflare Workers (V8)
                 ┌────────────────────────────────┐        ┌──────────────────────────┐
- あなたの Ruby ─►│  bundle exec rake build         │ ─────► │   worker.entrypoint.mjs  │
+ あなたの Ruby ─►│  bundle exec rake build         │ ─────► │   build/worker.entrypoint.mjs  │
  あなたの View ─►│   ├─ Opal compile (Ruby → JS)   │        │   (wrangler が読み込む)  │
  マイグレーション►│   ├─ ERB precompile             │        │   ├─ homura runtime      │
                 │   ├─ public/ アセット埋め込み   │        │   ├─ コンパイル済みアプリ│
@@ -100,7 +100,7 @@ homura はそのギャップを埋めるための糊だ。
 | [`sinatra-homura`](https://rubygems.org/gems/sinatra-homura) | Sinatra ポート ＋ Opal 互換パッチ、scaffolder（`homura new`）、JWT / Scheduled / Queue ヘルパー、ERB プリコンパイラ。 |
 | [`sequel-d1`](https://rubygems.org/gems/sequel-d1) | Cloudflare D1 用 Sequel アダプタ、マイグレーションコンパイラ（`homura db:migrate:*`）。 |
 
-ビルドの成果物は **単一の `worker.entrypoint.mjs`** と、それに埋め込まれた
+ビルドの成果物は **単一の `build/worker.entrypoint.mjs`** と、それに埋め込まれた
 アセットバンドル。`wrangler deploy` がそのファイルをそのままエッジに
 送り出す。
 
@@ -174,7 +174,7 @@ bundle exec rake deploy                            # wrangler deploy
    `require 'sinatra/cloudflare_workers'` に置き換える。`Sinatra::Base`
    をサブクラス化する。
 
-3. **`wrangler.toml` を追加** し、`main` を `worker.entrypoint.mjs` に
+3. **`wrangler.toml` を追加** し、`main` を `build/worker.entrypoint.mjs` に
    向け、必要な binding（D1 / KV / R2 / AI / Queue）を宣言する。
 
 4. **ビルドして起動**: `bundle exec rake build && bundle exec rake dev`。

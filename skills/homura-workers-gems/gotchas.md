@@ -45,7 +45,7 @@ In this repo's Opal-on-Workers runtime:
 
 ## Build output
 
-- generated apps write the Worker entrypoint to `worker.entrypoint.mjs`
+- generated apps write the Worker entrypoint to `build/worker.entrypoint.mjs`
 - monorepo / internal builds still write `build/worker.entrypoint.mjs`
 - `bundle exec homura build` is the standard build command
 - default entrypoint discovery prefers `config.ru`, then `app/hello.rb`, then `app/app.rb`

@@ -47,7 +47,7 @@ Every example exposes the same Rake interface:
 
 | Task | What it does |
 |---|---|
-| `rake build` | Run the full Workers build (Opal compile, ERB precompile, asset embed, auto-await rewrite). Output: `worker.entrypoint.mjs`. |
+| `rake build` | Run the full Workers build (Opal compile, ERB precompile, asset embed, auto-await rewrite). Output: `build/worker.entrypoint.mjs`. |
 | `rake dev` | Start `wrangler dev --local` under `portless`, so the app is reachable at `http://<example-name>.localhost:1355/`. |
 | `rake deploy` | `wrangler deploy` to your own Cloudflare account (set up `wrangler.toml` first). |
 | `rake db:migrate:compile` *(D1 examples)* | Run `homura db:migrate:compile` to turn the Sequel migration DSL under `db/migrate/` into wrangler-compatible SQL. |
@@ -69,14 +69,17 @@ example/
 ├── Rakefile             # build / dev / deploy / db:migrate:*
 ├── config.ru            # require_relative 'app/app'; run App
 ├── package.json         # devDep: wrangler
-├── wrangler.toml        # main = "worker.entrypoint.mjs"; bindings here
+├── wrangler.toml        # main = "build/worker.entrypoint.mjs"; bindings here
 ├── app/
 │   └── app.rb           # Sinatra::Base subclass — your routes
 ├── views/               # *.erb (precompiled at build time)
 ├── public/              # static assets (embedded at build time)
-├── db/migrate/          # *.rb Sequel migrations + compiled *.sql (D1 only)
-└── cf-runtime/          # tiny mjs files the worker entrypoint needs
+└── db/migrate/          # *.rb Sequel migrations + compiled *.sql (D1 only)
 ```
+
+`bundle exec rake build` populates a separate `build/` directory with
+the generated `worker.entrypoint.mjs` plus its `cf-runtime/` glue;
+`build/` is gitignored, so neither shows up in source control.
 
 The Ruby in `app/` and `views/` is exactly the Ruby you'd write on
 CRuby Sinatra. The build pipeline rewrites `__await__` calls,
@@ -99,7 +102,7 @@ installed; if it is not, replace `bundle exec rake dev` with a plain
 Each example tracks its own `Gemfile.lock`, so a fresh `bundle install`
 will pin you to exactly the gem versions the example was last verified
 against. After changing Ruby code, `bundle exec rake build` rebuilds
-`worker.entrypoint.mjs`; `wrangler dev` hot-reloads on the file change.
+`build/worker.entrypoint.mjs`; `wrangler dev` hot-reloads on the file change.
 
 Open a browser at the printed URL, exercise the app, and watch the
 local D1 file under `.wrangler/state/v3/d1/` if you want to see what

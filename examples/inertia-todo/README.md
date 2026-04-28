@@ -44,10 +44,9 @@ inertia-todo/
 ├── public/
 │   ├── assets/inertia-app.js         # Vue 3 + Inertia bootstrap
 │   └── robots.txt
-├── db/migrate/
-│   ├── 001_create_todos.rb
-│   └── 001_create_todos.sql
-└── cf-runtime/                       # bridging mjs files
+└── db/migrate/
+    ├── 001_create_todos.rb
+    └── 001_create_todos.sql
 ```
 
 ## How the server speaks Inertia

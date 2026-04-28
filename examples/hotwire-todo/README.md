@@ -45,10 +45,9 @@ hotwire-todo/
 ├── public/
 │   ├── assets/hotwire-app.js           # Turbo + Stimulus controller
 │   └── robots.txt
-├── db/migrate/
-│   ├── 001_create_todos.rb
-│   └── 001_create_todos.sql
-└── cf-runtime/
+└── db/migrate/
+    ├── 001_create_todos.rb
+    └── 001_create_todos.sql
 ```
 
 ## Code highlights

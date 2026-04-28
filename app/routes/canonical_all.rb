@@ -3,19 +3,16 @@
   get '/' do
     @title = 'Hello from Sinatra'
     @users = db ? db.execute('SELECT id, name FROM users ORDER BY id') : []
-    @content = erb :index
-    erb :layout
+    erb :index
   end
   get '/hello/:name' do
     @title = "Hello #{params['name']}"
     @name  = params['name']
-    @content = erb :hello
-    erb :layout
+    erb :hello
   end
   get '/about' do
     @title = 'About homura'
-    @content = erb :about
-    erb :layout
+    erb :about
   end
   post '/api/echo' do
     content_type 'application/json'
@@ -694,8 +691,7 @@
   get '/login' do
     @title = 'Login — homura'
     @login_error = nil
-    @content = erb :login
-    erb :layout
+    erb :login
   end
   post '/login' do
     username = params['username'].to_s.strip
@@ -713,8 +709,7 @@
     if username.empty? || username.length > 64 || username.include?(':')
       @title = 'Login — homura'
       @login_error = 'username is required (1-64 chars, no colon)'
-      @content = erb :login
-      next erb :layout
+      next erb :login
     end
 
     # mint_session_cookie is sync (HMAC-SHA256 via node:crypto).
@@ -755,8 +750,7 @@
     @ai_demos_enabled = ai_demos_enabled?
     @session_id = normalize_session_id(params['session'])
     @history = @ai_demos_enabled ? load_chat_history(@session_id) : []
-    @content = erb :chat
-    erb :layout
+    erb :chat
   end
   get '/api/chat/health' do
     content_type 'application/json'
@@ -1514,8 +1508,7 @@
         end
       end
     end
-    @content = erb :phase11a_upload
-    erb :layout
+    erb :phase11a_upload
   end
   post '/phase11a/cleanup' do
     content_type 'application/json'
@@ -1759,8 +1752,7 @@
       %w[gems 3つの gem],
       %w[next 次のステップ]
     ]
-    @docs_inner = erb :docs_index
-    erb :layout_docs
+    erb :docs_index, layout: :layout_docs
   end
   get '/docs', &docs_index_route
   get '/docs/quick-start' do
@@ -1779,8 +1771,7 @@
       %w[deploy デプロイ],
       %w[limits 現在の制限]
     ]
-    @docs_inner = erb :docs_quick_start
-    erb :layout_docs
+    erb :docs_quick_start, layout: :layout_docs
   end
   get '/docs/migration' do
     @title = '移行ガイド — homura Docs'
@@ -1796,8 +1787,7 @@
       %w[gotchas よくあるハマり],
       %w[blockers 移行が難しい例]
     ]
-    @docs_inner = erb :docs_migration
-    erb :layout_docs
+    erb :docs_migration, layout: :layout_docs
   end
   get '/docs/sinatra' do
     @title = 'sinatra-homura — homura Docs'
@@ -1817,8 +1807,7 @@
       %w[queue Queues],
       %w[matrix できること / できないこと]
     ]
-    @docs_inner = erb :docs_sinatra
-    erb :layout_docs
+    erb :docs_sinatra, layout: :layout_docs
   end
   get '/docs/sequel-d1' do
     @title = 'sequel-d1 — homura Docs'
@@ -1835,8 +1824,7 @@
       %w[opal Opal ビルドパス],
       %w[matrix できること / できないこと]
     ]
-    @docs_inner = erb :docs_sequel_d1
-    erb :layout_docs
+    erb :docs_sequel_d1, layout: :layout_docs
   end
   get '/docs/runtime' do
     @title = 'homura-runtime — homura Docs'
@@ -1850,11 +1838,10 @@
     @docs_toc = [
       %w[role 役割],
       %w[build ビルド CLI],
-      %w[entrypoint worker.entrypoint.mjs],
+      %w[entrypoint build/worker.entrypoint.mjs],
       %w[matrix できること / できないこと]
     ]
-    @docs_inner = erb :docs_runtime
-    erb :layout_docs
+    erb :docs_runtime, layout: :layout_docs
   end
   get '/docs/auto-await' do
     @title = 'Auto-Await — homura Docs'
@@ -1872,8 +1859,7 @@
       %w[diagnostic 診断モード],
       %w[limits 制限とフォールバック]
     ]
-    @docs_inner = erb :docs_auto_await
-    erb :layout_docs
+    erb :docs_auto_await, layout: :layout_docs
   end
   get '/docs/architecture' do
     @title = 'アーキテクチャ — homura Docs'
@@ -1890,8 +1876,7 @@
       %w[history Phase 15 の整理],
       %w[diagram 依存関係 (Mermaid)]
     ]
-    @docs_inner = erb :docs_architecture
-    erb :layout_docs
+    erb :docs_architecture, layout: :layout_docs
   end
   # Phase 17 — Cloudflare Email Service (SEND_EMAIL) manual test
   get '/debug/mail' do
@@ -1954,6 +1939,5 @@
       %w[debug /debug/mail],
       %w[links 公式リンク]
     ]
-    @docs_inner = erb :docs_email
-    erb :layout_docs
+    erb :docs_email, layout: :layout_docs
   end

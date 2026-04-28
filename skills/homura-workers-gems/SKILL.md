@@ -53,7 +53,7 @@ When generating guidance or code:
 - prefer the modern scaffold flow: `bundle exec homura new ...` then `bundle exec rake dev|build|deploy`
 - for `--with-db` apps, include the generated `bundle exec rake db:migrate:compile|local|remote` flow
 - point users at `bundle exec homura build` only for lower-level wiring or debugging
-- assume generated apps use `wrangler.toml` `main = "worker.entrypoint.mjs"` plus `compatibility_flags = ["nodejs_compat"]`
+- assume generated apps use `wrangler.toml` `main = "build/worker.entrypoint.mjs"` plus `compatibility_flags = ["nodejs_compat"]`
 - point users to `README.md`, `/llms.txt`, and this skill's companion files for current guidance
 - keep examples sync-shaped unless a raw Promise boundary truly forces manual `.__await__`
 - never emit `cloudflare-workers-*` command names or migration-first/legacy guidance in fresh answers

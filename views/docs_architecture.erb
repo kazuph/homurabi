@@ -11,7 +11,7 @@
 </ul>
 
 <h2 id="pipeline">ビルドパイプライン</h2>
-<p>ERB プリコンパイル → アセット埋め込み → Opal コンパイル → <code>patch-opal-evals.mjs</code> → <code>worker.entrypoint.mjs</code> 生成、の順です（ARCHITECTURE.md）。</p>
+<p>ERB プリコンパイル → アセット埋め込み → Opal コンパイル → <code>patch-opal-evals.mjs</code> → <code>build/worker.entrypoint.mjs</code> 生成、の順です（ARCHITECTURE.md）。</p>
 
 <h2 id="history">Phase 15 の整理</h2>
 <p>モノリス <code>hello.rb</code> からルートを <code>canonical_all.rb</code> に集約し、3 gem に責務分割。コンシューマが <code>path:</code> なしで組み立てやすいよう CLI とテンプレートを揃えました。</p>
@@ -20,7 +20,7 @@
 <p>レンダラ無しで読めるよう、ソースをそのまま掲載します（Mermaid 対応ビューアで表示可能）。</p>
 <pre><code>flowchart LR
   subgraph after["Phase 15-E"]
-    E[worker.entrypoint.mjs] --&gt; S[setup-node-crypto.mjs]
+    E[build/worker.entrypoint.mjs] --&gt; S[setup-node-crypto.mjs]
     E --&gt; O[build/*.mjs Opal bundle]
     E --&gt; M[worker_module.mjs]
   end</code></pre>

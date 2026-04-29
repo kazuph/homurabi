@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.2 — 2026-04-29
+
+- Fix: under Opal/Workers, the Inertia visit JSON body shipped with
+  `Content-Type: text/html` and missing `X-Inertia: true` /
+  `Vary: X-Inertia` headers. `Response#to_h` is an async function
+  (it `await`s any Proc-returned JS Promise), so the rest of the
+  `inertia` helper ran after a JS-level suspend; Sinatra finalised
+  the response with default headers before the awaited continuation
+  set them. We now set the protocol headers *before* touching
+  `to_h`, so the response's content type and Inertia headers are in
+  place regardless of how the runtime schedules the resumption.
+  Pure-MRI behaviour is unchanged.
+
 ## 0.1.1 — 2026-04-29
 
 - Add `spec.metadata['homura.auto_await'] = 'true'` so that when this

@@ -31,6 +31,19 @@ module Sinatra
                   end
         clear = @inertia_clear_history == true
 
+        # Set the protocol response headers BEFORE we touch any async
+        # `to_h` resolution. Under Opal, `Response#to_h` is an `async`
+        # function (it `await`s any Proc-returned JS Promise), so the
+        # rest of this method runs after a JS-level suspend. Setting
+        # `content_type` / `X-Inertia` before the suspend guarantees
+        # Sinatra's dispatch sees them when it finalises the response,
+        # regardless of how the underlying runtime schedules the
+        # awaited continuation.
+        if inertia_request?
+          content_type 'application/json; charset=utf-8'
+          headers 'X-Inertia' => 'true', 'Vary' => 'X-Inertia'
+        end
+
         # Read errors *before* sweeping so the response carries them, then
         # sweep immediately so the next request sees a clean slate. The
         # sweep must happen before any further session writes that the
@@ -52,12 +65,7 @@ module Sinatra
         page_hash = response_obj.to_h
         page_json = page_hash.to_json
 
-        if inertia_request?
-          content_type 'application/json; charset=utf-8'
-          headers['X-Inertia'] = 'true'
-          headers['Vary'] = 'X-Inertia'
-          return page_json
-        end
+        return page_json if inertia_request?
 
         @page = page_hash
         @page_json = ::Rack::Utils.escape_html(page_json)

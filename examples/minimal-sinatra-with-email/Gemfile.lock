@@ -1,42 +1,32 @@
-PATH
-  remote: ../../gems/homura-runtime
-  specs:
-    homura-runtime (0.1.1)
-      opal-homura (= 1.8.3.rc1)
-      parser (~> 3.3)
-
-PATH
-  remote: ../../gems/sinatra-homura
-  specs:
-    sinatra-homura (0.1.0)
-      homura-runtime (~> 0.1)
-      opal-homura (= 1.8.3.rc1)
-
-PATH
-  remote: ../../vendor/opal-gem
-  specs:
-    opal-homura (1.8.3.rc1)
-      ast (>= 2.3.0)
-      base64 (>= 0.2.0)
-      parser (~> 3.0, >= 3.0.3.2)
-
 GEM
   remote: https://rubygems.org/
   specs:
     ast (2.4.3)
     base64 (0.3.0)
+    homura-runtime (0.3.1)
+      opal-homura (= 1.8.3.rc1.5)
+      parser (~> 3.3)
+    opal-homura (1.8.3.rc1.5)
+      ast (>= 2.3.0)
+      base64 (>= 0.2.0)
+      parser (~> 3.0, >= 3.0.3.2)
     parser (3.3.11.1)
       ast (~> 2.4.1)
       racc
     racc (1.8.1)
+    rake (13.4.2)
+    sinatra-homura (0.3.0)
+      homura-runtime (~> 0.3)
+      opal-homura (= 1.8.3.rc1.5)
 
 PLATFORMS
   arm64-darwin-25
 
 DEPENDENCIES
-  homura-runtime!
-  opal-homura!
-  sinatra-homura!
+  homura-runtime (= 0.3.1)
+  opal-homura (= 1.8.3.rc1.5)
+  rake
+  sinatra-homura (= 0.3.0)
 
 RUBY VERSION
    ruby 3.4.9p82

@@ -1,0 +1,48 @@
+# frozen_string_literal: true
+
+task default: :build
+
+def run!(*argv)
+  ok = system(*argv)
+  exit 1 unless ok
+end
+
+desc 'Build the Worker bundle (with D1 / Sequel support)'
+task :build do
+  run!('bundle', 'exec', 'homura', 'build', '--standalone', '--with-db')
+end
+
+desc 'Start a local dev server through portless'
+task dev: :build do
+  app_name = File.basename(__dir__)
+  exec('portless', app_name, 'bash', '-c',
+       'exec npx wrangler dev --local --port=$PORT --ip 127.0.0.1')
+end
+
+desc 'Deploy to Cloudflare'
+task deploy: :build do
+  run!('npx', 'wrangler', 'deploy')
+end
+
+namespace :db do
+  namespace :migrate do
+    def d1_database_name
+      ENV['CLOUDFLARE_D1_DATABASE'] || 'minimal-sinatra-with-db'
+    end
+
+    desc 'Compile Sequel migrations to Wrangler SQL in db/migrations/'
+    task :compile do
+      run!('bundle', 'exec', 'homura', 'db:migrate:compile', 'db/migrations', '--out', 'db/migrations')
+    end
+
+    desc 'Apply compiled D1 migrations locally'
+    task local: :compile do
+      run!('bundle', 'exec', 'homura', 'db:migrate:apply', '--database', d1_database_name)
+    end
+
+    desc 'Apply compiled D1 migrations remotely'
+    task remote: :compile do
+      run!('bundle', 'exec', 'homura', 'db:migrate:apply', '--remote', '--database', d1_database_name)
+    end
+  end
+end

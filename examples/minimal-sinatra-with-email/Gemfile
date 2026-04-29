@@ -3,7 +3,7 @@ source 'https://rubygems.org'
 
 ruby '>= 3.4.0'
 
-# Monorepo dev (this example lives under homura `examples/`).
+gem 'rake' # used by Rakefile (build / dev / deploy entry points)
 gem 'opal-homura', '= 1.8.3.rc1.5', require: 'opal'
 gem 'homura-runtime', '= 0.3.1'
 gem 'sinatra-homura', '= 0.3.0'

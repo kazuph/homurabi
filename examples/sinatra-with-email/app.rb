@@ -31,7 +31,7 @@ end
 
 get '/' do
   content_type 'text/plain; charset=utf-8'
-  'minimal sinatra with email — POST /send (to, from, subject, text|html)'
+  'sinatra + Cloudflare Email on Workers — POST /send (to, from, subject, text|html)'
 end
 
 post '/send' do

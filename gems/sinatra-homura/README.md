@@ -4,17 +4,39 @@ Opal-oriented Sinatra compatibility patches (`sinatra_opal_patches.rb`) and exte
 
 ## Usage
 
+`sinatra-homura` does not require an explicit `require` line beyond the
+canonical Sinatra entry points — adding `gem 'sinatra-homura'` to your
+`Gemfile` is enough. The vendored Sinatra entry points (`sinatra.rb` /
+`sinatra/base.rb`) auto-load the homura adapter at the bottom, in the
+order: `homura/runtime` → Opal/Sinatra patches → `Sinatra::Base` →
+JwtAuth / Scheduled / Queue extensions.
+
+Classic top-level Sinatra (the canonical sinatrarb.com snippet shape):
+
 ```ruby
-require 'sinatra/cloudflare_workers'
-require 'sequel' # etc.
+require 'sinatra'
+
+get '/frank-says' do
+  'Put this in your pipe & smoke it!'
+end
+```
+
+Modular Sinatra (`bundle exec homura new` scaffolds this layout):
+
+```ruby
+require 'sinatra/base'
 
 class App < Sinatra::Base
   register Sinatra::JwtAuth
   # ...
 end
 
-run App # optional if `App` is defined; a fallback registers the Rack handler at exit
+run App
 ```
+
+In neither shape does user code reach for a Cloudflare-flavoured
+require. Everything Workers-specific lives in `homura-runtime` and is
+auto-loaded by sinatra-homura.
 
 ## Scaffolding
 

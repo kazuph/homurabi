@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.2 (2026-04-30)
+
+- README: replace the leftover `require 'cloudflare_workers'` line and
+  the `gem 'opal-homura', '= 1.8.3.rc1.3'` pin with the canonical
+  `require 'homura/runtime'` and `= 1.8.3.rc1.5` shipped on RubyGems.
+- README support-matrix Opal row updated to `= 1.8.3.rc1.5` to match.
+- No code changes vs. 0.3.1.
+
 ## 0.3.1 (2026-04-29)
 
 - Fix `release-gems.yml` `Resolve gem target` step: now reads

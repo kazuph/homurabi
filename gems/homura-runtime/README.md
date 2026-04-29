@@ -5,7 +5,7 @@ Core Ruby + Module Worker glue for [Opal](https://opalrb.com/) on [Cloudflare Wo
 ## What you get
 
 - `require 'opal_patches'` — additive patches for Opal corelib vs real-world gems (Rack, etc.).
-- `require 'cloudflare_workers'` — Rack handler, Cloudflare bindings, multipart, queue, Durable Objects, etc.
+- `require 'homura/runtime'` — Rack handler, Cloudflare bindings, multipart, queue, Durable Objects, etc. Sinatra apps using `sinatra-homura` get this required automatically; explicit consumers (non-Sinatra Rack apps) call it themselves.
 - `runtime/worker_module.mjs` — fetch / scheduled / queue / DO adapters (**no Opal bundle import**).
 - `runtime/worker.mjs` — thin bootstrap (crypto shim → bundle → `worker_module`) for legacy layouts.
 - `runtime/setup-node-crypto.mjs` — `node:crypto` on `globalThis` before the Opal bundle loads.
@@ -14,7 +14,7 @@ Core Ruby + Module Worker glue for [Opal](https://opalrb.com/) on [Cloudflare Wo
 
 ## Quick start (homura monorepo)
 
-1. `Gemfile`: `gem 'homura-runtime', path: 'gems/homura-runtime'` and `gem 'opal-homura', '= 1.8.3.rc1.3', require: 'opal'` (path or exact pin).
+1. `Gemfile`: `gem 'homura-runtime', '~> 0.3'` and `gem 'opal-homura', '= 1.8.3.rc1.5', require: 'opal'` (in the homura monorepo dev workspace, `path: 'gems/homura-runtime'` is also supported).
 2. `bundle exec homura build` — in generated standalone apps, writes `build/hello.no-exit.mjs` plus root-level `build/worker.entrypoint.mjs`; in the monorepo it writes `build/worker.entrypoint.mjs`.
 3. `wrangler.toml`: generated apps use `main = "build/worker.entrypoint.mjs"` and `compatibility_flags = ["nodejs_compat"]`.
 
@@ -25,7 +25,7 @@ Core Ruby + Module Worker glue for [Opal](https://opalrb.com/) on [Cloudflare Wo
 | Ruby       | 3.4.x            |
 | Node       | ≥ 20             |
 | Wrangler   | ^3.99            |
-| Opal       | = 1.8.3.rc1.3    |
+| Opal       | = 1.8.3.rc1.5    |
 
 ## Wrangler config
 

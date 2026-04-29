@@ -38,11 +38,11 @@ Live demo: https://homura.kazu-san.workers.dev
 ```ruby
 source 'https://rubygems.org'
 
-gem 'opal-homura', '= 1.8.3.rc1.3', require: 'opal'
+gem 'opal-homura',    '= 1.8.3.rc1.5', require: 'opal'
 gem 'rake' # generated apps use this for build/dev/deploy
-gem 'homura-runtime', '= 0.2.9'
-gem 'sinatra-homura', '= 0.2.13'
-gem 'sequel-d1', '= 0.2.7' # optional
+gem 'homura-runtime', '~> 0.3'
+gem 'sinatra-homura', '~> 0.3'
+gem 'sequel-d1',      '~> 0.3' # optional
 ```
 
 ## Minimal flow

@@ -17,7 +17,7 @@
 <h2 id="steps">6 ステップ（推奨順）</h2>
 <ol>
   <li><strong>Gemfile</strong>: <code>opal-homura</code>（<code>require: 'opal'</code>）、<code>homura-runtime</code>、<code>sinatra-homura</code> を追加。D1 を使うなら <code>sequel-d1</code> も追加します。</li>
-  <li><strong>エントリ</strong>: <code>app.rb</code>（またはメイン定義ファイル）の先頭付近に <code># await:</code> マジックコメントを付与（JWT / D1 / fetch など非同期が混ざるファイルは必須。Phase 15-C 教訓）。続けて <code>require 'sinatra/cloudflare_workers'</code>。</li>
+  <li><strong>エントリ</strong>: <code>app.rb</code>（またはメイン定義ファイル）の <code>require 'sinatra'</code>（classic）または <code>require 'sinatra/base'</code>（modular）はそのまま。Cloudflare 専用の <code>require</code> に差し替える必要はありません — <code>sinatra-homura</code> が Sinatra のエントリポイント上で Workers ランタイムを自動配線します。<code>__await__</code> 周りは <code>homura build</code> の auto-await が自動的に挿入するので、<code># await:</code> マジックコメントの手書きは原則不要です。</li>
   <li><strong>ルート</strong>: 既存の <code>get</code> / <code>post</code> を可能な限りそのまま移植。Sinatra の DSL は互換パッチ側で吸収。</li>
   <li><strong>DB</strong>: <code>Sequel.connect(adapter: :d1, d1: env['cloudflare.env'].DB)</code> の形へ。マイグレーションは <code>bundle exec homura db:migrate:compile db/migrations</code> → <code>homura db:migrate:apply</code>（<code>sequel-d1</code> README 参照）。</li>
   <li><strong>ビュー</strong>: <code>bundle exec homura erb:compile --input views --output build/templates.rb --namespace …</code>（プロジェクトの Rake / npm に合わせる）。</li>

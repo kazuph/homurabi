@@ -92,9 +92,10 @@ jobs:
 
   # ---------------------------------------------------------------------------
   # Ruby syntax check across every gem + example app — fast canary that
-  # catches typos / incomplete modernizations like the recent
-  # `require 'sinatra/cloudflare_workers'` strip. Doesn't run code, just
-  # `ruby -c` parses.
+  # catches typos / incomplete modernizations (the kind that surfaced when
+  # the `sinatra/cloudflare_workers` shim was retired in favour of plain
+  # `require 'sinatra'` / `require 'sinatra/base'`). Doesn't run code,
+  # just `ruby -c` parses.
   # ---------------------------------------------------------------------------
   ruby-syntax:
     name: ruby -c (syntax check)

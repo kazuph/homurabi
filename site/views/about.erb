@@ -1,12 +1,14 @@
 <h1>About this Sinatra app</h1>
 
-<p>This is <code>app/hello.rb</code>, a real
+<p>This is <code>site/app/app.rb</code>, a real
    <a href="https://github.com/sinatra/sinatra">sinatra/sinatra</a> 4.x
    application running on Cloudflare Workers. Phase 13 moved off the
    old <code>janbiedermann/sinatra</code> fork; we now track upstream
    Sinatra with Opal-specific patches in-repo. The file would run
    unchanged on any Rack server; the Cloudflare adapter lives entirely
-   in <code>lib/cloudflare_workers.rb</code> and does not leak through.</p>
+   in <code>gems/homura-runtime/lib/homura/runtime.rb</code> (with the
+   binding wrappers under <code>gems/homura-runtime/lib/homura/runtime/</code>)
+   and does not leak through.</p>
 
 <h2>Architecture</h2>
 <img src="/architecture.svg" alt="homura architecture diagram" style="width:100%; max-width:800px; margin:1em 0;">

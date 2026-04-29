@@ -15,11 +15,11 @@
 ```ruby
 source 'https://rubygems.org'
 
-gem 'opal-homura', '= 1.8.3.rc1.3', require: 'opal'
+gem 'opal-homura',    '= 1.8.3.rc1.5', require: 'opal'
 gem 'rake' # generated apps use this for build/dev/deploy
-gem 'homura-runtime', '= 0.2.9'
-gem 'sinatra-homura', '= 0.2.13'
-gem 'sequel-d1', '= 0.2.7' # only if D1 / Sequel is needed
+gem 'homura-runtime', '~> 0.3'
+gem 'sinatra-homura', '~> 0.3'
+gem 'sequel-d1',      '~> 0.3' # only if D1 / Sequel is needed
 ```
 
 ## Build / deploy flow
@@ -35,9 +35,11 @@ If `homura build` fails during Opal compile, read `build/opal.stderr.log` first.
 
 ## Minimal runtime snippet
 
+Modular Sinatra (the shape `bundle exec homura new` scaffolds):
+
 ```ruby
 # app/app.rb
-require 'sinatra/cloudflare_workers'
+require 'sinatra/base'
 require 'sequel'
 
 class App < Sinatra::Base
@@ -55,6 +57,31 @@ require_relative 'app/app'
 
 run App
 ```
+
+Classic top-level Sinatra is equally valid — see `examples/sinatra/`,
+`examples/sinatra-with-db/`, and the `examples/classic-top-sinatra/`
+dogfood:
+
+```ruby
+# app.rb
+require 'sinatra'
+require 'sequel'
+
+get '/users' do
+  db = Sequel.connect(adapter: :d1, d1: env['cloudflare.DB'])
+  content_type 'application/json'
+  db[:users].all.to_json
+end
+```
+
+```ruby
+# config.ru
+require_relative 'app'
+```
+
+In neither shape does the user code reach for a Cloudflare-flavoured
+require — `sinatra-homura` wires the Workers runtime onto the standard
+Sinatra entry points automatically.
 
 For the common binding/helper paths above, homura's build step auto-inserts
 `.__await__` under the hood. That includes the common Sequel helper shape

@@ -2,12 +2,13 @@
 <p>Sinatra を Opal / Workers 向けに補正するパッチと、JWT・Cron・Queues の拡張を提供します（gem 同梱 README の要約）。</p>
 
 <h2 id="overview">概要</h2>
-<pre><code>require 'sinatra/cloudflare_workers'
+<pre><code>require 'sinatra/base'
 
 class App &lt; Sinatra::Base
   register Sinatra::JwtAuth
   # ...
 end</code></pre>
+<p>classic スタイル（<code>require 'sinatra'</code> + トップレベルの <code>get '/' do ... end</code>）も同じく動きます。<code>sinatra-homura</code> は標準の Sinatra エントリポイント上で Workers ランタイムを自動配線するので、ユーザーコード側で Cloudflare 専用の <code>require</code> は使いません。</p>
 
 <h2 id="register">登録と require</h2>
 <p>アプリクラス内で <code>register</code> し、homura と同様に <code>require 'sequel'</code> 等はルート定義より前に置きます。</p>

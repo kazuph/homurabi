@@ -25,7 +25,6 @@ This is the example to copy when you want to demonstrate
 It is otherwise the same Sinatra you'd write on Puma:
 
 ```ruby
-require 'sinatra/cloudflare_workers'
 require 'sinatra'
 
 TODOS = []

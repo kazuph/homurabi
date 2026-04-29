@@ -9,22 +9,19 @@
 Live site: <https://homura.kazu-san.workers.dev>
 
 ```ruby
-# app/app.rb — yes, it really is plain Sinatra.
-require 'sinatra/cloudflare_workers'
+# app.rb — yes, it really is plain Sinatra.
+require 'sinatra'
+require 'sequel'
 
-class App < Sinatra::Base
-  get '/' do
-    'Hello from Ruby, running on Cloudflare Workers.'
-  end
-
-  get '/users' do
-    db = Sequel.connect(adapter: :d1, d1: env['cloudflare.DB'])
-    content_type :json
-    db[:users].order(:id).all.to_json
-  end
+get '/' do
+  'Hello from Ruby, running on Cloudflare Workers.'
 end
 
-run App
+get '/users' do
+  db = Sequel.connect(adapter: :d1, d1: env['cloudflare.DB'])
+  content_type :json
+  db[:users].order(:id).all.to_json
+end
 ```
 
 ```toml
@@ -35,11 +32,15 @@ compatibility_date = "2026-04-27"
 compatibility_flags = ["nodejs_compat"]
 ```
 
-There is no shim, no transpiled Sinatra-lookalike. The `Sinatra::Base` you
-inherit from is a port of the upstream gem; `redirect '/'` raises Sinatra's
-own `HaltResponse`; `erb :index, locals: { user: u }` resolves locals the
-way the docs say it does. The whole pipeline exists so Ruby people can keep
-writing Ruby and ship it to the Cloudflare edge.
+There is no shim, no transpiled Sinatra-lookalike. `require 'sinatra'`
+loads the canonical Sinatra port; `redirect '/'` raises Sinatra's own
+`HaltResponse`; `erb :index, locals: { user: u }` resolves locals the way
+the docs say it does. Modular apps use the same `class App < Sinatra::Base`
++ `config.ru` + `run App` shape upstream documents — see
+[`examples/todo/`](examples/todo/) and the canonical
+[`site/`](site/) homura.kazu-san.workers.dev source. The whole pipeline
+exists so Ruby people can keep writing Ruby and ship it to the
+Cloudflare edge.
 
 ---
 
@@ -158,14 +159,18 @@ If you already have Ruby and want to ship it to Workers:
 
    gem 'rake'
    gem 'opal-homura',    '= 1.8.3.rc1.5', require: 'opal'
-   gem 'homura-runtime', '~> 0.2'
-   gem 'sinatra-homura', '~> 0.2'
-   gem 'sequel-d1',      '~> 0.2'   # only if you want D1 / Sequel
+   gem 'homura-runtime', '~> 0.3'
+   gem 'sinatra-homura', '~> 0.3'
+   gem 'sequel-d1',      '~> 0.3'   # only if you want D1 / Sequel
    ```
 
-2. **Move app code under `app/`** (`app/app.rb` is the conventional
-   entrypoint). Keep your routes; replace `require 'sinatra'` with
-   `require 'sinatra/cloudflare_workers'`. Subclass `Sinatra::Base`.
+2. **Keep your Sinatra app exactly as you wrote it.** Classic style
+   (`require 'sinatra'` + top-level `get '/' do ... end`) and modular
+   style (`require 'sinatra/base'` + `class App < Sinatra::Base` +
+   `config.ru` with `run App`) both work as upstream documents.
+   You do **not** swap the `require` line for a Cloudflare-flavoured
+   one — sinatra-homura wires the Workers runtime into the standard
+   Sinatra entry points automatically.
 
 3. **Add `wrangler.toml`** pointing `main` at `build/worker.entrypoint.mjs` and
    declaring the bindings you need (D1 / KV / R2 / AI / Queue).

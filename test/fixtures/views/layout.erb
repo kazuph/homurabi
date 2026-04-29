@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title><%= @title || 'homura' %></title>
+    <link rel="icon" type="image/png" href="/favicon.png" sizes="32x32">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    <link rel="stylesheet" href="/style.css">
+  </head>
+  <body>
+    <nav>
+      <a href="/">Home</a>
+      <a href="/docs">Docs</a>
+      <a href="/about">About</a>
+      <a href="/d1/users">D1</a>
+      <a href="/demo/sequel">Sequel</a>
+      <a href="/posts">Posts</a>
+      <a href="/demo/http">HTTP</a>
+      <a href="/chat" class="nav-chat">Chat ⚡</a>
+      <% if (sess_user = current_session_user) %>
+        <span style="margin-left:auto;color:#666;font-size:0.9em;">
+          <%= Rack::Utils.escape_html(sess_user.to_s) %> &middot;
+          <a href="/logout">Logout</a>
+        </span>
+      <% else %>
+        <span style="margin-left:auto;font-size:0.9em;">
+          <a href="/login">Login</a>
+        </span>
+      <% end %>
+    </nav>
+    <hr>
+    <%= yield %>
+    <footer>
+      homura — real Sinatra on Cloudflare Workers via Opal &middot;
+      <a href="https://github.com/kazuph/homura">source</a>
+    </footer>
+  </body>
+</html>

@@ -1,12 +1,22 @@
 {
-  "name": "homura-monorepo",
+  "name": "homura",
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "homura gem monorepo (homura-runtime / sinatra-homura / sequel-d1 / sinatra-inertia). The canonical Cloudflare Worker application lives under site/.",
+  "description": "Real Ruby + Sinatra on Cloudflare Workers via Opal",
   "scripts": {
-    "preflight": "npm test",
-    "build:test": "bundle exec homura erb:compile --input test/fixtures/views --output build/homura_templates.rb --namespace HomuraTemplates && ruby bin/opal-test-build test/smoke.rb build/smoke-test.mjs -r opal_patches -r homura/runtime -r homura_templates",
+    "build:erb": "bundle exec homura erb:compile --input views --output build/homura_templates.rb --namespace HomuraTemplates",
+    "build:assets": "ruby \"$(ruby bin/gem-path homura-runtime exe/compile-assets)\" --input public --output build/homura_assets.rb --namespace HomuraAssets",
+    "build:opal": "bundle exec homura build",
+    "build": "ruby bin/generate-docs-search-index && bundle exec homura build",
+    "dev": "npm run build && wrangler dev --port 8787 --ip 127.0.0.1",
+    "dev:remote": "npm run build && wrangler dev --remote --port 8787 --ip 127.0.0.1",
+    "preflight": "npm test && npm run build",
+    "dev:dlq": "npm run build && wrangler dev --env dlq-demo --port 8787 --ip 127.0.0.1",
+    "d1:init": "bin/init-local-d1",
+    "test:workers": "bin/test-on-workers",
+    "deploy": "npm run build && wrangler deploy",
+    "build:test": "bundle exec homura erb:compile --input views --output build/homura_templates.rb --namespace HomuraTemplates && ruby bin/opal-test-build test/smoke.rb build/smoke-test.mjs -r opal_patches -r homura/runtime -r homura_templates",
     "test": "npm run build:test && ruby bin/node-with-runtime-setup build/smoke-test.mjs && npm run test:http && npm run test:crypto && npm run test:jwt && npm run test:scheduled && npm run test:ai && npm run test:faraday && npm run test:multipart && npm run test:streaming && npm run test:octokit && npm run test:do && npm run test:cache && npm run test:queue && npm run test:sequel && npm run test:fiber-await && npm run test:classic-sinatra && npm run test:auto-await && npm run test:build-support && npm run test:compile-assets && npm run test:compile-erb && npm run test:homura-cli && npm run test:jwt-auth",
     "build:classic-sinatra-test": "ruby bin/opal-test-build test/classic_sinatra_smoke.rb build/classic-sinatra-smoke.mjs -r opal_patches",
     "test:classic-sinatra": "npm run build:classic-sinatra-test && ruby bin/node-with-runtime-setup build/classic-sinatra-smoke.mjs",
@@ -46,5 +56,8 @@
     "test:jwt-auth": "bundle exec ruby test/jwt_auth_smoke.rb",
     "clean": "rm -f build/hello.no-exit.mjs build/smoke-test.mjs build/http-smoke.mjs build/crypto-smoke.mjs build/jwt-smoke.mjs build/ai-smoke.mjs build/scheduled-smoke.mjs build/faraday-smoke.mjs build/multipart-smoke.mjs build/streaming-smoke.mjs build/octokit-smoke.mjs build/do-smoke.mjs build/cache-smoke.mjs build/queue-smoke.mjs build/sequel-smoke.mjs build/homura_templates.rb build/homura_assets.rb build/opal.stderr.log"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "wrangler": "^3.99.0",
+    "ws": "^8.20.0"
+  }
 }

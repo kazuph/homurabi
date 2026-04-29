@@ -1,11 +1,7 @@
-# Ruby / Bundler — match at any depth so the same rules apply at the
-# repo root (gem dev workspace) and under site/ (canonical app).
+# Site-local Bundler / Wrangler artifacts (the root .gitignore covers
+# repo-wide patterns; this file is the canonical app's own slice).
 .bundle/
 vendor/bundle/
-Gemfile.lock.local
-.ruby-version.local
-
-# Node / wrangler
 node_modules/
 .wrangler/
 .dev.vars
@@ -17,18 +13,13 @@ dist/
 *.opal.js
 *.opal.mjs
 
-# Editor / OS
-.DS_Store
-*.swp
-.idea/
-.vscode/
-
-# Local secrets
+# Local secrets / per-machine config
 .env
 .env.local
-
-# mise local config (per-machine)
 .mise.local.toml
+Gemfile.lock.local
+.ruby-version.local
 
 # Local task artifacts (report/evidence, do not version)
 .artifacts/
+.playwright-cli/

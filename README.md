@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="public/homura-chan.png" alt="homura mascot" width="200">
+  <img src="site/public/homura-chan.png" alt="homura mascot" width="200">
 </p>
 
 # homura
@@ -249,7 +249,7 @@ homura ships agent-discoverable docs so Claude / Copilot / Cursor can
 pick the right gem and follow the canonical install/build flow without a
 human in the loop.
 
-- **Machine-readable summary**: [`/llms.txt`](public/llms.txt) — also
+- **Machine-readable summary**: [`/llms.txt`](site/public/llms.txt) — also
   served live at <https://homura.kazu-san.workers.dev/llms.txt>.
 - **Long-form docs**: <https://homura.kazu-san.workers.dev/docs>
   (renderable from this repo's `docs/`).
@@ -280,16 +280,21 @@ gems/                 # The four published gems live here
   homura-runtime/     # core runtime + build pipeline
   sinatra-homura/     # Sinatra port + Opal patches + scaffolder
   sequel-d1/          # Sequel D1 adapter + migration compiler
+  sinatra-inertia/    # Inertia.js v2 adapter for Sinatra
 vendor/opal-gem/      # Source of opal-homura (the patched Opal fork)
-examples/             # Six standalone example apps (see above)
+vendor/                 # Bundled Sinatra / Rack / Sequel / etc. for Workers
+examples/             # Standalone example apps consuming the released gems
+site/                 # The canonical homura.kazu-san.workers.dev application
+                      # (Sinatra app, ERB views, public/, wrangler.toml)
+test/                 # Gem-side smoke + Ruby tests (`npm test`)
 docs/                 # Long-form documentation
-public/llms.txt       # Agent-readable summary
 skills/               # Installable agent skills
 ```
 
 The `gems/*` directories and `vendor/opal-gem/` are the shipping surface.
-Everything else is either documentation, examples, or the infrastructure
-that builds and ships those four gems.
+`site/` is the dogfooding application that proves the gems work end-to-end on
+Cloudflare Workers; it lives in this repo as a sibling of the gem code so
+runtime regressions show up the moment they ship.
 
 ---
 

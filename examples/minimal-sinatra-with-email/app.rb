@@ -84,4 +84,3 @@ rescue Cloudflare::Email::Error => e
   { 'ok' => false, 'error' => e.message }.to_json
 end
 
-run Sinatra::Application

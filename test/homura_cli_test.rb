@@ -46,10 +46,15 @@ Dir.mktmpdir do |dir|
 
     config_ru = File.read(File.join(app_dir, 'config.ru'))
     raise 'config.ru should require app/app relatively' unless config_ru.include?("require_relative 'app/app'")
-    raise 'config.ru should run App' unless config_ru.include?('run App')
+    # As of sinatra-homura 0.2.23, `run App` is no longer required —
+    # `Sinatra::CloudflareWorkers.ensure_rack_app!` discovers and
+    # registers `App` on the first fetch event. Scaffolder must NOT emit it.
+    raise 'config.ru should not emit `run App` (auto-registered now)' if config_ru.include?('run App')
 
     app_rb = File.read(File.join(app_dir, 'app', 'app.rb'))
     raise 'app/app.rb should not call run App directly' if app_rb.include?('run App')
+    raise 'app/app.rb should require sinatra/base' unless app_rb.include?("require 'sinatra/base'")
+    raise 'app/app.rb should not require legacy sinatra/cloudflare_workers' if app_rb.include?("require 'sinatra/cloudflare_workers'")
 
     gemfile = File.read(File.join(app_dir, 'Gemfile'))
     raise 'Gemfile should include rake for generated tasks' unless gemfile.include?("gem 'rake'")
@@ -109,7 +114,7 @@ Dir.mktmpdir do |dir|
 
   File.write(File.join(app_dir, 'app', 'app.rb'), <<~RUBY)
     # frozen_string_literal: true
-    require 'sinatra/cloudflare_workers'
+    require 'sinatra/base'
 
     class App < Sinatra::Base
       get('/') { 'custom-entrypoint-ok' }
@@ -120,7 +125,6 @@ Dir.mktmpdir do |dir|
     # frozen_string_literal: true
     require_relative 'app/app'
 
-    run App
   RUBY
 
   File.write(File.join(app_dir, 'views', 'index.erb'), "ok\n")
@@ -164,7 +168,7 @@ Dir.mktmpdir do |dir|
 
   File.write(File.join(app_dir, 'app', 'app.rb'), <<~RUBY)
     # frozen_string_literal: true
-    require 'sinatra/cloudflare_workers'
+    require 'sinatra/base'
 
     class App < Sinatra::Base
       get('/') { 'ok-from-config-ru' }
@@ -179,7 +183,6 @@ Dir.mktmpdir do |dir|
     # frozen_string_literal: true
     require_relative 'app/app'
 
-    run App
   RUBY
 
   File.write(File.join(app_dir, 'views', 'index.erb'), "ok\n")
@@ -218,13 +221,12 @@ Dir.mktmpdir do |dir|
 
   File.write(File.join(app_dir, 'app', 'app.rb'), <<~RUBY)
     # frozen_string_literal: true
-    require 'sinatra/cloudflare_workers'
+    require 'sinatra/base'
 
     class App < Sinatra::Base
       get('/') { 'ok-from-app-rb' }
     end
 
-    run App
   RUBY
 
   File.write(File.join(app_dir, 'views', 'index.erb'), "ok\n")
@@ -257,7 +259,7 @@ Dir.mktmpdir do |dir|
 
   File.write(File.join(app_dir, 'app', 'app.rb'), <<~RUBY)
     # frozen_string_literal: true
-    require 'sinatra/cloudflare_workers'
+    require 'sinatra/base'
 
     class App < Sinatra::Base
       helpers do
@@ -274,7 +276,6 @@ Dir.mktmpdir do |dir|
       end
     end
 
-    run App
   RUBY
 
   File.write(File.join(app_dir, 'app', 'hello.rb'), <<~RUBY)
@@ -317,7 +318,7 @@ Dir.mktmpdir do |dir|
 
   File.write(File.join(app_dir, 'app', 'app.rb'), <<~RUBY)
     # frozen_string_literal: true
-    require 'sinatra/cloudflare_workers'
+    require 'sinatra/base'
     require 'sequel'
     require 'json'
 
@@ -346,14 +347,12 @@ Dir.mktmpdir do |dir|
       end
     end
 
-    run App
   RUBY
 
   File.write(File.join(app_dir, 'config.ru'), <<~RUBY)
     # frozen_string_literal: true
     require_relative 'app/app'
 
-    run App
   RUBY
 
   File.write(File.join(app_dir, 'views', 'index.erb'), <<~ERB)

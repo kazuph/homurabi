@@ -4,9 +4,9 @@ source 'https://rubygems.org'
 ruby '>= 3.4.0'
 
 # Mode A — monorepo dev (this example lives under homura `examples/`).
-gem 'opal-homura', path: '../../vendor/opal-gem', require: 'opal'
-gem 'homura-runtime', path: '../../gems/homura-runtime'
-gem 'sinatra-homura', path: '../../gems/sinatra-homura'
+gem 'opal-homura', '= 1.8.3.rc1.5', require: 'opal'
+gem 'homura-runtime', '= 0.2.26'
+gem 'sinatra-homura', '= 0.2.23'
 
 # Mode B — standalone: `gem build` each gem, then `gem install --local` in a clean dir (order: opal-homura → runtime → sinatra),
 # or keep `path:` pointing at a git worktree that contains `vendor/opal-gem` and `gems/*` (remove stray `*.gem` under

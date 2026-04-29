@@ -1,5 +1,5 @@
 # frozen_string_literal: true
-require 'sinatra/cloudflare_workers'
+require 'sinatra/base'
 require 'cgi'
 
 class App < Sinatra::Base

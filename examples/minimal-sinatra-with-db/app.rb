@@ -1,7 +1,6 @@
 # await: all, call, fetch, get_first_row, open, run, sleep
 # frozen_string_literal: true
 
-require 'sinatra/cloudflare_workers'
 require 'sinatra'
 require 'sequel'
 
@@ -25,4 +24,3 @@ get '/users' do
   { 'users' => rows }.to_json
 end
 
-run Sinatra::Application

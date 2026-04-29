@@ -99,6 +99,42 @@ ok '  — response body is "classic hello"',
    "got #{collected.inspect}"
 ok '  — Content-Type is text/plain*', (headers['content-type'] || '').start_with?('text/plain')
 
+# ---- Lazy-discovery regression (sinatra-homura 0.2.23) -----------------
+# Classic-style apps are now allowed to omit the trailing
+# `run Sinatra::Application` line. The flow that makes that work is:
+#
+#   1. `require 'sinatra'` triggers
+#      `Rack::Handler::CloudflareWorkers.ensure_dispatcher_installed!`
+#      so `globalThis.__HOMURA_RACK_DISPATCH__` is wired before any
+#      fetch lands.
+#   2. The first fetch reaches `Rack::Handler::CloudflareWorkers#call`
+#      with `@app == nil`, which falls back to
+#      `Sinatra::CloudflareWorkers.ensure_rack_app!` to discover the
+#      classic `Sinatra::Application` (or modular `App`) at runtime.
+#
+# To exercise that without a real Workers fetch we clear the handler's
+# cached `@app`, then call `ensure_rack_app!` directly and assert it
+# registered `Sinatra::Application` (which already has routes from the
+# classic `get '/classic' do … end` block above).
+puts ''
+puts '--- lazy first-fetch app discovery ---'
+
+original_app = Rack::Handler::CloudflareWorkers.app
+Rack::Handler::CloudflareWorkers.app = nil
+ok '  — handler @app cleared for the test',
+   Rack::Handler::CloudflareWorkers.app.nil?
+
+discovered = Sinatra::CloudflareWorkers.ensure_rack_app!
+ok '  — ensure_rack_app! discovers Sinatra::Application',
+   discovered == Sinatra::Application,
+   "got #{discovered.inspect}"
+ok '  — handler.app now points at Sinatra::Application',
+   Rack::Handler::CloudflareWorkers.app == Sinatra::Application
+
+# Restore so the rest of the smoke-suite (if anything follows) sees the
+# original handler state.
+Rack::Handler::CloudflareWorkers.app = original_app if original_app
+
 puts ''
 puts "#{$passed + $failed} tests, #{$passed} passed, #{$failed} failed"
 exit($failed == 0 ? 0 : 1)

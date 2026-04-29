@@ -6,18 +6,23 @@
   Previously, even after 0.2.22 made `require 'sinatra'` enough to load
   the runtime, users still had to write `run Sinatra::Application` /
   `run App` themselves because `ensure_rack_app!` only handled
-  `class App < Sinatra::Base` (and only at_exit-fired when
-  `sinatra/cloudflare_workers` was required directly). Two changes
-  fix this:
+  `class App < Sinatra::Base`, and the at_exit hook it relied on
+  doesn't fire on Workers (the isolate never actually exits between
+  fetches). The fix combines an *eager* dispatcher install with a
+  *lazy* app discovery on the first fetch:
 
   - `vendor/sinatra.rb` and `vendor/sinatra/base.rb` now require
-    `sinatra/cloudflare_workers` (was just `cloudflare_workers`), so
-    the at_exit hook is installed by `require 'sinatra'` /
-    `require 'sinatra/base'` alone.
-  - `Sinatra::CloudflareWorkers.ensure_rack_app!` now also detects
-    classic-style `Sinatra::Application` (top-level `get '/' do … end`)
-    and registers it with `Rack::Handler::CloudflareWorkers` if it has
-    routes. Modular `App` still wins when both are defined.
+    `sinatra/cloudflare_workers` (was just `cloudflare_workers`).
+    Loading this file calls
+    `Rack::Handler::CloudflareWorkers.ensure_dispatcher_installed!`,
+    which registers `globalThis.__HOMURA_RACK_DISPATCH__` immediately
+    — so a fetch arriving before any explicit `run` call still lands
+    inside our `call` method.
+  - `Rack::Handler::CloudflareWorkers#call` (homura-runtime 0.2.26)
+    falls back to `Sinatra::CloudflareWorkers.ensure_rack_app!` when
+    `@app` is nil, picking up either a modular `App < Sinatra::Base`
+    or a classic-style `Sinatra::Application` (top-level
+    `get '/' do … end`). Modular still wins when both are defined.
 
   Net effect: this app:
 
@@ -41,11 +46,13 @@
   `require 'sinatra/cloudflare_workers'` line and without a trailing
   `run Sinatra::Application` / `run App` line. Existing apps with
   either of those lines still work; the require is a no-op second load
-  and `run` still wins over the at_exit auto-registration.
+  and an explicit `run` still wins over the lazy first-fetch
+  registration.
 
-- Bumps `homura-runtime` floor to `>= 0.2.25` (Set-Cookie Array fix
-  + path:/RubyGems gem auto-await pipeline) so Inertia / CSRF
-  middleware patterns light up out of the box.
+- Bumps `homura-runtime` floor to `>= 0.2.26` (Set-Cookie Array fix
+  + path:/RubyGems gem auto-await pipeline + the new
+  `ensure_dispatcher_installed!` / lazy `call` discovery this gem
+  depends on).
 
 ## 0.2.17 (2026-04-27)
 

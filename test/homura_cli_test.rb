@@ -42,7 +42,6 @@ Dir.mktmpdir do |dir|
       system('bundle', 'exec', 'ruby', cli, 'new', app_dir) or raise 'homura new failed'
     end
     raise 'Gemfile missing' unless File.exist?(File.join(app_dir, 'Gemfile'))
-    raise 'cf-runtime/setup-node-crypto.mjs missing' unless File.exist?(File.join(app_dir, 'cf-runtime', 'setup-node-crypto.mjs'))
 
     config_ru = File.read(File.join(app_dir, 'config.ru'))
     raise 'config.ru should require app/app relatively' unless config_ru.include?("require_relative 'app/app'")
@@ -141,9 +140,9 @@ Dir.mktmpdir do |dir|
     raise output unless status.success?
 
     entrypoint = File.read(File.join(app_dir, 'build', 'worker.entrypoint.mjs'))
-    raise entrypoint unless entrypoint.include?('import "../cf-runtime/setup-node-crypto.mjs";')
+    raise entrypoint unless entrypoint.include?('import "./cf-runtime/setup-node-crypto.mjs";')
     raise entrypoint unless entrypoint.include?('import "./bundle.mjs";')
-    raise entrypoint unless entrypoint.include?('from "../cf-runtime/worker_module.mjs";')
+    raise entrypoint unless entrypoint.include?('from "./cf-runtime/worker_module.mjs";')
 
     node_script = <<~JS
       const mod = await import(process.argv[2]);
@@ -203,7 +202,7 @@ Dir.mktmpdir do |dir|
       const postResp = await app.fetch(new Request('http://127.0.0.1:8787/create', { method: 'POST' }), {}, ctx);
       console.log(`POST:${postResp.status}:${postResp.headers.get('location')}`);
     JS
-    output, status = Open3.capture2e('node', '--input-type=module', '-', File.join(app_dir, 'worker.entrypoint.mjs'), stdin_data: node_script)
+    output, status = Open3.capture2e('node', '--input-type=module', '-', File.join(app_dir, 'build', 'worker.entrypoint.mjs'), stdin_data: node_script)
     raise output unless status.success?
     lines = output.lines.map(&:strip)
     raise output unless lines.include?('GET:200:ok-from-config-ru')
@@ -243,7 +242,7 @@ Dir.mktmpdir do |dir|
       const resp = await app.fetch(new Request('https://example.test/'), {}, ctx);
       console.log(`${resp.status}:${await resp.text()}`);
     JS
-    output, status = Open3.capture2e('node', '--input-type=module', '-', File.join(app_dir, 'worker.entrypoint.mjs'), stdin_data: node_script)
+    output, status = Open3.capture2e('node', '--input-type=module', '-', File.join(app_dir, 'build', 'worker.entrypoint.mjs'), stdin_data: node_script)
     raise output unless status.success?
     raise output unless output.lines.map(&:strip).include?('200:ok-from-app-rb')
   end
@@ -300,7 +299,7 @@ Dir.mktmpdir do |dir|
         console.log(`${resp.status}:${await resp.text()}`);
       }
     JS
-    output, status = Open3.capture2e('node', '--input-type=module', '-', File.join(app_dir, 'worker.entrypoint.mjs'), stdin_data: node_script)
+    output, status = Open3.capture2e('node', '--input-type=module', '-', File.join(app_dir, 'build', 'worker.entrypoint.mjs'), stdin_data: node_script)
     raise output unless status.success?
     lines = output.lines.map(&:strip)
     raise output unless lines.include?('200:item:42')
@@ -403,7 +402,7 @@ Dir.mktmpdir do |dir|
       console.log(`POST:${postResp.status}:${postResp.headers.get('location')}`);
     JS
 
-    output, status = Open3.capture2e('node', '--input-type=module', '-', File.join(app_dir, 'worker.entrypoint.mjs'), stdin_data: node_script)
+    output, status = Open3.capture2e('node', '--input-type=module', '-', File.join(app_dir, 'build', 'worker.entrypoint.mjs'), stdin_data: node_script)
     raise output unless status.success?
 
     lines = output.lines.map(&:strip)

@@ -126,7 +126,7 @@ module Rack
 
       def self.run(app, **_options)
         @app = app
-        install_dispatcher
+        ensure_dispatcher_installed!
         app
       end
 
@@ -190,18 +190,13 @@ module Rack
       class << self
         private
 
+        # Legacy alias, kept so out-of-tree code calling
+        # `Rack::Handler::CloudflareWorkers.send(:install_dispatcher)`
+        # keeps working. New code should go through
+        # `ensure_dispatcher_installed!` (it's idempotent and tracks
+        # state via `@dispatcher_installed`).
         def install_dispatcher
-          handler = self
-          `
-            globalThis.__HOMURA_RACK_DISPATCH__ = async function(req, env, ctx, body_text) {
-              return await #{handler}.$call(req, env, ctx, body_text == null ? "" : body_text);
-            };
-            (function () {
-              var g = globalThis;
-              g.__OPAL_WORKERS__ = g.__OPAL_WORKERS__ || {};
-              g.__OPAL_WORKERS__.rack = g.__HOMURA_RACK_DISPATCH__;
-            })();
-          `
+          ensure_dispatcher_installed!
         end
 
         # Build a Rack-compliant env Hash from a Cloudflare Workers Request.

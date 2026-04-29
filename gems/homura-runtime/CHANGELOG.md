@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.27 (2026-04-29)
+
+- `Rack::Handler::CloudflareWorkers.run` now goes through
+  `ensure_dispatcher_installed!` instead of duplicating the JS
+  install snippet. Single source of truth for the dispatcher
+  installation; `@dispatcher_installed` correctly tracks the state
+  even when `run` is the first caller. Functionally identical from
+  the user's point of view (dispatcher ends up in `globalThis`
+  either way) — Copilot review on PR #34 spotted the duplication.
+
 ## 0.2.26 (2026-04-29)
 
 - `Rack::Handler::CloudflareWorkers#call`: when `@app` is nil, fall

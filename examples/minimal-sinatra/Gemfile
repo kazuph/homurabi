@@ -5,7 +5,7 @@ ruby '>= 3.4.0'
 
 # Mode A — monorepo dev (this example lives under homura `examples/`).
 gem 'opal-homura', '= 1.8.3.rc1.5', require: 'opal'
-gem 'homura-runtime', '= 0.2.26'
+gem 'homura-runtime', '= 0.2.27'
 gem 'sinatra-homura', '= 0.2.23'
 
 # Mode B — standalone: `gem build` each gem, then `gem install --local` in a clean dir (order: opal-homura → runtime → sinatra),

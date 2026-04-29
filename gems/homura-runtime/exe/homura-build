@@ -275,6 +275,30 @@ else
     warn 'homura build: no app/ directory or top-level app.rb — skipping auto-await'
   end
 
+  # Also run auto-await over every gem we ship to Opal:
+  # `path:`-resolved gems in the consumer Gemfile *and* RubyGems-
+  # installed gems that opt in via
+  # `spec.metadata['homura.auto_await'] = 'true'`. Both go to
+  # `build/auto_await/gem_<basename>/<sub>` and
+  # `standalone_load_paths` puts those rewritten copies ahead of the
+  # gem's untransformed `lib/`.
+  CloudflareWorkers::BuildSupport.opal_gem_paths(root).each do |gem_path|
+    %w[lib].each do |sub|
+      src = gem_path.join(sub)
+      next unless src.directory?
+      out = root.join('build', 'auto_await', "gem_#{gem_path.basename}", sub)
+      FileUtils.mkdir_p(out)
+      run!(
+        [
+          'ruby', CloudflareWorkersBuild.exe_path('auto-await').to_s,
+          '--input', src.to_s,
+          '--output', out.to_s
+        ],
+        chdir: root
+      )
+    end
+  end
+
   opal_in = Pathname(resolve_opal_input(root, options[:opal_input]))
   opal_out = Pathname(options[:opal_output])
   opal_in = root.join(opal_in) unless opal_in.absolute?

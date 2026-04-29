@@ -1,5 +1,38 @@
 # Changelog
 
+## 0.2.25 (2026-04-29)
+
+- `BuildSupport`: factor `opal_gem_paths` out of the path:-only
+  `path_gemfile_entries`. The new method also picks up
+  RubyGems-installed gems that opt in via
+  `spec.metadata['homura.auto_await'] = 'true'`. Without this, a
+  RubyGems-installed pure-Ruby gem (e.g. `sinatra-inertia >= 0.1.1`)
+  was missing from both the Opal load path and the auto-await pass,
+  so `require 'sinatra/inertia'` failed during `homura build`.
+- `homura-build` iterates `opal_gem_paths` instead of the old
+  path:-only list, so any opted-in gem (path: or RubyGems) gets the
+  same auto-await rewrite.
+
+## 0.2.24 (2026-04-29)
+
+- `BuildSupport.standalone_load_paths`: auto-discover `path:`-resolved
+  gems in the consumer Gemfile (skipping `require: false` and
+  `group :development/:test/:ci/...` blocks) and add their `lib/` and
+  `vendor/` to the Opal load path. Lets pure-Ruby gems like
+  `sinatra-inertia` drop into a project without runtime-side wiring.
+- `homura-build` now runs the `auto-await` analyzer over each `path:`
+  gem's `lib/` and writes the rewritten copy under
+  `build/auto_await/gem_<basename>/lib`. The transformed directory
+  is preferred over the gem's untransformed `lib/` on the load path,
+  so async chains inside gem code (e.g. `db[:foo].all` returning a
+  Promise) get `__await__` injected exactly like consumer app code.
+- `cloudflare_workers.rb#build_js_response`: emit `Set-Cookie`
+  Arrays via `Headers#append` (multiple lines) instead of stringifying
+  the Array via `to_s`. Previously, two cookies set by sequential Rack
+  middleware (e.g. session + auth) were serialised as
+  `'["a=…", "b=…"]'`, which broke cookie parsing on every Inertia /
+  CSRF / auth-cookie pattern.
+
 ## 0.2.17 (2026-04-27)
 
 - Rewrite class-variable references (`@@foo`) inside precompiled ERB

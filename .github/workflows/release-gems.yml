@@ -6,6 +6,7 @@ on:
       - 'opal-homura-v*'
       - 'homura-runtime-v*'
       - 'sinatra-homura-v*'
+      - 'sinatra-inertia-v*'
       - 'sequel-d1-v*'
   workflow_dispatch:
     inputs:
@@ -67,6 +68,13 @@ jobs:
               workdir="gems/sinatra-homura"
               gemspec="sinatra-homura.gemspec"
               expected_version="$(ruby -e 'spec = Gem::Specification.load("gems/sinatra-homura/sinatra-homura.gemspec"); print spec.version')"
+              ;;
+            sinatra-inertia-v*)
+              gem_name="sinatra-inertia"
+              version="${ref_name#sinatra-inertia-v}"
+              workdir="gems/sinatra-inertia"
+              gemspec="sinatra-inertia.gemspec"
+              expected_version="$(ruby -e 'load File.expand_path("gems/sinatra-inertia/lib/sinatra/inertia/version.rb", Dir.pwd); print Sinatra::Inertia::VERSION')"
               ;;
             sequel-d1-v*)
               gem_name="sequel-d1"

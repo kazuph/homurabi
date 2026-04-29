@@ -376,12 +376,53 @@ module Rack
             chunks << body
           end
 
+          # Build JS-side headers. Set-Cookie is the one HTTP response
+          # header that legitimately repeats — Rack 3 surfaces it as an
+          # Array of cookie strings (e.g. session middleware + auth
+          # middleware both setting cookies). Plain `vs = v.to_s` would
+          # collapse that Array into its `inspect` form and break cookie
+          # parsing on the client. We use a `__multi__` sentinel here
+          # and let `Cloudflare.headers_to_js` (the SSE/streaming code
+          # path also uses it) emit each entry as a separate header line
+          # via Headers#append.
           js_headers = `({})`
           headers.each do |k, v|
             ks = k.to_s
-            vs = v.to_s
-            `#{js_headers}[#{ks}] = #{vs}`
+            if v.is_a?(Array)
+              arr = `[]`
+              v.each { |vi| `#{arr}.push(#{vi.to_s})` }
+              `#{js_headers}[#{ks}] = { __multi__: true, values: #{arr} }`
+            else
+              vs = v.to_s
+              `#{js_headers}[#{ks}] = #{vs}`
+            end
           end
+
+          # Convert any `{ __multi__: true, values: [...] }` markers into
+          # a real `Headers` object that Workers' `new Response(headers:)`
+          # accepts. Single-valued headers stay as plain string values.
+          js_headers = `(function(h) {
+            var hasMulti = false;
+            for (var key in h) {
+              if (h[key] && typeof h[key] === 'object' && h[key].__multi__ === true) {
+                hasMulti = true;
+                break;
+              }
+            }
+            if (!hasMulti) return h;
+            var realHeaders = new Headers();
+            for (var key in h) {
+              var val = h[key];
+              if (val && typeof val === 'object' && val.__multi__ === true) {
+                for (var j = 0; j < val.values.length; j++) {
+                  realHeaders.append(key, val.values[j]);
+                }
+              } else {
+                realHeaders.set(key, val);
+              }
+            }
+            return realHeaders;
+          })(#{js_headers})`
 
           status_int = status.to_i
 

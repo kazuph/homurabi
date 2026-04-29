@@ -4,9 +4,11 @@ GEM
     ast (2.4.3)
     base64 (0.3.0)
     bigdecimal (4.1.2)
-    homura-runtime (0.2.23)
+    homura-runtime (0.2.25)
       opal-homura (= 1.8.3.rc1.5)
       parser (~> 3.3)
+    logger (1.7.0)
+    mustermann (3.1.1)
     opal-homura (1.8.3.rc1.5)
       ast (>= 2.3.0)
       base64 (>= 0.2.0)
@@ -15,6 +17,14 @@ GEM
       ast (~> 2.4.1)
       racc
     racc (1.8.1)
+    rack (3.2.6)
+    rack-protection (4.2.1)
+      base64 (>= 0.1.0)
+      logger (>= 1.6.0)
+      rack (>= 3.0.0, < 4)
+    rack-session (2.1.2)
+      base64 (>= 0.1.0)
+      rack (>= 3.0.0)
     rake (13.4.2)
     sequel (5.103.0)
       bigdecimal
@@ -23,21 +33,51 @@ GEM
       opal-homura (= 1.8.3.rc1.5)
       sequel (~> 5.0)
       sqlite3 (~> 2.0)
-    sinatra-homura (0.2.20)
+    sinatra (4.2.1)
+      logger (>= 1.6.0)
+      mustermann (~> 3.0)
+      rack (>= 3.0.0, < 4)
+      rack-protection (= 4.2.1)
+      rack-session (>= 2.0.0, < 3)
+      tilt (~> 2.0)
+    sinatra-homura (0.2.22)
       homura-runtime (~> 0.2, >= 0.2.23)
       opal-homura (= 1.8.3.rc1.5)
+    sinatra-inertia (0.1.2)
+      rack (>= 2.0, < 4.0)
+      sinatra (>= 3.0, < 5.0)
+    sqlite3 (2.9.3-aarch64-linux-gnu)
+    sqlite3 (2.9.3-aarch64-linux-musl)
+    sqlite3 (2.9.3-arm-linux-gnu)
+    sqlite3 (2.9.3-arm-linux-musl)
     sqlite3 (2.9.3-arm64-darwin)
+    sqlite3 (2.9.3-x86-linux-gnu)
+    sqlite3 (2.9.3-x86-linux-musl)
+    sqlite3 (2.9.3-x86_64-darwin)
+    sqlite3 (2.9.3-x86_64-linux-gnu)
+    sqlite3 (2.9.3-x86_64-linux-musl)
+    tilt (2.7.0)
 
 PLATFORMS
-  arm64-darwin-25
+  aarch64-linux-gnu
+  aarch64-linux-musl
+  arm-linux-gnu
+  arm-linux-musl
+  arm64-darwin
+  x86-linux-gnu
+  x86-linux-musl
+  x86_64-darwin
+  x86_64-linux-gnu
+  x86_64-linux-musl
 
 DEPENDENCIES
-  homura-runtime (= 0.2.23)
+  homura-runtime (= 0.2.25)
   opal-homura (= 1.8.3.rc1.5)
   rake
   sequel (~> 5.0)
   sequel-d1 (= 0.2.10)
-  sinatra-homura (= 0.2.20)
+  sinatra-homura (= 0.2.22)
+  sinatra-inertia (= 0.1.2)
   sqlite3 (>= 2.0)
 
 RUBY VERSION

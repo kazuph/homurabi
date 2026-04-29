@@ -3,9 +3,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "bundle exec rake build",
+    "client:install": "cd client && npm install",
+    "client:build": "cd client && npm run build",
+    "client:dev": "cd client && npm run dev",
+    "build": "npm run client:build && bundle exec rake build",
     "dev": "bundle exec rake dev",
-    "deploy": "bundle exec rake deploy"
+    "deploy": "npm run client:build && bundle exec rake deploy"
   },
   "devDependencies": {
     "wrangler": "^3.99.0"

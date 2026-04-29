@@ -6,7 +6,20 @@ require 'tmpdir'
 $LOAD_PATH.unshift(File.expand_path('../gems/homura-runtime/lib', __dir__))
 require 'cloudflare_workers/build_support'
 
-FakeSpec = Struct.new(:full_gem_path)
+FakeSpec = Struct.new(:full_gem_path) do
+  # `BuildSupport.opal_gem_paths` (added in homura-runtime 0.2.25)
+  # iterates `Gem.loaded_specs.each_value` and reads `spec.name` /
+  # `spec.metadata` to decide whether a gem opts in to the auto-await
+  # pass. Unit-test FakeSpecs must expose the same surface so that
+  # ordinary `loaded_specs:` lookup tests don't blow up.
+  def name
+    full_gem_path.to_s.split('/').last.to_s
+  end
+
+  def metadata
+    {}
+  end
+end
 
 passed = 0
 failed = 0
@@ -89,9 +102,10 @@ ok = assert('copies standalone runtime files into cf-runtime') do
     File.write(File.join(runtime_root, 'runtime', 'worker_module.mjs'), "worker\n")
 
     target = CloudflareWorkers::BuildSupport.ensure_standalone_runtime(dir, loaded_specs: specs)
-    raise "expected #{File.join(dir, 'cf-runtime')}, got #{target}" unless target.to_s == File.join(dir, 'cf-runtime')
-    raise 'missing setup-node-crypto.mjs' unless File.read(File.join(dir, 'cf-runtime', 'setup-node-crypto.mjs')) == "setup\n"
-    raise 'missing worker_module.mjs' unless File.read(File.join(dir, 'cf-runtime', 'worker_module.mjs')) == "worker\n"
+    expected = File.join(dir, 'build', 'cf-runtime')
+    raise "expected #{expected}, got #{target}" unless target.to_s == expected
+    raise 'missing setup-node-crypto.mjs' unless File.read(File.join(expected, 'setup-node-crypto.mjs')) == "setup\n"
+    raise 'missing worker_module.mjs' unless File.read(File.join(expected, 'worker_module.mjs')) == "worker\n"
   end
 end
 passed += 1 if ok

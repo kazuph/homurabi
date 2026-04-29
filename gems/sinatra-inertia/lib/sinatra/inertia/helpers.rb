@@ -1,0 +1,169 @@
+# frozen_string_literal: true
+
+require 'json'
+require_relative 'response'
+
+module Sinatra
+  module Inertia
+    # Sinatra helpers exposed to route handlers. Mounted by the
+    # `Sinatra::Inertia` extension.
+    module Helpers
+      # Render an Inertia response.
+      #
+      #   inertia 'Todos/Index', props: { todos: -> { Todo.all } }
+      #
+      # Layout selection: the configured layout (default `:layout`) is
+      # rendered for full HTML responses. The view receives `@page_json`
+      # (an HTML-escaped JSON string ready to drop into a `data-page`
+      # attribute) and `@page` (the underlying Hash, useful for SSR or
+      # custom rendering).
+      def inertia(component, props: {}, layout: nil)
+        layout = settings.respond_to?(:inertia_layout) ? settings.inertia_layout : :layout if layout.nil?
+
+        version = current_inertia_version
+        shared = current_inertia_shared
+        encrypt = if !@inertia_encrypt_history_override.nil?
+                    @inertia_encrypt_history_override == true
+                  elsif settings.respond_to?(:inertia_encrypt_history)
+                    settings.inertia_encrypt_history == true
+                  else
+                    false
+                  end
+        clear = @inertia_clear_history == true
+
+        # Read errors *before* sweeping so the response carries them, then
+        # sweep immediately so the next request sees a clean slate. The
+        # sweep must happen before any further session writes that the
+        # framework might serialise on commit.
+        errors_payload = inertia_errors_payload
+        sweep_inertia_session!
+
+        response_obj = Sinatra::Inertia::Response.new(
+          component: component,
+          props: props,
+          request: request,
+          version: version,
+          url: request.fullpath,
+          encrypt_history: encrypt,
+          clear_history: clear,
+          shared: shared,
+          errors: errors_payload
+        )
+        page_hash = response_obj.to_h
+        page_json = page_hash.to_json
+
+        if inertia_request?
+          content_type 'application/json; charset=utf-8'
+          headers['X-Inertia'] = 'true'
+          headers['Vary'] = 'X-Inertia'
+          return page_json
+        end
+
+        @page = page_hash
+        @page_json = ::Rack::Utils.escape_html(page_json)
+        erb layout, layout: false
+      end
+
+      # Rails-flavored alias: `render inertia: 'Component', props: {...}`
+      # We must preserve Sinatra's `render(engine, data = nil, options = {}, locals = {}, &block)`
+      # signature for the non-inertia path, so we forward *args/**kwargs.
+      def render(*args, **kwargs, &block)
+        first = args.first
+        if args.length == 1 && first.is_a?(Hash) && first.key?(:inertia)
+          inertia(first[:inertia], props: first[:props] || {}, layout: first[:layout])
+        elsif kwargs.key?(:inertia) && args.empty?
+          inertia(kwargs[:inertia], props: kwargs[:props] || {}, layout: kwargs[:layout])
+        else
+          super(*args, **kwargs, &block)
+        end
+      end
+
+      def inertia_request?
+        request.env['HTTP_X_INERTIA'] == 'true'
+      end
+
+      # CSRF token for the current request. Mounted by CSRFMiddleware
+      # (`set :inertia_csrf_protection, true` by default). Pair this with
+      # `inertia_share { { csrfToken: csrf_token } }` so the React/Vue
+      # client picks it up automatically — but note that when
+      # `Sinatra::Inertia::CSRFMiddleware` is active, the cookie + header
+      # exchange is already handled by the Inertia client; this helper is
+      # mainly for hidden-field forms or non-XHR submissions.
+      def csrf_token
+        request.env['sinatra.inertia.csrf_token']
+      end
+
+      # ------------------------------------------------------------------
+      # Shared props — runtime accessors (the `inertia_share` class DSL is
+      # in extension.rb, this is the per-request resolver).
+      def current_inertia_shared
+        blocks = settings.inertia_share_blocks || []
+        merged = {}
+        blocks.each do |b|
+          v = instance_exec(&b)
+          if v.is_a?(Hash)
+            merged = deep_merge(merged, v)
+          end
+        end
+        merged
+      end
+
+      # ------------------------------------------------------------------
+      # Asset version
+      def current_inertia_version
+        v = settings.respond_to?(:inertia_version) ? settings.inertia_version : nil
+        v.respond_to?(:call) ? v.call.to_s : v.to_s
+      end
+
+      # ------------------------------------------------------------------
+      # Errors / flash session sweep (per Inertia validation pattern).
+      # Consumers call `inertia_errors(field: 'message')` before redirecting
+      # to a form route; the next request renders the form with errors and
+      # sweeps them out of the session.
+      def inertia_errors(payload = nil)
+        if payload.nil?
+          (session[:_inertia_errors] || {}).dup
+        else
+          session[:_inertia_errors] = payload
+          payload
+        end
+      end
+
+      def inertia_clear_history!
+        @inertia_clear_history = true
+      end
+
+      def inertia_encrypt_history!(flag = true)
+        @inertia_encrypt_history_override = flag
+      end
+
+      def inertia_errors_payload
+        errors = session[:_inertia_errors]
+        return nil if errors.nil?
+        return nil if errors.respond_to?(:empty?) && errors.empty?
+        errors
+      end
+
+      def sweep_inertia_session!
+        # Rack::Session::Cookie tracks writes by hash mutation. On some
+        # session backends (e.g. the JSON-coder cookie store homura uses
+        # under Cloudflare Workers) `delete` is a no-op for the *backing
+        # cookie* — the change isn't serialised back. Force a write by
+        # assigning nil instead, which the JSON encoder still emits as
+        # `null` and makes `inertia_errors_payload` treat the field as
+        # absent on the next visit.
+        if session.respond_to?(:[]=)
+          session[:_inertia_errors] = nil
+        end
+      end
+
+      private
+
+      def deep_merge(a, b)
+        a.merge(b) do |_k, av, bv|
+          (av.is_a?(Hash) && bv.is_a?(Hash)) ? deep_merge(av, bv) : bv
+        end
+      end
+    end
+  end
+end

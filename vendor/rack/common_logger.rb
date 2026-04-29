@@ -66,8 +66,13 @@ module Rack
         length,
         Utils.clock_time - began_at)
 
-      msg.gsub!(/[^[:print:]]/) { |c| sprintf("\\x%x", c.ord) }
-      msg[-1] = "\n"
+      # homura: Opal Strings are immutable, so use non-mutating gsub +
+      # chomp + concat instead of `gsub!` / `String#[]=`. Behaviour
+      # identical on MRI; required to keep CommonLogger usable when
+      # Sinatra default-middleware is active under the Workers + Opal
+      # stack.
+      msg = msg.gsub(/[^[:print:]]/) { |c| sprintf("\\x%x", c.ord) }
+      msg = msg.chomp + "\n"
 
       logger = @logger || request.get_header(RACK_ERRORS)
       # Standard library logger doesn't support write but it supports << which actually

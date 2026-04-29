@@ -1,0 +1,128 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+# Cancel any in-progress run for the same PR / branch when a new commit lands.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Main test suite — npm test runs the full Opal-compiled smoke matrix
+  # plus the Ruby-side analyzer / CLI / build-support tests. This is the
+  # same `npm test` users run locally before pushing.
+  # ---------------------------------------------------------------------------
+  npm-test:
+    name: npm test (smoke + ruby tests)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.4'
+          bundler-cache: true
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - name: Install npm deps
+        run: npm ci
+      - name: Run npm test
+        run: npm test
+
+  # ---------------------------------------------------------------------------
+  # sinatra-inertia gem unit tests — pure-Sinatra side, runs under MRI
+  # against rack-test + minitest. Has its own Gemfile because the gem is
+  # supposed to work without homura-runtime.
+  # ---------------------------------------------------------------------------
+  sinatra-inertia-test:
+    name: sinatra-inertia (MRI minitest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.4'
+      - name: Install test deps
+        run: |
+          cat > /tmp/test-Gemfile <<'EOF'
+          source 'https://rubygems.org'
+          gem 'sinatra'
+          gem 'rack-test'
+          gem 'minitest'
+          EOF
+          BUNDLE_GEMFILE=/tmp/test-Gemfile bundle install
+      - name: Run sinatra-inertia tests
+        working-directory: gems/sinatra-inertia
+        run: |
+          BUNDLE_GEMFILE=/tmp/test-Gemfile bundle exec ruby -Ilib test/test_inertia.rb
+
+  # ---------------------------------------------------------------------------
+  # examples/inertia-todo client — TypeScript typecheck. Catches drift
+  # between sinatra-inertia's wire-protocol shape and the React client's
+  # type expectations.
+  # ---------------------------------------------------------------------------
+  inertia-todo-typecheck:
+    name: inertia-todo client (tsc)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - name: Install client deps
+        working-directory: examples/inertia-todo/client
+        run: npm ci
+      - name: TypeScript typecheck
+        working-directory: examples/inertia-todo/client
+        run: npm run typecheck
+      - name: Vite production build
+        working-directory: examples/inertia-todo/client
+        run: npm run build
+
+  # ---------------------------------------------------------------------------
+  # Ruby syntax check across every gem + example app — fast canary that
+  # catches typos / incomplete modernizations like the recent
+  # `require 'sinatra/cloudflare_workers'` strip. Doesn't run code, just
+  # `ruby -c` parses.
+  # ---------------------------------------------------------------------------
+  ruby-syntax:
+    name: ruby -c (syntax check)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.4'
+      - name: Parse all .rb files
+        run: |
+          set -euo pipefail
+          # Skip vendored upstream code (vendor/opal-gem, vendor/bundle,
+          # gems/*/vendor) — those are pristine third-party copies and any
+          # parser disagreement there is upstream's problem, not ours.
+          fail=0
+          while IFS= read -r f; do
+            if ! ruby -c "$f" >/dev/null 2>err; then
+              echo "::error file=$f::ruby -c failed:"
+              cat err
+              fail=1
+            fi
+          done < <(git ls-files -- '*.rb' \
+            ':!vendor/**' \
+            ':!vendor/opal-gem/**' \
+            ':!gems/*/vendor/**' \
+            ':!.worktree/**' \
+            ':!.worktrees/**')
+          rm -f err
+          exit $fail

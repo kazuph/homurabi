@@ -60,7 +60,7 @@ jobs:
               version="${ref_name#homura-runtime-v}"
               workdir="gems/homura-runtime"
               gemspec="homura-runtime.gemspec"
-              expected_version="$(ruby -e 'load File.expand_path("gems/homura-runtime/lib/cloudflare_workers/version.rb", Dir.pwd); print CloudflareWorkers::VERSION')"
+              expected_version="$(ruby -e 'load File.expand_path("gems/homura-runtime/lib/homura/runtime/version.rb", Dir.pwd); print HomuraRuntime::VERSION')"
               ;;
             sinatra-homura-v*)
               gem_name="sinatra-homura"

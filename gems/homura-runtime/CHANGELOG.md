@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.1 (2026-04-29)
+
+- Fix `release-gems.yml` `Resolve gem target` step: now reads
+  `gems/homura-runtime/lib/homura/runtime/version.rb` (was the
+  pre-rename `gems/homura-runtime/lib/cloudflare_workers/version.rb`,
+  which 0.3.0's tag-push publish failed on).
+- No code changes since 0.3.0; this version exists only because
+  re-tagging a published version is forbidden by the project's
+  release rules. 0.3.0 was never published to RubyGems.
+
 ## 0.3.0 (2026-04-29) — BREAKING: cloudflare_workers naming eliminated
 
 The "cloudflare_workers" branding everywhere inside the gem is gone.

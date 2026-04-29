@@ -5,13 +5,13 @@ ruby '>= 3.4.0'
 
 gem 'rake'
 gem 'opal-homura', '= 1.8.3.rc1.5', require: 'opal'
-gem 'homura-runtime', '= 0.3.0'
+gem 'homura-runtime', '= 0.3.1'
 gem 'sinatra-homura', '= 0.3.0'
 
 # D1 / Sequel migrations (compile-time only). The Worker itself talks to D1
 # directly through `env['cloudflare.DB']` (sqlite3-ruby compatible API), but
 # `bundle exec rake db:migrate:compile` needs Sequel + sqlite3 locally to
 # compile Sequel migration DSL into wrangler-compatible SQL.
-gem 'sequel-d1', '= 0.3.0'
+gem 'sequel-d1', '= 0.3.1'
 gem 'sequel', '~> 5.0'
 gem 'sqlite3', '>= 2.0'

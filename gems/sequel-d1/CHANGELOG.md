@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.1 (2026-04-29)
+
+- 0.3.0 was tagged but the release workflow failed before publish
+  because `lib/sequel/d1/version.rb` at that tag still showed
+  `0.2.10` (the version bump didn't actually land in the 0.3.0
+  commit due to a tooling glitch). 0.3.1 ships the actual 0.3.0
+  payload — the cloudflare_workers naming-elimination companion
+  changes. 0.3.0 was never published to RubyGems.
+
 ## 0.3.0 (2026-04-29) — BREAKING: cloudflare_workers naming eliminated
 
 Companion release to homura-runtime 0.3.0. The `homura

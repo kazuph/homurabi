@@ -2,6 +2,6 @@
 
 module Sequel
   module D1
-    VERSION = '0.2.10'
+    VERSION = '0.3.1'
   end
 end

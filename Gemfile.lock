@@ -1,14 +1,14 @@
 PATH
   remote: gems/homura-runtime
   specs:
-    homura-runtime (0.3.0)
+    homura-runtime (0.3.1)
       opal-homura (= 1.8.3.rc1.5)
       parser (~> 3.3)
 
 PATH
   remote: gems/sequel-d1
   specs:
-    sequel-d1 (0.2.10)
+    sequel-d1 (0.3.1)
       homura-runtime (~> 0.3)
       opal-homura (= 1.8.3.rc1.5)
       sequel (~> 5.0)

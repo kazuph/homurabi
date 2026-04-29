@@ -30,7 +30,7 @@
 ## Docs entrypoints
 
 - Human overview: `README.md`
-- Machine-readable summary: `public/llms.txt`
+- Machine-readable summary: served live at <https://homura.kazu-san.workers.dev/llms.txt> (source: `site/public/llms.txt`)
 - Setup guide: `skills/homura-workers-gems/quick-start.md`
 - Common pitfalls: `skills/homura-workers-gems/gotchas.md`
 - Runtime internals: `docs/TOOLCHAIN_CONTRACT.md`

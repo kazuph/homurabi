@@ -30,5 +30,10 @@ dist/
 # mise local config (per-machine)
 .mise.local.toml
 
+# Claude Code per-machine permission overrides (the project-wide
+# `.claude/settings.json` is tracked; `.claude/settings.local.json`
+# is the per-developer allow-list and should never be committed).
+.claude/settings.local.json
+
 # Local task artifacts (report/evidence, do not version)
 .artifacts/

@@ -16,10 +16,15 @@ require 'rubygems/version'
 
 require 'sinatra/main'
 require 'sinatra_opal_patches'
-# homura: classic-style `require 'sinatra'` should be enough on its own;
-# pull in the Cloudflare Workers runtime so users don't also have to
-# `require 'sinatra/cloudflare_workers'` to get the Rack handler and
-# Cloudflare bindings.
-require 'cloudflare_workers'
+# homura: classic-style `require 'sinatra'` is enough on its own.
+# `sinatra/cloudflare_workers` already chains in `cloudflare_workers`
+# (the runtime gem entry — BinaryBody, Rack handler, Cloudflare
+# bindings) and installs the at_exit hook that auto-registers
+# `Sinatra::Application` (or `App` in modular code) with
+# `Rack::Handler::CloudflareWorkers`. As of sinatra-homura 0.2.23 the
+# user does NOT need to write `require 'sinatra/cloudflare_workers'`
+# nor `run Sinatra::Application` — the canonical sinatrarb.com snippet
+# works verbatim on Workers.
+require 'sinatra/cloudflare_workers'
 
 enable :inline_templates

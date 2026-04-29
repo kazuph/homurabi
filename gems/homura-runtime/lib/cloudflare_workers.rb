@@ -134,6 +134,34 @@ module Rack
         @app
       end
 
+      def self.app=(app)
+        @app = app
+      end
+
+      # Eagerly install the JS-side dispatcher so a fetch arriving
+      # before `run` was called (e.g. classic-style apps that omit the
+      # trailing `run Sinatra::Application`) still gets routed into our
+      # `call` method, which can then discover the user's Sinatra app
+      # lazily via `Sinatra::CloudflareWorkers.ensure_rack_app!`. This
+      # is what makes the canonical sinatrarb.com snippet work
+      # verbatim on Workers — `at_exit` is unreliable here because the
+      # isolate never actually exits between fetches.
+      def self.ensure_dispatcher_installed!
+        return true if @dispatcher_installed
+        handler = self
+        `
+          globalThis.__HOMURA_RACK_DISPATCH__ = async function(req, env, ctx, body_text) {
+            return await #{handler}.$call(req, env, ctx, body_text == null ? "" : body_text);
+          };
+          (function () {
+            var g = globalThis;
+            g.__OPAL_WORKERS__ = g.__OPAL_WORKERS__ || {};
+            g.__OPAL_WORKERS__.rack = g.__HOMURA_RACK_DISPATCH__;
+          })();
+        `
+        @dispatcher_installed = true
+      end
+
       # Entry point invoked from the Module Worker (src/worker.mjs) for
       # every fetch event. `js_req` is a Cloudflare Workers Request,
       # `js_env` is the bindings object (D1, KV, R2, secrets...),
@@ -141,7 +169,13 @@ module Rack
       # request body (the worker.mjs front awaits req.text() before
       # handing control to Ruby because Opal runs synchronously).
       def self.call(js_req, js_env, js_ctx, body_text = '')
-        raise '`run app` was never called from user code' if @app.nil?
+        if @app.nil?
+          if defined?(::Sinatra::CloudflareWorkers) &&
+             ::Sinatra::CloudflareWorkers.respond_to?(:ensure_rack_app!)
+            ::Sinatra::CloudflareWorkers.ensure_rack_app!
+          end
+          raise '`run app` was never called from user code, and no Sinatra app was discoverable (define `class App < Sinatra::Base` or use top-level classic Sinatra routes)' if @app.nil?
+        end
 
         env = build_rack_env(js_req, js_env, js_ctx, body_text)
         result = @app.call(env)

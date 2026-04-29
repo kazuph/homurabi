@@ -16,5 +16,12 @@ require 'rubygems/version'
 
 require 'sinatra/main'
 require 'sinatra_opal_patches'
+# homura: classic-style `require 'sinatra'` is enough on its own.
+# `sinatra/cloudflare_workers` chains in `cloudflare_workers` (the
+# runtime gem entry: BinaryBody, Rack handler, Cloudflare bindings)
+# AND eagerly installs the JS-side dispatcher so a fetch arriving
+# before `run` was called (canonical sinatrarb.com snippet) still
+# resolves the user's Sinatra app via `ensure_rack_app!`.
+require 'sinatra/cloudflare_workers'
 
 enable :inline_templates

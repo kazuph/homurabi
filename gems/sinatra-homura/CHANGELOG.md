@@ -1,5 +1,52 @@
 # Changelog
 
+## 0.2.23 (2026-04-29)
+
+- The canonical sinatrarb.com snippet now works verbatim on Workers.
+  Previously, even after 0.2.22 made `require 'sinatra'` enough to load
+  the runtime, users still had to write `run Sinatra::Application` /
+  `run App` themselves because `ensure_rack_app!` only handled
+  `class App < Sinatra::Base` (and only at_exit-fired when
+  `sinatra/cloudflare_workers` was required directly). Two changes
+  fix this:
+
+  - `vendor/sinatra.rb` and `vendor/sinatra/base.rb` now require
+    `sinatra/cloudflare_workers` (was just `cloudflare_workers`), so
+    the at_exit hook is installed by `require 'sinatra'` /
+    `require 'sinatra/base'` alone.
+  - `Sinatra::CloudflareWorkers.ensure_rack_app!` now also detects
+    classic-style `Sinatra::Application` (top-level `get '/' do … end`)
+    and registers it with `Rack::Handler::CloudflareWorkers` if it has
+    routes. Modular `App` still wins when both are defined.
+
+  Net effect: this app:
+
+  ```ruby
+  require 'sinatra'
+  get '/frank-says' do
+    'Put this in your pipe & smoke it!'
+  end
+  ```
+
+  …and this app:
+
+  ```ruby
+  require 'sinatra/base'
+  class App < Sinatra::Base
+    get '/' do; 'hi'; end
+  end
+  ```
+
+  …both now run on Workers without an extra
+  `require 'sinatra/cloudflare_workers'` line and without a trailing
+  `run Sinatra::Application` / `run App` line. Existing apps with
+  either of those lines still work; the require is a no-op second load
+  and `run` still wins over the at_exit auto-registration.
+
+- Bumps `homura-runtime` floor to `>= 0.2.25` (Set-Cookie Array fix
+  + path:/RubyGems gem auto-await pipeline) so Inertia / CSRF
+  middleware patterns light up out of the box.
+
 ## 0.2.17 (2026-04-27)
 
 - Preserve `content_type`, `headers`, and `status` set inside async / `await: true`

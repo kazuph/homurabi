@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.2.26 (2026-04-29)
+
+- `Rack::Handler::CloudflareWorkers#call`: when `@app` is nil, fall
+  back to `Sinatra::CloudflareWorkers.ensure_rack_app!` to discover
+  the Sinatra app lazily on the first fetch. This is what lets
+  classic-style apps omit the trailing `run Sinatra::Application`
+  line (paired with `sinatra-homura >= 0.2.23`).
+- New `Rack::Handler::CloudflareWorkers.ensure_dispatcher_installed!`:
+  eagerly registers the JS-side dispatcher (`globalThis.__HOMURA_RACK_DISPATCH__`)
+  at script-load time, so a fetch arriving before `run` was called
+  still routes into our `call` method (where the lazy app discovery
+  above kicks in). On Workers `at_exit` is unreliable because the
+  isolate doesn't exit between requests; this eager install is the
+  reliable hook.
+
 ## 0.2.25 (2026-04-29)
 
 - `BuildSupport`: factor `opal_gem_paths` out of the path:-only

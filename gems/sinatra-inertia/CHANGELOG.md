@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.1 — 2026-04-29
+
+- Add `spec.metadata['homura.auto_await'] = 'true'` so that when this
+  gem is consumed via RubyGems alongside `homura-runtime >= 0.2.25`,
+  `homura build` automatically adds our `lib/` to the Opal load path
+  and runs the auto-await analyzer over our source. 0.1.0 only worked
+  when the consumer Gemfile path:-linked us; this is the released
+  fix for that.
+
 ## 0.1.0 — 2026-04-29
 
 * Initial release.

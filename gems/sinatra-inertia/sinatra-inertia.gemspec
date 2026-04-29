@@ -27,6 +27,14 @@ Gem::Specification.new do |spec|
   spec.metadata['changelog_uri'] = "#{spec.homepage}/blob/main/#{gem_path}/CHANGELOG.md"
   spec.metadata['readme_uri'] = "#{spec.homepage}/blob/main/#{gem_path}/README.md"
 
+  # Opt-in to homura-runtime's auto-await pass: when this gem is
+  # installed alongside homura-runtime (>= 0.2.25), `homura build`
+  # automatically adds our `lib/` to the Opal load path and runs the
+  # auto-await analyzer over our source so async chains
+  # (`db[:foo].all` returning a Promise inside a route Proc, etc.)
+  # resolve transparently. No-op when consumed by plain MRI Sinatra apps.
+  spec.metadata['homura.auto_await'] = 'true'
+
   spec.files = Dir.chdir(__dir__) do
     Dir['lib/**/*', 'README.md', 'CHANGELOG.md', 'LICENSE'].select { |f| File.file?(f) }
   end

@@ -7,9 +7,9 @@ ruby '>= 3.4.0'
 # CLAUDE.md, this Gemfile must NOT path:-link any unreleased local gem;
 # new versions get `gem build` + `gem push`-ed first.
 gem 'opal-homura', '= 1.8.3.rc1.5', require: 'opal'
-gem 'homura-runtime', '= 0.2.24'
+gem 'homura-runtime', '= 0.2.25'
 gem 'sinatra-homura', '= 0.2.22'
-gem 'sinatra-inertia', '= 0.1.0'
+gem 'sinatra-inertia', '= 0.1.1'
 gem 'sequel-d1', '= 0.2.10'
 
 gem 'rake'

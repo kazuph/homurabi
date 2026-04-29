@@ -86,18 +86,19 @@ module CloudflareWorkers
           end
         end
 
-        # Pick up any other `path:`-resolved gems declared in the consumer's
-        # Gemfile (e.g. `sinatra-inertia`). This keeps the build pipeline
-        # extensible: users can drop a pure-Ruby gem under `gems/foo`, list
-        # it as `gem 'foo', path: '../../gems/foo'`, and Opal will find its
-        # `lib/` automatically — no homura-runtime change required.
+        # Pick up any other gems that should ship in the Workers bundle:
         #
-        # We prefer the auto-await-transformed copy under
-        # `build/auto_await/gem_<basename>/lib` if present (homura-build
-        # writes one for every path: gem before invoking Opal), so that
-        # async chains inside the gem get `__await__` inserted just like
-        # consumer app code.
-        path_gemfile_entries(root).each do |gem_path|
+        #   * `path:`-resolved gems in the consumer's Gemfile (monorepo
+        #     dev mode), and
+        #   * RubyGems-installed gems that opt in via
+        #     `spec.metadata['homura.auto_await'] = 'true'`.
+        #
+        # Both go through the same auto-await pass during `homura-build`,
+        # and we prefer the rewritten copy under
+        # `build/auto_await/gem_<basename>/lib` if present so async chains
+        # inside gem code get `__await__` inserted just like consumer
+        # app code.
+        opal_gem_paths(root, loaded_specs: loaded_specs).each do |gem_path|
           basename = gem_path.basename.to_s
           rewritten_lib = root.join('build', 'auto_await', "gem_#{basename}", 'lib')
           load_paths << rewritten_lib.to_s if rewritten_lib.directory?
@@ -131,6 +132,31 @@ module CloudflareWorkers
         runtime_path = Pathname.new(m[1]).expand_path(project_root)
         vend = runtime_path.join('..', '..', 'vendor').expand_path
         vend if vend.directory?
+      end
+
+      # Returns the union of `path_gemfile_entries(project_root)` and any
+      # bundled gems that opt in to the Opal pipeline via
+      # `spec.metadata['homura.auto_await']`. This is the single source
+      # of truth for both `standalone_load_paths` and the auto-await pass
+      # that `homura-build` runs. Returns `Pathname` objects pointing at
+      # each gem's root directory.
+      def opal_gem_paths(project_root, loaded_specs: Gem.loaded_specs)
+        wired = [RUNTIME_GEM_NAME, SINATRA_GEM_NAME, SEQUEL_D1_GEM_NAME]
+        out = []
+        out.concat(path_gemfile_entries(project_root))
+
+        loaded_specs.each_value do |spec|
+          next if wired.include?(spec.name)
+          meta = spec.metadata
+          next unless meta.is_a?(Hash)
+          flag = meta['homura.auto_await']
+          next unless flag == 'true' || flag == true
+          next if spec.full_gem_path.nil?
+          gem_path = Pathname(spec.full_gem_path)
+          out << gem_path if gem_path.directory?
+        end
+
+        out.uniq
       end
 
       # Returns absolute Pathnames for every `path:`-declared gem in the

@@ -275,13 +275,14 @@ else
     warn 'homura build: no app/ directory or top-level app.rb — skipping auto-await'
   end
 
-  # Also run auto-await over any `path:`-resolved gems declared in the
-  # consumer's Gemfile (e.g. `sinatra-inertia`). The transformed copies
-  # are written to `build/auto_await/gem_<basename>/<original-relative>`,
-  # and `standalone_load_paths` puts those directories ahead of the
-  # untransformed gem `lib/` so `require 'sinatra/inertia'` resolves to
-  # the rewritten file.
-  CloudflareWorkers::BuildSupport.path_gemfile_entries(root).each do |gem_path|
+  # Also run auto-await over every gem we ship to Opal:
+  # `path:`-resolved gems in the consumer Gemfile *and* RubyGems-
+  # installed gems that opt in via
+  # `spec.metadata['homura.auto_await'] = 'true'`. Both go to
+  # `build/auto_await/gem_<basename>/<sub>` and
+  # `standalone_load_paths` puts those rewritten copies ahead of the
+  # gem's untransformed `lib/`.
+  CloudflareWorkers::BuildSupport.opal_gem_paths(root).each do |gem_path|
     %w[lib].each do |sub|
       src = gem_path.join(sub)
       next unless src.directory?

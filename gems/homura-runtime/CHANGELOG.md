@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.2.25 (2026-04-29)
+
+- `BuildSupport`: factor `opal_gem_paths` out of the path:-only
+  `path_gemfile_entries`. The new method also picks up
+  RubyGems-installed gems that opt in via
+  `spec.metadata['homura.auto_await'] = 'true'`. Without this, a
+  RubyGems-installed pure-Ruby gem (e.g. `sinatra-inertia >= 0.1.1`)
+  was missing from both the Opal load path and the auto-await pass,
+  so `require 'sinatra/inertia'` failed during `homura build`.
+- `homura-build` iterates `opal_gem_paths` instead of the old
+  path:-only list, so any opted-in gem (path: or RubyGems) gets the
+  same auto-await rewrite.
+
 ## 0.2.24 (2026-04-29)
 
 - `BuildSupport.standalone_load_paths`: auto-discover `path:`-resolved

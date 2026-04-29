@@ -1,4 +1,4 @@
-# Minimal Sinatra with Email — Phase 17.5 Auto-Await Demo
+# Sinatra with Email — Phase 17.5 Auto-Await Demo
 
 This example shows the **Phase 17.5** user experience: you write plain
 Sinatra + Ruby, and the `homura build` pipeline automatically
@@ -47,11 +47,12 @@ No `.__await__`. No `# await:` magic comment. Just Ruby.
 ## Build & run
 
 ```bash
-cd examples/minimal-sinatra-with-email
+cd examples/sinatra-with-email
 bundle install
-bundle exec homura build --standalone
-npx wrangler dev --port 8787
+bundle exec rake dev    # build + npx wrangler dev --local
 ```
+
+To deploy: `bundle exec rake deploy` (or `npm run deploy`).
 
 ## Test
 

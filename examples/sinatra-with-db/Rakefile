@@ -27,7 +27,7 @@ end
 namespace :db do
   namespace :migrate do
     def d1_database_name
-      ENV['CLOUDFLARE_D1_DATABASE'] || 'minimal-sinatra-with-db'
+      ENV['CLOUDFLARE_D1_DATABASE'] || 'sinatra-with-db'
     end
 
     desc 'Compile Sequel migrations to Wrangler SQL in db/migrations/'

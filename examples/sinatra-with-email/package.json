@@ -1,5 +1,5 @@
 {
-  "name": "minimal-sinatra",
+  "name": "sinatra-with-email",
   "private": true,
   "type": "module",
   "scripts": {

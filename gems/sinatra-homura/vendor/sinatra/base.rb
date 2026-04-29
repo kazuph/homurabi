@@ -9,16 +9,16 @@
 
 require 'sinatra_upstream/base'
 require 'sinatra_opal_patches'
-# homura: chain in `sinatra/cloudflare_workers`, which already pulls
-# `cloudflare_workers` (runtime gem entry: BinaryBody, Rack handler,
+# homura: chain in `sinatra/homura`, which already pulls
+# `homura/runtime` (runtime gem entry: BinaryBody, Rack handler,
 # Cloudflare bindings) AND installs the at_exit hook that
 # auto-registers `App` / `Sinatra::Application` with
-# `Rack::Handler::CloudflareWorkers`. As of sinatra-homura 0.2.23 a
+# `Rack::Handler::Homura`. As of sinatra-homura 0.2.23 a
 # modular app written the textbook way works on Workers without
-# either `require 'sinatra/cloudflare_workers'` or `run App`:
+# either `require 'sinatra/homura'` or `run App`:
 #
 #   require 'sinatra/base'
 #   class App < Sinatra::Base
 #     get '/' do; 'hi'; end
 #   end
-require 'sinatra/cloudflare_workers'
+require 'sinatra/homura'

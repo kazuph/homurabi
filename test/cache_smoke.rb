@@ -7,7 +7,7 @@
 # Runs under Node without a live Cloudflare runtime by installing a
 # tiny in-memory fake for `caches.default`. The fake implements just
 # enough of the Web Cache API surface (match / put / delete) to cover
-# every code path in `lib/cloudflare_workers/cache.rb`.
+# every code path in `lib/homura/runtime/cache.rb`.
 #
 #   1. Cache.default wraps the global `caches.default`.
 #   2. match returns nil for unknown keys, and a Cloudflare::HTTPResponse
@@ -17,7 +17,7 @@
 #   5. The wrapper stays safe when caches is absent (put/delete noop).
 
 require 'json'
-require 'cloudflare_workers'
+require 'homura/runtime'
 
 module SmokeTest
   @passed = 0

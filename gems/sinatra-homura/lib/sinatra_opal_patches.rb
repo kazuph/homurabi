@@ -118,7 +118,7 @@ module Sinatra
   # JS Promise (routes compiled `# await: true` return their body as
   # a Promise until the adapter resolves it), computing bytesize would
   # poison the response. Opt out in that case so
-  # Rack::Handler::CloudflareWorkers#build_js_response can await and
+  # Rack::Handler::Homura#build_js_response can await and
   # set content-length downstream.
   # ---------------------------------------------------------------
   class Response
@@ -442,7 +442,7 @@ module Sinatra
     # homura adds a fourth case: a native JS Promise (routes with
     # `# await: true` implicitly return a Promise from async function
     # wrapping). Wrap it as a single-chunk Array so the Cloudflare
-    # handler (`Rack::Handler::CloudflareWorkers#build_js_response`)
+    # handler (`Rack::Handler::Homura#build_js_response`)
     # can detect and await. We can't rely on `respond_to? :then`
     # because Ruby's Kernel#then (alias of yield_self) matches every
     # object since 2.6.
@@ -505,7 +505,7 @@ module Sinatra
     # Also: when the user route sets `content_type` / `status` / `headers`
     # *inside* the awaited block, those mutations land on `@response`
     # AFTER `route_eval` has already returned a bare Promise.
-    # `Rack::Handler::CloudflareWorkers#build_js_response` snapshots the
+    # `Rack::Handler::Homura#build_js_response` snapshots the
     # response headers/status BEFORE awaiting the body promise, so the
     # in-route mutations would be silently dropped. Wrap the Promise so it
     # resolves to a fully-materialized Rack triple

@@ -83,7 +83,7 @@ module Cloudflare
     # NOTE: single-line backtick x-string so Opal emits it as an
     # expression (multi-line x-strings compile to raw statements and
     # would silently return `undefined`). Same gotcha documented
-    # elsewhere in this codebase (see lib/cloudflare_workers.rb).
+    # elsewhere in this codebase (see lib/homura/runtime.rb).
     def to_uint8_array
       `(function(s) { var len = s.length; var out = new Uint8Array(len); for (var i = 0; i < len; i++) { out[i] = s.charCodeAt(i) & 0xff; } return out; })(#{@bytes_binstr})`
     end

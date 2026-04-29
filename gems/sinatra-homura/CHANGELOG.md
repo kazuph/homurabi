@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.3.0 (2026-04-29) — BREAKING: cloudflare_workers naming eliminated
+
+Companion release to homura-runtime 0.3.0. All `cloudflare_workers`
+naming inside this gem is replaced; the gem name remains
+`sinatra-homura` because it's already canonical.
+
+| was | now |
+|---|---|
+| `module Sinatra::CloudflareWorkers` | `module Sinatra::Homura` |
+| `require 'sinatra/cloudflare_workers'` | `require 'sinatra/homura'` |
+| `lib/sinatra/cloudflare_workers.rb` | `lib/sinatra/homura.rb` |
+| `bin/cloudflare-workers-erb-compile` (homura erb:compile impl) | `exe/homura-erb-compile` |
+| `bin/cloudflare-workers-new` (homura new impl) | `exe/homura-new` |
+
+`bin/homura` and the `homura erb:compile / new / build /
+db:migrate:*` user-facing CLIs are unchanged — only the internal
+script paths they delegate to moved.
+
+`Rack::Handler::CloudflareWorkers` references inside the vendored
+Sinatra entry points (`vendor/sinatra.rb`, `vendor/sinatra/base.rb`)
+follow homura-runtime 0.3.0 to `Rack::Handler::Homura`. Floor on
+`homura-runtime ~> 0.3` enforces the rename.
+
+No alias, no compatibility shim. Apps pinned to ≤ 0.2.x must update
+their requires and module references in lockstep.
+
 ## 0.2.23 (2026-04-29)
 
 - The canonical sinatrarb.com snippet now works verbatim on Workers.

@@ -23,7 +23,7 @@
 #
 #   3. Exposes `Cloudflare::Scheduled.app=` so non-Sinatra Rack apps
 #      can hook the dispatcher too. By default, `Rack::Handler::
-#      CloudflareWorkers.app` (set by `run app` in user code) is used.
+#      HomuraRuntime.app` (set by `run app` in user code) is used.
 #
 # Test entry point: `Cloudflare::Scheduled.dispatch(cron, scheduled_time, js_env, js_ctx)`
 # — used by `test/scheduled_smoke.rb` so the same code path that the
@@ -91,7 +91,7 @@ module Cloudflare
 
     class << self
       # Override the dispatch target. By default the dispatcher uses
-      # `Rack::Handler::CloudflareWorkers.app`, which is whatever the
+      # `Rack::Handler::Homura.app`, which is whatever the
       # user passed to top-level `run app`. Tests use this to plug
       # a fake Sinatra subclass without booting the full handler.
       attr_accessor :app
@@ -154,13 +154,13 @@ module Cloudflare
 
     # Resolve which app class should receive the dispatch. Priority:
     #   1. `Cloudflare::Scheduled.app = SomeApp`     (explicit override)
-    #   2. `Rack::Handler::CloudflareWorkers.app`    (set by `run app`)
+    #   2. `Rack::Handler::Homura.app`    (set by `run app`)
     # Returns the class itself (not an instance), because
     # `dispatch_scheduled` is a class method on Sinatra apps.
     def self.resolve_app
       candidate = @app
-      if candidate.nil? && defined?(::Rack::Handler::CloudflareWorkers)
-        candidate = ::Rack::Handler::CloudflareWorkers.app
+      if candidate.nil? && defined?(::Rack::Handler::Homura)
+        candidate = ::Rack::Handler::Homura.app
       end
       return nil if candidate.nil?
       # Sinatra app classes respond to `dispatch_scheduled` (added by

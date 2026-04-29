@@ -3,7 +3,7 @@
 require 'fileutils'
 require 'pathname'
 
-module CloudflareWorkers
+module HomuraRuntime
   module BuildSupport
     RUNTIME_GEM_NAME = 'homura-runtime'
     SINATRA_GEM_NAME = 'sinatra-homura'

@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.3.0 (2026-04-29) — BREAKING: cloudflare_workers naming eliminated
+
+The "cloudflare_workers" branding everywhere inside the gem is gone.
+gem name is `homura-runtime`, the module is now `HomuraRuntime`, the
+require path is `require 'homura/runtime'`, and the Rack handler is
+`Rack::Handler::Homura`. Apps that pinned ≤ 0.2.x and referenced
+either `CloudflareWorkers::*` or `require 'cloudflare_workers'`
+must update.
+
+Renames:
+
+| was | now |
+|---|---|
+| `module CloudflareWorkers` | `module HomuraRuntime` |
+| `CloudflareWorkersIO` (stdout/stderr replacement class) | `HomuraRuntimeIO` |
+| `Rack::Handler::CloudflareWorkers` | `Rack::Handler::Homura` |
+| `require 'cloudflare_workers'` | `require 'homura/runtime'` |
+| `lib/cloudflare_workers.rb` | `lib/homura/runtime.rb` |
+| `lib/cloudflare_workers/*.rb` | `lib/homura/runtime/*.rb` |
+
+`Cloudflare` namespace (binding wrappers like `Cloudflare::HTTP`,
+`Cloudflare::D1Error`, `Cloudflare.js_promise?`) and Cloudflare-
+specific Rack env keys (`env['cloudflare.DB']`, `env['cloudflare.KV']`,
+…) are unchanged — those are factual descriptions of the underlying
+Cloudflare Workers bindings, not branding.
+
+No backward-compat shim. Per the project's `v1未満は破壊的に置き換え`
+rule, old constant aliases are not preserved.
+
 ## 0.2.27 (2026-04-29)
 
 - `Rack::Handler::CloudflareWorkers.run` now goes through

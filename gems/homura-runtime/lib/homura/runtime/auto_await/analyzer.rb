@@ -4,7 +4,7 @@ require 'parser/current'
 require 'parser/source/tree_rewriter'
 require 'set'
 
-module CloudflareWorkers
+module HomuraRuntime
   module AutoAwait
     class Analyzer
       def initialize(registry, debug: false)

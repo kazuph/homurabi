@@ -6,6 +6,6 @@ ruby '>= 3.4.0'
 
 # Mode A — monorepo dev | Mode B — local `.gem` install (order: opal → runtime → sinatra → sequel-d1).
 gem 'opal-homura', '= 1.8.3.rc1.5', require: 'opal'
-gem 'homura-runtime', '= 0.2.27'
-gem 'sinatra-homura', '= 0.2.23'
-gem 'sequel-d1', '= 0.2.10'
+gem 'homura-runtime', '= 0.3.0'
+gem 'sinatra-homura', '= 0.3.0'
+gem 'sequel-d1', '= 0.3.0'

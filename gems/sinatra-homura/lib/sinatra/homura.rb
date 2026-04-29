@@ -3,14 +3,14 @@
 # Cloudflare-Workers-side glue for Sinatra. As of sinatra-homura 0.2.23
 # this file is loaded *automatically* from the bottom of
 # `vendor/sinatra.rb` and `vendor/sinatra/base.rb`, so users no longer
-# need an explicit `require 'sinatra/cloudflare_workers'` line. The
+# need an explicit `require 'sinatra/homura'` line. The
 # require is still kept around for backward compatibility (a no-op
 # second load is fine).
 #
 # Order: runtime (Cloudflare::BinaryBody, Rack handler) → Opal/Sinatra
 # patches → Sinatra::Base → extensions.
 
-require 'cloudflare_workers'
+require 'homura/runtime'
 require 'sinatra_opal_patches'
 require 'sinatra/base'
 
@@ -19,7 +19,7 @@ require 'sinatra/scheduled'
 require 'sinatra/queue'
 
 module Sinatra
-  module CloudflareWorkers
+  module Homura
     # Auto-registration shim. The user is allowed (and encouraged) to
     # write the canonical Sinatra snippet from sinatrarb.com:
     #
@@ -39,7 +39,7 @@ module Sinatra
     # …without `run App`. This runs at first-fetch time (lazy) — the
     # Workers isolate never actually exits between requests, so the
     # at_exit hook the previous version installed was unreliable.
-    # `Rack::Handler::CloudflareWorkers#call` calls back into here when
+    # `Rack::Handler::Homura#call` calls back into here when
     # `@app` is nil so we can pick the right Rack app.
     #
     # Resolution order: a user-defined `App` (must be a `Sinatra::Base`
@@ -49,13 +49,13 @@ module Sinatra
     # `scheduled` / `queue` / `email` handlers boot without an HTTP
     # surface.
     def self.ensure_rack_app!
-      return unless defined?(::Rack::Handler::CloudflareWorkers)
-      return ::Rack::Handler::CloudflareWorkers.app if ::Rack::Handler::CloudflareWorkers.app
+      return unless defined?(::Rack::Handler::Homura)
+      return ::Rack::Handler::Homura.app if ::Rack::Handler::Homura.app
 
       candidate = pick_modular_app || pick_classic_app
       return unless candidate
 
-      ::Rack::Handler::CloudflareWorkers.run(candidate)
+      ::Rack::Handler::Homura.run(candidate)
     end
 
     def self.pick_modular_app
@@ -85,10 +85,10 @@ end
 
 # Kept for backward compatibility with code that still wires up at_exit
 # explicitly; harmless on Workers because the isolate doesn't exit.
-at_exit { Sinatra::CloudflareWorkers.ensure_rack_app! }
+at_exit { Sinatra::Homura.ensure_rack_app! }
 
 # Eagerly boot the JS-side dispatcher so a fetch arriving before
 # `run` was called still lands inside
-# `Rack::Handler::CloudflareWorkers#call`, where the lazy
+# `Rack::Handler::Homura#call`, where the lazy
 # `ensure_rack_app!` discovery kicks in.
-Rack::Handler::CloudflareWorkers.ensure_dispatcher_installed! if defined?(Rack::Handler::CloudflareWorkers)
+Rack::Handler::Homura.ensure_dispatcher_installed! if defined?(Rack::Handler::Homura)

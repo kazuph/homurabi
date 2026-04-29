@@ -18,7 +18,7 @@
 #   npm test            # full suite
 
 require 'json'
-require 'cloudflare_workers/ai'
+require 'homura/runtime/ai'
 
 # ---------------------------------------------------------------------
 # Stub a fake env.AI binding. `__test_ai_response__` controls the next

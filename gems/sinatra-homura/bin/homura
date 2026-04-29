@@ -12,22 +12,22 @@ module HomuraCLI
     },
     'erb:compile' => {
       gem: 'sinatra-homura',
-      script: 'bin/cloudflare-workers-erb-compile',
+      script: 'exe/homura-erb-compile',
       argv_prefix: []
     },
     'db:migrate:compile' => {
       gem: 'sequel-d1',
-      script: 'bin/cloudflare-workers-migrate',
+      script: 'exe/homura-db-migrate',
       argv_prefix: ['compile']
     },
     'db:migrate:apply' => {
       gem: 'sequel-d1',
-      script: 'bin/cloudflare-workers-migrate',
+      script: 'exe/homura-db-migrate',
       argv_prefix: ['apply']
     },
     'new' => {
       gem: 'sinatra-homura',
-      script: 'bin/cloudflare-workers-new',
+      script: 'exe/homura-new',
       argv_prefix: []
     }
   }.freeze

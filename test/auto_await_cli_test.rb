@@ -27,7 +27,7 @@ Dir.mktmpdir do |dir|
   FileUtils.mkdir_p(lib_dir)
 
   File.write(File.join(lib_dir, 'homura_async_sources.rb'), <<~RUBY)
-    CloudflareWorkers::AsyncRegistry.register_async_source do
+    HomuraRuntime::AsyncRegistry.register_async_source do
       helper_factory :kv, 'Cloudflare::KVNamespace'
       async_method 'Cloudflare::KVNamespace', :get
     end

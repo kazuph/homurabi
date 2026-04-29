@@ -19,7 +19,7 @@
 #      the Ruby handler when invoked by JS.
 
 require 'json'
-require 'cloudflare_workers'
+require 'homura/runtime'
 require 'sinatra/base'
 require 'sinatra/queue'
 

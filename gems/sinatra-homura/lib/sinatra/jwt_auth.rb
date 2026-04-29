@@ -177,9 +177,9 @@ module Sinatra
   Base.register JwtAuth if defined?(::Sinatra::Base)
 end
 
-require 'cloudflare_workers/async_registry'
+require 'homura/runtime/async_registry'
 
-CloudflareWorkers::AsyncRegistry.register_async_source do
+HomuraRuntime::AsyncRegistry.register_async_source do
   async_helper :authenticate!, 'Sinatra::JwtAuth'
   async_helper :authenticate_or_401, 'Sinatra::JwtAuth'
   async_helper :issue_token, 'Sinatra::JwtAuth'

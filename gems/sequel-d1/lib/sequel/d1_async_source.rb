@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
-require 'cloudflare_workers/async_registry'
+require 'homura/runtime/async_registry'
 
-CloudflareWorkers::AsyncRegistry.register_async_source do
+HomuraRuntime::AsyncRegistry.register_async_source do
   helper_factory :db, 'Sequel::D1::Database'
   taint_return 'Sequel', :connect, 'Sequel::D1::Database'
 

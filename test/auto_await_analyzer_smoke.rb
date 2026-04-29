@@ -15,8 +15,8 @@
 require 'json'
 
 $LOAD_PATH.unshift(File.expand_path('../gems/homura-runtime/lib', __dir__))
-require 'cloudflare_workers/async_registry'
-require 'cloudflare_workers/auto_await/analyzer'
+require 'homura/runtime/async_registry'
+require 'homura/runtime/auto_await/analyzer'
 
 module SmokeTest
   @passed = 0
@@ -50,9 +50,9 @@ end
 # Setup: register the same async sources the real build uses.
 # ------------------------------------------------------------------
 
-CloudflareWorkers::AsyncRegistry.reset!
+HomuraRuntime::AsyncRegistry.reset!
 
-CloudflareWorkers::AsyncRegistry.register_async_source do
+HomuraRuntime::AsyncRegistry.register_async_source do
   async_accessor :env, :'cloudflare.DB', 'Cloudflare::D1Database'
   async_accessor :env, :'cloudflare.KV', 'Cloudflare::KVNamespace'
   helper_factory :db,  'Cloudflare::D1Database'
@@ -69,8 +69,8 @@ end
 # ------------------------------------------------------------------
 
 def analyze(source)
-  registry = CloudflareWorkers::AsyncRegistry.instance
-  analyzer = CloudflareWorkers::AutoAwait::Analyzer.new(registry)
+  registry = HomuraRuntime::AsyncRegistry.instance
+  analyzer = HomuraRuntime::AutoAwait::Analyzer.new(registry)
   _buffer, nodes = analyzer.process(source, '(smoke)')
   nodes.map { |n| n.loc.expression.source }
 end

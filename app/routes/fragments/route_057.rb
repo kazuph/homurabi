@@ -119,7 +119,7 @@ get '/test/foundations' do
 end
 # Phase 16 — self-hosted docs (Cloudflare-style /docs/*)
 # Mustermann on Opal rejects `^`/`$` in regex routes. Trailing `/docs/` is normalized
-# to `/docs` in Rack::Handler::CloudflareWorkers.build_rack_env (runtime gem).
+# to `/docs` in Rack::Handler::Homura.build_rack_env (runtime gem).
 docs_index_route = lambda do
   @title = 'ドキュメント — homura'
   @docs_page = 'index'

@@ -48,7 +48,7 @@ module Cloudflare
       @js_stream = nil
     end
 
-    # Duck-typed marker consumed by Rack::Handler::CloudflareWorkers.
+    # Duck-typed marker consumed by Rack::Handler::Homura.
     def sse_stream?
       true
     end

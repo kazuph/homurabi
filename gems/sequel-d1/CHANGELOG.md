@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.3.0 (2026-04-29) — BREAKING: cloudflare_workers naming eliminated
+
+Companion release to homura-runtime 0.3.0. The `homura
+db:migrate:compile / db:migrate:apply` user-facing CLIs are
+unchanged; only the internal script path they delegate to moved.
+
+| was | now |
+|---|---|
+| `bin/cloudflare-workers-migrate` (homura db:migrate:* impl) | `exe/homura-db-migrate` |
+
+Internal references that reach into homura-runtime now use
+`HomuraRuntime::*` instead of `CloudflareWorkers::*`. Floor on
+`homura-runtime ~> 0.3` enforces the rename.
+
 ## 0.2.10 (2026-04-27)
 
 - Fix `update(col: Sequel.lit('expr'))` (and `insert(col: Sequel.lit(...))`)

@@ -1,11 +1,11 @@
 # frozen_string_literal: true
 
-require_relative '../gems/homura-runtime/lib/cloudflare_workers/async_registry'
-require_relative '../gems/homura-runtime/lib/cloudflare_workers/auto_await/analyzer'
-require_relative '../gems/homura-runtime/lib/cloudflare_workers/auto_await/transformer'
+require_relative '../gems/homura-runtime/lib/homura/runtime/async_registry'
+require_relative '../gems/homura-runtime/lib/homura/runtime/auto_await/analyzer'
+require_relative '../gems/homura-runtime/lib/homura/runtime/auto_await/transformer'
 
-registry = CloudflareWorkers::AsyncRegistry.new
-CloudflareWorkers::AsyncRegistry::Builder.new(registry).instance_eval do
+registry = HomuraRuntime::AsyncRegistry.new
+HomuraRuntime::AsyncRegistry::Builder.new(registry).instance_eval do
   async_method 'Cloudflare::D1Database', :execute
   async_method 'Cloudflare::D1Database', :execute_insert
   async_method 'Cloudflare::D1Database', :prepare
@@ -45,7 +45,7 @@ def assert_eq(expected, actual, msg)
 end
 
 def assert_transform(source, expected, registry)
-  analyzer = CloudflareWorkers::AutoAwait::Analyzer.new(registry)
+  analyzer = HomuraRuntime::AutoAwait::Analyzer.new(registry)
   buffer, nodes = analyzer.process(source, '(test)')
   actual = nodes.map { |n| n.loc.expression.source }
   [assert_eq(expected, actual, "transform targets for: #{source[0..50]}"), actual]
@@ -110,9 +110,9 @@ src6 = <<~RUBY
     all_rows = list.all
   end
 RUBY
-analyzer = CloudflareWorkers::AutoAwait::Analyzer.new(registry)
+analyzer = HomuraRuntime::AutoAwait::Analyzer.new(registry)
 buffer, nodes = analyzer.process(src6, '(test)')
-transformed = CloudflareWorkers::AutoAwait::Transformer.transform(src6, nodes, buffer)
+transformed = HomuraRuntime::AutoAwait::Transformer.transform(src6, nodes, buffer)
 
 expected_lines = [
   "db[:users].where(active: true).insert(name: 'foo')",

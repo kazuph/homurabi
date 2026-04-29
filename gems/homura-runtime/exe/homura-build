@@ -8,12 +8,12 @@ require 'fileutils'
 require 'open3'
 require 'optparse'
 require 'pathname'
-require_relative '../lib/cloudflare_workers/build_support'
+require_relative '../lib/homura/runtime/build_support'
 
-module CloudflareWorkersBuild
+module HomuraRuntimeBuild
   class << self
     def gem_root
-      CloudflareWorkers::BuildSupport.runtime_root(current_file: __FILE__)
+      HomuraRuntime::BuildSupport.runtime_root(current_file: __FILE__)
     end
 
     def runtime_dir
@@ -25,11 +25,11 @@ module CloudflareWorkersBuild
     end
 
     def gem_lib(*names)
-      CloudflareWorkers::BuildSupport.gem_lib(*names)
+      HomuraRuntime::BuildSupport.gem_lib(*names)
     end
 
     def gem_vendor(*names)
-      CloudflareWorkers::BuildSupport.gem_vendor(*names)
+      HomuraRuntime::BuildSupport.gem_vendor(*names)
     end
   end
 end
@@ -72,8 +72,8 @@ end.parse!
 options[:standalone] = true if options[:with_db]
 
 root = Pathname(options[:root]).expand_path
-options[:templates_namespace] ||= CloudflareWorkers::BuildSupport.standalone_namespace(root, 'Templates') if options[:standalone]
-options[:assets_namespace] ||= CloudflareWorkers::BuildSupport.standalone_namespace(root, 'Assets') if options[:standalone]
+options[:templates_namespace] ||= HomuraRuntime::BuildSupport.standalone_namespace(root, 'Templates') if options[:standalone]
+options[:assets_namespace] ||= HomuraRuntime::BuildSupport.standalone_namespace(root, 'Assets') if options[:standalone]
 
 if options[:standalone]
   Dir.chdir(root) { require 'bundler/setup' }
@@ -109,7 +109,7 @@ def run_opal_homura!(root, opal_input, opal_output)
     '-I', 'gems/sinatra-homura/lib',
     '-I', 'gems/sequel-d1/lib',
     '-I', 'lib', '-I', 'vendor', '-I', 'build',
-    '-r', 'opal_patches', '-r', 'cloudflare_workers',
+    '-r', 'opal_patches', '-r', 'homura/runtime',
     '-r', 'homura_templates', '-r', 'homura_assets',
     '-o', opal_output,
     opal_input
@@ -123,15 +123,15 @@ def run_opal_homura!(root, opal_input, opal_output)
 end
 
 def homura_vendor_from_gemfile(project_root)
-  CloudflareWorkers::BuildSupport.vendor_from_gemfile(project_root)
+  HomuraRuntime::BuildSupport.vendor_from_gemfile(project_root)
 end
 
 def run_opal_standalone!(root, opal_input, opal_output, with_db:)
-  load_paths = CloudflareWorkers::BuildSupport.standalone_load_paths(root, with_db: with_db)
+  load_paths = HomuraRuntime::BuildSupport.standalone_load_paths(root, with_db: with_db)
 
   argv = ['bundle', 'exec', 'opal', '-c', '-E', '--esm', '--no-source-map']
   load_paths.each { |p| argv.push('-I', p) }
-  argv += %w[-r opal_patches -r cloudflare_workers -r app_templates -r app_assets -o] + [opal_output, opal_input]
+  argv += %w[-r opal_patches -r homura/runtime -r app_templates -r app_assets -o] + [opal_output, opal_input]
 
   stderr_log = root.join('build/opal.stderr.log')
   FileUtils.mkdir_p(root.join('build'))
@@ -185,7 +185,7 @@ unless options[:standalone]
   run!(['ruby', 'bin/inline-routes-for-opal'], chdir: root)
   run!(
     [
-      'ruby', CloudflareWorkersBuild.exe_path('auto-await').to_s,
+      'ruby', HomuraRuntimeBuild.exe_path('auto-await').to_s,
       '--input', 'app',
       '--output', 'build/auto_await/app'
     ],
@@ -193,7 +193,7 @@ unless options[:standalone]
   )
   run!(
     [
-      'ruby', CloudflareWorkersBuild.exe_path('auto-await').to_s,
+      'ruby', HomuraRuntimeBuild.exe_path('auto-await').to_s,
       '--input', 'build/routes_app_class_eval.rb',
       '--output', 'build/auto_await/routes_app_class_eval.rb'
     ],
@@ -201,7 +201,7 @@ unless options[:standalone]
   )
   run!(
     [
-      'ruby', CloudflareWorkersBuild.exe_path('compile-erb').to_s,
+      'ruby', HomuraRuntimeBuild.exe_path('compile-erb').to_s,
       '--input', 'views',
       '--output', 'build/homura_templates.rb',
       '--namespace', 'HomuraTemplates'
@@ -210,7 +210,7 @@ unless options[:standalone]
   )
   run!(
     [
-      'ruby', CloudflareWorkersBuild.exe_path('compile-assets').to_s,
+      'ruby', HomuraRuntimeBuild.exe_path('compile-assets').to_s,
       '--input', 'public',
       '--output', 'build/homura_assets.rb',
       '--namespace', 'HomuraAssets'
@@ -229,10 +229,10 @@ unless options[:standalone]
     FileUtils.rm_f(temp_input) if temp_input
   end
 else
-  CloudflareWorkers::BuildSupport.ensure_standalone_runtime(root, current_file: __FILE__)
+  HomuraRuntime::BuildSupport.ensure_standalone_runtime(root, current_file: __FILE__)
   run!(
     [
-      'ruby', CloudflareWorkersBuild.exe_path('compile-erb').to_s,
+      'ruby', HomuraRuntimeBuild.exe_path('compile-erb').to_s,
       '--input', 'views',
       '--output', 'build/app_templates.rb',
       '--namespace', options[:templates_namespace]
@@ -241,7 +241,7 @@ else
   )
   run!(
     [
-      'ruby', CloudflareWorkersBuild.exe_path('compile-assets').to_s,
+      'ruby', HomuraRuntimeBuild.exe_path('compile-assets').to_s,
       '--input', 'public',
       '--output', 'build/app_assets.rb',
       '--namespace', options[:assets_namespace]
@@ -256,7 +256,7 @@ else
   if root.join('app').directory?
     run!(
       [
-        'ruby', CloudflareWorkersBuild.exe_path('auto-await').to_s,
+        'ruby', HomuraRuntimeBuild.exe_path('auto-await').to_s,
         '--input', 'app',
         '--output', 'build/auto_await/app'
       ],
@@ -265,7 +265,7 @@ else
   elsif root.join('app.rb').file?
     run!(
       [
-        'ruby', CloudflareWorkersBuild.exe_path('auto-await').to_s,
+        'ruby', HomuraRuntimeBuild.exe_path('auto-await').to_s,
         '--input', 'app.rb',
         '--output', 'build/auto_await/app.rb'
       ],
@@ -282,7 +282,7 @@ else
   # `build/auto_await/gem_<basename>/<sub>` and
   # `standalone_load_paths` puts those rewritten copies ahead of the
   # gem's untransformed `lib/`.
-  CloudflareWorkers::BuildSupport.opal_gem_paths(root).each do |gem_path|
+  HomuraRuntime::BuildSupport.opal_gem_paths(root).each do |gem_path|
     %w[lib].each do |sub|
       src = gem_path.join(sub)
       next unless src.directory?
@@ -290,7 +290,7 @@ else
       FileUtils.mkdir_p(out)
       run!(
         [
-          'ruby', CloudflareWorkersBuild.exe_path('auto-await').to_s,
+          'ruby', HomuraRuntimeBuild.exe_path('auto-await').to_s,
           '--input', src.to_s,
           '--output', out.to_s
         ],
@@ -317,7 +317,7 @@ patch_rel = root.join(patch_rel) unless patch_rel.absolute?
 run!(
   [
     'node',
-    CloudflareWorkersBuild.runtime_dir.join('patch-opal-evals.mjs').to_s,
+    HomuraRuntimeBuild.runtime_dir.join('patch-opal-evals.mjs').to_s,
     patch_rel.relative_path_from(root).to_s
   ],
   chdir: root

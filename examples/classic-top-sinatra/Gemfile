@@ -4,5 +4,5 @@ ruby '>= 3.4.0'
 
 # Mode A — monorepo dev | Mode B — `gem install --local` + path to worktree (see `examples/minimal-sinatra/Gemfile`).
 gem 'opal-homura', '= 1.8.3.rc1.5', require: 'opal'
-gem 'homura-runtime', '= 0.2.27'
-gem 'sinatra-homura', '= 0.2.23'
+gem 'homura-runtime', '= 0.3.0'
+gem 'sinatra-homura', '= 0.3.0'

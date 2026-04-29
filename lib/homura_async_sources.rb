@@ -4,9 +4,9 @@
 # These map the env binding names used in wrangler.toml to their
 # Cloudflare wrapper class names so the analyzer can taint them.
 
-require 'cloudflare_workers/async_registry'
+require 'homura/runtime/async_registry'
 
-CloudflareWorkers::AsyncRegistry.register_async_source do
+HomuraRuntime::AsyncRegistry.register_async_source do
   async_accessor :env, :DB, 'Cloudflare::D1Database'
   async_accessor :env, :KV, 'Cloudflare::KVNamespace'
   async_accessor :env, :BUCKET, 'Cloudflare::R2Bucket'

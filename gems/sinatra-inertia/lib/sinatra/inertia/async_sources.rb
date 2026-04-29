@@ -10,8 +10,8 @@
 # Loaded only when the homura runtime is present (MRI / pure-Sinatra
 # environments don't need this; their `to_h` is fully synchronous).
 
-if defined?(::CloudflareWorkers) && defined?(::CloudflareWorkers::AsyncRegistry)
-  ::CloudflareWorkers::AsyncRegistry.register_async_source do
+if defined?(::HomuraRuntime) && defined?(::HomuraRuntime::AsyncRegistry)
+  ::HomuraRuntime::AsyncRegistry.register_async_source do
     async_method 'Sinatra::Inertia::Response', :to_h
     async_method 'Sinatra::Inertia::Response', :to_json
   end

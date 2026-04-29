@@ -7,7 +7,7 @@ get '/chat' do
   # boundary. Set Location on the response (captured into
   # `js_headers` by build_js_response before any await), then
   # return a 2-element `[status, body]` tuple that the JS
-  # override in `lib/cloudflare_workers.rb` recognises.
+  # override in `lib/homura/runtime.rb` recognises.
   unless current_session_user
     response['Location'] = "/login?return_to=#{Rack::Utils.escape('/chat')}"
     next [302, '']

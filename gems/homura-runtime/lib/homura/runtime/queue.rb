@@ -63,7 +63,7 @@ module Cloudflare
     def available?
       js = @js
       # Opal's Ruby nil is a runtime sentinel (Opal.nil), not JS null.
-      # See `lib/cloudflare_workers/cache.rb#available?` for the same
+      # See `lib/homura/runtime/cache.rb#available?` for the same
       # pattern and rationale.
       !!`(#{js} !== null && #{js} !== undefined && #{js} !== Opal.nil)`
     end
@@ -86,7 +86,7 @@ module Cloudflare
       `#{js_opts}.delaySeconds = #{delay_seconds.to_i}` if delay_seconds
       `#{js_opts}.contentType  = #{content_type.to_s}`  if content_type
 
-      # Single-line IIFE — see `lib/cloudflare_workers/cache.rb#put`
+      # Single-line IIFE — see `lib/homura/runtime/cache.rb#put`
       # for the Opal multi-line x-string quirk. Passing arguments in
       # explicitly (rather than interpolating inside the template)
       # keeps the Promise a first-class expression.

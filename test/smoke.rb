@@ -290,10 +290,10 @@ def call_app(method, path, body: '', headers: {})
 end
 
 def call_worker_app(method, path, body: '')
-  Rack::Handler::CloudflareWorkers.run(TestApp)
+  Rack::Handler::Homura.run(TestApp)
   url = "https://example.test#{path}"
   js_req = `new Request(#{url}, { method: #{method}, body: #{body} })`
-  js_resp = Rack::Handler::CloudflareWorkers.call(js_req, `({})`, `({ waitUntil: function() {} })`, body).__await__
+  js_resp = Rack::Handler::Homura.call(js_req, `({})`, `({ waitUntil: function() {} })`, body).__await__
   status = `#{js_resp}.status`
   location = `#{js_resp}.headers.get('location') || #{js_resp}.headers.get('Location')`
   text = `#{js_resp}.text()`.__await__
@@ -301,10 +301,10 @@ def call_worker_app(method, path, body: '')
 end
 
 def call_worker_app_with_env(method, path, js_env, body: '')
-  Rack::Handler::CloudflareWorkers.run(TestApp)
+  Rack::Handler::Homura.run(TestApp)
   url = "https://example.test#{path}"
   js_req = `new Request(#{url}, { method: #{method}, body: #{body} })`
-  js_resp = Rack::Handler::CloudflareWorkers.call(js_req, js_env, `({ waitUntil: function() {} })`, body).__await__
+  js_resp = Rack::Handler::Homura.call(js_req, js_env, `({ waitUntil: function() {} })`, body).__await__
   status = `#{js_resp}.status`
   location = `#{js_resp}.headers.get('location') || #{js_resp}.headers.get('Location')`
   text = `#{js_resp}.text()`.__await__
@@ -312,10 +312,10 @@ def call_worker_app_with_env(method, path, js_env, body: '')
 end
 
 def call_worker_app_for(app, method, path, body: '')
-  Rack::Handler::CloudflareWorkers.run(app)
+  Rack::Handler::Homura.run(app)
   url = "https://example.test#{path}"
   js_req = `new Request(#{url}, { method: #{method}, body: #{body} })`
-  js_resp = Rack::Handler::CloudflareWorkers.call(js_req, `({})`, `({ waitUntil: function() {} })`, body).__await__
+  js_resp = Rack::Handler::Homura.call(js_req, `({})`, `({ waitUntil: function() {} })`, body).__await__
   status = `#{js_resp}.status`
   text = `#{js_resp}.text()`.__await__
   [status, text]

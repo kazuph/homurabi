@@ -46,14 +46,14 @@ Dir.mktmpdir do |dir|
     config_ru = File.read(File.join(app_dir, 'config.ru'))
     raise 'config.ru should require app/app relatively' unless config_ru.include?("require_relative 'app/app'")
     # As of sinatra-homura 0.2.23, `run App` is no longer required —
-    # `Sinatra::CloudflareWorkers.ensure_rack_app!` discovers and
+    # `Sinatra::Homura.ensure_rack_app!` discovers and
     # registers `App` on the first fetch event. Scaffolder must NOT emit it.
     raise 'config.ru should not emit `run App` (auto-registered now)' if config_ru.include?('run App')
 
     app_rb = File.read(File.join(app_dir, 'app', 'app.rb'))
     raise 'app/app.rb should not call run App directly' if app_rb.include?('run App')
     raise 'app/app.rb should require sinatra/base' unless app_rb.include?("require 'sinatra/base'")
-    raise 'app/app.rb should not require legacy sinatra/cloudflare_workers' if app_rb.include?("require 'sinatra/cloudflare_workers'")
+    raise 'app/app.rb should not require legacy sinatra/homura' if app_rb.include?("require 'sinatra/homura'")
 
     gemfile = File.read(File.join(app_dir, 'Gemfile'))
     raise 'Gemfile should include rake for generated tasks' unless gemfile.include?("gem 'rake'")

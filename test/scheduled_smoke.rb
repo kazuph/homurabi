@@ -20,7 +20,7 @@
 #      env wrappers the dispatcher built).
 #   5. `Cloudflare::Scheduled.dispatch(...)` — the test entry point —
 #      resolves the registered Sinatra app from
-#      `Rack::Handler::CloudflareWorkers.app` and forwards.
+#      `Rack::Handler::Homura.app` and forwards.
 #   6. `Cloudflare::ScheduledEvent.from_js` correctly converts the JS
 #      `event.scheduledTime` epoch-millis into a Ruby Time.
 #   7. Cron expression validation rejects malformed input loudly.
@@ -36,7 +36,7 @@
 require 'json'
 require 'time'
 require 'sinatra/base'
-require 'cloudflare_workers'
+require 'homura/runtime'
 require 'sinatra/scheduled'
 
 module SmokeTest
@@ -333,10 +333,10 @@ SmokeTest.assert('Scheduled.dispatch routes to the registered app') {
 
 SmokeTest.assert('Scheduled.dispatch raises when no app is registered') {
   Cloudflare::Scheduled.app = nil
-  if defined?(Rack::Handler::CloudflareWorkers)
+  if defined?(Rack::Handler::Homura)
     begin
-      saved_app = Rack::Handler::CloudflareWorkers.instance_variable_get(:@app)
-      Rack::Handler::CloudflareWorkers.instance_variable_set(:@app, nil)
+      saved_app = Rack::Handler::Homura.instance_variable_get(:@app)
+      Rack::Handler::Homura.instance_variable_set(:@app, nil)
     rescue StandardError
       saved_app = nil
     end
@@ -347,8 +347,8 @@ SmokeTest.assert('Scheduled.dispatch raises when no app is registered') {
   rescue StandardError
     raised = true
   end
-  if defined?(Rack::Handler::CloudflareWorkers) && saved_app
-    Rack::Handler::CloudflareWorkers.instance_variable_set(:@app, saved_app)
+  if defined?(Rack::Handler::Homura) && saved_app
+    Rack::Handler::Homura.instance_variable_set(:@app, saved_app)
   end
   raised
 }

@@ -2,7 +2,7 @@
 
 Gem::Specification.new do |spec|
   spec.name = 'sinatra-homura'
-  spec.version = '0.2.23'
+  spec.version = '0.3.0'
   spec.authors = ['Kazuhiro Homma']
   spec.summary = 'Sinatra + Opal patches and extensions for Cloudflare Workers'
   spec.description = <<~DESC
@@ -23,12 +23,12 @@ Gem::Specification.new do |spec|
   spec.metadata['documentation_uri'] = 'https://homura.kazu-san.workers.dev/docs/sinatra'
 
   spec.files = Dir.chdir(__dir__) do
-    Dir['lib/**/*', 'vendor/**/*', 'bin/*', 'templates/**/*', 'README.md', 'CHANGELOG.md'].select { |f| File.file?(f) }
+    Dir['lib/**/*', 'vendor/**/*', 'exe/*', 'bin/*', 'templates/**/*', 'README.md', 'CHANGELOG.md'].select { |f| File.file?(f) }
   end
   spec.require_paths = ['lib']
   spec.bindir = 'bin'
   spec.executables = ['homura']
 
-  spec.add_runtime_dependency 'homura-runtime', '~> 0.2', '>= 0.2.26'
+  spec.add_runtime_dependency 'homura-runtime', '~> 0.3'
   spec.add_runtime_dependency 'opal-homura', '= 1.8.3.rc1.5'
 end

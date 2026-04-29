@@ -1,0 +1,13 @@
+# Workers + Sinatra + sequel-d1 sample.
+# Replace database_id with your D1 UUID from `wrangler d1 create`.
+
+name = "sinatra-with-db"
+main = "build/worker.entrypoint.mjs"
+compatibility_date = "2026-04-15"
+compatibility_flags = ["nodejs_compat"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "sinatra-with-db"
+database_id = "51a842c8-6df0-4875-8bd0-98bcb0d79d04"
+migrations_dir = "db/migrations"

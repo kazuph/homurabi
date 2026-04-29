@@ -6,7 +6,7 @@ require 'sequel'
 
 get '/' do
   content_type 'text/plain; charset=utf-8'
-  'minimal sinatra + sequel-d1 — try GET /users'
+  'sinatra + sequel-d1 on Cloudflare Workers — try GET /users'
 end
 
 get '/users' do

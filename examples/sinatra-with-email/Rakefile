@@ -1,0 +1,25 @@
+# frozen_string_literal: true
+
+task default: :build
+
+def run!(*argv)
+  ok = system(*argv)
+  exit 1 unless ok
+end
+
+desc 'Build the Worker bundle'
+task :build do
+  run!('bundle', 'exec', 'homura', 'build', '--standalone')
+end
+
+desc 'Start a local dev server through portless'
+task dev: :build do
+  app_name = File.basename(__dir__)
+  exec('portless', app_name, 'bash', '-c',
+       'exec npx wrangler dev --local --port=$PORT --ip 127.0.0.1')
+end
+
+desc 'Deploy to Cloudflare'
+task deploy: :build do
+  run!('npx', 'wrangler', 'deploy')
+end

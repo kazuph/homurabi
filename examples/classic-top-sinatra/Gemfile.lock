@@ -14,6 +14,7 @@ GEM
       ast (~> 2.4.1)
       racc
     racc (1.8.1)
+    rake (13.4.2)
     sinatra-homura (0.3.0)
       homura-runtime (~> 0.3)
       opal-homura (= 1.8.3.rc1.5)
@@ -25,6 +26,7 @@ PLATFORMS
 DEPENDENCIES
   homura-runtime (= 0.3.1)
   opal-homura (= 1.8.3.rc1.5)
+  rake
   sinatra-homura (= 0.3.0)
 
 RUBY VERSION

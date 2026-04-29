@@ -1,0 +1,19 @@
+{
+  "name": "sinatra-with-db",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "bundle exec rake build",
+    "dev": "bundle exec rake dev",
+    "deploy": "bundle exec rake deploy",
+    "db:migrate:compile": "bundle exec rake db:migrate:compile",
+    "db:migrate:local": "bundle exec rake db:migrate:local",
+    "db:migrate:remote": "bundle exec rake db:migrate:remote"
+  },
+  "devDependencies": {
+    "wrangler": "^3.99.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

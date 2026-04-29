@@ -21,7 +21,7 @@
 # Tests stub globalThis.fetch so they are deterministic and offline.
 
 require 'json'
-require 'cloudflare_workers/http'
+require 'homura/runtime/http'
 require 'net/http'
 
 # =====================================================================

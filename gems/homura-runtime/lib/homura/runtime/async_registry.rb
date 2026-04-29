@@ -2,7 +2,7 @@
 
 require 'set'
 
-module CloudflareWorkers
+module HomuraRuntime
   class AsyncRegistry
     class Builder
       def initialize(registry)
@@ -137,7 +137,7 @@ end
 # Phase 17.5 — Auto-Await: register runtime gem async sources.
 # Each binding declares which methods return Promises so the
 # build-time analyzer can insert .__await__ automatically.
-CloudflareWorkers::AsyncRegistry.register_async_source do
+HomuraRuntime::AsyncRegistry.register_async_source do
   async_method 'Cloudflare::D1Database', :execute
   async_method 'Cloudflare::D1Database', :get_first_row
   async_method 'Cloudflare::D1Database', :execute_insert

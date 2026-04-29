@@ -4,7 +4,7 @@
 #
 # Cloudflare::SSEStream / SSEOut smoke tests.
 
-require 'cloudflare_workers/stream'
+require 'homura/runtime/stream'
 
 module StreamingSmoke
   @passed = 0

@@ -85,7 +85,7 @@ module Cloudflare
       # at end-of-method silently drops the Promise. Do NOT refactor
       # this into `def fetch ... end` with the backtick as the last
       # expression. See the single-line IIFE pattern used in
-      # lib/cloudflare_workers/{cache,queue,durable_object}.rb#put for
+      # lib/homura/runtime/{cache,queue,durable_object}.rb#put for
       # the alternative that survives either position. (Phase 11B audit.)
       js_promise = `
         (async function() {

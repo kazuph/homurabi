@@ -95,4 +95,3 @@ post '/todos/:id/delete' do
   redirect '/'
 end
 
-run Sinatra::Application

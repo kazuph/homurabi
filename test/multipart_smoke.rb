@@ -4,7 +4,7 @@
 #
 # Cloudflare::Multipart parser smoke tests.
 
-require 'cloudflare_workers/multipart'
+require 'homura/runtime/multipart'
 
 module MultipartSmoke
   @passed = 0

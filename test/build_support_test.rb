@@ -4,9 +4,22 @@ require 'fileutils'
 require 'tmpdir'
 
 $LOAD_PATH.unshift(File.expand_path('../gems/homura-runtime/lib', __dir__))
-require 'cloudflare_workers/build_support'
+require 'homura/runtime/build_support'
 
-FakeSpec = Struct.new(:full_gem_path)
+FakeSpec = Struct.new(:full_gem_path) do
+  # `BuildSupport.opal_gem_paths` (added in homura-runtime 0.2.25)
+  # iterates `Gem.loaded_specs.each_value` and reads `spec.name` /
+  # `spec.metadata` to decide whether a gem opts in to the auto-await
+  # pass. Unit-test FakeSpecs must expose the same surface so that
+  # ordinary `loaded_specs:` lookup tests don't blow up.
+  def name
+    full_gem_path.to_s.split('/').last.to_s
+  end
+
+  def metadata
+    {}
+  end
+end
 
 passed = 0
 failed = 0
@@ -20,13 +33,13 @@ rescue => e
   false
 end
 
-runtime_name = CloudflareWorkers::BuildSupport::RUNTIME_GEM_NAME
-sinatra_name = CloudflareWorkers::BuildSupport::SINATRA_GEM_NAME
-sequel_name = CloudflareWorkers::BuildSupport::SEQUEL_D1_GEM_NAME
+runtime_name = HomuraRuntime::BuildSupport::RUNTIME_GEM_NAME
+sinatra_name = HomuraRuntime::BuildSupport::SINATRA_GEM_NAME
+sequel_name = HomuraRuntime::BuildSupport::SEQUEL_D1_GEM_NAME
 
 ok = assert('resolves homura-runtime from loaded specs') do
   specs = { 'homura-runtime' => FakeSpec.new('/tmp/new-runtime') }
-  spec = CloudflareWorkers::BuildSupport.loaded_spec(runtime_name, loaded_specs: specs)
+  spec = HomuraRuntime::BuildSupport.loaded_spec(runtime_name, loaded_specs: specs)
   raise "expected /tmp/new-runtime, got #{spec&.full_gem_path}" unless spec&.full_gem_path == '/tmp/new-runtime'
 end
 passed += 1 if ok
@@ -34,7 +47,7 @@ failed += 1 unless ok
 
 ok = assert('resolves homura-runtime lib path') do
   specs = { 'homura-runtime' => FakeSpec.new('/tmp/new-runtime') }
-  lib = CloudflareWorkers::BuildSupport.gem_lib(runtime_name, loaded_specs: specs)
+  lib = HomuraRuntime::BuildSupport.gem_lib(runtime_name, loaded_specs: specs)
   raise "expected /tmp/new-runtime/lib, got #{lib}" unless lib == '/tmp/new-runtime/lib'
 end
 passed += 1 if ok
@@ -42,7 +55,7 @@ failed += 1 unless ok
 
 ok = assert('resolves sinatra-homura lib path') do
   specs = { 'sinatra-homura' => FakeSpec.new('/tmp/new-sinatra') }
-  lib = CloudflareWorkers::BuildSupport.gem_lib(sinatra_name, loaded_specs: specs)
+  lib = HomuraRuntime::BuildSupport.gem_lib(sinatra_name, loaded_specs: specs)
   raise "expected /tmp/new-sinatra/lib, got #{lib}" unless lib == '/tmp/new-sinatra/lib'
 end
 passed += 1 if ok
@@ -52,7 +65,7 @@ ok = assert('resolves packaged homura-runtime vendor path') do
   Dir.mktmpdir do |dir|
     specs = { 'homura-runtime' => FakeSpec.new(dir) }
     FileUtils.mkdir_p(File.join(dir, 'vendor'))
-    vendor = CloudflareWorkers::BuildSupport.gem_vendor(runtime_name, loaded_specs: specs)
+    vendor = HomuraRuntime::BuildSupport.gem_vendor(runtime_name, loaded_specs: specs)
     expected = File.join(dir, 'vendor')
     raise "expected #{expected}, got #{vendor}" unless vendor == expected
   end
@@ -62,7 +75,7 @@ failed += 1 unless ok
 
 ok = assert('returns nil when packaged vendor path is absent') do
   specs = { 'sinatra-homura' => FakeSpec.new('/tmp/new-sinatra') }
-  vendor = CloudflareWorkers::BuildSupport.gem_vendor(sinatra_name, loaded_specs: specs)
+  vendor = HomuraRuntime::BuildSupport.gem_vendor(sinatra_name, loaded_specs: specs)
   raise "expected nil, got #{vendor.inspect}" unless vendor.nil?
 end
 passed += 1 if ok
@@ -72,7 +85,7 @@ ok = assert('matches homura-runtime path dependency in Gemfile') do
   Dir.mktmpdir do |dir|
     FileUtils.mkdir_p(File.expand_path('../vendor', dir))
     File.write(File.join(dir, 'Gemfile'), "gem 'homura-runtime', path: '../gems/homura-runtime'\n")
-    vendor = CloudflareWorkers::BuildSupport.vendor_from_gemfile(dir)
+    vendor = HomuraRuntime::BuildSupport.vendor_from_gemfile(dir)
     expected = File.expand_path('../vendor', dir)
     raise "expected #{expected}, got #{vendor}" unless vendor&.to_s == expected
   end
@@ -88,10 +101,11 @@ ok = assert('copies standalone runtime files into cf-runtime') do
     File.write(File.join(runtime_root, 'runtime', 'setup-node-crypto.mjs'), "setup\n")
     File.write(File.join(runtime_root, 'runtime', 'worker_module.mjs'), "worker\n")
 
-    target = CloudflareWorkers::BuildSupport.ensure_standalone_runtime(dir, loaded_specs: specs)
-    raise "expected #{File.join(dir, 'cf-runtime')}, got #{target}" unless target.to_s == File.join(dir, 'cf-runtime')
-    raise 'missing setup-node-crypto.mjs' unless File.read(File.join(dir, 'cf-runtime', 'setup-node-crypto.mjs')) == "setup\n"
-    raise 'missing worker_module.mjs' unless File.read(File.join(dir, 'cf-runtime', 'worker_module.mjs')) == "worker\n"
+    target = HomuraRuntime::BuildSupport.ensure_standalone_runtime(dir, loaded_specs: specs)
+    expected = File.join(dir, 'build', 'cf-runtime')
+    raise "expected #{expected}, got #{target}" unless target.to_s == expected
+    raise 'missing setup-node-crypto.mjs' unless File.read(File.join(expected, 'setup-node-crypto.mjs')) == "setup\n"
+    raise 'missing worker_module.mjs' unless File.read(File.join(expected, 'worker_module.mjs')) == "worker\n"
   end
 end
 passed += 1 if ok
@@ -111,7 +125,7 @@ ok = assert('standalone load paths prepend packaged sequel-d1 vendor before lib 
       'sinatra-homura' => FakeSpec.new(sinatra_root),
       'sequel-d1' => FakeSpec.new(sequel_root)
     }
-    load_paths = CloudflareWorkers::BuildSupport.standalone_load_paths(app_root, with_db: true, loaded_specs: specs)
+    load_paths = HomuraRuntime::BuildSupport.standalone_load_paths(app_root, with_db: true, loaded_specs: specs)
     sequel_vendor = File.join(sequel_root, 'vendor')
     sequel_lib = File.join(sequel_root, 'lib')
     raise "missing #{sequel_vendor}" unless load_paths.include?(sequel_vendor)
@@ -123,8 +137,8 @@ passed += 1 if ok
 failed += 1 unless ok
 
 ok = assert('derives standalone namespaces from project name') do
-  templates = CloudflareWorkers::BuildSupport.standalone_namespace('/tmp/demo-app', 'Templates')
-  assets = CloudflareWorkers::BuildSupport.standalone_namespace('/tmp/demo-app', 'Assets')
+  templates = HomuraRuntime::BuildSupport.standalone_namespace('/tmp/demo-app', 'Templates')
+  assets = HomuraRuntime::BuildSupport.standalone_namespace('/tmp/demo-app', 'Assets')
   raise "expected DemoAppTemplates, got #{templates}" unless templates == 'DemoAppTemplates'
   raise "expected DemoAppAssets, got #{assets}" unless assets == 'DemoAppAssets'
 end
@@ -132,7 +146,7 @@ passed += 1 if ok
 failed += 1 unless ok
 
 ok = assert('prefixes standalone namespaces that would start with digits') do
-  namespace = CloudflareWorkers::BuildSupport.standalone_namespace('/tmp/123-app', 'Templates')
+  namespace = HomuraRuntime::BuildSupport.standalone_namespace('/tmp/123-app', 'Templates')
   raise "expected App123AppTemplates, got #{namespace}" unless namespace == 'App123AppTemplates'
 end
 passed += 1 if ok

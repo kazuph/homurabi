@@ -10,11 +10,11 @@
 #
 # Three responsibilities, modelled after existing Ruby conventions:
 #
-#   1. CloudflareWorkersIO — replaces nodejs.rb's $stdout / $stderr (which
+#   1. HomuraRuntimeIO — replaces nodejs.rb's $stdout / $stderr (which
 #      try to write to a closed Socket on Workers) with shims that route
 #      Ruby `puts` / `print` to V8's globalThis.console.log/error.
 #
-#   2. Rack::Handler::CloudflareWorkers — a standard Rack handler. Same
+#   2. Rack::Handler::Homura — a standard Rack handler. Same
 #      shape as Rack::Handler::Puma, Rack::Handler::WEBrick, etc. User
 #      code uses the conventional top-level `run app` from a config.ru-
 #      style entry point and never sees a Cloudflare-specific symbol.
@@ -35,7 +35,7 @@ require 'await'
 # 1. stdout / stderr → console.log / console.error
 # ---------------------------------------------------------------------------
 
-class CloudflareWorkersIO
+class HomuraRuntimeIO
   def initialize(channel)
     @channel = channel  # 'log' or 'error'
     @buffer = ''
@@ -105,13 +105,13 @@ class CloudflareWorkersIO
   end
 end
 
-$stdout = CloudflareWorkersIO.new('log')
-$stderr = CloudflareWorkersIO.new('error')
-Object.const_set(:STDOUT, $stdout) unless Object.const_defined?(:STDOUT) && STDOUT.is_a?(CloudflareWorkersIO)
-Object.const_set(:STDERR, $stderr) unless Object.const_defined?(:STDERR) && STDERR.is_a?(CloudflareWorkersIO)
+$stdout = HomuraRuntimeIO.new('log')
+$stderr = HomuraRuntimeIO.new('error')
+Object.const_set(:STDOUT, $stdout) unless Object.const_defined?(:STDOUT) && STDOUT.is_a?(HomuraRuntimeIO)
+Object.const_set(:STDERR, $stderr) unless Object.const_defined?(:STDERR) && STDERR.is_a?(HomuraRuntimeIO)
 
 # ---------------------------------------------------------------------------
-# 2. Rack::Handler::CloudflareWorkers
+# 2. Rack::Handler::Homura
 # ---------------------------------------------------------------------------
 #
 # Conforms to the Rack handler convention: a module with a `run` class
@@ -121,17 +121,45 @@ Object.const_set(:STDERR, $stderr) unless Object.const_defined?(:STDERR) && STDE
 
 module Rack
   module Handler
-    module CloudflareWorkers
+    module Homura
       EMPTY_STRING_IO = StringIO.new('').freeze
 
       def self.run(app, **_options)
         @app = app
-        install_dispatcher
+        ensure_dispatcher_installed!
         app
       end
 
       def self.app
         @app
+      end
+
+      def self.app=(app)
+        @app = app
+      end
+
+      # Eagerly install the JS-side dispatcher so a fetch arriving
+      # before `run` was called (e.g. classic-style apps that omit the
+      # trailing `run Sinatra::Application`) still gets routed into our
+      # `call` method, which can then discover the user's Sinatra app
+      # lazily via `Sinatra::Homura.ensure_rack_app!`. This
+      # is what makes the canonical sinatrarb.com snippet work
+      # verbatim on Workers — `at_exit` is unreliable here because the
+      # isolate never actually exits between fetches.
+      def self.ensure_dispatcher_installed!
+        return true if @dispatcher_installed
+        handler = self
+        `
+          globalThis.__HOMURA_RACK_DISPATCH__ = async function(req, env, ctx, body_text) {
+            return await #{handler}.$call(req, env, ctx, body_text == null ? "" : body_text);
+          };
+          (function () {
+            var g = globalThis;
+            g.__OPAL_WORKERS__ = g.__OPAL_WORKERS__ || {};
+            g.__OPAL_WORKERS__.rack = g.__HOMURA_RACK_DISPATCH__;
+          })();
+        `
+        @dispatcher_installed = true
       end
 
       # Entry point invoked from the Module Worker (src/worker.mjs) for
@@ -141,7 +169,13 @@ module Rack
       # request body (the worker.mjs front awaits req.text() before
       # handing control to Ruby because Opal runs synchronously).
       def self.call(js_req, js_env, js_ctx, body_text = '')
-        raise '`run app` was never called from user code' if @app.nil?
+        if @app.nil?
+          if defined?(::Sinatra::Homura) &&
+             ::Sinatra::Homura.respond_to?(:ensure_rack_app!)
+            ::Sinatra::Homura.ensure_rack_app!
+          end
+          raise '`run app` was never called from user code, and no Sinatra app was discoverable (define `class App < Sinatra::Base` or use top-level classic Sinatra routes)' if @app.nil?
+        end
 
         env = build_rack_env(js_req, js_env, js_ctx, body_text)
         result = @app.call(env)
@@ -156,18 +190,13 @@ module Rack
       class << self
         private
 
+        # Legacy alias, kept so out-of-tree code calling
+        # `Rack::Handler::Homura.send(:install_dispatcher)`
+        # keeps working. New code should go through
+        # `ensure_dispatcher_installed!` (it's idempotent and tracks
+        # state via `@dispatcher_installed`).
         def install_dispatcher
-          handler = self
-          `
-            globalThis.__HOMURA_RACK_DISPATCH__ = async function(req, env, ctx, body_text) {
-              return await #{handler}.$call(req, env, ctx, body_text == null ? "" : body_text);
-            };
-            (function () {
-              var g = globalThis;
-              g.__OPAL_WORKERS__ = g.__OPAL_WORKERS__ || {};
-              g.__OPAL_WORKERS__.rack = g.__HOMURA_RACK_DISPATCH__;
-            })();
-          `
+          ensure_dispatcher_installed!
         end
 
         # Build a Rack-compliant env Hash from a Cloudflare Workers Request.
@@ -475,7 +504,7 @@ module Kernel
   private
 
   def run(app, **options)
-    Rack::Handler::CloudflareWorkers.run(app, **options)
+    Rack::Handler::Homura.run(app, **options)
   end
 end
 
@@ -921,7 +950,7 @@ end
 # Phase 6 — HTTP client foundation. Loaded as part of the Cloudflare
 # Workers adapter so user code can simply `require 'sinatra/base'`
 # and use Net::HTTP / Cloudflare::HTTP.fetch without an extra require.
-require 'cloudflare_workers/http'
+require 'homura/runtime/http'
 
 # Phase 9 — Scheduled (Cron Triggers) dispatcher. Installs the JS
 # `globalThis.__HOMURA_SCHEDULED_DISPATCH__` hook that
@@ -929,11 +958,11 @@ require 'cloudflare_workers/http'
 # Must be loaded after the Cloudflare::* binding wrappers above
 # because it constructs D1Database/KVNamespace/R2Bucket instances
 # inside the dispatcher's per-job env.
-require 'cloudflare_workers/scheduled'
+require 'homura/runtime/scheduled'
 
 # Phase 10 — Workers AI binding wrapper. Loaded here so any Sinatra
 # route can call Cloudflare::AI.run(...) without an extra require.
-require 'cloudflare_workers/ai'
+require 'homura/runtime/ai'
 
 # Phase 11A — HTTP foundations.
 #
@@ -942,17 +971,17 @@ require 'cloudflare_workers/ai'
 # `stream`    adds `Cloudflare::SSEStream` + `Sinatra::Streaming#sse`
 #             so a route can `sse do |out| ... end` and flush chunks
 #             through a Workers ReadableStream.
-require 'cloudflare_workers/multipart'
-require 'cloudflare_workers/stream'
+require 'homura/runtime/multipart'
+require 'homura/runtime/stream'
 
 # Phase 11B — Cloudflare native bindings (Durable Objects / Cache /
 # Queues). Each file registers its own globalThis dispatcher hook
 # where applicable (DO / Queue consumer). Loaded here so user code
 # just needs `require 'sinatra/base'` — no extra `require` per
 # binding.
-require 'cloudflare_workers/cache'
-require 'cloudflare_workers/queue'
-require 'cloudflare_workers/email'
-require 'cloudflare_workers/durable_object'
+require 'homura/runtime/cache'
+require 'homura/runtime/queue'
+require 'homura/runtime/email'
+require 'homura/runtime/durable_object'
 
-require 'cloudflare_workers/async_registry'
+require 'homura/runtime/async_registry'

@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.3.1 (2026-04-29)
+
+- 0.3.0 was tagged but the release workflow failed before publish
+  because `lib/sequel/d1/version.rb` at that tag still showed
+  `0.2.10` (the version bump didn't actually land in the 0.3.0
+  commit due to a tooling glitch). 0.3.1 ships the actual 0.3.0
+  payload — the cloudflare_workers naming-elimination companion
+  changes. 0.3.0 was never published to RubyGems.
+
+## 0.3.0 (2026-04-29) — BREAKING: cloudflare_workers naming eliminated
+
+Companion release to homura-runtime 0.3.0. The `homura
+db:migrate:compile / db:migrate:apply` user-facing CLIs are
+unchanged; only the internal script path they delegate to moved.
+
+| was | now |
+|---|---|
+| `bin/cloudflare-workers-migrate` (homura db:migrate:* impl) | `exe/homura-db-migrate` |
+
+Internal references that reach into homura-runtime now use
+`HomuraRuntime::*` instead of `CloudflareWorkers::*`. Floor on
+`homura-runtime ~> 0.3` enforces the rename.
+
 ## 0.2.10 (2026-04-27)
 
 - Fix `update(col: Sequel.lit('expr'))` (and `insert(col: Sequel.lit(...))`)

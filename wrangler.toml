@@ -115,8 +115,8 @@ crons = [
 #
 # `HomuraCounterDO` is a generic DO class exported from
 # `gems/homura-runtime/runtime/worker.mjs`; it forwards every fetch through the Ruby
-# dispatcher installed by `gems/homura-runtime/lib/cloudflare_workers/durable_object.rb`
-# (require path: `cloudflare_workers/durable_object`).
+# dispatcher installed by `gems/homura-runtime/lib/homura/runtime/durable_object.rb`
+# (require path: `homura/runtime/durable_object`).
 # The Ruby handler registered for `HomuraCounterDO` lives in
 # `app/hello.rb` and implements a simple counter (inc / peek / reset).
 #

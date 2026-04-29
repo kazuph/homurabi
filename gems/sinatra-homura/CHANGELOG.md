@@ -1,5 +1,85 @@
 # Changelog
 
+## 0.3.0 (2026-04-29) — BREAKING: cloudflare_workers naming eliminated
+
+Companion release to homura-runtime 0.3.0. All `cloudflare_workers`
+naming inside this gem is replaced; the gem name remains
+`sinatra-homura` because it's already canonical.
+
+| was | now |
+|---|---|
+| `module Sinatra::CloudflareWorkers` | `module Sinatra::Homura` |
+| `require 'sinatra/cloudflare_workers'` | `require 'sinatra/homura'` |
+| `lib/sinatra/cloudflare_workers.rb` | `lib/sinatra/homura.rb` |
+| `bin/cloudflare-workers-erb-compile` (homura erb:compile impl) | `exe/homura-erb-compile` |
+| `bin/cloudflare-workers-new` (homura new impl) | `exe/homura-new` |
+
+`bin/homura` and the `homura erb:compile / new / build /
+db:migrate:*` user-facing CLIs are unchanged — only the internal
+script paths they delegate to moved.
+
+`Rack::Handler::CloudflareWorkers` references inside the vendored
+Sinatra entry points (`vendor/sinatra.rb`, `vendor/sinatra/base.rb`)
+follow homura-runtime 0.3.0 to `Rack::Handler::Homura`. Floor on
+`homura-runtime ~> 0.3` enforces the rename.
+
+No alias, no compatibility shim. Apps pinned to ≤ 0.2.x must update
+their requires and module references in lockstep.
+
+## 0.2.23 (2026-04-29)
+
+- The canonical sinatrarb.com snippet now works verbatim on Workers.
+  Previously, even after 0.2.22 made `require 'sinatra'` enough to load
+  the runtime, users still had to write `run Sinatra::Application` /
+  `run App` themselves because `ensure_rack_app!` only handled
+  `class App < Sinatra::Base`, and the at_exit hook it relied on
+  doesn't fire on Workers (the isolate never actually exits between
+  fetches). The fix combines an *eager* dispatcher install with a
+  *lazy* app discovery on the first fetch:
+
+  - `vendor/sinatra.rb` and `vendor/sinatra/base.rb` now require
+    `sinatra/cloudflare_workers` (was just `cloudflare_workers`).
+    Loading this file calls
+    `Rack::Handler::CloudflareWorkers.ensure_dispatcher_installed!`,
+    which registers `globalThis.__HOMURA_RACK_DISPATCH__` immediately
+    — so a fetch arriving before any explicit `run` call still lands
+    inside our `call` method.
+  - `Rack::Handler::CloudflareWorkers#call` (homura-runtime 0.2.26)
+    falls back to `Sinatra::CloudflareWorkers.ensure_rack_app!` when
+    `@app` is nil, picking up either a modular `App < Sinatra::Base`
+    or a classic-style `Sinatra::Application` (top-level
+    `get '/' do … end`). Modular still wins when both are defined.
+
+  Net effect: this app:
+
+  ```ruby
+  require 'sinatra'
+  get '/frank-says' do
+    'Put this in your pipe & smoke it!'
+  end
+  ```
+
+  …and this app:
+
+  ```ruby
+  require 'sinatra/base'
+  class App < Sinatra::Base
+    get '/' do; 'hi'; end
+  end
+  ```
+
+  …both now run on Workers without an extra
+  `require 'sinatra/cloudflare_workers'` line and without a trailing
+  `run Sinatra::Application` / `run App` line. Existing apps with
+  either of those lines still work; the require is a no-op second load
+  and an explicit `run` still wins over the lazy first-fetch
+  registration.
+
+- Bumps `homura-runtime` floor to `>= 0.2.26` (Set-Cookie Array fix
+  + path:/RubyGems gem auto-await pipeline + the new
+  `ensure_dispatcher_installed!` / lazy `call` discovery this gem
+  depends on).
+
 ## 0.2.17 (2026-04-27)
 
 - Preserve `content_type`, `headers`, and `status` set inside async / `await: true`

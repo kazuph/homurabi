@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.3 — 2026-04-29
+
+- `lib/sinatra/inertia/async_sources.rb` registers under
+  `HomuraRuntime::AsyncRegistry` (was `CloudflareWorkers::AsyncRegistry`)
+  to follow the homura-runtime 0.3.0 module rename. Pure-Sinatra MRI
+  consumers are unaffected (the registration block is gated on
+  `defined?(::HomuraRuntime)`). Pin homura-runtime ≥ 0.3.0 if you
+  want sinatra-inertia 0.1.3's auto-await registration to fire.
+
 ## 0.1.2 — 2026-04-29
 
 - Fix: under Opal/Workers, the Inertia visit JSON body shipped with

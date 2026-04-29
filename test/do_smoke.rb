@@ -27,7 +27,7 @@
 #   npm test                # full suite
 
 require 'json'
-require 'cloudflare_workers'
+require 'homura/runtime'
 
 module SmokeTest
   @passed = 0

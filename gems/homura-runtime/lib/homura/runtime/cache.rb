@@ -165,7 +165,7 @@ module Cloudflare
       # gets dropped and the caller's `__await__` receives `undefined`
       # instead of waiting for `cache.put` to resolve. That was the
       # silent bug: the inner `await` ran, but the outer await had
-      # already proceeded. See lib/cloudflare_workers/scheduled.rb for
+      # already proceeded. See lib/homura/runtime/scheduled.rb for
       # the same Opal multi-line x-string constraint.
       # Warn ONCE per isolate on a nil cache. Non-Workers runtimes
       # hit `Cache.new(nil, ...)` intentionally (tests, safe fall-back

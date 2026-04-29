@@ -1,5 +1,6 @@
 # frozen_string_literal: true
-require 'sinatra/cloudflare_workers'
+
+require 'sinatra/base'
 
 class App < Sinatra::Base
   helpers do
@@ -117,4 +118,3 @@ class App < Sinatra::Base
   end
 end
 
-run App

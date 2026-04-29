@@ -25,13 +25,13 @@ Gem::Specification.new do |spec|
   spec.metadata['documentation_uri'] = 'https://homura.kazu-san.workers.dev/docs/sequel-d1'
 
   spec.files = Dir.chdir(__dir__) do
-    Dir['lib/**/*', 'vendor/**/*', 'bin/*', 'README.md', 'CHANGELOG.md'].select { |f| File.file?(f) }
+    Dir['lib/**/*', 'vendor/**/*', 'exe/*', 'README.md', 'CHANGELOG.md'].select { |f| File.file?(f) }
   end
   spec.require_paths = ['lib']
   spec.bindir = 'bin'
   spec.executables = []
 
-  spec.add_runtime_dependency 'homura-runtime', '~> 0.2', '>= 0.2.12'
+  spec.add_runtime_dependency 'homura-runtime', '~> 0.3'
   spec.add_runtime_dependency 'opal-homura', '= 1.8.3.rc1.5'
   spec.add_runtime_dependency 'sequel', '~> 5.0'
   spec.add_runtime_dependency 'sqlite3', '~> 2.0'

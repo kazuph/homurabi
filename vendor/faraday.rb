@@ -45,7 +45,7 @@
 #   - Custom middleware registration. Use the built-ins above.
 
 require 'json'
-require 'cloudflare_workers/http'
+require 'homura/runtime/http'
 
 module Faraday
   VERSION = '2.0.0-homura-shim'
@@ -583,7 +583,7 @@ module Faraday
       # headers / body (request middleware already mutated env.body into
       # the encoded form). Use `while` (not `loop do`) because Opal
       # compiles `loop { … __await__ … break }` into a JS microtask
-      # storm that OOMs workerd — see lib/cloudflare_workers/stream.rb
+      # storm that OOMs workerd — see lib/homura/runtime/stream.rb
       # for the same workaround in the SSE pipe.
       attempt = 0
       keep_going = true

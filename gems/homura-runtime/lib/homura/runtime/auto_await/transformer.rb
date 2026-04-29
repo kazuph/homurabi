@@ -2,7 +2,7 @@
 
 require 'parser/source/tree_rewriter'
 
-module CloudflareWorkers
+module HomuraRuntime
   module AutoAwait
     class Transformer
       def self.transform(source, await_nodes, buffer)

@@ -10,7 +10,7 @@
 # test suite remains hermetic (no real Cloudflare runtime required).
 
 require 'json'
-require 'cloudflare_workers'
+require 'homura/runtime'
 require 'sequel'
 
 # ---------------------------------------------------------------------

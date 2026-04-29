@@ -35,9 +35,9 @@
 # needed when bypassing that build step.
 
 begin
-  require 'cloudflare_workers'
+  require 'homura/runtime'
 rescue LoadError
-  # Workers / Opal builds compile this file with `-r cloudflare_workers`
+  # Workers / Opal builds compile this file with `-r homura/runtime`
   # already applied; standalone specs may omit the runtime gem.
 end
 require 'sequel/adapters/shared/sqlite'

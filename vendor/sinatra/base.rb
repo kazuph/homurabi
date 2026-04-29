@@ -9,3 +9,8 @@
 
 require 'sinatra_upstream/base'
 require 'sinatra_opal_patches'
+# homura: chain in `sinatra/homura` so a modular app
+# written the textbook way works on Workers without an extra
+# `require 'sinatra/homura'` line and without a
+# trailing `run App` line.
+require 'sinatra/homura'

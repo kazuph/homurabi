@@ -1,5 +1,69 @@
 # Changelog
 
+## 0.3.1 (2026-04-29)
+
+- Fix `release-gems.yml` `Resolve gem target` step: now reads
+  `gems/homura-runtime/lib/homura/runtime/version.rb` (was the
+  pre-rename `gems/homura-runtime/lib/cloudflare_workers/version.rb`,
+  which 0.3.0's tag-push publish failed on).
+- No code changes since 0.3.0; this version exists only because
+  re-tagging a published version is forbidden by the project's
+  release rules. 0.3.0 was never published to RubyGems.
+
+## 0.3.0 (2026-04-29) — BREAKING: cloudflare_workers naming eliminated
+
+The "cloudflare_workers" branding everywhere inside the gem is gone.
+gem name is `homura-runtime`, the module is now `HomuraRuntime`, the
+require path is `require 'homura/runtime'`, and the Rack handler is
+`Rack::Handler::Homura`. Apps that pinned ≤ 0.2.x and referenced
+either `CloudflareWorkers::*` or `require 'cloudflare_workers'`
+must update.
+
+Renames:
+
+| was | now |
+|---|---|
+| `module CloudflareWorkers` | `module HomuraRuntime` |
+| `CloudflareWorkersIO` (stdout/stderr replacement class) | `HomuraRuntimeIO` |
+| `Rack::Handler::CloudflareWorkers` | `Rack::Handler::Homura` |
+| `require 'cloudflare_workers'` | `require 'homura/runtime'` |
+| `lib/cloudflare_workers.rb` | `lib/homura/runtime.rb` |
+| `lib/cloudflare_workers/*.rb` | `lib/homura/runtime/*.rb` |
+
+`Cloudflare` namespace (binding wrappers like `Cloudflare::HTTP`,
+`Cloudflare::D1Error`, `Cloudflare.js_promise?`) and Cloudflare-
+specific Rack env keys (`env['cloudflare.DB']`, `env['cloudflare.KV']`,
+…) are unchanged — those are factual descriptions of the underlying
+Cloudflare Workers bindings, not branding.
+
+No backward-compat shim. Per the project's `v1未満は破壊的に置き換え`
+rule, old constant aliases are not preserved.
+
+## 0.2.27 (2026-04-29)
+
+- `Rack::Handler::CloudflareWorkers.run` now goes through
+  `ensure_dispatcher_installed!` instead of duplicating the JS
+  install snippet. Single source of truth for the dispatcher
+  installation; `@dispatcher_installed` correctly tracks the state
+  even when `run` is the first caller. Functionally identical from
+  the user's point of view (dispatcher ends up in `globalThis`
+  either way) — Copilot review on PR #34 spotted the duplication.
+
+## 0.2.26 (2026-04-29)
+
+- `Rack::Handler::CloudflareWorkers#call`: when `@app` is nil, fall
+  back to `Sinatra::CloudflareWorkers.ensure_rack_app!` to discover
+  the Sinatra app lazily on the first fetch. This is what lets
+  classic-style apps omit the trailing `run Sinatra::Application`
+  line (paired with `sinatra-homura >= 0.2.23`).
+- New `Rack::Handler::CloudflareWorkers.ensure_dispatcher_installed!`:
+  eagerly registers the JS-side dispatcher (`globalThis.__HOMURA_RACK_DISPATCH__`)
+  at script-load time, so a fetch arriving before `run` was called
+  still routes into our `call` method (where the lazy app discovery
+  above kicks in). On Workers `at_exit` is unreliable because the
+  isolate doesn't exit between requests; this eager install is the
+  reliable hook.
+
 ## 0.2.25 (2026-04-29)
 
 - `BuildSupport`: factor `opal_gem_paths` out of the path:-only

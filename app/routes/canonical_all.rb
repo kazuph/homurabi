@@ -738,7 +738,7 @@
     # boundary. Set Location on the response (captured into
     # `js_headers` by build_js_response before any await), then
     # return a 2-element `[status, body]` tuple that the JS
-    # override in `lib/cloudflare_workers.rb` recognises.
+    # override in `lib/homura/runtime.rb` recognises.
     unless current_session_user
       response['Location'] = "/login?return_to=#{Rack::Utils.escape('/chat')}"
       next [302, '']
@@ -1738,7 +1738,7 @@
   end
   # Phase 16 — self-hosted docs (Cloudflare-style /docs/*)
   # Mustermann on Opal rejects `^`/`$` in regex routes. Trailing `/docs/` is normalized
-  # to `/docs` in Rack::Handler::CloudflareWorkers.build_rack_env (runtime gem).
+  # to `/docs` in Rack::Handler::Homura.build_rack_env (runtime gem).
   docs_index_route = lambda do
     @title = 'ドキュメント — homura'
     @docs_page = 'index'

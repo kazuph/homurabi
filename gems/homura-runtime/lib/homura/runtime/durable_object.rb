@@ -11,7 +11,7 @@
 # session servers, and collaborative state machines without any external
 # store.
 #
-# Three responsibilities here, analogous to `cloudflare_workers.rb`'s
+# Three responsibilities here, analogous to `homura/runtime.rb`'s
 # D1 / KV / R2 section:
 #
 #   1. `Cloudflare::DurableObjectNamespace`  — wraps the binding JS object
@@ -163,7 +163,7 @@ module Cloudflare
       response_klass = Cloudflare::HTTPResponse
       do_class_label = 'DurableObjectStub'
 
-      # Single-line IIFE — see `lib/cloudflare_workers/cache.rb#put`
+      # Single-line IIFE — see `lib/homura/runtime/cache.rb#put`
       # for why Opal can silently drop a multi-line x-string Promise.
       js_promise = `(async function(stub, url_str, method_str, js_headers, js_body, Kernel, err_klass, do_class_label) { var init = { method: method_str, headers: js_headers }; if (js_body !== null && js_body !== undefined && js_body !== Opal.nil) { init.body = js_body; } var resp; try { resp = await stub.fetch(url_str, init); } catch (e) { Kernel.$raise(err_klass.$new(e && e.message ? e.message : String(e), Opal.hash({ operation: 'stub.fetch', do_class: do_class_label }))); } var text = ''; try { text = await resp.text(); } catch (_) { text = ''; } var hk = []; var hv = []; if (resp.headers && typeof resp.headers.forEach === 'function') { resp.headers.forEach(function(v, k) { hk.push(String(k).toLowerCase()); hv.push(String(v)); }); } return { status: resp.status|0, text: text, hkeys: hk, hvals: hv }; })(#{js_stub}, #{url_str}, #{method_str}, #{js_headers}, #{js_body}, #{Kernel}, #{err_klass}, #{do_class_label})`
 
@@ -357,7 +357,7 @@ module Cloudflare
     #
     # Kept as a single-line backtick x-string — Opal's compiler refuses
     # multi-line backticks as expressions (same constraint documented
-    # in `lib/cloudflare_workers/scheduled.rb#install_dispatcher`).
+    # in `lib/homura/runtime/scheduled.rb#install_dispatcher`).
     # Installs FOUR hooks: fetch dispatcher + 3 websocket event
     # dispatchers. Each wraps Ruby exceptions in a console.error so a
     # bad handler doesn't crash the DO.
@@ -516,7 +516,7 @@ module Cloudflare
 
   # The incoming `request` argument passed to DO handlers. `body_text`
   # is pre-awaited by the JS dispatcher because Ruby runs synchronously
-  # under Opal (same pattern as `Rack::Handler::CloudflareWorkers.call`).
+  # under Opal (same pattern as `Rack::Handler::Homura.call`).
   class DurableObjectRequest
     attr_reader :js_request, :body
 

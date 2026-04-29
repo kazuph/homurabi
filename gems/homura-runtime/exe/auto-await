@@ -15,18 +15,18 @@
 
 require 'fileutils'
 require 'pathname'
-require_relative '../lib/cloudflare_workers/build_support'
+require_relative '../lib/homura/runtime/build_support'
 
 # homura-runtime lib path resolution (with legacy alias fallback)
 runtime_lib = ENV['CFW_RUNTIME_LIB']
 unless runtime_lib
-  runtime_lib = CloudflareWorkers::BuildSupport.runtime_root(current_file: __FILE__).join('lib').to_s
+  runtime_lib = HomuraRuntime::BuildSupport.runtime_root(current_file: __FILE__).join('lib').to_s
 end
 $LOAD_PATH.unshift(runtime_lib) unless $LOAD_PATH.include?(runtime_lib)
 
-require 'cloudflare_workers/async_registry'
-require 'cloudflare_workers/auto_await/analyzer'
-require 'cloudflare_workers/auto_await/transformer'
+require 'homura/runtime/async_registry'
+require 'homura/runtime/auto_await/analyzer'
+require 'homura/runtime/auto_await/transformer'
 
 options = { input: nil, output: nil, debug: ENV['CLOUDFLARE_WORKERS_AUTO_AWAIT_DEBUG'] == '1' }
 
@@ -43,10 +43,10 @@ abort('Usage: auto-await --input DIR --output DIR [--debug]') unless options[:in
 input_root  = Pathname(options[:input]).expand_path
 output_root = Pathname(options[:output]).expand_path
 
-registry = CloudflareWorkers::AsyncRegistry.instance
+registry = HomuraRuntime::AsyncRegistry.instance
 
 # Auto-load async source registrations from all loaded gems.
-CloudflareWorkers::AsyncRegistry.auto_load_gem_async_sources(debug: options[:debug])
+HomuraRuntime::AsyncRegistry.auto_load_gem_async_sources(debug: options[:debug])
 
 # Load project-specific async source registrations if present.
 project_async = File.join(Dir.pwd, 'lib', 'homura_async_sources.rb')
@@ -75,7 +75,7 @@ paths.each do |path|
   has_existing_await = source.include?('.__await__')
 
   begin
-    analyzer = CloudflareWorkers::AutoAwait::Analyzer.new(registry, debug: options[:debug])
+    analyzer = HomuraRuntime::AutoAwait::Analyzer.new(registry, debug: options[:debug])
     buffer, nodes = analyzer.process(source, path)
     needs_magic_only_output = has_existing_await && !has_magic
 
@@ -89,7 +89,7 @@ paths.each do |path|
       if nodes.empty?
         source
       else
-        CloudflareWorkers::AutoAwait::Transformer.transform(source, nodes, buffer)
+        HomuraRuntime::AutoAwait::Transformer.transform(source, nodes, buffer)
       end
     unless has_magic
       transformed = "# await: true\n" + transformed

@@ -5,7 +5,7 @@ source 'https://rubygems.org'
 ruby '>= 3.4.0'
 
 # Mode A — monorepo dev | Mode B — local `.gem` install (order: opal → runtime → sinatra → sequel-d1).
-gem 'opal-homura', path: '../../vendor/opal-gem', require: 'opal'
-gem 'homura-runtime', path: '../../gems/homura-runtime'
-gem 'sinatra-homura', path: '../../gems/sinatra-homura'
-gem 'sequel-d1', path: '../../gems/sequel-d1'
+gem 'opal-homura', '= 1.8.3.rc1.5', require: 'opal'
+gem 'homura-runtime', '= 0.3.1'
+gem 'sinatra-homura', '= 0.3.0'
+gem 'sequel-d1', '= 0.3.1'

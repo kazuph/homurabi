@@ -1,15 +1,15 @@
 PATH
   remote: gems/homura-runtime
   specs:
-    homura-runtime (0.2.23)
+    homura-runtime (0.3.1)
       opal-homura (= 1.8.3.rc1.5)
       parser (~> 3.3)
 
 PATH
   remote: gems/sequel-d1
   specs:
-    sequel-d1 (0.2.10)
-      homura-runtime (~> 0.2, >= 0.2.12)
+    sequel-d1 (0.3.1)
+      homura-runtime (~> 0.3)
       opal-homura (= 1.8.3.rc1.5)
       sequel (~> 5.0)
       sqlite3 (~> 2.0)
@@ -17,8 +17,8 @@ PATH
 PATH
   remote: gems/sinatra-homura
   specs:
-    sinatra-homura (0.2.22)
-      homura-runtime (~> 0.2, >= 0.2.23)
+    sinatra-homura (0.3.0)
+      homura-runtime (~> 0.3)
       opal-homura (= 1.8.3.rc1.5)
 
 PATH
@@ -42,9 +42,11 @@ GEM
     sequel (5.103.0)
       bigdecimal
     sqlite3 (2.9.3-arm64-darwin)
+    sqlite3 (2.9.3-x86_64-linux-gnu)
 
 PLATFORMS
   arm64-darwin-25
+  x86_64-linux
 
 DEPENDENCIES
   homura-runtime!

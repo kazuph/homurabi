@@ -1,10 +1,10 @@
 # frozen_string_literal: true
 
-require_relative 'lib/cloudflare_workers/version'
+require_relative 'lib/homura/runtime/version'
 
 Gem::Specification.new do |spec|
   spec.name = 'homura-runtime'
-  spec.version = CloudflareWorkers::VERSION
+  spec.version = HomuraRuntime::VERSION
   spec.authors = ['Kazuhiro Homma']
   spec.summary = 'Cloudflare Workers + Opal runtime core (Rack dispatch, bindings, patches)'
   spec.description = <<~DESC

@@ -42,14 +42,18 @@ Dir.mktmpdir do |dir|
       system('bundle', 'exec', 'ruby', cli, 'new', app_dir) or raise 'homura new failed'
     end
     raise 'Gemfile missing' unless File.exist?(File.join(app_dir, 'Gemfile'))
-    raise 'cf-runtime/setup-node-crypto.mjs missing' unless File.exist?(File.join(app_dir, 'cf-runtime', 'setup-node-crypto.mjs'))
 
     config_ru = File.read(File.join(app_dir, 'config.ru'))
     raise 'config.ru should require app/app relatively' unless config_ru.include?("require_relative 'app/app'")
-    raise 'config.ru should run App' unless config_ru.include?('run App')
+    # As of sinatra-homura 0.2.23, `run App` is no longer required —
+    # `Sinatra::Homura.ensure_rack_app!` discovers and
+    # registers `App` on the first fetch event. Scaffolder must NOT emit it.
+    raise 'config.ru should not emit `run App` (auto-registered now)' if config_ru.include?('run App')
 
     app_rb = File.read(File.join(app_dir, 'app', 'app.rb'))
     raise 'app/app.rb should not call run App directly' if app_rb.include?('run App')
+    raise 'app/app.rb should require sinatra/base' unless app_rb.include?("require 'sinatra/base'")
+    raise 'app/app.rb should not require legacy sinatra/homura' if app_rb.include?("require 'sinatra/homura'")
 
     gemfile = File.read(File.join(app_dir, 'Gemfile'))
     raise 'Gemfile should include rake for generated tasks' unless gemfile.include?("gem 'rake'")
@@ -109,7 +113,7 @@ Dir.mktmpdir do |dir|
 
   File.write(File.join(app_dir, 'app', 'app.rb'), <<~RUBY)
     # frozen_string_literal: true
-    require 'sinatra/cloudflare_workers'
+    require 'sinatra/base'
 
     class App < Sinatra::Base
       get('/') { 'custom-entrypoint-ok' }
@@ -120,7 +124,6 @@ Dir.mktmpdir do |dir|
     # frozen_string_literal: true
     require_relative 'app/app'
 
-    run App
   RUBY
 
   File.write(File.join(app_dir, 'views', 'index.erb'), "ok\n")
@@ -137,9 +140,9 @@ Dir.mktmpdir do |dir|
     raise output unless status.success?
 
     entrypoint = File.read(File.join(app_dir, 'build', 'worker.entrypoint.mjs'))
-    raise entrypoint unless entrypoint.include?('import "../cf-runtime/setup-node-crypto.mjs";')
+    raise entrypoint unless entrypoint.include?('import "./cf-runtime/setup-node-crypto.mjs";')
     raise entrypoint unless entrypoint.include?('import "./bundle.mjs";')
-    raise entrypoint unless entrypoint.include?('from "../cf-runtime/worker_module.mjs";')
+    raise entrypoint unless entrypoint.include?('from "./cf-runtime/worker_module.mjs";')
 
     node_script = <<~JS
       const mod = await import(process.argv[2]);
@@ -164,7 +167,7 @@ Dir.mktmpdir do |dir|
 
   File.write(File.join(app_dir, 'app', 'app.rb'), <<~RUBY)
     # frozen_string_literal: true
-    require 'sinatra/cloudflare_workers'
+    require 'sinatra/base'
 
     class App < Sinatra::Base
       get('/') { 'ok-from-config-ru' }
@@ -179,7 +182,6 @@ Dir.mktmpdir do |dir|
     # frozen_string_literal: true
     require_relative 'app/app'
 
-    run App
   RUBY
 
   File.write(File.join(app_dir, 'views', 'index.erb'), "ok\n")
@@ -200,7 +202,7 @@ Dir.mktmpdir do |dir|
       const postResp = await app.fetch(new Request('http://127.0.0.1:8787/create', { method: 'POST' }), {}, ctx);
       console.log(`POST:${postResp.status}:${postResp.headers.get('location')}`);
     JS
-    output, status = Open3.capture2e('node', '--input-type=module', '-', File.join(app_dir, 'worker.entrypoint.mjs'), stdin_data: node_script)
+    output, status = Open3.capture2e('node', '--input-type=module', '-', File.join(app_dir, 'build', 'worker.entrypoint.mjs'), stdin_data: node_script)
     raise output unless status.success?
     lines = output.lines.map(&:strip)
     raise output unless lines.include?('GET:200:ok-from-config-ru')
@@ -218,13 +220,12 @@ Dir.mktmpdir do |dir|
 
   File.write(File.join(app_dir, 'app', 'app.rb'), <<~RUBY)
     # frozen_string_literal: true
-    require 'sinatra/cloudflare_workers'
+    require 'sinatra/base'
 
     class App < Sinatra::Base
       get('/') { 'ok-from-app-rb' }
     end
 
-    run App
   RUBY
 
   File.write(File.join(app_dir, 'views', 'index.erb'), "ok\n")
@@ -241,7 +242,7 @@ Dir.mktmpdir do |dir|
       const resp = await app.fetch(new Request('https://example.test/'), {}, ctx);
       console.log(`${resp.status}:${await resp.text()}`);
     JS
-    output, status = Open3.capture2e('node', '--input-type=module', '-', File.join(app_dir, 'worker.entrypoint.mjs'), stdin_data: node_script)
+    output, status = Open3.capture2e('node', '--input-type=module', '-', File.join(app_dir, 'build', 'worker.entrypoint.mjs'), stdin_data: node_script)
     raise output unless status.success?
     raise output unless output.lines.map(&:strip).include?('200:ok-from-app-rb')
   end
@@ -257,7 +258,7 @@ Dir.mktmpdir do |dir|
 
   File.write(File.join(app_dir, 'app', 'app.rb'), <<~RUBY)
     # frozen_string_literal: true
-    require 'sinatra/cloudflare_workers'
+    require 'sinatra/base'
 
     class App < Sinatra::Base
       helpers do
@@ -274,7 +275,6 @@ Dir.mktmpdir do |dir|
       end
     end
 
-    run App
   RUBY
 
   File.write(File.join(app_dir, 'app', 'hello.rb'), <<~RUBY)
@@ -299,7 +299,7 @@ Dir.mktmpdir do |dir|
         console.log(`${resp.status}:${await resp.text()}`);
       }
     JS
-    output, status = Open3.capture2e('node', '--input-type=module', '-', File.join(app_dir, 'worker.entrypoint.mjs'), stdin_data: node_script)
+    output, status = Open3.capture2e('node', '--input-type=module', '-', File.join(app_dir, 'build', 'worker.entrypoint.mjs'), stdin_data: node_script)
     raise output unless status.success?
     lines = output.lines.map(&:strip)
     raise output unless lines.include?('200:item:42')
@@ -317,7 +317,7 @@ Dir.mktmpdir do |dir|
 
   File.write(File.join(app_dir, 'app', 'app.rb'), <<~RUBY)
     # frozen_string_literal: true
-    require 'sinatra/cloudflare_workers'
+    require 'sinatra/base'
     require 'sequel'
     require 'json'
 
@@ -346,14 +346,12 @@ Dir.mktmpdir do |dir|
       end
     end
 
-    run App
   RUBY
 
   File.write(File.join(app_dir, 'config.ru'), <<~RUBY)
     # frozen_string_literal: true
     require_relative 'app/app'
 
-    run App
   RUBY
 
   File.write(File.join(app_dir, 'views', 'index.erb'), <<~ERB)
@@ -404,7 +402,7 @@ Dir.mktmpdir do |dir|
       console.log(`POST:${postResp.status}:${postResp.headers.get('location')}`);
     JS
 
-    output, status = Open3.capture2e('node', '--input-type=module', '-', File.join(app_dir, 'worker.entrypoint.mjs'), stdin_data: node_script)
+    output, status = Open3.capture2e('node', '--input-type=module', '-', File.join(app_dir, 'build', 'worker.entrypoint.mjs'), stdin_data: node_script)
     raise output unless status.success?
 
     lines = output.lines.map(&:strip)

@@ -1,6 +1,6 @@
 # await: all, call, fetch, get_first_row, execute, execute_insert, open, run, send, sleep
 # frozen_string_literal: true
-require 'sinatra/cloudflare_workers'
+require 'sinatra/base'
 require 'sequel'
 
 class App < Sinatra::Base

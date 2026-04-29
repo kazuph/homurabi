@@ -4,7 +4,7 @@
 # the canonical Sinatra README / examples, so every line here reads
 # the same as it would in any other Sinatra project. Nothing about
 # Cloudflare Workers, Opal, or the Cloudflare bindings is visible in
-# this file — the adapter lives entirely in `lib/cloudflare_workers.rb`.
+# this file — the adapter lives entirely in `lib/homura/runtime.rb`.
 #
 # HTML pages go through real ERB templates stored under `views/*.erb`
 # and rendered with the classic `erb :name` helper. homura's build
@@ -13,7 +13,7 @@
 
 require 'json'
 require 'time'
-require 'sinatra/cloudflare_workers'
+require 'sinatra/homura'
 require 'net/http'
 require 'openssl'
 require 'securerandom'
@@ -23,7 +23,7 @@ require 'homura_markdown'
 # Phase 11A — HTTP foundations. `faraday` is the compat shim living
 # under vendor/ (NOT the real ruby-faraday gem — see file header for
 # the rationale). The Cloudflare::Multipart parser and the SSEStream
-# helper are auto-required from lib/cloudflare_workers.rb.
+# helper are auto-required from lib/homura/runtime.rb.
 require 'faraday'
 # Phase 12 — Sequel (vendored v5.103.0) + D1 adapter (`sequel-d1` gem).
 # `Sequel.connect(adapter: :d1, d1: …)` uses the per-request D1 binding

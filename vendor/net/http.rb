@@ -19,7 +19,7 @@
 # request objects, multipart, chunked streaming) is out of scope for
 # Phase 6. Use Cloudflare::HTTP.fetch directly for those.
 
-require 'cloudflare_workers/http'
+require 'homura/runtime/http'
 
 module Net
   # Net::HTTPResponse — minimal CRuby compatibility surface.

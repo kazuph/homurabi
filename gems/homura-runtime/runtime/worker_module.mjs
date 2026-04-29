@@ -156,7 +156,7 @@ export default {
     const dispatch = rackDispatch();
     if (typeof dispatch !== "function") {
       return new Response(
-        "homura: Rack dispatcher not installed (Rack::Handler::CloudflareWorkers.run never called)\n",
+        "homura: Rack dispatcher not installed (Rack::Handler::Homura.run never called)\n",
         { status: 500, headers: { "content-type": "text/plain; charset=utf-8" } },
       );
     }
@@ -180,7 +180,7 @@ export default {
   // The Workers runtime invokes this `scheduled` export once per
   // matching `[triggers] crons` entry in wrangler.toml. We forward
   // the (event, env, ctx) triple to the Ruby-side dispatcher
-  // installed by `lib/cloudflare_workers/scheduled.rb`
+  // installed by `lib/homura/runtime/scheduled.rb`
   // (which registers `globalThis.__HOMURA_SCHEDULED_DISPATCH__`).
   //
   // The Ruby dispatcher walks every job registered via the
@@ -199,12 +199,12 @@ export default {
     const dispatch = scheduledDispatch();
     if (typeof dispatch !== "function") {
       // No Ruby dispatcher installed — the Opal bundle didn't
-      // require 'cloudflare_workers/scheduled'. Log loudly so this
+      // require 'homura/runtime/scheduled'. Log loudly so this
       // misconfiguration surfaces instead of silently dropping
       // every cron firing.
       try {
         globalThis.console.error(
-          "homura: scheduled dispatcher not installed (require 'cloudflare_workers/scheduled' missing)",
+          "homura: scheduled dispatcher not installed (require 'homura/runtime/scheduled' missing)",
         );
       } catch (e) {
         // ignore — console may itself be broken in pathological cases
@@ -246,7 +246,7 @@ export default {
     if (typeof dispatch !== "function") {
       try {
         globalThis.console.error(
-          "homura: queue dispatcher not installed (require 'cloudflare_workers/queue' missing)",
+          "homura: queue dispatcher not installed (require 'homura/runtime/queue' missing)",
         );
       } catch (e) {}
       return;
@@ -272,7 +272,7 @@ export default {
 // must be a named export on this module. We export ONE generic class
 // (`HomuraCounterDO`) that forwards every `fetch(req)` it receives
 // to the Ruby-side dispatcher installed by
-// `lib/cloudflare_workers/durable_object.rb`
+// `lib/homura/runtime/durable_object.rb`
 // (`globalThis.__HOMURA_DO_DISPATCH__`).
 //
 // The Ruby handler is registered via:
@@ -361,7 +361,7 @@ export class HomuraCounterDO {
   }
 
   // Hibernation API callbacks — routed into Ruby via the hooks
-  // installed by `lib/cloudflare_workers/durable_object.rb`. Each
+  // installed by `lib/homura/runtime/durable_object.rb`. Each
   // hook is optional on the Ruby side; missing hooks are a no-op.
   async webSocketMessage(ws, message) {
     const fn = durableObjectWsMessage();

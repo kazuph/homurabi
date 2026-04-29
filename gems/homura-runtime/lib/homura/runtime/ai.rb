@@ -21,7 +21,7 @@
 #
 # Streaming (`stream: true`) returns the raw JS ReadableStream wrapped
 # in `Cloudflare::AI::Stream` so a route can hand it to a Server-Sent
-# Events response. See `lib/cloudflare_workers.rb#build_js_response`
+# Events response. See `lib/homura/runtime.rb#build_js_response`
 # for the SSE / ReadableStream pass-through.
 
 require 'json'
@@ -71,7 +71,7 @@ module Cloudflare
       # keeps the returned value alive through the local). Do NOT
       # refactor this so the backtick is the method's last expression
       # or the Promise will be silently dropped (same pitfall
-      # documented in lib/cloudflare_workers/{cache,queue}.rb —
+      # documented in lib/homura/runtime/{cache,queue}.rb —
       # Phase 11B audit).
       js_promise = `
         (async function() {

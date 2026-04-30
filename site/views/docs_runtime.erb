@@ -4,7 +4,7 @@
 <h2 id="role">役割</h2>
 <ul>
   <li><code>require 'opal_patches'</code> — Rack 等との現実的な互換パッチ。</li>
-  <li><code>require 'cloudflare_workers'</code> — Rack ハンドラ、KV / D1 / R2 等のバインディング。</li>
+  <li><code>require 'homura/runtime'</code> — Rack ハンドラ、KV / D1 / R2 / AI / Queue / DO / Cache などの Cloudflare バインディングラッパー（<code>Cloudflare::*</code> 名前空間）。<code>sinatra-homura</code> が Sinatra 経由で自動的にロードするので、ユーザーコードから直接 require することは通常ありません。</li>
   <li><code>homura build</code> — ERB → アセット → Opal → <code>patch-opal-evals.mjs</code> → <code>build/worker.entrypoint.mjs</code> まで一括。</li>
 </ul>
 

@@ -38,11 +38,11 @@ Live demo: https://homura.kazu-san.workers.dev
 ```ruby
 source 'https://rubygems.org'
 
-gem 'opal-homura', '= 1.8.3.rc1.3', require: 'opal'
+gem 'opal-homura',    '= 1.8.3.rc1.5', require: 'opal'
 gem 'rake' # generated apps use this for build/dev/deploy
-gem 'homura-runtime', '= 0.2.9'
-gem 'sinatra-homura', '= 0.2.13'
-gem 'sequel-d1', '= 0.2.7' # optional
+gem 'homura-runtime', '~> 0.3'
+gem 'sinatra-homura', '~> 0.3'
+gem 'sequel-d1',      '~> 0.3' # optional
 ```
 
 ## Minimal flow
@@ -56,9 +56,30 @@ gem 'sequel-d1', '= 0.2.7' # optional
 
 ## Minimal Sinatra + D1 example
 
+Classic top-level Sinatra (the canonical sinatrarb.com snippet shape):
+
+```ruby
+# app.rb
+require 'sinatra'
+require 'sequel'
+
+get '/users' do
+  db = Sequel.connect(adapter: :d1, d1: env['cloudflare.DB'])
+  content_type 'application/json'
+  db[:users].all.to_json
+end
+```
+
+```ruby
+# config.ru
+require_relative 'app'
+```
+
+Modular Sinatra (the shape `bundle exec homura new` scaffolds):
+
 ```ruby
 # app/app.rb
-require 'sinatra/cloudflare_workers'
+require 'sinatra/base'
 require 'sequel'
 
 class App < Sinatra::Base
@@ -76,6 +97,10 @@ require_relative 'app/app'
 
 run App
 ```
+
+In neither shape does user code reach for a Cloudflare-flavoured
+require: `sinatra-homura` wires the Workers runtime onto the standard
+Sinatra entry points automatically.
 
 ## Key docs
 

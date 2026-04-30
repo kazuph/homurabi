@@ -115,7 +115,7 @@ foo_gem/
 | `ruby-jwt` | vendor + patch | 中 (~2.5k 行) | JWT encode/decode |
 | `cgi`, `digest`, `net` (shims) | vendor patches | 小 | stdlib shim |
 | `lib/homura_markdown.rb` | 自作 | 極小 (~200 行) | Markdown → HTML 変換 |
-| `lib/cloudflare_workers/*.rb` | 自作 | 中 | D1/KV/R2/AI/Cache/Queue/DO wrapper |
+| `gems/homura-runtime/lib/homura/runtime/*.rb` | 自作 | 中 | D1/KV/R2/AI/Cache/Queue/DO wrapper（`Cloudflare::*` 名前空間） |
 
 ## 採用判定で迷ったら
 
@@ -141,8 +141,8 @@ foo_gem/
 
 ## Phase 進化でわかった "これはイケる" パターン
 
-- **wrapper 作成パターン** (Phase 3/6/7/9/10/11B): JS binding 側の機能を Ruby から呼べるように backtick x-string で薄く包む。single-line IIFE が安全（multi-line は Promise を silent drop する落とし穴あり — 詳細は `lib/cloudflare_workers/cache.rb#put` のコメント）
+- **wrapper 作成パターン** (Phase 3/6/7/9/10/11B): JS binding 側の機能を Ruby から呼べるように backtick x-string で薄く包む。single-line IIFE が安全（multi-line は Promise を silent drop する落とし穴あり — 詳細は `gems/homura-runtime/lib/homura/runtime/cache.rb#put` のコメント）
 - **dispatcher 登録パターン** (Phase 9/11B): `globalThis.__HOMURA_*_DISPATCH__` に async function を install、`src/worker.mjs` から forward
 - **AOT 変換パターン** (ERB): 実行時 `eval` を回避するため、ビルド時に Ruby コードへ変換
 
-迷ったら既存 wrapper (`lib/cloudflare_workers/*.rb`) と `lib/homura_markdown.rb` を読んで真似る。
+迷ったら既存 wrapper (`gems/homura-runtime/lib/homura/runtime/*.rb`) と `site/lib/homura_markdown.rb` を読んで真似る。

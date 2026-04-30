@@ -11,22 +11,19 @@
 稼働中のサイト: <https://homura.kazu-san.workers.dev>
 
 ```ruby
-# app/app.rb — そう、これは本当にただの Sinatra だ。
-require 'sinatra/cloudflare_workers'
+# app.rb — そう、これは本当にただの Sinatra だ。
+require 'sinatra'
+require 'sequel'
 
-class App < Sinatra::Base
-  get '/' do
-    'Hello from Ruby, running on Cloudflare Workers.'
-  end
-
-  get '/users' do
-    db = Sequel.connect(adapter: :d1, d1: env['cloudflare.DB'])
-    content_type :json
-    db[:users].order(:id).all.to_json
-  end
+get '/' do
+  'Hello from Ruby, running on Cloudflare Workers.'
 end
 
-run App
+get '/users' do
+  db = Sequel.connect(adapter: :d1, d1: env['cloudflare.DB'])
+  content_type :json
+  db[:users].order(:id).all.to_json
+end
 ```
 
 ```toml
@@ -37,12 +34,15 @@ compatibility_date = "2026-04-27"
 compatibility_flags = ["nodejs_compat"]
 ```
 
-シムも、トランスパイルされた Sinatra もどきも存在しない。継承元の
-`Sinatra::Base` は upstream gem のポートそのものだし、`redirect '/'` は
-Sinatra 純正の `HaltResponse` を raise する。`erb :index, locals: { user: u }`
-もドキュメント通りに locals を解決する。このパイプライン全体は、Ruby
-ユーザーが Ruby を書き続けたまま Cloudflare のエッジに届けられるよう
-にするためだけに存在する。
+シムも、トランスパイルされた Sinatra もどきも存在しない。`require 'sinatra'`
+は canonical な Sinatra ポートをロードする。`redirect '/'` は Sinatra 純正の
+`HaltResponse` を raise する。`erb :index, locals: { user: u }` もドキュメント
+通りに locals を解決する。modular スタイル（`class App < Sinatra::Base` +
+`config.ru` + `run App`）もそのまま動く — 例として
+[`examples/todo/`](examples/todo/) と canonical な
+[`site/`](site/)（homura.kazu-san.workers.dev）を参照。
+このパイプライン全体は、Ruby ユーザーが Ruby を書き続けたまま Cloudflare の
+エッジに届けられるようにするためだけに存在する。
 
 ---
 
@@ -164,15 +164,18 @@ bundle exec rake deploy                            # wrangler deploy
 
    gem 'rake'
    gem 'opal-homura',    '= 1.8.3.rc1.5', require: 'opal'
-   gem 'homura-runtime', '~> 0.2'
-   gem 'sinatra-homura', '~> 0.2'
-   gem 'sequel-d1',      '~> 0.2'   # D1 / Sequel を使う場合のみ
+   gem 'homura-runtime', '~> 0.3'
+   gem 'sinatra-homura', '~> 0.3'
+   gem 'sequel-d1',      '~> 0.3'   # D1 / Sequel を使う場合のみ
    ```
 
-2. **アプリコードを `app/` 配下に移す**（`app/app.rb` が慣習的な
-   エントリポイント）。ルーティングはそのままで、`require 'sinatra'` を
-   `require 'sinatra/cloudflare_workers'` に置き換える。`Sinatra::Base`
-   をサブクラス化する。
+2. **Sinatra アプリは書いたままでよい。** classic スタイル
+   （`require 'sinatra'` + トップレベルの `get '/' do ... end`）も
+   modular スタイル（`require 'sinatra/base'` + `class App < Sinatra::Base`
+   + `config.ru` で `run App`）もどちらも upstream のドキュメント通りに
+   動く。`require` を Cloudflare 専用のものに差し替える必要は **ない** —
+   sinatra-homura が標準の Sinatra エントリポイントの上で Workers ランタイム
+   を自動的に配線する。
 
 3. **`wrangler.toml` を追加** し、`main` を `build/worker.entrypoint.mjs` に
    向け、必要な binding（D1 / KV / R2 / AI / Queue）を宣言する。

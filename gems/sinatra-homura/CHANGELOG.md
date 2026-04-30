@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.1 (2026-04-30)
+
+- README: drop the leftover `require 'sinatra/cloudflare_workers'` snippet
+  (the require path was retired in 0.3.0). The README now shows the two
+  supported user-facing shapes — classic top-level (`require 'sinatra'`)
+  and modular (`require 'sinatra/base'` + `class App < Sinatra::Base` +
+  `run App`) — and explains that neither needs a Cloudflare-flavoured
+  require because the vendored Sinatra entry points auto-load
+  `homura/runtime` and the sinatra-homura extensions at the bottom.
+- No code changes vs. 0.3.0.
+
 ## 0.3.0 (2026-04-29) — BREAKING: cloudflare_workers naming eliminated
 
 Companion release to homura-runtime 0.3.0. All `cloudflare_workers`

@@ -40,7 +40,7 @@ globals so older smoke bundles and gradual migrations keep working.
 Homura’s production bundle is built with:
 
 - `-I gems/homura-runtime/lib -I lib -I vendor -I build`
-- `-r opal_patches -r cloudflare_workers -r homura_templates -r homura_assets`
+- `-r opal_patches -r homura/runtime -r homura_templates -r homura_assets`
 - Entry: auto-detected from `config.ru`, `app/hello.rb`, then `app/app.rb` (overridable)
 - Output: `build/hello.no-exit.mjs` (overridable)
 
@@ -88,7 +88,9 @@ Use plain `rake` (not `bundle exec rake`) unless `rake` is added to the
 ## 6. Wrangler bindings (reference)
 
 `wrangler.toml` declares D1, KV, R2, AI, Queues, Durable Objects, etc.
-`lib/cloudflare_workers.rb` maps `env.DB` / `env.KV` / … onto
-`env['cloudflare.*']` keys. Changing binding **names** requires coordinated
-updates in Ruby + TOML — out of scope for Phase 15-A but listed here because
-gem consumers will copy the pattern.
+`gems/homura-runtime/lib/homura/runtime.rb` (with the per-binding
+wrappers under `gems/homura-runtime/lib/homura/runtime/*.rb`) maps
+`env.DB` / `env.KV` / … onto `env['cloudflare.*']` keys. Changing
+binding **names** requires coordinated updates in Ruby + TOML — out
+of scope for Phase 15-A but listed here because gem consumers will
+copy the pattern.

@@ -25,7 +25,6 @@
 それ以外は Puma で動かすときと同じ Sinatra そのものだ。
 
 ```ruby
-require 'sinatra/cloudflare_workers'
 require 'sinatra'
 
 TODOS = []

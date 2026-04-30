@@ -8,6 +8,14 @@
 
 Live site: <https://homura.kazu-san.workers.dev>
 
+> ⚠️ **Status — active development. Do not use in production yet.**
+> homura is pre-1.0 and changes hard between releases. Public surfaces
+> (gem APIs, CLI, scaffolder layout, build artifacts) can shift in a
+> breaking way at any `0.x` bump. Pin exact gem versions if you
+> experiment, expect to chase the next minor, and treat the live demos
+> at `*.kazu-san.workers.dev` as dogfooding fixtures rather than SLA
+> targets.
+
 ```ruby
 # app.rb — yes, it really is plain Sinatra.
 require 'sinatra'

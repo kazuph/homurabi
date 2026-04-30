@@ -10,6 +10,13 @@
 
 稼働中のサイト: <https://homura.kazu-san.workers.dev>
 
+> ⚠️ **ステータス — 活発に開発中。本番投入はまだしないでください。**
+> homura は pre-1.0 で、リリース毎に大きく変わります。公開面（gem API、
+> CLI、scaffolder のレイアウト、ビルド成果物）は任意の `0.x` bump で
+> 破壊的に変更される可能性があります。試す場合は gem の完全一致ピンを
+> 推奨し、次の minor を追い続ける覚悟で。`*.kazu-san.workers.dev` の
+> ライブデモは dogfooding フィクスチャであって SLA 対象ではありません。
+
 ```ruby
 # app.rb — そう、これは本当にただの Sinatra だ。
 require 'sinatra'

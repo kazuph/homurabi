@@ -12,19 +12,19 @@ idiom works the way the upstream docs say it does.
 
 ## What's here
 
-| Example | Stack | Highlights |
-|---|---|---|
-| [`sinatra/`](sinatra/) | Sinatra (single file) | The classic Sinatra README snippet: `require 'sinatra'` + `get '/frank-says'`. The shortest possible homura app. |
-| [`classic-top-sinatra/`](classic-top-sinatra/) | Sinatra (single file, JSON) | Same shape as `sinatra/` but emits JSON via `content_type :json`. Dogfoods the classic top-level DSL across the build pipeline. |
-| [`sinatra-with-db/`](sinatra-with-db/) | Sinatra + D1 + Sequel | Smallest D1-backed Sinatra: `Sequel.connect(adapter: :d1, d1: env['cloudflare.DB'])`, one route, one migration. |
-| [`sinatra-with-email/`](sinatra-with-email/) | Sinatra + Cloudflare Email | Phase 17.5 auto-await demo — POST `/send` over the `SEND_EMAIL` Cloudflare Email binding, no `.__await__` in source. |
-| [`todo-simple/`](todo-simple/) | Sinatra (in-memory) | **The smallest stateful example.** One `app.rb`, no `views/`, no D1 — heredoc HTML right next to the routes. Use it when you want to see how little homura needs once you have state. |
-| [`todo/`](todo/) | Sinatra + D1 (no ORM) | Smallest D1 CRUD. `env['cloudflare.DB']` and the `Cloudflare::D1Database#execute` / `execute_insert` API directly — no Sequel. |
-| [`todo-orm/`](todo-orm/) | Sinatra + D1 + Sequel | Same TODO domain through `sequel-d1`. Datasets, `.first`, `.update(... Sequel.lit ...)`, migration DSL → wrangler-ready SQL. |
-| [`auth-otp/`](auth-otp/) | Sinatra + D1 + mailpit + Playwright | Email OTP login backed by a [mailpit](https://mailpit.axllent.org/) sink in development. HMAC-signed session cookie. `rake e2e` (Net::HTTP) and `rake e2e:headed` (real Chromium) for end-to-end verification. |
-| [`blog/`](blog/) | Sinatra + D1 (no ORM) | Index / detail / new / proper 404 / delete. Shows that `status 404; erb :posts_not_found` returns 404 — not 200 — under the async route pipeline. |
-| [`inertia-todo/`](inertia-todo/) | Sinatra + Inertia.js + Vue 3 | Server-rendered Inertia page object, `X-Inertia` content negotiation, JSON props. Client JS lives in `public/assets/inertia-app.js`. |
-| [`hotwire-todo/`](hotwire-todo/) | Sinatra + Turbo Streams + Stimulus | Server-rendered turbo-stream partials over `Accept: text/vnd.turbo-stream.html` negotiation. The only client JS is a tiny Stimulus controller for autofocus. |
+| Example | Stack | Live | Highlights |
+|---|---|---|---|
+| [`sinatra/`](sinatra/) | Sinatra (single file) | <https://sinatra.kazu-san.workers.dev/> | The classic Sinatra README snippet: `require 'sinatra'` + `get '/frank-says'`. The shortest possible homura app. |
+| [`classic-top-sinatra/`](classic-top-sinatra/) | Sinatra (single file, JSON) | <https://classic-top-sinatra.kazu-san.workers.dev/> | Same shape as `sinatra/` but emits JSON via `content_type :json`. Dogfoods the classic top-level DSL across the build pipeline. |
+| [`sinatra-with-db/`](sinatra-with-db/) | Sinatra + D1 + Sequel | <https://sinatra-with-db.kazu-san.workers.dev/> | Smallest D1-backed Sinatra: `Sequel.connect(adapter: :d1, d1: env['cloudflare.DB'])`, one route, one migration. |
+| [`sinatra-with-email/`](sinatra-with-email/) | Sinatra + Cloudflare Email | <https://sinatra-with-email.kazu-san.workers.dev/> | Phase 17.5 auto-await demo — POST `/send` over the `SEND_EMAIL` Cloudflare Email binding, no `.__await__` in source. |
+| [`todo-simple/`](todo-simple/) | Sinatra (in-memory) | <https://todo-simple.kazu-san.workers.dev/> | **The smallest stateful example.** One `app.rb`, no `views/`, no D1 — heredoc HTML right next to the routes. Use it when you want to see how little homura needs once you have state. |
+| [`todo/`](todo/) | Sinatra + D1 (no ORM) | <https://todo.kazu-san.workers.dev/> | Smallest D1 CRUD. `env['cloudflare.DB']` and the `Cloudflare::D1Database#execute` / `execute_insert` API directly — no Sequel. |
+| [`todo-orm/`](todo-orm/) | Sinatra + D1 + Sequel | <https://todo-orm.kazu-san.workers.dev/> | Same TODO domain through `sequel-d1`. Datasets, `.first`, `.update(... Sequel.lit ...)`, migration DSL → wrangler-ready SQL. |
+| [`auth-otp/`](auth-otp/) | Sinatra + D1 + mailpit + Playwright | <https://auth-otp.kazu-san.workers.dev/login> | Email OTP login backed by a [mailpit](https://mailpit.axllent.org/) sink in development. HMAC-signed session cookie. `rake e2e` (Net::HTTP) and `rake e2e:headed` (real Chromium) for end-to-end verification. |
+| [`blog/`](blog/) | Sinatra + D1 (no ORM) | <https://blog.kazu-san.workers.dev/> | Index / detail / new / proper 404 / delete. Shows that `status 404; erb :posts_not_found` returns 404 — not 200 — under the async route pipeline. |
+| [`inertia-todo/`](inertia-todo/) | Sinatra + Inertia.js + Vue 3 | <https://inertia-todo.kazu-san.workers.dev/> | Server-rendered Inertia page object, `X-Inertia` content negotiation, JSON props. Client JS lives in `public/assets/inertia-app.js`. |
+| [`hotwire-todo/`](hotwire-todo/) | Sinatra + Turbo Streams + Stimulus | <https://hotwire-todo.kazu-san.workers.dev/> | Server-rendered turbo-stream partials over `Accept: text/vnd.turbo-stream.html` negotiation. The only client JS is a tiny Stimulus controller for autofocus. |
 
 ## Running any example
 

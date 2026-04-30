@@ -195,19 +195,19 @@ a standalone project that depends on the published gems only — no
 `path:` references back to the monorepo. They are also the regression
 fixtures behind the latest gem releases.
 
-| Example | What it shows |
-|---|---|
-| [`sinatra`](examples/sinatra/) | The classic Sinatra README snippet — `require 'sinatra'` + `get '/frank-says'`. Single `app.rb`, no D1, no views. |
-| [`classic-top-sinatra`](examples/classic-top-sinatra/) | Same shape as `sinatra` but with `content_type :json` + a JSON route, to dogfood the classic top-level DSL. |
-| [`sinatra-with-db`](examples/sinatra-with-db/) | Smallest D1-backed Sinatra: `Sequel.connect(adapter: :d1, d1: env['cloudflare.DB'])`, one route, one migration. |
-| [`sinatra-with-email`](examples/sinatra-with-email/) | Phase 17.5 auto-await demo — POST `/send` over the `SEND_EMAIL` Cloudflare Email binding, no `.__await__` in source. |
-| [`todo-simple`](examples/todo-simple/) | **The smallest stateful example.** One `app.rb`, no `views/`, no D1 — HTML written as Ruby heredocs. The thing to copy when "how little does homura need" is the question. |
-| [`todo`](examples/todo/) | D1-backed CRUD without an ORM — `env['cloudflare.DB']` and `Cloudflare::D1Database` directly. |
-| [`todo-orm`](examples/todo-orm/) | The same TODO app, this time through `sequel-d1`: migrations, dataset chains, `.first` / `.update`. |
-| [`auth-otp`](examples/auth-otp/) | Email OTP login. Sends through [mailpit](https://mailpit.axllent.org/) in development; HMAC-signed session cookie; full headed Playwright E2E in `rake e2e:headed`. |
-| [`blog`](examples/blog/) | A small blog: index / detail / new / **proper 404** / delete. Demonstrates async-route status preservation and `<%= h(post[:body]).gsub("\n", "<br>") %>`. |
-| [`inertia-todo`](examples/inertia-todo/) | A thin SPA via [Inertia.js](https://inertiajs.com) + Vue 3, with Sinatra serving page props. Client-side JS lives in `public/assets/`. |
-| [`hotwire-todo`](examples/hotwire-todo/) | Turbo Streams (server-rendered partials over Accept negotiation) + a tiny Stimulus controller for autofocus. |
+| Example | Live | What it shows |
+|---|---|---|
+| [`sinatra`](examples/sinatra/) | <https://sinatra.kazu-san.workers.dev/> | The classic Sinatra README snippet — `require 'sinatra'` + `get '/frank-says'`. Single `app.rb`, no D1, no views. |
+| [`classic-top-sinatra`](examples/classic-top-sinatra/) | <https://classic-top-sinatra.kazu-san.workers.dev/> | Same shape as `sinatra` but with `content_type :json` + a JSON route, to dogfood the classic top-level DSL. |
+| [`sinatra-with-db`](examples/sinatra-with-db/) | <https://sinatra-with-db.kazu-san.workers.dev/> | Smallest D1-backed Sinatra: `Sequel.connect(adapter: :d1, d1: env['cloudflare.DB'])`, one route, one migration. |
+| [`sinatra-with-email`](examples/sinatra-with-email/) | <https://sinatra-with-email.kazu-san.workers.dev/> | Phase 17.5 auto-await demo — POST `/send` over the `SEND_EMAIL` Cloudflare Email binding, no `.__await__` in source. |
+| [`todo-simple`](examples/todo-simple/) | <https://todo-simple.kazu-san.workers.dev/> | **The smallest stateful example.** One `app.rb`, no `views/`, no D1 — HTML written as Ruby heredocs. The thing to copy when "how little does homura need" is the question. |
+| [`todo`](examples/todo/) | <https://todo.kazu-san.workers.dev/> | D1-backed CRUD without an ORM — `env['cloudflare.DB']` and `Cloudflare::D1Database` directly. |
+| [`todo-orm`](examples/todo-orm/) | <https://todo-orm.kazu-san.workers.dev/> | The same TODO app, this time through `sequel-d1`: migrations, dataset chains, `.first` / `.update`. |
+| [`auth-otp`](examples/auth-otp/) | <https://auth-otp.kazu-san.workers.dev/login> | Email OTP login. Sends through [mailpit](https://mailpit.axllent.org/) in development; HMAC-signed session cookie; full headed Playwright E2E in `rake e2e:headed`. |
+| [`blog`](examples/blog/) | <https://blog.kazu-san.workers.dev/> | A small blog: index / detail / new / **proper 404** / delete. Demonstrates async-route status preservation and `<%= h(post[:body]).gsub("\n", "<br>") %>`. |
+| [`inertia-todo`](examples/inertia-todo/) | <https://inertia-todo.kazu-san.workers.dev/> | A thin SPA via [Inertia.js](https://inertiajs.com) + Vue 3, with Sinatra serving page props. Client-side JS lives in `public/assets/`. |
+| [`hotwire-todo`](examples/hotwire-todo/) | <https://hotwire-todo.kazu-san.workers.dev/> | Turbo Streams (server-rendered partials over Accept negotiation) + a tiny Stimulus controller for autofocus. |
 
 See [`examples/README.md`](examples/README.md) for the full index with
 URLs and per-app feature notes.

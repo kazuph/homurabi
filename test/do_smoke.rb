@@ -69,7 +69,7 @@ end
 # expressions, so the returned value would be dropped.)
 # ---------------------------------------------------------------------
 
-`globalThis.__homura_do_fake_namespace = function() { var ns = { _calls: { idFromName: [], newUniqueId: 0, get: [] }, idFromName: function(name) { ns._calls.idFromName.push(name); var captured = name; return { kind: 'named', name: captured, toString: function() { return 'id::' + captured; } }; }, newUniqueId: function() { ns._calls.newUniqueId += 1; var n = ns._calls.newUniqueId; return { kind: 'unique', n: n, toString: function() { return 'uid::' + n; } }; }, idFromString: function(s) { var captured = s; return { kind: 'parsed', hex: captured, toString: function() { return captured; } }; }, get: function(id) { ns._calls.get.push(id); return { _lastInit: null, fetch: function(url, init) { this._lastInit = { url: url, init: init }; return Promise.resolve(new Response(JSON.stringify({ url: url, method: (init && init.method) || 'GET', id: (id && id.toString && id.toString()) }), { status: 200, headers: { 'content-type': 'application/json', 'x-homura-test': 'yes' } })); } }; } }; return ns; };`
+`globalThis.__homura_do_fake_namespace = function() { var ns = { _calls: { idFromName: [], newUniqueId: 0, get: [] }, idFromName: function(name) { ns._calls.idFromName.push(name); var captured = name; return { kind: 'named', name: captured, toString: function() { return 'id::' + captured; } }; }, newUniqueId: function() { ns._calls.newUniqueId += 1; var n = ns._calls.newUniqueId; return { kind: 'unique', n: n, toString: function() { return 'uid::' + n; } }; }, idFromString: function(s) { var captured = s; return { kind: 'parsed', hex: captured, toString: function() { return captured; } }; }, get: function(id) { ns._calls.get.push(id); return { _lastInit: null, fetch: function(url, init) { this._lastInit = { url: url, init: init }; return Promise.resolve(new Response(JSON.stringify({ url: url, method: (init && init.method) || 'GET', id: (id && id.toString && id.toString()), body: (init && init.body) || '', content_type: (init && init.headers && init.headers['content-type']) || '' }), { status: 200, headers: { 'content-type': 'application/json', 'x-homura-test': 'yes' } })); } }; } }; return ns; };`
 
 `globalThis.__homura_do_fake_storage = function() { var m = new Map(); return { _map: m, get: function(k) { return Promise.resolve(m.has(k) ? m.get(k) : null); }, put: function(k, v) { m.set(k, v); return Promise.resolve(); }, delete: function(k) { var had = m.has(k); m.delete(k); return Promise.resolve(had); }, deleteAll: function() { m.clear(); return Promise.resolve(); }, list: function(_opts) { var out = new Map(); m.forEach(function(v, k) { out.set(k, v); }); return Promise.resolve(out); } }; };`
 
@@ -149,6 +149,39 @@ SmokeTest.assert('fetch with method: POST includes POST in the init object') do
   res = stub.fetch('/inc', method: 'POST').__await__
   body = JSON.parse(res.body)
   body['method'] == 'POST' && body['url'] == '/inc'
+end
+
+SmokeTest.assert('request serializes Ruby Hash bodies as JSON') do
+  js_ns = fake_namespace
+  ns = Cloudflare::DurableObjectNamespace.new(js_ns)
+  stub = ns.get_by_name('a')
+  res = stub.request('/inc', method: 'POST', body: { 'amount' => 2 }).__await__
+  body = JSON.parse(res.body)
+  body['method'] == 'POST' &&
+    body['body'].include?('"amount":2') &&
+    body['content_type'] == 'application/json'
+end
+
+SmokeTest.assert('get/post convenience methods call request') do
+  js_ns = fake_namespace
+  ns = Cloudflare::DurableObjectNamespace.new(js_ns)
+  stub = ns.get_by_name('a')
+  get_res = stub.get('/state').__await__
+  post_res = stub.post('/inc', { 'amount' => 1 }).__await__
+  JSON.parse(get_res.body)['method'] == 'GET' &&
+    JSON.parse(post_res.body)['method'] == 'POST'
+end
+
+SmokeTest.assert('BindingHelpers#durable_object returns a named stub') do
+  js_ns = fake_namespace
+  helper = Object.new
+  helper.extend(Cloudflare::BindingHelpers)
+  helper.define_singleton_method(:env) do
+    Cloudflare::Bindings.build_env(`({ COUNTER: #{js_ns} })`)
+  end
+  stub = helper.durable_object(:counter, 'global')
+  stub.is_a?(Cloudflare::DurableObjectStub) &&
+    `#{js_ns}._calls.idFromName[0]` == 'global'
 end
 
 SmokeTest.assert('fetch raises DurableObjectError when the JS stub rejects') do

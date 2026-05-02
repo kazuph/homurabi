@@ -24,15 +24,15 @@ HOMURA_MAIL_FROM = "noreply@example.com"
 </code></pre>
 
 <h2 id="wrapper">Cloudflare::Email</h2>
-<p><strong>送信バインディングは Worker の <code>env.SEND_EMAIL</code> が正</strong>です。<code>worker_module.mjs</code> の <code>fetch</code> 先頭で <code>globalThis.__OPAL_WORKERS__.sendEmailBinding</code> にコピーしたうえで、Rack 側は <code>env['cloudflare.SEND_EMAIL']</code>（<code>Cloudflare::Email</code> ラッパー）として参照します。D1 / Queue などが <code>cloudflare.env</code> 経由で触るパターンとは別に、Email はこの明示注入経路が主軸です（Miniflare でも同じ JS オブジェクトを拾えるようにするため）。</p>
-<pre><code>mail = send_email # => env['cloudflare.SEND_EMAIL']（内部は env.SEND_EMAIL と同一バインディング）
+<p><strong>送信バインディングは Worker の <code>env.SEND_EMAIL</code> が正</strong>です。homura は Rack / Sinatra 側に <code>send_email</code> ヘルパーとして <code>Cloudflare::Email</code> ラッパーを渡します。アプリコードからは低レベルの Rack env キーを触らずに使えます。</p>
+<pre><code>mail = send_email
 mail.send(
   to: 'you@example.com',
   from: ENV_STYLE_FROM, # 実際は vars の HOMURA_MAIL_FROM を参照
   subject: 'Hello',
   text: 'Plain text body',
   html: '&lt;p&gt;Optional rich body&lt;/p&gt;' # 省略可／text と併用可（どちらか必須）
-).__await__
+)
 </code></pre>
 <p>アプリ側ではヘルパー <code>send_email</code> と <code>homura_mail_from</code> を利用できます。</p>
 

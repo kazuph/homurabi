@@ -6,9 +6,9 @@
 <pre><code class="language-ruby"># await: get, put, execute, fetch, send, decode, ...
 
 post '/users' do
-  db = Sequel.connect(adapter: :d1, d1: env['cloudflare.env'].DB)
-  result = db[:users].insert(name: 'foo').__await__
-  Cloudflare::Email.new(env.SEND_EMAIL).send(
+  database = Sequel.connect(adapter: :d1, d1: d1)
+  result = database[:users].insert(name: 'foo').__await__
+  send_email.send(
     to: '...', subject: '...', text: '...'
   ).__await__
   'ok'
@@ -17,9 +17,9 @@ end
 
 <p><strong>After（Auto-Await）</strong>:</p>
 <pre><code class="language-ruby">post '/users' do
-  db = Sequel.connect(adapter: :d1, d1: env['cloudflare.env'].DB)
-  result = db[:users].insert(name: 'foo')
-  Cloudflare::Email.new(env.SEND_EMAIL).send(
+  database = Sequel.connect(adapter: :d1, d1: d1)
+  result = database[:users].insert(name: 'foo')
+  send_email.send(
     to: '...', subject: '...', text: '...'
   )
   'ok'

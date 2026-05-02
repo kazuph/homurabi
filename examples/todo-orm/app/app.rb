@@ -8,7 +8,6 @@ require 'cgi'
 class App < Sinatra::Base
   helpers do
     def db
-      d1 = env['cloudflare.DB']
       return nil unless d1
       Sequel.connect(adapter: :d1, d1: d1)
     end
@@ -76,4 +75,3 @@ class App < Sinatra::Base
     redirect '/'
   end
 end
-

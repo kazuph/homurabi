@@ -64,7 +64,7 @@ require 'sinatra'
 require 'sequel'
 
 get '/users' do
-  db = Sequel.connect(adapter: :d1, d1: env['cloudflare.DB'])
+  db = Sequel.connect(adapter: :d1, d1: d1)
   content_type 'application/json'
   db[:users].all.to_json
 end
@@ -84,7 +84,7 @@ require 'sequel'
 
 class App < Sinatra::Base
   get '/users' do
-    db = Sequel.connect(adapter: :d1, d1: env['cloudflare.DB'])
+    db = Sequel.connect(adapter: :d1, d1: d1)
     content_type 'application/json'
     db[:users].all.to_json
   end
@@ -114,11 +114,11 @@ Sinatra entry points automatically.
 
 - Use `homura` and generated `rake` tasks; do not emit `cloudflare-workers-*` command names.
 - Current releases support ordinary Sinatra `redirect`, `halt`, route params, ERB layout `yield`, and Sequel CRUD on D1.
-- Workers bindings are exposed through Rack env keys such as `env['cloudflare.DB']`, `env['cloudflare.KV']`, `env['cloudflare.BUCKET']`, and `env['cloudflare.AI']`.
+- Workers bindings are exposed through Ruby helpers such as `db`, `d1`, `kv`, `bucket`, `ai`, `send_email`, `jobs_queue`, and `durable_object(:counter, 'global')`.
 - Common binding/helper paths are auto-awaited at build time; keep examples sync-shaped unless you are handling a raw Promise boundary directly.
 - D1 boolean columns come back as Ruby booleans on normal dataset reads, but custom SQL/projections can still surface raw `0` / `1`.
 - For hand-wired D1/Sequel apps, use `bundle exec homura build --standalone --with-db`.
-- The supported D1 contract is `require 'sequel'` plus `Sequel.connect(adapter: :d1, d1: env['cloudflare.DB'])`; do not teach `require 'sequel/d1'` as a public entrypoint.
+- The supported D1 contract is `require 'sequel'` plus `Sequel.connect(adapter: :d1, d1: d1)`; do not teach `require 'sequel/d1'` as a public entrypoint.
 - Standard Sinatra `config.ru` with `run App` is supported, including the common `require_relative 'app/app'` form.
 - Precompiled ERB follows ordinary Sinatra layout defaults: `erb :index` picks up `layout.erb` unless you pass `layout: false`.
 - Awaited Sequel/D1 routes can still `redirect` normally, and local-dev redirects keep the current host/port.

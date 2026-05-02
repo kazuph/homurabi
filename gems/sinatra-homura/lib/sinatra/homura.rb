@@ -83,6 +83,8 @@ module Sinatra
   end
 end
 
+Sinatra::Base.helpers Cloudflare::BindingHelpers if defined?(Sinatra::Base) && defined?(Cloudflare::BindingHelpers)
+
 # Kept for backward compatibility with code that still wires up at_exit
 # explicitly; harmless on Workers because the isolate doesn't exit.
 at_exit { Sinatra::Homura.ensure_rack_app! }

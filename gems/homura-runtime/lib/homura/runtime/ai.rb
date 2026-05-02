@@ -4,18 +4,15 @@
 #
 # Phase 10 — Workers AI binding wrapper.
 #
-# `Cloudflare::AI.run(model, inputs, binding: env['cloudflare.AI'])`
-# wraps `env.AI.run(model, inputs, options)` and returns a Ruby Hash so
-# Sinatra routes can call:
+# `ai.run(model, inputs)` wraps `env.AI.run(model, inputs, options)` and
+# returns a Ruby Hash so Sinatra routes can call:
 #
-#     ai = env['cloudflare.AI']
-#     out = Cloudflare::AI.run(
+#     out = ai.run(
 #             '@cf/google/gemma-4-26b-a4b-it',
-#             { messages: [
+#             messages: [
 #                 { role: 'system', content: 'You are a helpful assistant.' },
 #                 { role: 'user',   content: 'こんにちは' }
-#             ] },
-#             binding: ai
+#             ]
 #           ).__await__
 #     out['response']  # => "..."
 #
@@ -40,6 +37,31 @@ module Cloudflare
     # Default REST options forwarded to env.AI.run as the third argument.
     DEFAULT_OPTIONS = {}.freeze
 
+    class Binding
+      attr_reader :js
+
+      def initialize(js)
+        @js = js
+      end
+
+      def available?
+        js = @js
+        !!`(#{js} !== null && #{js} !== undefined && #{js} !== Opal.nil)`
+      end
+
+      def run(model, inputs = nil, options: nil, **input_options)
+        payload = inputs || input_options
+        payload = payload.merge(input_options) if inputs.is_a?(Hash) && !input_options.empty?
+        Cloudflare::AI.run(model, payload, binding: @js, options: options)
+      end
+
+      def run_stream(model, inputs = nil, **input_options)
+        payload = inputs || input_options
+        payload = payload.merge(input_options) if inputs.is_a?(Hash) && !input_options.empty?
+        run(model, payload.merge(stream: true))
+      end
+    end
+
     # Run a Workers AI model. Returns a JS Promise that resolves to a
     # Ruby Hash for non-streaming calls, or to a Cloudflare::AI::Stream
     # wrapping the JS ReadableStream for streaming calls.
@@ -49,6 +71,7 @@ module Cloudflare
     # @param binding [JS object] env.AI binding (required)
     # @param options [Hash] gateway / extra options forwarded as the 3rd arg
     def self.run(model, inputs, binding: nil, options: nil)
+      binding = binding.js if defined?(Binding) && `(#{binding} != null && #{binding}.$$class === #{Binding})`
       # Use a JS-side null check because `binding` may be a raw JS object
       # (env.AI), which has no Ruby `#nil?` method on the prototype.
       bound = !`(#{binding} == null)`

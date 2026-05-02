@@ -4,17 +4,6 @@ require 'sinatra/base'
 
 class App < Sinatra::Base
   helpers do
-    # D1 binding (Cloudflare::D1Database). Provides a sqlite3-ruby compatible
-    # surface: `execute`, `execute_insert`, `get_first_row`, etc.
-    #
-    # NOTE: keep the body as a bare `env['cloudflare.DB']`. Wrapping it in
-    # `... or raise ...` turns the AST into a `:or` node and auto-await stops
-    # inferring the return type as `Cloudflare::D1Database`, which silently
-    # breaks `db.execute(...)` (the JS Promise leaks through).
-    def db
-      env['cloudflare.DB']
-    end
-
     def turbo_stream_request?
       accept = request.env['HTTP_ACCEPT'].to_s
       accept.include?('text/vnd.turbo-stream.html')
@@ -117,4 +106,3 @@ class App < Sinatra::Base
     end
   end
 end
-

@@ -1,7 +1,7 @@
 # todo
 
 > The smallest **D1-backed CRUD** in the homura family — no ORM, just
-> `env['cloudflare.DB']` and the `Cloudflare::D1Database` API.
+> `db` and the `Cloudflare::D1Database` API.
 
 ## What this shows
 
@@ -50,12 +50,6 @@ CRuby; the runtime app does not `require 'sequel'`.
 
 ```ruby
 class App < Sinatra::Base
-  helpers do
-    def db
-      env['cloudflare.DB']
-    end
-  end
-
   get '/' do
     @todos = db.execute('SELECT id, title, done, created_at FROM todos ORDER BY id')
     erb :index

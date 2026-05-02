@@ -15,15 +15,14 @@
 # Usage (typical in a Sinatra route):
 #
 #   get '/demo/sequel' do
-#     db = Sequel.connect(adapter: :d1, d1: env['cloudflare.DB'])
+#     db = Sequel.connect(adapter: :d1, d1: d1)
 #     users = db[:users].where(active: true).order(:name).limit(10).all
 #     json users
 #   end
 #
 # The `:d1` option must be a duck-typed D1 binding (`#prepare` →
-# `#bind` → `#all` / `#run`); typically `env['cloudflare.DB']` from
-# cloudflare-workers-runtime. Workers isolates
-# hold the binding for the duration of the request, so one
+# `#bind` → `#all` / `#run`); in homura routes, the `d1` helper is
+# the usual source. Workers isolates hold the binding for the duration of the request, so one
 # Sequel::D1::Database per request is fine (SingleConnectionPool
 # keeps overhead minimal).
 #
@@ -120,7 +119,7 @@ module Sequel
         d1_binding = @opts[:d1] || @opts[:database]
         unless d1_binding
           raise Error, "Sequel D1 adapter requires a :d1 option (object responding to #prepare). " \
-                       "Example: Sequel.connect(adapter: :d1, d1: env['cloudflare.DB'])"
+                       "Example: Sequel.connect(adapter: :d1, d1: d1)"
         end
         Connection.new(d1_binding)
       end

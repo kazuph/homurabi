@@ -3,54 +3,34 @@
 module Homura
   # D1/KV/R2 + Cache / Queue gates, plus Workers AI chat history helpers.
   module CloudflareBindingHelpers
-    def db;     env['cloudflare.DB'];     end
-    def kv;     env['cloudflare.KV'];     end
-    def bucket; env['cloudflare.BUCKET']; end
-
     def crypto_demos_enabled?
-      cf_env = env['cloudflare.env']
       return false unless cf_env
       val = `(#{cf_env} && #{cf_env}.HOMURA_ENABLE_CRYPTO_DEMOS) || ''`
       val.to_s == '1'
     end
 
     def scheduled_demos_enabled?
-      cf_env = env['cloudflare.env']
       return false unless cf_env
       val = `(#{cf_env} && #{cf_env}.HOMURA_ENABLE_SCHEDULED_DEMOS) || ''`
       val.to_s == '1'
     end
 
     def binding_demos_enabled?
-      cf_env = env['cloudflare.env']
       return false unless cf_env
       val = `(#{cf_env} && #{cf_env}.HOMURA_ENABLE_BINDING_DEMOS) || ''`
       val.to_s == '1'
     end
 
     def do_counter
-      env['cloudflare.DO_COUNTER']
+      durable_object(:counter)
     end
 
     def cache
       @cache ||= ::Cloudflare::Cache.default
     end
 
-    def jobs_queue
-      env['cloudflare.QUEUE_JOBS']
-    end
-
-    def jobs_dlq
-      env['cloudflare.QUEUE_JOBS_DLQ']
-    end
-
-    def send_email
-      env['cloudflare.SEND_EMAIL']
-    end
-
     # Phase 17 — verified sender, sourced from a Wrangler secret.
     def homura_mail_from
-      cf_env = env['cloudflare.env']
       return '' unless cf_env
       `(#{cf_env}.HOMURA_MAIL_FROM || '')`.to_s.strip
     end
@@ -58,7 +38,6 @@ module Homura
     # /debug/mail default recipient, sourced from a Wrangler secret so we
     # never commit a real address to source.
     def homura_mail_default_to
-      cf_env = env['cloudflare.env']
       return '' unless cf_env
       `(#{cf_env}.HOMURA_MAIL_DEFAULT_TO || '')`.to_s.strip
     end
@@ -97,19 +76,17 @@ module Homura
     SESSION_ID_RE = /\A[A-Za-z0-9_-]{1,64}\z/.freeze
 
     def ai_demos_enabled?
-      cf_env = env['cloudflare.env']
       return false unless cf_env
       val = `(#{cf_env} && #{cf_env}.HOMURA_ENABLE_AI_DEMOS) || ''`
       val.to_s == '1'
     end
 
     def ai_binding
-      env['cloudflare.AI']
+      ai
     end
 
     def ai_binding?
-      v = env['cloudflare.AI']
-      `(#{v} != null)`
+      ai && ai.available?
     end
 
     def parse_json_body

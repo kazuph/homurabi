@@ -171,6 +171,8 @@ HomuraRuntime::AsyncRegistry.register_async_source do
 
   async_method 'Cloudflare::AI', :run
   taint_return 'Cloudflare::AI', :run_stream, 'Cloudflare::AI::Stream'
+  async_method 'Cloudflare::AI::Binding', :run
+  taint_return 'Cloudflare::AI::Binding', :run_stream, 'Cloudflare::AI::Stream'
 
   async_method 'Cloudflare::Cache', :match
   async_method 'Cloudflare::Cache', :put
@@ -187,6 +189,11 @@ HomuraRuntime::AsyncRegistry.register_async_source do
   taint_return 'Cloudflare::DurableObjectNamespace', :get_by_name, 'Cloudflare::DurableObjectStub'
   taint_return 'Cloudflare::DurableObjectState', :storage, 'Cloudflare::DurableObjectStorage'
   async_method 'Cloudflare::DurableObjectStub', :fetch
+  async_method 'Cloudflare::DurableObjectStub', :request
+  async_method 'Cloudflare::DurableObjectStub', :get
+  async_method 'Cloudflare::DurableObjectStub', :post
+  async_method 'Cloudflare::DurableObjectStub', :put
+  async_method 'Cloudflare::DurableObjectStub', :delete
 
   async_method 'Cloudflare::DurableObjectStorage', :get
   async_method 'Cloudflare::DurableObjectStorage', :put
@@ -202,4 +209,15 @@ HomuraRuntime::AsyncRegistry.register_async_source do
   async_method 'Faraday::Connection', :delete
   async_method 'Faraday::Connection', :patch
   async_method 'Faraday::Connection', :head
+
+  helper_factory :d1, 'Cloudflare::D1Database'
+  helper_factory :db, 'Cloudflare::D1Database'
+  helper_factory :kv, 'Cloudflare::KVNamespace'
+  helper_factory :bucket, 'Cloudflare::R2Bucket'
+  helper_factory :ai, 'Cloudflare::AI::Binding'
+  helper_factory :send_email, 'Cloudflare::Email'
+  helper_factory :jobs_queue, 'Cloudflare::Queue'
+  helper_factory :jobs_dlq, 'Cloudflare::Queue'
+  helper_factory :do_counter, 'Cloudflare::DurableObjectNamespace'
+  helper_factory :durable_object, 'Cloudflare::DurableObjectStub'
 end

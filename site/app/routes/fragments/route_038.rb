@@ -24,12 +24,13 @@ get '/test/ai' do
 
   test_one = lambda { |model, label|
     result = begin
-      out = Cloudflare::AI.run(model,
-        { messages: [
+      out = ai.run(
+        model,
+        messages: [
           { role: 'system', content: 'reply with the single word READY' },
           { role: 'user',   content: 'ping' }
-        ], max_tokens: 64 },
-        binding: ai_binding
+        ],
+        max_tokens: 64
       )
       txt = App.extract_ai_text(out).strip
       if txt.empty?

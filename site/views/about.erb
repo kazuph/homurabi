@@ -22,9 +22,9 @@
       registry &rarr; <code>erb :name</code> helper</li>
   <li>Cloudflare bindings cover D1, KV, R2, Workers AI, Queues, Durable Objects,
       and the Workers Cache API. Ruby reaches D1/KV/R2/AI/queues/DO namespaces via
-      <code>env['cloudflare.DB']</code>, <code>env['cloudflare.KV']</code>,
-      <code>env['cloudflare.BUCKET']</code>, <code>env['cloudflare.AI']</code>,
-      <code>env['cloudflare.QUEUE_*']</code>, and <code>env['cloudflare.DO_*']</code>;
+      helpers such as <code>db</code>, <code>d1</code>, <code>kv</code>,
+      <code>bucket</code>, <code>ai</code>, <code>jobs_queue</code>, and
+      <code>durable_object(:counter, 'global')</code>;
       cache reads/writes use the <code>Cloudflare::Cache</code> wrapper over
       <code>caches.default</code> / <code>caches.open</code>.</li>
   <li>Phase 12.5 added Fiber-transparent <code>await</code>; most routes no

@@ -20,12 +20,6 @@ class App < Sinatra::Base
   HMAC_HEX_LEN = 64
 
   helpers do
-    def db
-      d1 = env['cloudflare.DB']
-      return nil unless d1
-      d1
-    end
-
     def h(s)
       Rack::Utils.escape_html(s.to_s)
     end
@@ -83,10 +77,9 @@ class App < Sinatra::Base
 
     # Read a Cloudflare Workers env var / secret. Wrangler `[vars]` and
     # `wrangler secret put` both surface as plain JS properties on the
-    # bound env object (`env['cloudflare.env']`). Returns '' when the
+    # bound env object (`cf_env`). Returns '' when the
     # binding hasn't been configured.
     def cf_env_var(name)
-      cf_env = env['cloudflare.env']
       return '' unless cf_env
       `(#{cf_env}[#{name}] || '')`.to_s.strip
     end
@@ -141,12 +134,11 @@ class App < Sinatra::Base
     # The destination address must be verified in Cloudflare Email Routing,
     # and the `from` address must come from a domain you've added there.
     def send_otp_via_cloudflare_email(email, code)
-      mailer = env['cloudflare.SEND_EMAIL']
-      return [false, 'SEND_EMAIL binding missing'] unless mailer && mailer.available?
+      return [false, 'SEND_EMAIL binding missing'] unless send_email && send_email.available?
 
       from = cf_env_var('HOMURA_MAIL_FROM')
       from = 'noreply@example.com' if from.empty?
-      mailer.send(
+      send_email.send(
         to: email,
         from: from,
         subject: 'Your one-time code',

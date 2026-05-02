@@ -6,10 +6,6 @@ class App < Sinatra::Base
   set :views, File.expand_path('../views', __dir__)
 
   helpers do
-    def db
-      env['cloudflare.DB']
-    end
-
     def h(text)
       Rack::Utils.escape_html(text.to_s)
     end

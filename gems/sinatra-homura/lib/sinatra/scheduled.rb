@@ -14,11 +14,10 @@
 #       register Sinatra::Scheduled
 #
 #       schedule '*/5 * * * *', name: 'heartbeat' do |event|
-#         db = env['cloudflare.DB']
 #         db.execute_insert(
 #           'INSERT INTO heartbeats (cron, scheduled_at) VALUES (?, ?)',
 #           [event.cron, event.scheduled_time.to_i]
-#         ).__await__
+#         )
 #       end
 #
 #       schedule '0 */1 * * *' do |event|
@@ -216,9 +215,8 @@ module Sinatra
 
       private
 
-      # Build a tiny Rack-shaped env so the block has the same
-      # `env['cloudflare.DB']` / `KV` / `BUCKET` accessors that HTTP
-      # routes use. We deliberately do NOT spin up a full Sinatra
+      # Build a tiny Rack-shaped env so the block has the same binding
+      # helpers that HTTP routes use. We deliberately do NOT spin up a full Sinatra
       # request — there is no HTTP request, no params, no response.
       def invoke_scheduled_job(job, event, js_env, js_ctx)
         env = build_scheduled_env(event, js_env, js_ctx)
@@ -264,23 +262,12 @@ module Sinatra
       end
 
       def build_scheduled_env(event, js_env, js_ctx)
-        env = {
+        Cloudflare::Bindings.build_env(js_env, js_ctx, {
           'cloudflare.scheduled'      => true,
           'cloudflare.event'          => event,
           'cloudflare.cron'           => event.cron,
-          'cloudflare.scheduled_time' => event.scheduled_time,
-          'cloudflare.env'            => js_env,
-          'cloudflare.ctx'            => js_ctx
-        }
-        if js_env
-          js_db = `#{js_env} && #{js_env}.DB`
-          js_kv = `#{js_env} && #{js_env}.KV`
-          js_r2 = `#{js_env} && #{js_env}.BUCKET`
-          env['cloudflare.DB']     = ::Cloudflare::D1Database.new(js_db)  if `#{js_db} != null`
-          env['cloudflare.KV']     = ::Cloudflare::KVNamespace.new(js_kv) if `#{js_kv} != null`
-          env['cloudflare.BUCKET'] = ::Cloudflare::R2Bucket.new(js_r2)    if `#{js_r2} != null`
-        end
-        env
+          'cloudflare.scheduled_time' => event.scheduled_time
+        })
       end
     end
 
@@ -298,9 +285,18 @@ module Sinatra
         @js_ctx = js_ctx
       end
 
-      def db;     env['cloudflare.DB'];     end
+      def d1;     env['cloudflare.DB'];     end
+      def db;     d1;                    end
+      def cf_env; env['cloudflare.env']; end
+      def cf_ctx; env['cloudflare.ctx']; end
       def kv;     env['cloudflare.KV'];     end
       def bucket; env['cloudflare.BUCKET']; end
+      def ai; Cloudflare::Bindings.ai(env); end
+      def send_email; env['cloudflare.SEND_EMAIL']; end
+      def jobs_queue; env['cloudflare.QUEUE_JOBS']; end
+      def durable_object(name, id_or_name = nil)
+        Cloudflare::Bindings.durable_object(env, name, id_or_name)
+      end
 
       # Forward a long-running promise to the Workers runtime so the
       # job can return immediately while the work continues.

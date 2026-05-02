@@ -9,7 +9,7 @@ gem 'homura-runtime', '= 0.3.1'
 gem 'sinatra-homura', '= 0.3.0'
 
 # D1 / Sequel migrations (compile-time only). The Worker itself talks to D1
-# directly through `env['cloudflare.DB']` (sqlite3-ruby compatible API), but
+# directly through `db` (sqlite3-ruby compatible API), but
 # `bundle exec rake db:migrate:compile` needs Sequel + sqlite3 locally to
 # compile Sequel migration DSL into wrangler-compatible SQL.
 gem 'sequel-d1', '= 0.3.1'

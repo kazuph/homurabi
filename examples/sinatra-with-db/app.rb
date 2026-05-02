@@ -11,9 +11,6 @@ end
 
 get '/users' do
   content_type 'application/json; charset=utf-8'
-  # Prefer the Ruby D1 wrapper from cloudflare-workers-runtime.
-  # Raw `env['cloudflare.env'].DB` is also valid for duck-typed `d1:`.
-  d1 = env['cloudflare.DB']
   unless d1
     status 503
     next({ 'error' => 'D1 binding missing (configure wrangler D1)' }.to_json)
@@ -23,4 +20,3 @@ get '/users' do
   rows = db[:users].order(:id).all
   { 'users' => rows }.to_json
 end
-

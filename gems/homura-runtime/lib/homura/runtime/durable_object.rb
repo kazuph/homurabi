@@ -185,6 +185,34 @@ module Cloudflare
         url:     url_str
       )
     end
+
+    def request(path, method: 'GET', headers: nil, body: nil)
+      hdrs = headers ? headers.dup : {}
+      request_body = body
+      if body.is_a?(Hash) || body.is_a?(Array)
+        request_body = body.to_json
+        unless hdrs.key?('content-type') || hdrs.key?('Content-Type')
+          hdrs['content-type'] = 'application/json'
+        end
+      end
+      fetch(path, method: method, headers: hdrs, body: request_body)
+    end
+
+    def get(path, headers: nil)
+      request(path, method: 'GET', headers: headers)
+    end
+
+    def post(path, body = nil, headers: nil)
+      request(path, method: 'POST', headers: headers, body: body)
+    end
+
+    def put(path, body = nil, headers: nil)
+      request(path, method: 'PUT', headers: headers, body: body)
+    end
+
+    def delete(path, headers: nil)
+      request(path, method: 'DELETE', headers: headers)
+    end
   end
 
   # -----------------------------------------------------------------
@@ -281,7 +309,8 @@ module Cloudflare
 
       state = DurableObjectState.new(js_state)
       request = DurableObjectRequest.new(js_request, body_text)
-      ctx = DurableObjectRequestContext.new(state, js_env, request)
+      env = Cloudflare::Bindings.build_env(js_env)
+      ctx = DurableObjectRequestContext.new(state, env, request)
 
       result = handler.bind(ctx).call(state, request)
 
@@ -581,6 +610,19 @@ module Cloudflare
     end
 
     def storage; @state.storage; end
+    def cf_env; env['cloudflare.env']; end
+    def cf_ctx; env['cloudflare.ctx']; end
+
+    def d1; env['cloudflare.DB']; end
+    def db; d1; end
+    def kv; env['cloudflare.KV']; end
+    def bucket; env['cloudflare.BUCKET']; end
+    def ai; Cloudflare::Bindings.ai(env); end
+    def send_email; env['cloudflare.SEND_EMAIL']; end
+    def jobs_queue; env['cloudflare.QUEUE_JOBS']; end
+    def durable_object(name, id_or_name = nil)
+      Cloudflare::Bindings.durable_object(env, name, id_or_name)
+    end
   end
 end
 

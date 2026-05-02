@@ -27,7 +27,7 @@ require 'homura_markdown'
 require 'faraday'
 # Phase 12 — Sequel (vendored v5.103.0) + D1 adapter (`sequel-d1` gem).
 # `Sequel.connect(adapter: :d1, d1: …)` uses the per-request D1 binding
-# from `env['cloudflare.DB']` (wired by cloudflare-workers-runtime), and Dataset DSL compiles
+# from `d1` (wired by homura-runtime), and Dataset DSL compiles
 # to SQLite-dialect SQL which D1 speaks natively.
 require 'sequel'
 
@@ -44,7 +44,7 @@ class App < Sinatra::Base
   # requests don't pay the 2048-bit RSA generation cost. The secret is
   # deterministic only for local dev — in production it should come
   # from a Workers secret (wrangler secret put JWT_SECRET) pulled via
-  # `env['cloudflare.env'].JWT_SECRET`.
+  # `cf_env.JWT_SECRET`.
   register Sinatra::JwtAuth
   set :jwt_secret, 'homura-phase8-demo-secret-change-me-in-prod'
   set :jwt_algorithm, 'HS256'
@@ -80,7 +80,6 @@ class App < Sinatra::Base
   # Phase 9 — Cron Trigger handlers (see also /test/scheduled* routes).
   # ------------------------------------------------------------------
   schedule '*/5 * * * *', name: 'heartbeat' do |event|
-    cf_env = env['cloudflare.env']
     enabled = cf_env && `(#{cf_env}.HOMURA_ENABLE_SCHEDULED_DEMOS || '')`.to_s == '1'
     next unless enabled
     # Insert one row into D1's heartbeats table per cron firing.
@@ -94,7 +93,6 @@ class App < Sinatra::Base
   end
 
   schedule '0 */1 * * *', name: 'hourly-housekeeping' do |event|
-    cf_env = env['cloudflare.env']
     enabled = cf_env && `(#{cf_env}.HOMURA_ENABLE_SCHEDULED_DEMOS || '')`.to_s == '1'
     next unless enabled
     # Demo: bump a KV counter so we can prove hourly cron runs from
@@ -316,7 +314,6 @@ class App < Sinatra::Base
     # so leaving it publicly reachable in production is a small but real
     # abuse vector. Flip via wrangler [vars] HOMURA_ENABLE_FOUNDATIONS_DEMOS=1.
     def foundations_demos_enabled?
-      cf_env = env['cloudflare.env']
       return false unless cf_env
       val = `(#{cf_env} && #{cf_env}.HOMURA_ENABLE_FOUNDATIONS_DEMOS) || ''`
       val.to_s == '1'

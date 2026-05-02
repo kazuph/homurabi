@@ -26,7 +26,7 @@ get '/' do
 end
 
 get '/users' do
-  db = Sequel.connect(adapter: :d1, d1: env['cloudflare.DB'])
+  db = Sequel.connect(adapter: :d1, d1: d1)
   content_type :json
   db[:users].order(:id).all.to_json
 end
@@ -83,13 +83,14 @@ homura is the glue that closes that gap:
 - **Real Sinatra DSL** — `get`, `post`, `before`, `after`, `helpers`, `halt`,
   `redirect`, `erb` with `locals:` and layout, `Sinatra::Base` inheritance
   exactly as upstream documents.
-- **Edge SQL** — `Sequel.connect(adapter: :d1, d1: env['cloudflare.DB'])`
+- **Edge SQL** — `Sequel.connect(adapter: :d1, d1: d1)`
   works against Cloudflare D1; migrations are written in Sequel DSL and
   compiled to wrangler-compatible SQL. Or skip the ORM and use the
-  `Cloudflare::D1Database` wrapper directly.
+  `db.execute(...)` wrapper directly.
 - **All the bindings** — D1, KV, R2, Workers AI, Queues, Scheduled, Durable
-  Objects, Vectorize. They surface as ordinary Ruby objects in
-  `request.env['cloudflare.<NAME>']`.
+  Objects, Vectorize. They surface as ordinary Ruby helpers such as
+  `db`, `d1`, `kv`, `bucket`, `ai`, `send_email`, `jobs_queue`, and
+  `durable_object(:counter, 'global')`.
 - **Ordinary distribution** — four gems on RubyGems. No `path:`,
   no submodules, no clone of homura required.
 - **Async without ceremony** — the build step rewrites the `__await__`
@@ -228,10 +229,10 @@ fixtures behind the latest gem releases.
 | [`sinatra`](examples/sinatra/) | <https://sinatra.kazu-san.workers.dev/> | The classic Sinatra README snippet — `require 'sinatra'` + `get '/frank-says'`. Single `app.rb`, no D1, no views. |
 | [`rack`](examples/rack/) | <https://rack.kazu-san.workers.dev/> | Direct Rack response triples with `run ->(env) { ... }`; no Sinatra require. |
 | [`classic-top-sinatra`](examples/classic-top-sinatra/) | <https://classic-top-sinatra.kazu-san.workers.dev/> | Same shape as `sinatra` but with `content_type :json` + a JSON route, to dogfood the classic top-level DSL. |
-| [`sinatra-with-db`](examples/sinatra-with-db/) | <https://sinatra-with-db.kazu-san.workers.dev/> | Smallest D1-backed Sinatra: `Sequel.connect(adapter: :d1, d1: env['cloudflare.DB'])`, one route, one migration. |
+| [`sinatra-with-db`](examples/sinatra-with-db/) | <https://sinatra-with-db.kazu-san.workers.dev/> | Smallest D1-backed Sinatra: `Sequel.connect(adapter: :d1, d1: d1)`, one route, one migration. |
 | [`sinatra-with-email`](examples/sinatra-with-email/) | <https://sinatra-with-email.kazu-san.workers.dev/> | Phase 17.5 auto-await demo — POST `/send` over the `SEND_EMAIL` Cloudflare Email binding, no `.__await__` in source. |
 | [`todo-simple`](examples/todo-simple/) | <https://todo-simple.kazu-san.workers.dev/> | **The smallest stateful example.** One `app.rb`, no `views/`, no D1 — HTML written as Ruby heredocs. The thing to copy when "how little does homura need" is the question. |
-| [`todo`](examples/todo/) | <https://todo.kazu-san.workers.dev/> | D1-backed CRUD without an ORM — `env['cloudflare.DB']` and `Cloudflare::D1Database` directly. |
+| [`todo`](examples/todo/) | <https://todo.kazu-san.workers.dev/> | D1-backed CRUD without an ORM — `db.execute` / `db.execute_insert` directly. |
 | [`todo-orm`](examples/todo-orm/) | <https://todo-orm.kazu-san.workers.dev/> | The same TODO app, this time through `sequel-d1`: migrations, dataset chains, `.first` / `.update`. |
 | [`auth-otp`](examples/auth-otp/) | <https://auth-otp.kazu-san.workers.dev/login> | Email OTP login. Sends through [mailpit](https://mailpit.axllent.org/) in development; HMAC-signed session cookie; full headed Playwright E2E in `rake e2e:headed`. |
 | [`blog`](examples/blog/) | <https://blog.kazu-san.workers.dev/> | A small blog: index / detail / new / **proper 404** / delete. Demonstrates async-route status preservation and `<%= h(post[:body]).gsub("\n", "<br>") %>`. |
@@ -268,7 +269,7 @@ to:
   `literal_literal_string_append`.
 - **Async at the edge.** D1 / KV / fetch are all promise-shaped. The
   build pipeline runs an auto-await pass that inserts `__await__` for
-  registered async methods (`db.execute`, `kv.get`, `Cloudflare::AI.run`,
+  registered async methods (`db.execute`, `kv.get`, `ai.run`,
   …), so route bodies stay sync-shaped.
 
 If you find an idiom that should "just work" but does not, it belongs on

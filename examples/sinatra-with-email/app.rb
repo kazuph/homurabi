@@ -16,7 +16,6 @@ helpers do
   end
 
   def cf_env_var(name)
-    cf_env = env['cloudflare.env']
     return '' unless cf_env
     `(#{cf_env}[#{name}] || '')`.to_s.strip
   end
@@ -67,10 +66,9 @@ post '/send' do
   else
     # Production: Cloudflare Email Workers (SEND_EMAIL binding is already a
     # Cloudflare::Email instance — no extra `.new` wrapper needed).
-    mailer = env['cloudflare.SEND_EMAIL']
     from = cf_env_var('HOMURA_MAIL_FROM')
     from = params['from'] || 'noreply@example.com' if from.empty?
-    result = mailer.send(
+    result = send_email.send(
       to:      to,
       from:    from,
       subject: params['subject'].to_s,
@@ -83,4 +81,3 @@ rescue Cloudflare::Email::Error => e
   status 502
   { 'ok' => false, 'error' => e.message }.to_json
 end
-

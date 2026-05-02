@@ -4,16 +4,13 @@ require 'cgi'
 
 class App < Sinatra::Base
   helpers do
-    def db
-      env['cloudflare.DB'] or raise 'D1 binding missing (configure wrangler D1)'
-    end
-
     def h(text)
       CGI.escapeHTML(text.to_s)
     end
   end
 
   get '/' do
+    raise 'D1 binding missing (configure wrangler D1)' unless db
     @todos = db.execute('SELECT id, title, done, created_at FROM todos ORDER BY id')
     content_type 'text/html; charset=utf-8'
     erb :index

@@ -10,13 +10,13 @@ require 'sequel'
 DB = nil
 
 get '/users' do
-  DB ||= Sequel.connect(adapter: :d1, d1: env['cloudflare.DB'])
+  DB ||= Sequel.connect(adapter: :d1, d1: d1)
   content_type 'application/json'
   DB[:users].order(:id).all.to_json
 end
 ```
 
-`d1:` must respond to `prepare(sql)` returning a statement that supports `bind(*args)`, `all`, and `run` (same contract as the JavaScript D1 API). The Ruby wrapper from `homura-runtime` (`env['cloudflare.DB']`) is the usual choice.
+`d1:` must respond to `prepare(sql)` returning a statement that supports `bind(*args)`, `all`, and `run` (same contract as the JavaScript D1 API). In a homura route, the `d1` helper is the usual choice.
 
 ## Opal build paths
 

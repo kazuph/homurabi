@@ -7,13 +7,13 @@ get '/test/ai/debug' do
     next({ 'error' => 'disabled' }.to_json)
   end
   model = params['model'] || App::CHAT_MODELS[:primary]
-  out = Cloudflare::AI.run(
+  out = ai.run(
     model,
-    { messages: [
+    messages: [
       { role: 'system', content: 'reply with a short Japanese greeting' },
       { role: 'user',   content: 'こんにちは' }
-    ], max_tokens: 64 },
-    binding: ai_binding
+    ],
+    max_tokens: 64
   )
   {
     'model'    => model,

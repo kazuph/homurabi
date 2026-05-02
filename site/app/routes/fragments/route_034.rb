@@ -72,15 +72,15 @@ post '/api/chat/messages' do
   ai_error  = nil
 
   begin
-    result = Cloudflare::AI.run(
+    result = ai.run(
       model,
       # max_tokens raised to 1024 because OpenAI-style models (Gemma 4,
       # gpt-oss-*) report `finish_reason: "length"` and surface the
       # visible answer in `message.reasoning` instead of `content` when
       # truncated. 1024 is generous enough for most chat replies and
       # still well under Workers' 30s wall-time budget.
-      { messages: messages, max_tokens: 1024 },
-      binding: ai_binding
+      messages: messages,
+      max_tokens: 1024
     )
     reply_text = App.extract_ai_text(result).strip
     raise Cloudflare::AIError.new('empty response', model: model) if reply_text.empty?
@@ -94,10 +94,10 @@ post '/api/chat/messages' do
     used_fallback = true
     used_model = (model == primary) ? fallback : primary
     begin
-      result = Cloudflare::AI.run(
+      result = ai.run(
         used_model,
-        { messages: messages, max_tokens: 1024 },
-        binding: ai_binding
+        messages: messages,
+        max_tokens: 1024
       )
       reply_text = App.extract_ai_text(result).strip
     rescue Cloudflare::AIError => e

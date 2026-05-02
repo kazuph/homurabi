@@ -24,6 +24,6 @@ post '/test/queue/fire' do
     idx += 1
   end
   js_batch = `({ queue: #{qname}, messages: #{js_msgs}, ackAll: function() {}, retryAll: function() {} })`
-  summary = Cloudflare::QueueConsumer.dispatch_js(js_batch, env['cloudflare.env'], env['cloudflare.ctx'])
+  summary = Cloudflare::QueueConsumer.dispatch_js(js_batch, cf_env, cf_ctx)
   summary.merge('injected' => messages.size).to_json
 end

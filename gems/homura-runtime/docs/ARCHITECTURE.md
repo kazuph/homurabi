@@ -44,7 +44,7 @@ flowchart LR
 | 項目 | 内容 |
 |------|------|
 | Wrangler | `[[send_email]]` に `name = "SEND_EMAIL"`（Cloudflare Email Service · Agents Week 2026）。 |
-| Rack env | `env['cloudflare.SEND_EMAIL']` は `Cloudflare::Email`（JS `env.SEND_EMAIL.send(...)` を Ruby 側で `await`）。 |
+| Ruby helper | `send_email` は `Cloudflare::Email`（JS `env.SEND_EMAIL.send(...)` を Ruby 側で `await`）。 |
 | 備考 | consumer アプリ側で verified sender を wrangler `[vars]` などに載せ、アプリから `from` に渡す。 |
 
 ### Phase 17-E — `/cdn-cgi/*`（Rack に渡さない）とバインディング注入
@@ -53,7 +53,7 @@ flowchart LR
 |------|------|
 | **`worker_module.mjs` の `fetch` 先頭** | `env.SEND_EMAIL` があれば **`globalThis.__OPAL_WORKERS__.sendEmailBinding`** にコピーしてから Rack を呼ぶ。Miniflare 等で `js_env.SEND_EMAIL` が欠ける場合でも Ruby が同じ JS オブジェクトを拾える。 |
 | **`/cdn-cgi/*`** | **Sinatra に渡さない**。Miniflare の entry.worker は `/cdn-cgi/mf/scheduled` だけ先処理する。`/cdn-cgi/handler/email` などはユーザ Worker の `fetch` に届くため、ここで処理しないと Rack が 404 になる。将来 Phase 18（Email 受信）で `export async email(...)` と接続する前提。 |
-| **D1 / KV / Queue との違い** | それらは典型的に `env['cloudflare.env']` 経由で JS バインディングを参照する。`SEND_EMAIL` は **Worker の `env` に付く生バインディング**を `worker_module` が先に global に載せ、`Cloudflare::Email` がそれを包む（Rack の `cloudflare.*` はラッパー用の入口）。 |
+| **D1 / KV / Queue との違い** | D1 / KV / Queue は `db` / `kv` / `jobs_queue` ヘルパーとして使える。`SEND_EMAIL` は **Worker の `env` に付く生バインディング**を `worker_module` が先に global に載せ、`Cloudflare::Email` がそれを包み、アプリ側では `send_email` として触る。 |
 
 ## wrangler.json について
 

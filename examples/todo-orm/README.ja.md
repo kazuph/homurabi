@@ -9,7 +9,7 @@
 
 ## このサンプルで示すこと
 
-- `Sequel.connect(adapter: :d1, d1: env['cloudflare.DB'])` —
+- `Sequel.connect(adapter: :d1, d1: d1)` —
   ドキュメントに書かれているそのままの書き方。
 - Sequel の **dataset** API: `db[:todos].order(:id).all`、
   `db[:todos].where(id: 1).first`、
@@ -58,7 +58,7 @@ todo-orm/
 class App < Sinatra::Base
   helpers do
     def db
-      Sequel.connect(adapter: :d1, d1: env['cloudflare.DB'])
+      Sequel.connect(adapter: :d1, d1: d1)
     end
   end
 

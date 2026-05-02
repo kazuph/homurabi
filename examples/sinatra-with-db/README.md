@@ -31,4 +31,4 @@ The remote tasks honor `CLOUDFLARE_D1_DATABASE` env var; the default matches the
 ## Quick check
 
 - `GET /` — plain text hello
-- `GET /users` — JSON rows from `users` via `Sequel.connect(adapter: :d1, d1: env['cloudflare.DB'])` (or `d1: env['cloudflare.env'].DB` for a raw binding)
+- `GET /users` — JSON rows from `users` via `Sequel.connect(adapter: :d1, d1: d1)`

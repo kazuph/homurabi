@@ -22,7 +22,6 @@ class App < Sinatra::Base
 
   helpers do
     def db
-      d1 = env['cloudflare.DB']
       raise 'D1 binding missing' unless d1
       Sequel.connect(adapter: :d1, d1: d1)
     end

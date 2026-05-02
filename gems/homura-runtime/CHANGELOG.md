@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.3.5 (2026-05-03)
+
+- Add Ruby-shaped Cloudflare binding helpers for HTTP, scheduled, queue,
+  and Durable Object contexts: `db` / `d1`, `kv`, `bucket`, `ai`,
+  `send_email`, `jobs_queue`, `jobs_dlq`, `do_counter`, `cache`, and
+  `durable_object(:counter, 'global')`.
+- Add `Cloudflare::AI::Binding#run`, so app code can call
+  `ai.run(model, messages: [...])` instead of passing a raw binding into
+  `Cloudflare::AI.run`.
+- Add `DurableObjectStub#request` plus `#get`, `#post`, `#put`, and
+  `#delete` convenience methods. Hash/Array bodies are JSON encoded with
+  `content-type: application/json`.
+- Share Cloudflare binding env construction across HTTP, scheduled,
+  queue, and Durable Object dispatch paths.
+- Register the new helpers with auto-await so sync-shaped app code keeps
+  working without explicit `.__await__` calls.
+
 ## 0.3.4 (2026-05-02)
 
 - Package the Rack vendor files in `homura-runtime` itself. The 0.3.3

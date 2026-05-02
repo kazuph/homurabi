@@ -24,9 +24,8 @@ end</code></pre>
 <pre><code>register Sinatra::Scheduled
 
 schedule '*/5 * * * *', name: 'heartbeat' do |event|
-  db = env['cloudflare.DB']
   db.execute_insert('INSERT INTO heartbeats (cron, scheduled_at) VALUES (?, ?)',
-    [event.cron, event.scheduled_time.to_i]).__await__
+    [event.cron, event.scheduled_time.to_i])
 end</code></pre>
 
 <h2 id="queue">Queues（Sinatra::Queue）</h2>

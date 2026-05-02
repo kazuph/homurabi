@@ -367,9 +367,18 @@ module Cloudflare
       @env = build_env(js_env)
     end
 
-    def db;     env['cloudflare.DB'];     end
+    def d1;     env['cloudflare.DB'];     end
+    def db;     d1;                    end
+    def cf_env; env['cloudflare.env']; end
+    def cf_ctx; env['cloudflare.ctx']; end
     def kv;     env['cloudflare.KV'];     end
     def bucket; env['cloudflare.BUCKET']; end
+    def ai; Cloudflare::Bindings.ai(env); end
+    def send_email; env['cloudflare.SEND_EMAIL']; end
+    def jobs_queue; env['cloudflare.QUEUE_JOBS']; end
+    def durable_object(name, id_or_name = nil)
+      Cloudflare::Bindings.durable_object(env, name, id_or_name)
+    end
 
     # Hand a long-running promise to ctx.waitUntil. Mirrors the same
     # helper in Sinatra::Scheduled's ScheduledContext.
@@ -383,23 +392,9 @@ module Cloudflare
     private
 
     def build_env(js_env)
-      env = {
+      Cloudflare::Bindings.build_env(js_env, @js_ctx, {
         'cloudflare.queue' => true,
-        'cloudflare.env'   => js_env,
-        'cloudflare.ctx'   => @js_ctx
-      }
-      # js_env is a raw JS object when called from the Workers runtime,
-      # so `.nil?` would explode with NoMethodError. Use a JS-level
-      # null/undefined/Opal.nil check instead — same pattern
-      # `Cloudflare::Cache#available?` uses.
-      return env if `(#{js_env} == null || #{js_env} === undefined || #{js_env} === Opal.nil)`
-      js_db = `#{js_env} && #{js_env}.DB`
-      js_kv = `#{js_env} && #{js_env}.KV`
-      js_r2 = `#{js_env} && #{js_env}.BUCKET`
-      env['cloudflare.DB']     = Cloudflare::D1Database.new(js_db)  if `#{js_db} != null`
-      env['cloudflare.KV']     = Cloudflare::KVNamespace.new(js_kv) if `#{js_kv} != null`
-      env['cloudflare.BUCKET'] = Cloudflare::R2Bucket.new(js_r2)    if `#{js_r2} != null`
-      env
+      })
     end
   end
 end

@@ -7,9 +7,9 @@
 DB = nil
 
 get '/users' do
-  DB ||= Sequel.connect(adapter: :d1, d1: env['cloudflare.env'].DB)
+  DB ||= Sequel.connect(adapter: :d1, d1: d1)
   content_type 'application/json'
-  DB[:users].order(:id).all.__await__.to_json
+  DB[:users].order(:id).all.to_json
 end</code></pre>
 <p><code>d1:</code> には <code>prepare(sql)</code> 可能なオブジェクト（D1 の Ruby ラッパ）を渡します。homura の <code>/demo/sequel</code> や <code>/posts</code> が実コード例です。</p>
 

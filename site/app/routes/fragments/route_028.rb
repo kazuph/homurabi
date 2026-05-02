@@ -19,6 +19,6 @@ post '/test/scheduled/run' do
   # the HTTP response is sent. The literal `__await__` token is
   # what Opal scans for to emit a JS `await`.
   event  = Cloudflare::ScheduledEvent.new(cron: cron, scheduled_time: Time.now)
-  result = App.dispatch_scheduled(event, env['cloudflare.env'], env['cloudflare.ctx'])
+  result = App.dispatch_scheduled(event, cf_env, cf_ctx)
   result.merge('cron' => cron, 'registered_crons' => App.scheduled_jobs.map(&:cron)).to_json
 end

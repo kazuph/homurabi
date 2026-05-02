@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.2 (2026-05-03)
+
+- Register `Cloudflare::BindingHelpers` on `Sinatra::Base`, making D1,
+  KV, R2, Workers AI, Email, Queues, Cache, and Durable Object bindings
+  available through Ruby-shaped helpers in normal routes.
+- Route scheduled jobs through the same binding env builder as HTTP,
+  then expose the same helpers on `ScheduledContext`.
+- Require `homura-runtime >= 0.3.5` so the helper surface and shared
+  binding builder are present.
+
 ## 0.3.1 (2026-04-30)
 
 - README: drop the leftover `require 'sinatra/cloudflare_workers'` snippet

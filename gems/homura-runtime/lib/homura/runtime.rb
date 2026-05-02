@@ -239,55 +239,7 @@ module Rack
                                "#{host}:#{port}"
                              end
 
-          # Cloudflare-specific extras under their own namespace, per the
-          # Rack convention that env keys other than the standard ones
-          # SHOULD use a `<library>.<key>` form.
-          env['cloudflare.env'] = js_env
-          env['cloudflare.ctx'] = js_ctx
-
-          # Expose D1 / KV / R2 bindings as plain Ruby wrapper objects.
-          # The user Sinatra routes reach them via
-          # `env['cloudflare.DB']` / `.KV` / `.BUCKET` and call ordinary
-          # Ruby methods on them. Under the hood those methods are async,
-          # but homura's auto-await build step inserts `.__await__` for the
-          # common binding/helper patterns so app source usually does not.
-          js_db = `#{js_env} && #{js_env}.DB`
-          js_kv = `#{js_env} && #{js_env}.KV`
-          js_r2 = `#{js_env} && #{js_env}.BUCKET`
-          js_ai = `#{js_env} && #{js_env}.AI`
-          env['cloudflare.DB']     = Cloudflare::D1Database.new(js_db)  if `#{js_db} != null`
-          env['cloudflare.KV']     = Cloudflare::KVNamespace.new(js_kv) if `#{js_kv} != null`
-          env['cloudflare.BUCKET'] = Cloudflare::R2Bucket.new(js_r2)    if `#{js_r2} != null`
-          # Phase 10: env.AI is a Workers AI binding object. Routes call
-          # Cloudflare::AI.run(model, inputs, binding: env['cloudflare.AI'])
-          # to invoke a model. We expose the raw JS object (not a wrapper)
-          # because the wrapper is stateless — every call passes both the
-          # model id and the binding explicitly.
-          env['cloudflare.AI']     = js_ai if `#{js_ai} != null`
-
-          # Phase 11B: Durable Objects / Queues.
-          # env.COUNTER is a DurableObjectNamespace binding; wrap it into
-          # Cloudflare::DurableObjectNamespace so routes can call
-          # `do_counter.get_by_name("global").fetch('/inc').__await__`
-          # without a backtick. env.JOBS_QUEUE is a Queue producer binding.
-          js_do_counter = `#{js_env} && #{js_env}.COUNTER`
-          if `#{js_do_counter} != null`
-            env['cloudflare.DO_COUNTER'] = Cloudflare::DurableObjectNamespace.new(js_do_counter)
-          end
-          js_queue = `#{js_env} && #{js_env}.JOBS_QUEUE`
-          env['cloudflare.QUEUE_JOBS'] = Cloudflare::Queue.new(js_queue, 'JOBS_QUEUE') if `#{js_queue} != null`
-          js_dlq = `#{js_env} && #{js_env}.JOBS_DLQ`
-          env['cloudflare.QUEUE_JOBS_DLQ'] = Cloudflare::Queue.new(js_dlq, 'JOBS_DLQ') if `#{js_dlq} != null`
-
-          # Phase 17 — SEND_EMAIL。worker_module.fetch は先に globalThis.__OPAL_WORKERS__.sendEmailBinding を設定する。
-          # 本番では js_env.SEND_EMAIL が直に入る。Miniflare で欠ける場合のみ global を試す（2 段に分けて Opal の埋め込みを単純化）。
-          js_send_email = `#{js_env}.SEND_EMAIL`
-          if `#{js_send_email} == null || #{js_send_email} === undefined`
-            js_send_email = `(typeof globalThis !== 'undefined' && globalThis.__OPAL_WORKERS__ && globalThis.__OPAL_WORKERS__.sendEmailBinding) || null`
-          end
-          env['cloudflare.SEND_EMAIL'] = Cloudflare::Email.new(js_send_email) if `#{js_send_email} != null`
-
-          env
+          Cloudflare::Bindings.attach!(env, js_env, js_ctx)
         end
 
         # Copy CF Workers Request headers into Rack HTTP_* keys, with the
@@ -945,6 +897,107 @@ module Cloudflare
       `#{js_bucket}.list(#{opts}).then(function(res) { var rows = []; var arr = res && res.objects ? res.objects : []; for (var i = 0; i < arr.length; i++) { var o = arr[i]; var ct = (o.httpMetadata && o.httpMetadata.contentType) || 'application/octet-stream'; var h = new Map(); h.set('key', o.key); h.set('size', o.size|0); h.set('uploaded', o.uploaded ? o.uploaded.toISOString() : null); h.set('content_type', ct); rows.push(h); } return rows; })`
     end
   end
+
+  module Bindings
+    module_function
+
+    def build_env(js_env, js_ctx = nil, extras = nil)
+      env = extras ? extras.dup : {}
+      attach!(env, js_env, js_ctx)
+    end
+
+    def attach!(env, js_env, js_ctx = nil)
+      env['cloudflare.env'] = js_env
+      env['cloudflare.ctx'] = js_ctx unless `(#{js_ctx} == null || #{js_ctx} === undefined || #{js_ctx} === Opal.nil)`
+      return env if `(#{js_env} == null || #{js_env} === undefined || #{js_env} === Opal.nil)`
+
+      js_db = `#{js_env} && #{js_env}.DB`
+      js_kv = `#{js_env} && #{js_env}.KV`
+      js_r2 = `#{js_env} && #{js_env}.BUCKET`
+      js_ai = `#{js_env} && #{js_env}.AI`
+      env['cloudflare.DB']     = D1Database.new(js_db)  if `#{js_db} != null`
+      env['cloudflare.KV']     = KVNamespace.new(js_kv) if `#{js_kv} != null`
+      env['cloudflare.BUCKET'] = R2Bucket.new(js_r2)    if `#{js_r2} != null`
+      env['cloudflare.AI']     = js_ai                  if `#{js_ai} != null`
+
+      attach_durable_object!(env, :counter, `#{js_env} && #{js_env}.COUNTER`)
+      attach_queue!(env, :jobs, `#{js_env} && #{js_env}.JOBS_QUEUE`, 'JOBS_QUEUE')
+      attach_queue!(env, :jobs_dlq, `#{js_env} && #{js_env}.JOBS_DLQ`, 'JOBS_DLQ')
+      attach_send_email!(env, js_env)
+
+      env
+    end
+
+    def attach_durable_object!(env, name, js_binding)
+      return env if `(#{js_binding} == null || #{js_binding} === undefined || #{js_binding} === Opal.nil)`
+      return env unless defined?(::Cloudflare::DurableObjectNamespace)
+
+      suffix = normalize_binding_name(name)
+      env["cloudflare.DO_#{suffix}"] = DurableObjectNamespace.new(js_binding)
+      env
+    end
+
+    def attach_queue!(env, name, js_binding, binding_name)
+      return env if `(#{js_binding} == null || #{js_binding} === undefined || #{js_binding} === Opal.nil)`
+      return env unless defined?(::Cloudflare::Queue)
+
+      suffix = normalize_binding_name(name)
+      env["cloudflare.QUEUE_#{suffix}"] = Queue.new(js_binding, binding_name)
+      env
+    end
+
+    def attach_send_email!(env, js_env)
+      return env unless defined?(::Cloudflare::Email)
+
+      js_send_email = `#{js_env} && #{js_env}.SEND_EMAIL`
+      if `#{js_send_email} == null || #{js_send_email} === undefined`
+        js_send_email = `(typeof globalThis !== 'undefined' && globalThis.__OPAL_WORKERS__ && globalThis.__OPAL_WORKERS__.sendEmailBinding) || null`
+      end
+      env['cloudflare.SEND_EMAIL'] = Email.new(js_send_email) if `#{js_send_email} != null`
+      env
+    end
+
+    def normalize_binding_name(name)
+      name.to_s.upcase.gsub(/[^A-Z0-9]+/, '_').sub(/\A_+/, '').sub(/_+\z/, '')
+    end
+
+    def durable_object(env, name, id_or_name = nil)
+      suffix = normalize_binding_name(name)
+      ns = env["cloudflare.DO_#{suffix}"] || env["cloudflare.#{suffix}"]
+      return nil unless ns
+      return ns if id_or_name.nil?
+
+      ns.get_by_name(id_or_name.to_s)
+    end
+
+    def ai(env)
+      raw = env['cloudflare.AI']
+      return nil if `(#{raw} == null || #{raw} === undefined || #{raw} === Opal.nil)`
+      return raw if defined?(::Cloudflare::AI::Binding) && `(#{raw} != null && #{raw}.$$class === #{::Cloudflare::AI::Binding})`
+      return ::Cloudflare::AI::Binding.new(raw) if defined?(::Cloudflare::AI::Binding)
+
+      raw
+    end
+  end
+
+  module BindingHelpers
+    def cf_env; env['cloudflare.env']; end
+    def cf_ctx; env['cloudflare.ctx']; end
+    def d1; env['cloudflare.DB']; end
+    def db; d1; end
+    def kv; env['cloudflare.KV']; end
+    def bucket; env['cloudflare.BUCKET']; end
+    def ai; Cloudflare::Bindings.ai(env); end
+    def send_email; env['cloudflare.SEND_EMAIL']; end
+    def jobs_queue; env['cloudflare.QUEUE_JOBS']; end
+    def jobs_dlq; env['cloudflare.QUEUE_JOBS_DLQ']; end
+    def do_counter; env['cloudflare.DO_COUNTER']; end
+    def cache; @__homura_cache ||= Cloudflare::Cache.default; end
+
+    def durable_object(name, id_or_name = nil)
+      Cloudflare::Bindings.durable_object(env, name, id_or_name)
+    end
+  end
 end
 
 # Phase 6 — HTTP client foundation. Loaded as part of the Cloudflare
@@ -961,7 +1014,7 @@ require 'homura/runtime/http'
 require 'homura/runtime/scheduled'
 
 # Phase 10 — Workers AI binding wrapper. Loaded here so any Sinatra
-# route can call Cloudflare::AI.run(...) without an extra require.
+# route can call the `ai` helper without an extra require.
 require 'homura/runtime/ai'
 
 # Phase 11A — HTTP foundations.

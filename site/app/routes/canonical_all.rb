@@ -685,7 +685,7 @@
     # the HTTP response is sent. The literal `__await__` token is
     # what Opal scans for to emit a JS `await`.
     event  = Cloudflare::ScheduledEvent.new(cron: cron, scheduled_time: Time.now)
-    result = App.dispatch_scheduled(event, env['cloudflare.env'], env['cloudflare.ctx'])
+    result = App.dispatch_scheduled(event, cf_env, cf_ctx)
     result.merge('cron' => cron, 'registered_crons' => App.scheduled_jobs.map(&:cron)).to_json
   end
   get '/login' do
@@ -835,15 +835,15 @@
     ai_error  = nil
 
     begin
-      result = Cloudflare::AI.run(
+      result = ai.run(
         model,
         # max_tokens raised to 1024 because OpenAI-style models (Gemma 4,
         # gpt-oss-*) report `finish_reason: "length"` and surface the
         # visible answer in `message.reasoning` instead of `content` when
         # truncated. 1024 is generous enough for most chat replies and
         # still well under Workers' 30s wall-time budget.
-        { messages: messages, max_tokens: 1024 },
-        binding: ai_binding
+        messages: messages,
+        max_tokens: 1024
       )
       reply_text = App.extract_ai_text(result).strip
       raise Cloudflare::AIError.new('empty response', model: model) if reply_text.empty?
@@ -857,10 +857,10 @@
       used_fallback = true
       used_model = (model == primary) ? fallback : primary
       begin
-        result = Cloudflare::AI.run(
+        result = ai.run(
           used_model,
-          { messages: messages, max_tokens: 1024 },
-          binding: ai_binding
+          messages: messages,
+          max_tokens: 1024
         )
         reply_text = App.extract_ai_text(result).strip
       rescue Cloudflare::AIError => e
@@ -941,13 +941,13 @@
       next({ 'error' => 'disabled' }.to_json)
     end
     model = params['model'] || App::CHAT_MODELS[:primary]
-    out = Cloudflare::AI.run(
+    out = ai.run(
       model,
-      { messages: [
+      messages: [
         { role: 'system', content: 'reply with a short Japanese greeting' },
         { role: 'user',   content: 'こんにちは' }
-      ], max_tokens: 64 },
-      binding: ai_binding
+      ],
+      max_tokens: 64
     )
     {
       'model'    => model,
@@ -982,12 +982,13 @@
 
     test_one = lambda { |model, label|
       result = begin
-        out = Cloudflare::AI.run(model,
-          { messages: [
+        out = ai.run(
+          model,
+          messages: [
             { role: 'system', content: 'reply with the single word READY' },
             { role: 'user',   content: 'ping' }
-          ], max_tokens: 64 },
-          binding: ai_binding
+          ],
+          max_tokens: 64
         )
         txt = App.extract_ai_text(out).strip
         if txt.empty?
@@ -1263,7 +1264,7 @@
       idx += 1
     end
     js_batch = `({ queue: #{qname}, messages: #{js_msgs}, ackAll: function() {}, retryAll: function() {} })`
-    summary = Cloudflare::QueueConsumer.dispatch_js(js_batch, env['cloudflare.env'], env['cloudflare.ctx'])
+    summary = Cloudflare::QueueConsumer.dispatch_js(js_batch, cf_env, cf_ctx)
     summary.merge('injected' => messages.size).to_json
   end
   get '/demo/queue/dlq-status' do

@@ -14,10 +14,10 @@
 | [`sinatra/`](sinatra/) | Sinatra（単一ファイル） | <https://sinatra.kazu-san.workers.dev/> | classic Sinatra README そのまま — `require 'sinatra'` + `get '/frank-says'`。homura で書ける最短アプリ。 |
 | [`rack/`](rack/) | Rack のみ | <https://rack.kazu-san.workers.dev/> | `run ->(env) { ... }` による直接 Rack response triple。Sinatra の require なし。 |
 | [`classic-top-sinatra/`](classic-top-sinatra/) | Sinatra（単一ファイル、JSON） | <https://classic-top-sinatra.kazu-san.workers.dev/> | `sinatra/` と同じ形だが `content_type :json` で JSON を返す。classic トップレベル DSL をビルドパイプライン全体で dogfood する。 |
-| [`sinatra-with-db/`](sinatra-with-db/) | Sinatra + D1 + Sequel | <https://sinatra-with-db.kazu-san.workers.dev/> | 最小の D1 付き Sinatra: `Sequel.connect(adapter: :d1, d1: env['cloudflare.DB'])`、ルート 1 個、マイグレーション 1 個。 |
+| [`sinatra-with-db/`](sinatra-with-db/) | Sinatra + D1 + Sequel | <https://sinatra-with-db.kazu-san.workers.dev/> | 最小の D1 付き Sinatra: `Sequel.connect(adapter: :d1, d1: d1)`、ルート 1 個、マイグレーション 1 個。 |
 | [`sinatra-with-email/`](sinatra-with-email/) | Sinatra + Cloudflare Email | <https://sinatra-with-email.kazu-san.workers.dev/> | Phase 17.5 auto-await デモ — `SEND_EMAIL` Cloudflare Email バインディング越しの POST `/send`、ソース上に `.__await__` ゼロ。 |
 | [`todo-simple/`](todo-simple/) | Sinatra（インメモリ） | <https://todo-simple.kazu-san.workers.dev/> | **最小のステートフル example。** `app.rb` 1 つ、`views/` なし、D1 なし — HTML はルートのすぐ隣の heredoc。状態を持つ最小構成を見たい時に。 |
-| [`todo/`](todo/) | Sinatra + D1 (ORM なし) | <https://todo.kazu-san.workers.dev/> | 最小の D1 CRUD。`env['cloudflare.DB']` と `Cloudflare::D1Database#execute` / `execute_insert` API を直接利用 — Sequel なし。 |
+| [`todo/`](todo/) | Sinatra + D1 (ORM なし) | <https://todo.kazu-san.workers.dev/> | 最小の D1 CRUD。`db.execute` / `db.execute_insert` を直接利用 — Sequel なし。 |
 | [`todo-orm/`](todo-orm/) | Sinatra + D1 + Sequel | <https://todo-orm.kazu-san.workers.dev/> | 同じ TODO ドメインを `sequel-d1` 経由で実装。Datasets、`.first`、`.update(... Sequel.lit ...)`、マイグレーション DSL → wrangler 対応 SQL。 |
 | [`auth-otp/`](auth-otp/) | Sinatra + D1 + mailpit + Playwright | <https://auth-otp.kazu-san.workers.dev/login> | 開発時の [mailpit](https://mailpit.axllent.org/) シンクを利用したメール OTP ログイン。HMAC で署名されたセッション cookie。エンドツーエンド検証用に `rake e2e` (Net::HTTP) と `rake e2e:headed` (実際の Chromium) を提供。 |
 | [`blog/`](blog/) | Sinatra + D1 (ORM なし) | <https://blog.kazu-san.workers.dev/> | 一覧 / 詳細 / 新規作成 / 適切な 404 / 削除。非同期ルートパイプラインの下でも `status 404; erb :posts_not_found` が 200 ではなく 404 を返すことを示す。 |

@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 #
 # Example Rake tasks for a Sinatra-on-Cloudflare-Workers project using
-# sinatra-cloudflare-workers + cloudflare-workers-runtime.
+# sinatra-homura + homura-runtime.
 #
 # Copy to your app root as `Rakefile` and adjust paths.
 

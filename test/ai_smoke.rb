@@ -18,7 +18,7 @@
 #   npm test            # full suite
 
 require 'json'
-require 'homura/runtime/ai'
+require 'homura/runtime'
 
 # ---------------------------------------------------------------------
 # Stub a fake env.AI binding. `__test_ai_response__` controls the next
@@ -182,6 +182,23 @@ SmokeTest.assert!('symbol keys in inputs become string keys in JS') {
                      binding: binding).__await__
   c = last_call
   c['inputs']['messages'][0]['role'] == 'user' && c['inputs'].key?('stream')
+}.__await__
+
+SmokeTest.assert!('AI binding wrapper supports ai.run(model, messages: ...)') {
+  binding = fresh_binding
+  ai = Cloudflare::AI::Binding.new(binding)
+  push_response('response' => 'wrapper ok')
+  out = ai.run('@cf/google/gemma-4-26b-a4b-it',
+               messages: [{ role: 'user', content: 'hi via wrapper' }]).__await__
+  c = last_call
+  out['response'] == 'wrapper ok' &&
+    c['inputs']['messages'][0]['content'] == 'hi via wrapper'
+}.__await__
+
+SmokeTest.assert!('Cloudflare::Bindings.ai wraps env cloudflare.AI') {
+  env = { 'cloudflare.AI' => fresh_binding }
+  ai = Cloudflare::Bindings.ai(env)
+  ai.is_a?(Cloudflare::AI::Binding) && ai.available?
 }.__await__
 
 SmokeTest.assert!('AIError raised when binding is nil') {

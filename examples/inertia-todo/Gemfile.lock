@@ -43,7 +43,7 @@ GEM
     sinatra-homura (0.3.2)
       homura-runtime (>= 0.3.5, < 0.4)
       opal-homura (= 1.8.3.rc1.5)
-    sinatra-inertia (0.1.3)
+    sinatra-inertia (0.1.4)
       rack (>= 2.0, < 4.0)
       sinatra (>= 3.0, < 5.0)
     sqlite3 (2.9.3-aarch64-linux-gnu)
@@ -77,7 +77,7 @@ DEPENDENCIES
   sequel (~> 5.0)
   sequel-d1 (= 0.3.1)
   sinatra-homura (= 0.3.2)
-  sinatra-inertia (= 0.1.3)
+  sinatra-inertia (= 0.1.4)
   sqlite3 (>= 2.0)
 
 RUBY VERSION

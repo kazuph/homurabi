@@ -1,36 +1,60 @@
 # inertia-todo
 
-> A thin SPA via [**Inertia.js**](https://inertiajs.com) + **Vue 3**,
-> with **Sinatra** serving page-object props out of D1. The server is
-> all Ruby; the client JS is one small file in `public/assets/`.
+> A thin SPA via [**Inertia.js**](https://inertiajs.com) + **React**,
+> with **Sinatra** serving page props from D1. The server is Ruby, the
+> client is a small Vite bundle, and the deployed Worker uses released gems
+> only.
 
 ## What this shows
 
-- The Inertia.js wire protocol implemented from the server side in
-  ~30 lines of Sinatra:
-  - First request: full HTML page with
-    `<div id="app" data-page="<%= Rack::Utils.escape_html(@page_json) %>">`.
-  - Subsequent navigation: `X-Inertia: true` requests get the page
-    object as JSON, with `Vary: X-Inertia`.
-  - `redirect to('/'), 303` for POSTs — Inertia client follows.
-  - Asset versioning via a top-level `ASSETS_VERSION` constant and
-    `409 Conflict` + `X-Inertia-Location` when versions diverge.
-- The Sinatra-standard way of setting Inertia headers — `content_type`
-  and `headers`, not a `halt [status, headers, body]` Rack triple.
-  This relies on `sinatra-homura` 0.2.17 capturing the final response
-  triple after the awaited route body finishes.
-- Sinatra-side **D1** access for the actual todo CRUD.
-- Client-side **Vue 3 + @inertiajs/vue3** loaded via an importmap and
-  a single `public/assets/inertia-app.js`. No bundler step.
+- `sinatra-inertia` handling the Inertia v2 protocol while route code stays
+  Sinatra-shaped.
+- Sinatra-side **D1** access for todo CRUD through `sequel-d1`.
+- Shared props, redirect validation errors, CSRF, deferred props, and partial
+  reloads without hand-writing protocol headers in the app.
+
+## Server shape
+
+```ruby
+class App < Sinatra::Base
+  register Sinatra::Inertia
+
+  set :page_version, ENV.fetch('ASSETS_VERSION', '3')
+  set :page_layout, :layout
+
+  share_props do
+    { flash: flash_payload, csrfToken: csrf_token }
+  end
+
+  get '/' do
+    render 'Todos/Index',
+           todos: -> { todos },
+           stats: defer(group: 'meta') { todo_stats }
+  end
+
+  post '/todos' do
+    if title.empty?
+      page_errors title: 'title is required'
+      redirect to('/'), 303
+    end
+
+    db[:todos].insert(title: title, done: 0, created_at: Time.now.to_i)
+    redirect to('/'), 303
+  end
+end
+```
+
+The app still requires and registers `Sinatra::Inertia`, but route code uses
+page-level nouns: `render`, `share_props`, `defer`, and `page_errors`.
 
 ## Routes
 
 | Method | Path | What it does |
 |---|---|---|
-| `GET`  | `/` | Either render the full page (with `data-page`) or, on `X-Inertia: true`, return the JSON page object. |
-| `POST` | `/todos` | Insert into D1, `redirect to('/'), 303`. |
-| `POST` | `/todos/:id/toggle` | Flip `done`, `redirect to('/'), 303`. |
-| `POST` | `/todos/:id/delete` | Delete row, `redirect to('/'), 303`. |
+| `GET` | `/` | Render the full HTML page, or return a JSON page object on `X-Inertia: true`. |
+| `POST` | `/todos` | Insert a todo into D1 and redirect back. |
+| `POST` | `/todos/:id/toggle` | Toggle `done` and redirect back. |
+| `POST` | `/todos/:id/delete` | Delete the row and redirect back. |
 
 ## Layout
 
@@ -38,105 +62,16 @@
 inertia-todo/
 ├── Gemfile
 ├── Rakefile
-├── wrangler.toml                     # D1 binding "DB" → database "inertia-todo"
-├── app/app.rb                        # render_inertia + CRUD routes
-├── views/layout.erb                  # importmap + #app[data-page]
+├── wrangler.toml
+├── app/app.rb
+├── views/layout.erb
+├── client/src/main.tsx
+├── client/src/Pages/Todos/Index.tsx
 ├── public/
-│   ├── assets/inertia-app.js         # Vue 3 + Inertia bootstrap
 │   └── robots.txt
 └── db/migrate/
     ├── 001_create_todos.rb
     └── 001_create_todos.sql
-```
-
-## How the server speaks Inertia
-
-```ruby
-ASSETS_VERSION = '2'
-
-helpers do
-  def render_inertia(component, props)
-    page = { component: component, props: props,
-             url: request.fullpath, version: ASSETS_VERSION }
-    json = page.to_json
-
-    if inertia_request?
-      content_type 'application/json'
-      headers 'X-Inertia' => 'true', 'Vary' => 'X-Inertia'
-      return json
-    end
-
-    @page_json = json
-    erb :layout, layout: false
-  end
-
-  def inertia_request?
-    request.env['HTTP_X_INERTIA'] == 'true'
-  end
-end
-
-before do
-  if inertia_request? && request.env['HTTP_X_INERTIA_VERSION'] != ASSETS_VERSION
-    halt 409, { 'X-Inertia-Location' => request.fullpath }, ''
-  end
-end
-
-get '/' do
-  rows = db.execute('SELECT id, title, done FROM todos ORDER BY id')
-            .map { |r| { 'id' => r['id'], 'title' => r['title'], 'done' => r['done'].to_i == 1 } }
-  render_inertia('Todos', { todos: rows })
-end
-```
-
-## Layout (HTML side)
-
-```erb
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>Inertia × homura Todo</title>
-  <script type="importmap">
-  { "imports": {
-      "vue":              "https://esm.sh/vue@3.5.13/dist/vue.esm-browser.prod.js",
-      "@inertiajs/vue3":  "https://esm.sh/@inertiajs/vue3@1.3.0?deps=vue@3.5.13"
-  }}
-  </script>
-  <script type="module" src="/assets/inertia-app.js"></script>
-</head>
-<body>
-  <div id="app" data-page="<%= Rack::Utils.escape_html(@page_json) %>"></div>
-</body>
-</html>
-```
-
-`Rack::Utils.escape_html(@page_json)` is the only "trick" here — JSON
-naturally contains `"`, which would break the HTML attribute without
-escaping.
-
-## Client bootstrap (`public/assets/inertia-app.js`)
-
-```js
-import { createApp, h } from 'vue'
-import { createInertiaApp } from '@inertiajs/vue3'
-
-const Todos = {
-  props: ['todos'],
-  template: `<div class="page"> ... </div>`,
-  data() { return { title: '' } },
-  methods: {
-    submit() { this.$inertia.post('/todos', { title: this.title }, { onSuccess: () => this.title = '' }) },
-    toggle(id) { this.$inertia.post(`/todos/${id}/toggle`) },
-    del(id)    { this.$inertia.post(`/todos/${id}/delete`) }
-  }
-}
-
-createInertiaApp({
-  resolve: name => Promise.resolve({ Todos }[name]),  // Inertia v1 wants a Promise
-  setup({ el, App, props, plugin }) {
-    createApp({ render: () => h(App, props) }).use(plugin).mount(el)
-  }
-})
 ```
 
 ## Run it
@@ -147,33 +82,15 @@ bundle install
 npm install
 
 bundle exec rake db:migrate:local
-bundle exec rake build
-bundle exec rake dev
-# → http://inertia-todo.localhost:1355/
+npm run build
+npm run dev
 ```
 
-Test that the JSON path returns the right headers:
-
-```bash
-curl -sS -i -H 'X-Inertia: true' -H 'X-Inertia-Version: 2' \
-        http://inertia-todo.localhost:1355/
-
-# HTTP/1.1 200 OK
-# content-type: application/json
-# x-inertia: true
-# vary: X-Inertia
-#
-# {"component":"Todos","props":{"todos":[...]},"url":"/","version":"2"}
-```
-
-Then open the URL in a browser — adding, toggling, and deleting a todo
-all go through Inertia POSTs and update the page without a full reload.
+Then open `http://inertia-todo.localhost:1355/`.
 
 ## Deploy
 
 ```bash
-npx wrangler d1 create inertia-todo
-# paste the new database_id into wrangler.toml
 bundle exec rake db:migrate:remote
-bundle exec rake deploy
+npm run deploy
 ```

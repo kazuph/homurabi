@@ -7,16 +7,16 @@ require 'json'
 class App < Sinatra::Base
   register Sinatra::Inertia
 
-  set :inertia_version, ENV.fetch('ASSETS_VERSION', '3')
-  set :inertia_layout, :layout
+  set :page_version, ENV.fetch('ASSETS_VERSION', '3')
+  set :page_layout, :layout
   set :logging, false   # Rack::CommonLogger uses gsub! (not Opal-compatible)
   enable :sessions
   set :session_secret, ENV.fetch('SESSION_SECRET', 'a' * 64)
 
-  inertia_share do
+  share_props do
     {
       flash: flash_payload,
-      csrfToken: 'unused-here-but-demonstrates-always-prop'
+      csrfToken: csrf_token
     }
   end
 
@@ -36,6 +36,15 @@ class App < Sinatra::Base
           created_at: row[:created_at]
         }
       end
+    end
+
+    def todo_stats
+      all = db[:todos].all
+      {
+        total: all.size,
+        done: all.count { |r| r[:done].to_i == 1 },
+        pending: all.count { |r| r[:done].to_i == 0 }
+      }
     end
 
     def parse_body_params
@@ -67,17 +76,9 @@ class App < Sinatra::Base
   end
 
   get '/' do
-    inertia 'Todos/Index', props: {
-      todos: -> { todos },
-      stats: Inertia.defer(group: 'meta') {
-        all = db[:todos].all
-        {
-          total: all.size,
-          done: all.count { |r| r[:done].to_i == 1 },
-          pending: all.count { |r| r[:done].to_i == 0 }
-        }
-      }
-    }
+    render 'Todos/Index',
+           todos: -> { todos },
+           stats: defer(group: 'meta') { todo_stats }
   end
 
   post '/todos' do
@@ -91,7 +92,7 @@ class App < Sinatra::Base
     errors[:description] = 'description must be 200 chars or less' if description.length > 200
 
     unless errors.empty?
-      inertia_errors errors
+      page_errors errors
       # Re-render the same page with the previous values so the form is preserved.
       set_flash(values: { title: title, description: description })
       redirect to('/'), 303

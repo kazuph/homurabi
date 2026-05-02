@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.4 (2026-05-02)
+
+- Package the Rack vendor files in `homura-runtime` itself. The 0.3.3
+  release made Sinatra optional in the build path, but Rack-only apps
+  still needed `rack/request` through `homura/runtime/multipart`; that
+  worked from the monorepo checkout and failed from the published gem.
+
 ## 0.3.3 (2026-05-02)
 
 - Make standalone Rack-only builds work without `sinatra-homura` in the

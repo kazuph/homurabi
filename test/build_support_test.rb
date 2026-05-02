@@ -179,6 +179,8 @@ ok = assert('homura-runtime gemspec packages vendor shims') do
   raise 'missing vendor/digest.rb' unless spec.files.include?('vendor/digest.rb')
   raise 'missing vendor/cgi/escape.rb' unless spec.files.include?('vendor/cgi/escape.rb')
   raise 'missing vendor/rubygems/version.rb' unless spec.files.include?('vendor/rubygems/version.rb')
+  raise 'missing vendor/rack.rb' unless spec.files.include?('vendor/rack.rb')
+  raise 'missing vendor/rack/request.rb' unless spec.files.include?('vendor/rack/request.rb')
 end
 passed += 1 if ok
 failed += 1 unless ok

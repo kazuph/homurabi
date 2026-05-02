@@ -1,7 +1,7 @@
 # Examples
 
-Eleven fully-working applications built on the published [homura](../) gems.
-Each example is a standalone project: its `Gemfile` pins the four gems
+Twelve fully-working applications built on the published [homura](../) gems.
+Each example is a standalone project: its `Gemfile` pins released gems
 from RubyGems with no `path:` references back to the monorepo, so any
 of them can be copied out of this directory and shipped on its own.
 
@@ -15,6 +15,7 @@ idiom works the way the upstream docs say it does.
 | Example | Stack | Live | Highlights |
 |---|---|---|---|
 | [`sinatra/`](sinatra/) | Sinatra (single file) | <https://sinatra.kazu-san.workers.dev/> | The classic Sinatra README snippet: `require 'sinatra'` + `get '/frank-says'`. The shortest possible homura app. |
+| [`rack/`](rack/) | Rack only | <https://rack.kazu-san.workers.dev/> | Direct Rack response triples with `run ->(env) { ... }`; no Sinatra require. |
 | [`classic-top-sinatra/`](classic-top-sinatra/) | Sinatra (single file, JSON) | <https://classic-top-sinatra.kazu-san.workers.dev/> | Same shape as `sinatra/` but emits JSON via `content_type :json`. Dogfoods the classic top-level DSL across the build pipeline. |
 | [`sinatra-with-db/`](sinatra-with-db/) | Sinatra + D1 + Sequel | <https://sinatra-with-db.kazu-san.workers.dev/> | Smallest D1-backed Sinatra: `Sequel.connect(adapter: :d1, d1: env['cloudflare.DB'])`, one route, one migration. |
 | [`sinatra-with-email/`](sinatra-with-email/) | Sinatra + Cloudflare Email | <https://sinatra-with-email.kazu-san.workers.dev/> | Phase 17.5 auto-await demo — POST `/send` over the `SEND_EMAIL` Cloudflare Email binding, no `.__await__` in source. |
@@ -60,7 +61,7 @@ for the end-to-end flow. See [`auth-otp/README.md`](auth-otp/README.md).
 
 ## Shared conventions
 
-All six examples follow the same shape so they read like one another:
+The examples follow the same shape so they read like one another:
 
 ```
 example/
@@ -88,7 +89,7 @@ doesn't have to deal with the missing Workers filesystem.
 
 ## Why portless
 
-Running six wrangler dev processes simultaneously means six TCP ports
+Running several wrangler dev processes simultaneously means several TCP ports
 to remember. [`portless`](https://github.com/vercel-labs/portless)
 proxies them under stable subdomains (`http://todo.localhost:1355/`,
 `http://blog.localhost:1355/`, …) so cookies, links, and screenshots

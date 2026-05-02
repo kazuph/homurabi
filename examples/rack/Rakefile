@@ -1,0 +1,30 @@
+# frozen_string_literal: true
+
+task default: :build
+
+def run!(*argv)
+  ok = system(*argv)
+  exit 1 unless ok
+end
+
+def homura_build_script
+  spec = Gem::Specification.find_by_name('homura-runtime')
+  File.join(spec.full_gem_path, 'exe', 'homura-build')
+end
+
+desc 'Build the Worker bundle'
+task :build do
+  run!('bundle', 'exec', 'ruby', homura_build_script, '--standalone')
+end
+
+desc 'Start a local dev server through portless'
+task dev: :build do
+  app_name = File.basename(__dir__)
+  exec('portless', app_name, 'bash', '-c',
+       'exec npx wrangler dev --local --port=$PORT --ip 127.0.0.1')
+end
+
+desc 'Deploy to Cloudflare'
+task deploy: :build do
+  run!('npx', 'wrangler', 'deploy')
+end

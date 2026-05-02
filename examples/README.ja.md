@@ -2,8 +2,8 @@
 
 # Examples
 
-公開済みの [homura](../) gem 群の上に構築された、完全に動作する 11 個のアプリケーション。
-各 example は独立したプロジェクトであり、`Gemfile` は monorepo への `path:` 参照を使わず、4 つの gem を RubyGems から直接ピン留めしている。そのため、どの example もこのディレクトリからコピーアウトしてそのまま単独で出荷できる。
+公開済みの [homura](../) gem 群の上に構築された、完全に動作する 12 個のアプリケーション。
+各 example は独立したプロジェクトであり、`Gemfile` は monorepo への `path:` 参照を使わず、公開済み gem を RubyGems から直接ピン留めしている。そのため、どの example もこのディレクトリからコピーアウトしてそのまま単独で出荷できる。
 
 これらのアプリは最新の gem リリースの裏にある回帰テスト用フィクスチャでもある。4 つの gem が吸収する Workers/Opal の差異それぞれについて、標準的な Sinatra / Sequel / ERB のイディオムが上流ドキュメント通りに動くことを証明する example が少なくとも一つ存在する。
 
@@ -12,6 +12,7 @@
 | Example | スタック | Live | 特徴 |
 |---|---|---|---|
 | [`sinatra/`](sinatra/) | Sinatra（単一ファイル） | <https://sinatra.kazu-san.workers.dev/> | classic Sinatra README そのまま — `require 'sinatra'` + `get '/frank-says'`。homura で書ける最短アプリ。 |
+| [`rack/`](rack/) | Rack のみ | <https://rack.kazu-san.workers.dev/> | `run ->(env) { ... }` による直接 Rack response triple。Sinatra の require なし。 |
 | [`classic-top-sinatra/`](classic-top-sinatra/) | Sinatra（単一ファイル、JSON） | <https://classic-top-sinatra.kazu-san.workers.dev/> | `sinatra/` と同じ形だが `content_type :json` で JSON を返す。classic トップレベル DSL をビルドパイプライン全体で dogfood する。 |
 | [`sinatra-with-db/`](sinatra-with-db/) | Sinatra + D1 + Sequel | <https://sinatra-with-db.kazu-san.workers.dev/> | 最小の D1 付き Sinatra: `Sequel.connect(adapter: :d1, d1: env['cloudflare.DB'])`、ルート 1 個、マイグレーション 1 個。 |
 | [`sinatra-with-email/`](sinatra-with-email/) | Sinatra + Cloudflare Email | <https://sinatra-with-email.kazu-san.workers.dev/> | Phase 17.5 auto-await デモ — `SEND_EMAIL` Cloudflare Email バインディング越しの POST `/send`、ソース上に `.__await__` ゼロ。 |
@@ -53,7 +54,7 @@ bundle exec rake dev        # wrangler dev (portless が利用可能なら経由
 
 ## 共通の規約
 
-6 つの example はすべて同じ形を踏襲しており、互いに同じように読める構造になっている。
+各 example は同じ Rake インターフェイスを踏襲しており、互いに同じように読める構造になっている。
 
 ```
 example/
@@ -78,7 +79,7 @@ example/
 
 ## なぜ portless か
 
-6 つの wrangler dev プロセスを同時に走らせるということは、6 つの TCP ポートを覚えておく必要があるということだ。[`portless`](https://github.com/vercel-labs/portless) はそれらを安定したサブドメイン (`http://todo.localhost:1355/`、`http://blog.localhost:1355/`、…) の下にプロキシしてくれるので、wrangler がたまたまどのポートにバインドしようと、cookie もリンクもスクリーンショットもすべて有効なまま保たれる。各 example の `Rakefile` は portless がインストールされていればそれ経由で wrangler を起動する。インストールされていない場合は、`bundle exec rake dev` を素の `npx wrangler dev --local --port 8787` 呼び出しに置き換えればよい。
+複数の wrangler dev プロセスを同時に走らせるということは、複数の TCP ポートを覚えておく必要があるということだ。[`portless`](https://github.com/vercel-labs/portless) はそれらを安定したサブドメイン (`http://todo.localhost:1355/`、`http://blog.localhost:1355/`、…) の下にプロキシしてくれるので、wrangler がたまたまどのポートにバインドしようと、cookie もリンクもスクリーンショットもすべて有効なまま保たれる。各 example の `Rakefile` は portless がインストールされていればそれ経由で wrangler を起動する。インストールされていない場合は、`bundle exec rake dev` を素の `npx wrangler dev --local --port 8787` 呼び出しに置き換えればよい。
 
 ## これらの example をいじる
 

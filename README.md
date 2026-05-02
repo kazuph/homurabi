@@ -52,6 +52,26 @@ Cloudflare edge.
 
 ---
 
+## Rack-only quick start
+
+Sinatra is optional. A plain Rack app can run directly on the same
+Workers adapter:
+
+```ruby
+# config.ru
+run ->(env) {
+  [
+    200,
+    { 'content-type' => 'text/plain; charset=utf-8' },
+    ["Hello from Rack on Cloudflare Workers\n"]
+  ]
+}
+```
+
+See [`examples/rack/`](examples/rack/) for the deployed Rack-only fixture.
+
+---
+
 ## Why homura
 
 Cloudflare Workers does not run a Ruby VM. It runs JavaScript on V8, with
@@ -198,7 +218,7 @@ divergence from CRuby.
 
 ## Examples
 
-[`examples/`](examples/) contains eleven fully-working applications, each one
+[`examples/`](examples/) contains twelve fully-working applications, each one
 a standalone project that depends on the published gems only — no
 `path:` references back to the monorepo. They are also the regression
 fixtures behind the latest gem releases.
@@ -206,6 +226,7 @@ fixtures behind the latest gem releases.
 | Example | Live | What it shows |
 |---|---|---|
 | [`sinatra`](examples/sinatra/) | <https://sinatra.kazu-san.workers.dev/> | The classic Sinatra README snippet — `require 'sinatra'` + `get '/frank-says'`. Single `app.rb`, no D1, no views. |
+| [`rack`](examples/rack/) | <https://rack.kazu-san.workers.dev/> | Direct Rack response triples with `run ->(env) { ... }`; no Sinatra require. |
 | [`classic-top-sinatra`](examples/classic-top-sinatra/) | <https://classic-top-sinatra.kazu-san.workers.dev/> | Same shape as `sinatra` but with `content_type :json` + a JSON route, to dogfood the classic top-level DSL. |
 | [`sinatra-with-db`](examples/sinatra-with-db/) | <https://sinatra-with-db.kazu-san.workers.dev/> | Smallest D1-backed Sinatra: `Sequel.connect(adapter: :d1, d1: env['cloudflare.DB'])`, one route, one migration. |
 | [`sinatra-with-email`](examples/sinatra-with-email/) | <https://sinatra-with-email.kazu-san.workers.dev/> | Phase 17.5 auto-await demo — POST `/send` over the `SEND_EMAIL` Cloudflare Email binding, no `.__await__` in source. |

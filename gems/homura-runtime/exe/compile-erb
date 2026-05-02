@@ -515,11 +515,9 @@ template_root = positional.find { |a| File.directory?(a) } || options[:input_dir
 write_file = !options[:stdout] && (positional.empty? || options[:output])
 out_path = options[:output]
 
-# An app with zero ERB templates (e.g. an example that builds HTML
-# inline with Ruby heredocs) is a valid case: still emit the registry
-# header + Sinatra dispatcher patch so `erb :foo` raises a clear error
-# at runtime instead of silently disappearing, and so the build
-# pipeline doesn't fail when there is nothing to compile.
+# An app with zero ERB templates is valid, including Rack-only apps
+# that do not ship sinatra-homura at all. Emit the empty registry, but
+# skip the Sinatra hook so `homura-runtime` remains Sinatra-free.
 if inputs.empty?
   warn "compile-erb: no .erb files under #{options[:input_dir]}/ — writing empty registry"
 end
@@ -529,11 +527,11 @@ if write_file
   File.open(out_path, 'w') do |io|
     emit_header(io, namespace)
     emit_templates(io, inputs, namespace, template_root)
-    emit_sinatra_patch(io, namespace)
+    emit_sinatra_patch(io, namespace) unless inputs.empty?
   end
   warn "compile-erb: wrote #{out_path} (#{inputs.size} templates)"
 else
   emit_header($stdout, namespace)
   emit_templates($stdout, inputs, namespace, template_root)
-  emit_sinatra_patch($stdout, namespace)
+  emit_sinatra_patch($stdout, namespace) unless inputs.empty?
 end

@@ -151,8 +151,8 @@ File.open(out_path, 'w') do |io|
 
   io.puts <<~RUBY
 
-    # Auto-install the middleware on Sinatra::Base if Sinatra is loaded.
-    if defined?(::Sinatra::Base)
+    # Auto-install the middleware on Sinatra::Base if a real Sinatra app is loaded.
+    if defined?(::Sinatra::Base) && ::Sinatra::Base.respond_to?(:use)
       ::Sinatra::Base.use #{ns}::Middleware
     end
   RUBY

@@ -136,6 +136,26 @@ end
 passed += 1 if ok
 failed += 1 unless ok
 
+ok = assert('standalone load paths do not require sinatra-homura') do
+  Dir.mktmpdir do |dir|
+    runtime_root = File.join(dir, 'runtime')
+    app_root = File.join(dir, 'app')
+    [runtime_root, app_root].each { |path| FileUtils.mkdir_p(path) }
+    FileUtils.mkdir_p(File.join(runtime_root, 'vendor'))
+    specs = {
+      'homura-runtime' => FakeSpec.new(runtime_root)
+    }
+
+    load_paths = HomuraRuntime::BuildSupport.standalone_load_paths(app_root, with_db: false, loaded_specs: specs)
+    runtime_vendor = File.join(runtime_root, 'vendor')
+    runtime_lib = File.join(runtime_root, 'lib')
+    raise "missing #{runtime_vendor}" unless load_paths.include?(runtime_vendor)
+    raise "missing #{runtime_lib}" unless load_paths.include?(runtime_lib)
+  end
+end
+passed += 1 if ok
+failed += 1 unless ok
+
 ok = assert('derives standalone namespaces from project name') do
   templates = HomuraRuntime::BuildSupport.standalone_namespace('/tmp/demo-app', 'Templates')
   assets = HomuraRuntime::BuildSupport.standalone_namespace('/tmp/demo-app', 'Assets')

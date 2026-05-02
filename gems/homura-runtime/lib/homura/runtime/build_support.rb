@@ -39,6 +39,23 @@ module HomuraRuntime
         nil
       end
 
+      def maybe_gem_lib(name, loaded_specs: Gem.loaded_specs)
+        spec = loaded_spec(name, loaded_specs: loaded_specs)
+        return nil unless spec
+
+        File.join(spec.full_gem_path, 'lib')
+      end
+
+      def maybe_gem_vendor(name, loaded_specs: Gem.loaded_specs)
+        spec = loaded_spec(name, loaded_specs: loaded_specs)
+        return nil unless spec
+
+        vendor = File.join(spec.full_gem_path, 'vendor')
+        return vendor if Dir.exist?(vendor)
+
+        nil
+      end
+
       def runtime_file(*names, current_file: __FILE__, loaded_specs: Gem.loaded_specs)
         runtime_root(current_file: current_file, loaded_specs: loaded_specs).join('runtime', *names)
       end
@@ -71,8 +88,8 @@ module HomuraRuntime
         [
           gem_lib(RUNTIME_GEM_NAME, loaded_specs: loaded_specs),
           gem_vendor(RUNTIME_GEM_NAME, loaded_specs: loaded_specs),
-          gem_lib(SINATRA_GEM_NAME, loaded_specs: loaded_specs),
-          gem_vendor(SINATRA_GEM_NAME, loaded_specs: loaded_specs)
+          maybe_gem_lib(SINATRA_GEM_NAME, loaded_specs: loaded_specs),
+          maybe_gem_vendor(SINATRA_GEM_NAME, loaded_specs: loaded_specs)
         ].compact.each do |path|
           load_paths << path
         end

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.3 (2026-05-02)
+
+- Make standalone Rack-only builds work without `sinatra-homura` in the
+  bundle. `BuildSupport.standalone_load_paths` now treats Sinatra load
+  paths as optional while keeping the existing Sinatra app path unchanged.
+- Keep generated empty ERB registries Sinatra-free. Apps with no `.erb`
+  templates no longer emit the Sinatra ERB hook, so a Rack-only app can
+  compile with `homura-runtime` alone.
+- Guard static-asset middleware auto-installation so the generated asset
+  bundle only calls `Sinatra::Base.use` when a real Sinatra app is loaded.
+
 ## 0.3.2 (2026-04-30)
 
 - README: replace the leftover `require 'cloudflare_workers'` line and

@@ -2,8 +2,8 @@
 
 A Sinatra extension that implements the full **Inertia.js v2** wire protocol —
 page-object responses, version-mismatch detection, partial reloads,
-deferred / lazy / always / optional / merge / once props, encrypted history,
-303 redirect promotion, and error/flash session sweeps.
+deferred / lazy / always / optional / merge props, encrypted history, 303
+redirect promotion, and error/flash session sweeps.
 
 Pure Sinatra-compatible: depends only on `sinatra` and `rack`. Runs on
 MRI Ruby and on the [homura](https://github.com/kazuph/homura) Cloudflare
@@ -13,11 +13,12 @@ Workers + Opal stack.
 
 Two principles drove the API:
 
-1. **Sinatra慣習に乗る.** Rendering a page is `inertia 'Component', props: {...}` —
-   the same shape as Sinatra's `erb :index`. A `render inertia: 'Component'`
-   alias is also provided for Rails refugees.
-2. **Class-level config uses `set` and `inertia_share do ... end`,**
-   matching Sinatra's existing DSL surface (`set :views`, `helpers do … end`).
+1. **Routes render pages.** Application code should read like ordinary
+   Sinatra: `render 'Pages/Show', record: record`. The Inertia protocol stays
+   in the extension.
+2. **Class-level config uses Sinatra nouns.** Use `set :page_version`,
+   `set :page_layout`, and `share_props do ... end`. The older `inertia_*`
+   names still work for existing apps.
 
 ## Installation
 
@@ -33,10 +34,12 @@ gem 'sinatra-inertia'
 require 'sinatra'
 require 'sinatra/inertia'
 
-set :inertia_version, -> { ENV.fetch('ASSETS_VERSION', '1') }
+register Sinatra::Inertia
+
+set :page_version, -> { ENV.fetch('ASSETS_VERSION', '1') }
 
 get '/' do
-  inertia 'Pages/Hello', props: { name: 'world' }
+  render 'Pages/Hello', name: 'world'
 end
 ```
 
@@ -61,42 +64,49 @@ end
 
 | helper | purpose |
 |---|---|
-| `inertia(component, props:, layout:)` | Render an Inertia response (HTML on first hit, JSON on Inertia visit). |
-| `render(inertia: 'Comp', props: {...})` | Rails-style alias for the above. |
-| `inertia_request?` | True when `X-Inertia: true` header is present. |
-| `inertia_errors(payload = nil)` | Read or write validation errors that survive one redirect. |
-| `inertia_clear_history!` | Mark the next response's history as cleared. |
-| `inertia_encrypt_history!` | Mark the next response's history as encrypted. |
+| `render 'Comp', props_hash` | Render an Inertia response (HTML on first hit, JSON on Inertia visit). |
+| `render 'Comp', key: value` | Keyword-prop form of the same page render. |
+| `page_request?` | True when `X-Inertia: true` header is present. |
+| `page_errors(payload = nil)` | Read or write validation errors that survive one redirect. |
+| `clear_history!` | Mark the next response's history as cleared. |
+| `encrypt_history!` | Mark the next response's history as encrypted. |
+| `always`, `defer`, `optional`, `lazy`, `merge` | Prop wrappers for Inertia v2 transport modes. |
+
+Compatibility aliases remain available: `inertia`, `render(inertia: ...)`,
+`inertia_request?`, `inertia_errors`, `inertia_clear_history!`,
+`inertia_encrypt_history!`, and `Inertia.defer` / `Inertia.merge` / etc.
 
 ### Class-level DSL
 
 | DSL | purpose |
 |---|---|
-| `set :inertia_version, -> { ... }` | Asset version. Mismatch on Inertia GET → 409 + `X-Inertia-Location`. |
-| `set :inertia_layout, :layout` | ERB layout used for full-page rendering (default `:layout`). |
+| `set :page_version, -> { ... }` | Asset version. Mismatch on Inertia GET → 409 + `X-Inertia-Location`. |
+| `set :page_layout, :layout` | ERB layout used for full-page rendering (default `:layout`). |
 | `set :inertia_encrypt_history, true` | Default `encryptHistory: true` on every page. |
-| `inertia_share do … end` | Block whose return Hash is merged into every page's props. |
+| `share_props do … end` | Block whose return Hash is merged into every page's props. |
+
+Compatibility aliases remain available: `set :inertia_version`,
+`set :inertia_layout`, and `inertia_share do ... end`.
 
 ### Prop wrappers (Inertia v2 transport modes)
 
 ```ruby
-inertia 'Page', props: {
+render 'Page',
   todos:  -> { Todo.all },                        # plain lazy
-  csrf:   Inertia.always { csrf_token },          # always sent
-  stats:  Inertia.defer(group: 'meta') { stats }, # excluded from initial response
-  filter: Inertia.optional { params[:f] },        # only on partial-reload request
-  feed:   Inertia.merge(page_items)               # client-side array merge
-}
+  csrf:   always { csrf_token },                  # always sent
+  stats:  defer(group: 'meta') { stats },         # excluded from initial response
+  filter: optional { params[:f] },                # only on partial-reload request
+  feed:   merge(page_items)                       # client-side array merge
 ```
 
 | wrapper | semantics |
 |---|---|
 | bare `Proc`/`->` | resolved every request when included; partial-reload aware. |
-| `Inertia.always { … }` | always included, even on partials that omit it. |
-| `Inertia.defer(group:) { … }` | excluded on initial visit; client refetches in second roundtrip. |
-| `Inertia.optional { … }` | only resolved when explicitly requested via `X-Inertia-Partial-Data`. |
-| `Inertia.lazy { … }` | alias of `optional` (Inertia v1 name). |
-| `Inertia.merge(value)` | sent as a merge prop (`mergeProps` array on page object). Honours `X-Inertia-Reset: prop1,prop2` (Inertia 2.0) — reset props are emitted as plain values and dropped from `mergeProps`. |
+| `always { … }` | always included, even on partials that omit it. |
+| `defer(group:) { … }` | excluded on initial visit; client refetches in second roundtrip. |
+| `optional { … }` | only resolved when explicitly requested via `X-Inertia-Partial-Data`. |
+| `lazy { … }` | alias of `optional` (Inertia v1 name). |
+| `merge(value)` | sent as a merge prop (`mergeProps` array on page object). Honours `X-Inertia-Reset: prop1,prop2` (Inertia 2.0) — reset props are emitted as plain values and dropped from `mergeProps`. |
 
 ## Protocol features
 
@@ -110,9 +120,9 @@ inertia 'Page', props: {
   303 so the browser follows with GET.
 * **Partial reloads** — `X-Inertia-Partial-Component` + `X-Inertia-Partial-Data`
   / `X-Inertia-Partial-Except` headers narrow which props are resolved.
-* **Encrypted history / clear history** — set per-app via setting or
-  per-route via `inertia_encrypt_history!` / `inertia_clear_history!`.
-* **Errors session** — `inertia_errors(field: 'msg')` survives one redirect
+* **Encrypted history / clear history** — set per-app via setting or per-route
+  via `encrypt_history!` / `clear_history!`.
+* **Errors session** — `page_errors(field: 'msg')` survives one redirect
   and is automatically swept on render.
 
 ## Validation pattern (no 422, no client state)
@@ -120,7 +130,7 @@ inertia 'Page', props: {
 ```ruby
 post '/todos' do
   if params[:title].to_s.strip.empty?
-    inertia_errors title: "can't be blank"
+    page_errors title: "can't be blank"
     redirect back  # 303 by middleware; Inertia client follows
   else
     Todo.create(params)
@@ -129,10 +139,9 @@ post '/todos' do
 end
 
 get '/' do
-  inertia 'Todos/Index', props: {
+  render 'Todos/Index',
     todos: Todo.all,
     values: { title: params[:title] }
-  }
 end
 ```
 

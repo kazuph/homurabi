@@ -13,8 +13,7 @@ module Sinatra
     #     stats:  Inertia.defer { compute_stats } # excluded from initial response, fetched in 2nd request
     #     csrf:   Inertia.always { csrf_token }   # included even on partial reloads that omit it
     #     filter: Inertia.optional { params[:f] } # only included when explicitly requested via partial
-    #     feed:   Inertia.merge(page_items)       # array merged with existing client-side feed
-    #     once:   Inertia.once { current_time }   # delivered exactly once; subsequent visits suppress
+    #     feed:   merge(page_items)               # array merged with existing client-side feed
     #   }
     class Prop
       attr_reader :block, :value, :group
@@ -45,8 +44,6 @@ module Sinatra
       # existing array (Inertia 2 merge semantics)?
       def merge? = false
 
-      # Once-only delivery (cleared from session/state after first emission).
-      def once? = false
     end
 
     class AlwaysProp < Prop

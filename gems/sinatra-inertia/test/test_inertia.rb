@@ -247,6 +247,82 @@ class InertiaProtocolTest < Minitest::Test
     end
   end
 
+  def test_render_component_with_kwargs_is_the_page_api
+    a = make_app do
+      get('/ideal') do
+        render 'Ideal/Page',
+               todos: -> { ['ship'] },
+               stats: defer(group: 'meta') { { total: 1 } }
+      end
+    end
+    with(a) do
+      header 'X-Inertia', 'true'
+      header 'X-Inertia-Version', '1'
+      get '/ideal'
+      page = JSON.parse(last_response.body)
+      assert_equal 'Ideal/Page', page['component']
+      assert_equal({ 'todos' => ['ship'] }, page['props'])
+      assert_equal({ 'meta' => ['stats'] }, page['deferredProps'])
+    end
+  end
+
+  def test_share_props_is_the_recommended_shared_props_dsl
+    a = make_app do
+      share_props { { auth: { user: 'Ruby' } } }
+      get('/') { render 'Page', foo: 'bar' }
+    end
+    with(a) do
+      header 'X-Inertia', 'true'
+      header 'X-Inertia-Version', '1'
+      get '/'
+      page = JSON.parse(last_response.body)
+      assert_equal 'bar', page['props']['foo']
+      assert_equal 'Ruby', page['props']['auth']['user']
+    end
+  end
+
+  def test_page_version_setting_drives_protocol_version
+    a = make_app do
+      set :page_version, -> { 'page-v2' }
+      get('/') { render 'Page' }
+    end
+    with(a) do
+      header 'X-Inertia', 'true'
+      header 'X-Inertia-Version', 'page-v2'
+      get '/'
+      page = JSON.parse(last_response.body)
+      assert_equal 'page-v2', page['version']
+    end
+  end
+
+  def test_page_error_and_history_helpers_alias_protocol_helpers
+    a = make_app do
+      put '/save' do
+        page_errors title: 'is required'
+        redirect '/form'
+      end
+      get '/form' do
+        clear_history!
+        encrypt_history!
+        render 'Form'
+      end
+    end
+    with(a) do
+      header 'X-Inertia', 'true'
+      header 'X-Inertia-Version', '1'
+      put '/save'
+      assert_equal 303, last_response.status
+
+      header 'X-Inertia', 'true'
+      header 'X-Inertia-Version', '1'
+      follow_redirect!
+      page = JSON.parse(last_response.body)
+      assert_equal({ 'title' => 'is required' }, page['props']['errors'])
+      assert_equal true, page['clearHistory']
+      assert_equal true, page['encryptHistory']
+    end
+  end
+
   def test_errors_session_sweeps_after_one_render
     a = make_app do
       put '/save' do

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.4 — 2026-05-03
+
+- Add the recommended Sinatra-native page API: `render 'Component', props`,
+  `share_props`, `set :page_version`, `set :page_layout`, and route helpers
+  `defer`, `always`, `optional`, `lazy`, `merge`, `page_errors`,
+  `clear_history!`, and `encrypt_history!`.
+- Keep existing `inertia_*` helpers/settings and `Inertia.*` prop wrappers
+  working for compatibility.
+
 ## 0.1.3 — 2026-04-29
 
 - `lib/sinatra/inertia/async_sources.rb` registers under

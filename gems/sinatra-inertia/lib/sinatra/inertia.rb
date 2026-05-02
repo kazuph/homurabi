@@ -16,22 +16,23 @@ module Sinatra
   #   class App < Sinatra::Base
   #     register Sinatra::Inertia
   #
-  #     set :inertia_version, -> { ASSETS_VERSION }
-  #     set :inertia_layout,  :layout
+  #     set :page_version, -> { ASSETS_VERSION }
+  #     set :page_layout,  :layout
   #
-  #     inertia_share do
+  #     share_props do
   #       { auth: { user: current_user }, flash: flash_payload }
   #     end
   #
   #     get '/' do
-  #       inertia 'Todos/Index', props: { todos: -> { Todo.all } }
+  #       render 'Todos/Index', todos: -> { Todo.all }
   #     end
   #   end
   #
   # See README.md for the full feature matrix.
   module Inertia
     def self.registered(app)
-      # Default settings — consumers override with `set :inertia_*` in app.
+      # Default settings. `page_*` is the recommended application-facing API;
+      # `inertia_*` remains supported for existing apps and lower-level tuning.
       app.set :inertia_version, '1' unless app.respond_to?(:inertia_version)
       app.set :inertia_layout,  :layout unless app.respond_to?(:inertia_layout)
       app.set :inertia_encrypt_history, false unless app.respond_to?(:inertia_encrypt_history)
@@ -47,13 +48,24 @@ module Sinatra
       end
 
       # Mount protocol middleware (version mismatch + 303 redirect promotion).
-      app.use Sinatra::Inertia::Middleware, version: -> { app.settings.inertia_version }
+      app.use Sinatra::Inertia::Middleware, version: lambda {
+        version = if app.settings.respond_to?(:page_version)
+                    app.settings.page_version
+                  else
+                    app.settings.inertia_version
+                  end
+        version.respond_to?(:call) ? version.call.to_s : version.to_s
+      }
 
-      # Class-level DSL: `inertia_share { ... }` registers a block whose
-      # return value is merged into every page's `props.shared` payload.
+      # Class-level DSL: `share_props { ... }` registers a block whose return
+      # value is merged into every page's props.
       app.define_singleton_method(:inertia_share) do |&block|
         raise ArgumentError, 'inertia_share requires a block' unless block
         settings.inertia_share_blocks = settings.inertia_share_blocks + [block]
+      end
+
+      app.define_singleton_method(:share_props) do |&block|
+        inertia_share(&block)
       end
 
       app.helpers Sinatra::Inertia::Helpers
@@ -72,4 +84,3 @@ end
 # overwrite an existing `::Inertia` constant — if your app has one, use
 # `Sinatra::Inertia.defer` instead.
 ::Inertia = Sinatra::Inertia unless defined?(::Inertia)
-

@@ -10,7 +10,7 @@ module Sinatra
     module Helpers
       # Render an Inertia response.
       #
-      #   inertia 'Todos/Index', props: { todos: -> { Todo.all } }
+      #   render 'Todos/Index', todos: -> { Todo.all }
       #
       # Layout selection: the configured layout (default `:layout`) is
       # rendered for full HTML responses. The view receives `@page_json`
@@ -18,7 +18,7 @@ module Sinatra
       # attribute) and `@page` (the underlying Hash, useful for SSR or
       # custom rendering).
       def inertia(component, props: {}, layout: nil)
-        layout = settings.respond_to?(:inertia_layout) ? settings.inertia_layout : :layout if layout.nil?
+        layout = current_page_layout if layout.nil?
 
         version = current_inertia_version
         shared = current_inertia_shared
@@ -72,7 +72,9 @@ module Sinatra
         erb layout, layout: false
       end
 
-      # Rails-flavored alias: `render inertia: 'Component', props: {...}`
+      # Natural page-rendering API: `render 'Component', props_hash`.
+      # `render inertia: 'Component', props: {...}` remains available for
+      # existing apps, while non-page render calls still delegate to Sinatra.
       # We must preserve Sinatra's `render(engine, data = nil, options = {}, locals = {}, &block)`
       # signature for the non-inertia path, so we forward *args/**kwargs.
       def render(*args, **kwargs, &block)
@@ -81,6 +83,14 @@ module Sinatra
           inertia(first[:inertia], props: first[:props] || {}, layout: first[:layout])
         elsif kwargs.key?(:inertia) && args.empty?
           inertia(kwargs[:inertia], props: kwargs[:props] || {}, layout: kwargs[:layout])
+        elsif first.is_a?(String) && args.length <= 2 && (args.length == 1 || args[1].is_a?(Hash))
+          layout = kwargs.delete(:layout)
+          props = {}
+          props.merge!(args[1]) if args[1].is_a?(Hash)
+          explicit_props = kwargs.delete(:props)
+          props.merge!(explicit_props) if explicit_props.is_a?(Hash)
+          props.merge!(kwargs)
+          inertia(first, props: props, layout: layout)
         else
           super(*args, **kwargs, &block)
         end
@@ -88,6 +98,10 @@ module Sinatra
 
       def inertia_request?
         request.env['HTTP_X_INERTIA'] == 'true'
+      end
+
+      def page_request?
+        inertia_request?
       end
 
       # CSRF token for the current request. Mounted by CSRFMiddleware
@@ -99,6 +113,26 @@ module Sinatra
       # mainly for hidden-field forms or non-XHR submissions.
       def csrf_token
         request.env['sinatra.inertia.csrf_token']
+      end
+
+      def always(value = nil, &block)
+        Sinatra::Inertia.always(value, &block)
+      end
+
+      def defer(group: 'default', &block)
+        Sinatra::Inertia.defer(group: group, &block)
+      end
+
+      def optional(&block)
+        Sinatra::Inertia.optional(&block)
+      end
+
+      def lazy(&block)
+        Sinatra::Inertia.lazy(&block)
+      end
+
+      def merge(value = nil, &block)
+        Sinatra::Inertia.merge(value, &block)
       end
 
       # ------------------------------------------------------------------
@@ -119,7 +153,11 @@ module Sinatra
       # ------------------------------------------------------------------
       # Asset version
       def current_inertia_version
-        v = settings.respond_to?(:inertia_version) ? settings.inertia_version : nil
+        v = if settings.respond_to?(:page_version)
+              settings.page_version
+            elsif settings.respond_to?(:inertia_version)
+              settings.inertia_version
+            end
         v.respond_to?(:call) ? v.call.to_s : v.to_s
       end
 
@@ -137,12 +175,24 @@ module Sinatra
         end
       end
 
+      def page_errors(payload = nil)
+        inertia_errors(payload)
+      end
+
       def inertia_clear_history!
         @inertia_clear_history = true
       end
 
+      def clear_history!
+        inertia_clear_history!
+      end
+
       def inertia_encrypt_history!(flag = true)
         @inertia_encrypt_history_override = flag
+      end
+
+      def encrypt_history!(flag = true)
+        inertia_encrypt_history!(flag)
       end
 
       def inertia_errors_payload
@@ -166,6 +216,16 @@ module Sinatra
       end
 
       private
+
+      def current_page_layout
+        if settings.respond_to?(:page_layout)
+          settings.page_layout
+        elsif settings.respond_to?(:inertia_layout)
+          settings.inertia_layout
+        else
+          :layout
+        end
+      end
 
       def deep_merge(a, b)
         a.merge(b) do |_k, av, bv|

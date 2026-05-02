@@ -6,8 +6,8 @@ main = "build/worker.entrypoint.mjs"
 compatibility_date = "2026-04-15"
 compatibility_flags = ["nodejs_compat"]
 
-# Phase 3: D1 / KV / R2 bindings reachable from Sinatra routes via
-# `env['cloudflare.env'].DB` / `.KV` / `.BUCKET`.
+# Phase 3: D1 / KV / R2 bindings are reachable from Sinatra routes via
+# Ruby helpers (`db` / `d1`, `kv`, `bucket`).
 
 [[d1_databases]]
 binding = "DB"
@@ -32,7 +32,7 @@ bucket_name = "homura-bucket"
 preview_bucket_name = "homura-r2-remote-preview"
 
 # Phase 10: Workers AI binding. Routes reach this from Ruby as
-# `env['cloudflare.AI']` and pass it to `Cloudflare::AI.run(model, …)`.
+# `ai.run(model, messages: [...])`.
 # The binding name "AI" matches the Cloudflare convention; the runtime
 # implements env.AI.run(model, inputs, options) automatically once
 # wrangler dev / deploy attaches the AI gateway. No account-side
@@ -42,7 +42,7 @@ preview_bucket_name = "homura-r2-remote-preview"
 binding = "AI"
 
 # Phase 17 — Cloudflare Email Service (Agents Week 2026 public beta).
-# Routes use `env['cloudflare.SEND_EMAIL']` → Cloudflare::Email wrapping `env.SEND_EMAIL`.
+# Routes use `send_email` → Cloudflare::Email wrapping `env.SEND_EMAIL`.
 [[send_email]]
 name = "SEND_EMAIL"
 

@@ -4,5 +4,5 @@ ruby '>= 3.4.0'
 
 gem 'rake' # used by Rakefile (build / dev / deploy entry points)
 gem 'opal-homura', '= 1.8.3.rc1.5', require: 'opal'
-gem 'homura-runtime', '= 0.3.1'
-gem 'sinatra-homura', '= 0.3.0'
+gem 'homura-runtime', '= 0.3.5'
+gem 'sinatra-homura', '= 0.3.2'

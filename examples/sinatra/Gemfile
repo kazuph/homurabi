@@ -5,9 +5,5 @@ ruby '>= 3.4.0'
 
 gem 'rake' # used by Rakefile (build / dev / deploy entry points)
 gem 'opal-homura', '= 1.8.3.rc1.5', require: 'opal'
-gem 'homura-runtime', '= 0.3.1'
-gem 'sinatra-homura', '= 0.3.0'
-
-# Mode B — standalone: `gem build` each gem, then `gem install --local` in a clean dir (order: opal-homura → runtime → sinatra),
-# or keep `path:` pointing at a git worktree that contains `vendor/opal-gem` and `gems/*` (remove stray `*.gem` under
-# `vendor/opal-gem` before `bundle install` — a built `.gem` must not sit inside the path gem tree).
+gem 'homura-runtime', '= 0.3.5'
+gem 'sinatra-homura', '= 0.3.2'

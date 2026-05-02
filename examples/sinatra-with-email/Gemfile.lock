@@ -3,7 +3,7 @@ GEM
   specs:
     ast (2.4.3)
     base64 (0.3.0)
-    homura-runtime (0.3.1)
+    homura-runtime (0.3.5)
       opal-homura (= 1.8.3.rc1.5)
       parser (~> 3.3)
     opal-homura (1.8.3.rc1.5)
@@ -15,18 +15,18 @@ GEM
       racc
     racc (1.8.1)
     rake (13.4.2)
-    sinatra-homura (0.3.0)
-      homura-runtime (~> 0.3)
+    sinatra-homura (0.3.2)
+      homura-runtime (>= 0.3.5, < 0.4)
       opal-homura (= 1.8.3.rc1.5)
 
 PLATFORMS
   arm64-darwin-25
 
 DEPENDENCIES
-  homura-runtime (= 0.3.1)
+  homura-runtime (= 0.3.5)
   opal-homura (= 1.8.3.rc1.5)
   rake
-  sinatra-homura (= 0.3.0)
+  sinatra-homura (= 0.3.2)
 
 RUBY VERSION
    ruby 3.4.9p82

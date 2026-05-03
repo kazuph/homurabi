@@ -18,7 +18,7 @@ end</code></pre>
 <p>Rake 連携例は <code>gems/sinatra-homura/templates/Rakefile.example</code> を参照。</p>
 
 <h2 id="jwt">JWT（Sinatra::JwtAuth）</h2>
-<p>ヘッダ <code>Authorization: Bearer …</code> を検証し、<code>authenticate!</code> で 401 を返せます。トークン検証内部は <code>JWT.decode(...).__await__</code> を利用（<code>sinatra/jwt_auth.rb</code>）。</p>
+<p>ヘッダ <code>Authorization: Bearer …</code> を検証し、<code>authenticate!</code> で 401 を返せます。トークン検証の runtime 境界は gem 側で吸収されるため、アプリコードは通常の Sinatra helper として扱えます。</p>
 
 <h2 id="scheduled">Cron（Sinatra::Scheduled）</h2>
 <pre><code>register Sinatra::Scheduled

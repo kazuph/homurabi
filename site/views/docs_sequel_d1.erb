@@ -28,7 +28,7 @@ bundle exec homura db:migrate:apply --remote --database homura-db</code></pre>
   <thead><tr><th></th><th>できること</th><th>できないこと</th></tr></thead>
   <tbody>
     <tr><td>SQL</td><td>SQLite 方言で D1 に送る（<code>Dataset#sql</code> で確認可能）</td><td>PostgreSQL 専用方言をそのまま</td></tr>
-    <tr><td>非同期</td><td><code>Dataset#all</code> 等は Promise → <code>__await__</code> で解決</td><td>同期 MRI と同じ「常に Array」前提</td></tr>
+    <tr><td>非同期</td><td><code>Dataset#all</code> 等は auto-await が Ruby の同期形に寄せる</td><td>dynamic dispatch で receiver の型を隠す書き方</td></tr>
     <tr><td>マイグレーション</td><td>Ruby マイグレーションを SQL にコンパイルして apply</td><td>AR の schema.rb をそのまま流用</td></tr>
   </tbody>
 </table>

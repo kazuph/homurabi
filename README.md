@@ -93,9 +93,10 @@ homura is the glue that closes that gap:
   `durable_object(:counter, 'global')`.
 - **Ordinary distribution** — four gems on RubyGems. No `path:`,
   no submodules, no clone of homura required.
-- **Async without ceremony** — the build step rewrites the `__await__`
-  calls Workers needs into the obvious sync-looking source you'd write on
-  CRuby. `db.execute(...)` reads like sqlite3-ruby, not like a coroutine.
+- **Async without ceremony** — the build step absorbs Workers' promise-shaped
+  binding calls so user source stays sync-looking, like the Ruby you would
+  write on CRuby. `db.execute(...)` reads like sqlite3-ruby, not like a
+  coroutine.
 
 If a stock Sinatra-on-Workers idiom doesn't behave the way Ruby developers
 expect, that is a bug in homura, not a quirk of the stack. The
@@ -230,7 +231,7 @@ fixtures behind the latest gem releases.
 | [`rack`](examples/rack/) | <https://rack.kazu-san.workers.dev/> | Direct Rack response triples with `run ->(env) { ... }`; no Sinatra require. |
 | [`classic-top-sinatra`](examples/classic-top-sinatra/) | <https://classic-top-sinatra.kazu-san.workers.dev/> | Same shape as `sinatra` but with `content_type :json` + a JSON route, to dogfood the classic top-level DSL. |
 | [`sinatra-with-db`](examples/sinatra-with-db/) | <https://sinatra-with-db.kazu-san.workers.dev/> | Smallest D1-backed Sinatra: `Sequel.connect(adapter: :d1, d1: d1)`, one route, one migration. |
-| [`sinatra-with-email`](examples/sinatra-with-email/) | <https://sinatra-with-email.kazu-san.workers.dev/> | Phase 17.5 auto-await demo — POST `/send` over the `SEND_EMAIL` Cloudflare Email binding, no `.__await__` in source. |
+| [`sinatra-with-email`](examples/sinatra-with-email/) | <https://sinatra-with-email.kazu-san.workers.dev/> | Phase 17.5 auto-await demo — POST `/send` over the `SEND_EMAIL` Cloudflare Email binding with sync-shaped Ruby source. |
 | [`todo-simple`](examples/todo-simple/) | <https://todo-simple.kazu-san.workers.dev/> | **The smallest stateful example.** One `app.rb`, no `views/`, no D1 — HTML written as Ruby heredocs. The thing to copy when "how little does homura need" is the question. |
 | [`todo`](examples/todo/) | <https://todo.kazu-san.workers.dev/> | D1-backed CRUD without an ORM — `db.execute` / `db.execute_insert` directly. |
 | [`todo-orm`](examples/todo-orm/) | <https://todo-orm.kazu-san.workers.dev/> | The same TODO app, this time through `sequel-d1`: migrations, dataset chains, `.first` / `.update`. |
@@ -268,9 +269,8 @@ to:
   branches so `update(done: Sequel.lit('1 - done'))` lands in
   `literal_literal_string_append`.
 - **Async at the edge.** D1 / KV / fetch are all promise-shaped. The
-  build pipeline runs an auto-await pass that inserts `__await__` for
-  registered async methods (`db.execute`, `kv.get`, `ai.run`,
-  …), so route bodies stay sync-shaped.
+  build pipeline runs an auto-await pass for registered async methods
+  (`db.execute`, `kv.get`, `ai.run`, …), so route bodies stay sync-shaped.
 
 If you find an idiom that should "just work" but does not, it belongs on
 this list. File an issue.

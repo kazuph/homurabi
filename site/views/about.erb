@@ -27,9 +27,8 @@
       <code>durable_object(:counter, 'global')</code>;
       cache reads/writes use the <code>Cloudflare::Cache</code> wrapper over
       <code>caches.default</code> / <code>caches.open</code>.</li>
-  <li>Phase 12.5 added Fiber-transparent <code>await</code>; most routes no
-      longer hand-roll <code>.__await__</code>. Edge cases that still need
-      explicit async can use <code># await: true</code> as before.</li>
+  <li>Phase 12.5 added Fiber-transparent async handling; most routes can stay
+      sync-shaped even when they touch Workers bindings.</li>
 </ul>
 
 <h2>Posts, login, and chat (Phase 14)</h2>

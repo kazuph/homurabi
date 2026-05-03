@@ -17,7 +17,7 @@
 <h2 id="steps">6 ステップ（推奨順）</h2>
 <ol>
   <li><strong>Gemfile</strong>: <code>opal-homura</code>（<code>require: 'opal'</code>）、<code>homura-runtime</code>、<code>sinatra-homura</code> を追加。D1 を使うなら <code>sequel-d1</code> も追加します。</li>
-  <li><strong>エントリ</strong>: <code>app.rb</code>（またはメイン定義ファイル）の <code>require 'sinatra'</code>（classic）または <code>require 'sinatra/base'</code>（modular）はそのまま。Cloudflare 専用の <code>require</code> に差し替える必要はありません — <code>sinatra-homura</code> が Sinatra のエントリポイント上で Workers ランタイムを自動配線します。<code>__await__</code> 周りは <code>homura build</code> の auto-await が自動的に挿入するので、<code># await:</code> マジックコメントの手書きは原則不要です。</li>
+  <li><strong>エントリ</strong>: <code>app.rb</code>（またはメイン定義ファイル）の <code>require 'sinatra'</code>（classic）または <code>require 'sinatra/base'</code>（modular）はそのまま。Cloudflare 専用の <code>require</code> に差し替える必要はありません — <code>sinatra-homura</code> が Sinatra のエントリポイント上で Workers ランタイムを自動配線します。Cloudflare binding 由来の async 境界は <code>homura build</code> の auto-await が吸収します。</li>
   <li><strong>ルート</strong>: 既存の <code>get</code> / <code>post</code> を可能な限りそのまま移植。Sinatra の DSL は互換パッチ側で吸収。</li>
   <li><strong>DB</strong>: <code>Sequel.connect(adapter: :d1, d1: d1)</code> の形へ。ORM なしなら <code>db.execute</code> / <code>db.execute_insert</code> を使います。マイグレーションは <code>bundle exec homura db:migrate:compile db/migrations</code> → <code>homura db:migrate:apply</code>（<code>sequel-d1</code> README 参照）。</li>
   <li><strong>ビュー</strong>: <code>bundle exec homura erb:compile --input views --output build/templates.rb --namespace …</code>（プロジェクトの Rake / npm に合わせる）。</li>
@@ -26,7 +26,7 @@
 
 <h2 id="gotchas">よくあるハマりポイント</h2>
 <ul>
-  <li><strong><code># await:</code></strong>: ルート内で <code>__await__</code> が必要なのにマジックコメントが無いと、Promise がそのまま残って 1101 等で落ちます。</li>
+  <li><strong>async 境界</strong>: dynamic dispatch や Hash 経由で binding を隠すと auto-await が推論しにくくなります。<code>db</code> / <code>kv</code> / <code>ai</code> / <code>durable_object</code> のような helper か、型が見える local 変数に出してください。</li>
   <li><strong>同期 FS</strong>: Workers ではリクエスト処理中の <code>File.read</code> は使えません。ERB／アセットはビルド時に埋め込み。</li>
   <li><strong>require パス</strong>: <code>vendor/</code> や gem <code>lib</code> を Opal の <code>-I</code> に載せる順序が重要（<code>sequel-d1</code> README のとおり <code>gems/sequel-d1/lib</code> を <code>vendor</code> より前）。</li>
   <li><strong>direct eval</strong>: Opal の制約へはビルド後 <code>patch-opal-evals.mjs</code> が自動適用（<code>homura build</code> パイプライン）。</li>

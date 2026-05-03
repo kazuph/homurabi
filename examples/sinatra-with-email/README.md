@@ -1,22 +1,10 @@
-# Sinatra with Email — Phase 17.5 Auto-Await Demo
+# Sinatra with Email
 
-This example shows the **Phase 17.5** user experience: you write plain
-Sinatra + Ruby, and the `homura build` pipeline automatically
-inserts `.__await__` where needed.
+This example shows the Workers Email binding from plain Sinatra + Ruby.
+The app source keeps the same synchronous shape you would expect from a
+small Sinatra endpoint.
 
-## What makes this different from pre-17.5
-
-**Before (manual await):**
-```ruby
-# await: send
-post '/send' do
-  mailer = Cloudflare::Email.new(env.SEND_EMAIL)
-  result = mailer.send(...).__await__
-  { ok: true }.to_json
-end
-```
-
-**After (Phase 17.5 — auto-await):**
+## Route shape
 ```ruby
 post '/send' do
   mailer = Cloudflare::Email.new(env.SEND_EMAIL)
@@ -25,17 +13,14 @@ post '/send' do
 end
 ```
 
-No `.__await__`. No `# await:` magic comment. Just Ruby.
-
 ## How it works
 
 1. `homura build` parses your Ruby files with the `parser` gem
 2. The `AsyncRegistry` knows that `env.SEND_EMAIL` returns a `Cloudflare::Email`
    binding, and that `Cloudflare::Email#send` is async
-3. The analyzer taints the receiver chain and inserts `.__await__` at the
-   exact call sites that need it
-4. Opal compiles the transformed source, which now contains the await
-   calls inside an async function wrapper
+3. The build output handles the Workers async boundary for the call sites
+   that need it
+4. Opal compiles the transformed source for the Worker runtime
 
 ## Prerequisites
 
@@ -63,8 +48,8 @@ curl http://127.0.0.1:8787/
 # Send an email (replace with your verified sender domain)
 curl -X POST http://127.0.0.1:8787/send \
   -d 'to=you@example.com' \
-  -d 'subject=Hello from Phase 17.5' \
-  -d 'text=No __await__ anywhere!'
+  -d 'subject=Hello from homura' \
+  -d 'text=Plain Sinatra source on Workers'
 ```
 
 ## Files

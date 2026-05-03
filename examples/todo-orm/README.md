@@ -76,9 +76,8 @@ class App < Sinatra::Base
 end
 ```
 
-`Dataset#all` and `Dataset#update` resolve asynchronously inside the
-Workers runtime; the build pipeline's auto-await pass inserts the
-required `__await__` calls so application code stays sync-shaped.
+`Dataset#all` and `Dataset#update` resolve through Workers async APIs at
+runtime; the build pipeline keeps the application code sync-shaped.
 
 ## Run it
 

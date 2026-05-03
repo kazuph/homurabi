@@ -1,4 +1,3 @@
-# await: all, call, fetch, get_first_row, open, run, sleep
 # frozen_string_literal: true
 
 require 'sinatra'

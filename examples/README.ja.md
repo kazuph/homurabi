@@ -15,7 +15,7 @@
 | [`rack/`](rack/) | Rack のみ | <https://rack.kazu-san.workers.dev/> | `run ->(env) { ... }` による直接 Rack response triple。Sinatra の require なし。 |
 | [`classic-top-sinatra/`](classic-top-sinatra/) | Sinatra（単一ファイル、JSON） | <https://classic-top-sinatra.kazu-san.workers.dev/> | `sinatra/` と同じ形だが `content_type :json` で JSON を返す。classic トップレベル DSL をビルドパイプライン全体で dogfood する。 |
 | [`sinatra-with-db/`](sinatra-with-db/) | Sinatra + D1 + Sequel | <https://sinatra-with-db.kazu-san.workers.dev/> | 最小の D1 付き Sinatra: `Sequel.connect(adapter: :d1, d1: d1)`、ルート 1 個、マイグレーション 1 個。 |
-| [`sinatra-with-email/`](sinatra-with-email/) | Sinatra + Cloudflare Email | <https://sinatra-with-email.kazu-san.workers.dev/> | Phase 17.5 auto-await デモ — `SEND_EMAIL` Cloudflare Email バインディング越しの POST `/send`、ソース上に `.__await__` ゼロ。 |
+| [`sinatra-with-email/`](sinatra-with-email/) | Sinatra + Cloudflare Email | <https://sinatra-with-email.kazu-san.workers.dev/> | `SEND_EMAIL` Cloudflare Email バインディング越しの POST `/send` を、通常の Ruby メソッド呼び出しとして書ける。 |
 | [`todo-simple/`](todo-simple/) | Sinatra（インメモリ） | <https://todo-simple.kazu-san.workers.dev/> | **最小のステートフル example。** `app.rb` 1 つ、`views/` なし、D1 なし — HTML はルートのすぐ隣の heredoc。状態を持つ最小構成を見たい時に。 |
 | [`todo/`](todo/) | Sinatra + D1 (ORM なし) | <https://todo.kazu-san.workers.dev/> | 最小の D1 CRUD。`db.execute` / `db.execute_insert` を直接利用 — Sequel なし。 |
 | [`todo-orm/`](todo-orm/) | Sinatra + D1 + Sequel | <https://todo-orm.kazu-san.workers.dev/> | 同じ TODO ドメインを `sequel-d1` 経由で実装。Datasets、`.first`、`.update(... Sequel.lit ...)`、マイグレーション DSL → wrangler 対応 SQL。 |
@@ -75,7 +75,7 @@ example/
 とその `cf-runtime/` グルーは別ディレクトリ `build/` に置かれる。`build/`
 は gitignore 対象なので、どちらもソース管理には現れない。
 
-`app/` と `views/` 配下の Ruby は、CRuby Sinatra で書くのとまったく同じ Ruby そのものだ。ビルドパイプラインが `__await__` 呼び出しを書き換え、ERB をプリコンパイルし、`public/` をビルド時に埋め込むので、ランタイムは Workers にファイルシステムが存在しないことを意識しなくて済む。
+`app/` と `views/` 配下の Ruby は、CRuby Sinatra で書くのとまったく同じ Ruby そのものだ。ビルドパイプラインが Workers の非同期バインディングを解決し、ERB をプリコンパイルし、`public/` をビルド時に埋め込むので、ランタイムは Workers にファイルシステムが存在しないことを意識しなくて済む。
 
 ## なぜ portless か
 

@@ -18,7 +18,7 @@ idiom works the way the upstream docs say it does.
 | [`rack/`](rack/) | Rack only | <https://rack.kazu-san.workers.dev/> | Direct Rack response triples with `run ->(env) { ... }`; no Sinatra require. |
 | [`classic-top-sinatra/`](classic-top-sinatra/) | Sinatra (single file, JSON) | <https://classic-top-sinatra.kazu-san.workers.dev/> | Same shape as `sinatra/` but emits JSON via `content_type :json`. Dogfoods the classic top-level DSL across the build pipeline. |
 | [`sinatra-with-db/`](sinatra-with-db/) | Sinatra + D1 + Sequel | <https://sinatra-with-db.kazu-san.workers.dev/> | Smallest D1-backed Sinatra: `Sequel.connect(adapter: :d1, d1: d1)`, one route, one migration. |
-| [`sinatra-with-email/`](sinatra-with-email/) | Sinatra + Cloudflare Email | <https://sinatra-with-email.kazu-san.workers.dev/> | Phase 17.5 auto-await demo — POST `/send` over the `SEND_EMAIL` Cloudflare Email binding, no `.__await__` in source. |
+| [`sinatra-with-email/`](sinatra-with-email/) | Sinatra + Cloudflare Email | <https://sinatra-with-email.kazu-san.workers.dev/> | POST `/send` over the `SEND_EMAIL` Cloudflare Email binding with ordinary Ruby method calls in source. |
 | [`todo-simple/`](todo-simple/) | Sinatra (in-memory) | <https://todo-simple.kazu-san.workers.dev/> | **The smallest stateful example.** One `app.rb`, no `views/`, no D1 — heredoc HTML right next to the routes. Use it when you want to see how little homura needs once you have state. |
 | [`todo/`](todo/) | Sinatra + D1 (no ORM) | <https://todo.kazu-san.workers.dev/> | Smallest D1 CRUD. `db.execute` / `db.execute_insert` directly — no Sequel. |
 | [`todo-orm/`](todo-orm/) | Sinatra + D1 + Sequel | <https://todo-orm.kazu-san.workers.dev/> | Same TODO domain through `sequel-d1`. Datasets, `.first`, `.update(... Sequel.lit ...)`, migration DSL → wrangler-ready SQL. |
@@ -83,7 +83,7 @@ the generated `worker.entrypoint.mjs` plus its `cf-runtime/` glue;
 `build/` is gitignored, so neither shows up in source control.
 
 The Ruby in `app/` and `views/` is exactly the Ruby you'd write on
-CRuby Sinatra. The build pipeline rewrites `__await__` calls,
+CRuby Sinatra. The build pipeline resolves Workers async bindings,
 precompiles ERB, and embeds `public/` at build time so the runtime
 doesn't have to deal with the missing Workers filesystem.
 

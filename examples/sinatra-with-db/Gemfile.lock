@@ -4,7 +4,7 @@ GEM
     ast (2.4.3)
     base64 (0.3.0)
     bigdecimal (4.1.2)
-    homura-runtime (0.3.5)
+    homura-runtime (0.3.6)
       opal-homura (= 1.8.3.rc1.5)
       parser (~> 3.3)
     opal-homura (1.8.3.rc1.5)
@@ -50,7 +50,7 @@ PLATFORMS
   x86_64-linux-musl
 
 DEPENDENCIES
-  homura-runtime (= 0.3.5)
+  homura-runtime (= 0.3.6)
   opal-homura (= 1.8.3.rc1.5)
   rake
   sequel-d1 (= 0.3.1)

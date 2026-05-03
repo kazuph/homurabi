@@ -18,7 +18,7 @@ end</code></pre>
 end
 </code></pre>
 
-<p>多くのケースで、ファイル先頭の magic comment やユーザー定義のメソッド名リストは不要になりました。推論不能なケース（metaprogramming、Hash 動的アクセスなど）は、明示的な wrapper/helper に切り出して型が見える形にするのが推奨です。</p>
+<p>多くのケースで、ユーザー定義のメソッド名リストや runtime 境界用の特別な記法は不要になりました。推論不能なケース（metaprogramming、Hash 動的アクセスなど）は、明示的な wrapper/helper に切り出して型が見える形にするのが推奨です。</p>
 
 <h2 id="registry">AsyncRegistry</h2>
 <p>gem 側で「これは async source」を宣言します:</p>

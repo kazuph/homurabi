@@ -79,9 +79,8 @@ class App < Sinatra::Base
 end
 ```
 
-`Dataset#all` と `Dataset#update` は Workers ランタイム内で非同期に解決される。
-ビルドパイプラインの auto-await パスが必要な `__await__` 呼び出しを挿入するので、
-アプリケーション側のコードは同期的な見た目のまま保てる。
+`Dataset#all` と `Dataset#update` は Workers ランタイム内では非同期 API を通る。
+ビルドパイプラインがその境界を処理するので、アプリケーション側のコードは同期的な見た目のまま保てる。
 
 ## 実行方法
 

@@ -1,0 +1,26 @@
+<h1>opal-homura</h1>
+<p>homura stack が使う Opal fork です。Ruby を Workers の V8 で実行できる JavaScript へコンパイルする土台で、アプリ側は通常どおり <code>require 'opal'</code> として扱います。</p>
+
+<h2 id="role">役割</h2>
+<ul>
+  <li>Ruby ソース、vendored Ruby ライブラリ、precompiled ERB / assets を ESM bundle に変換します。</li>
+  <li>homura が必要とする Opal パッチと runtime contract に合わせた compiler behavior を提供します。</li>
+  <li>公開 gem 名は <code>opal-homura</code> ですが、Bundler の require 名は <code>opal</code> のままです。</li>
+</ul>
+
+<h2 id="gemfile">Gemfile</h2>
+<pre><code>gem 'opal-homura', '= 1.8.3.rc1.5', require: 'opal'</code></pre>
+<p><code>require: 'opal'</code> を外すと既存の Opal toolchain が期待する require 名から外れます。アプリケーションコードから <code>opal-homura</code> を直接 require する必要はありません。</p>
+
+<h2 id="build-path">ビルド内での位置</h2>
+<p><code>homura build</code> は Opal に <code>-I app -I gems/... -I lib -I vendor -I build</code> を渡し、アプリ、gem、vendored shim、precompiled templates をひとつの bundle にします。</p>
+
+<h2 id="matrix">できること / できないこと</h2>
+<table>
+  <thead><tr><th></th><th>できること</th><th>できないこと</th></tr></thead>
+  <tbody>
+    <tr><td>Ruby</td><td>Sinatra / Rack / Sequel など pure Ruby 中心のコードを compile</td><td>C extension や OS process 前提の gem をそのまま実行</td></tr>
+    <tr><td>require</td><td><code>require 'opal'</code> と既存 Opal 互換の入口を維持</td><td><code>require 'opal-homura'</code> を public API として扱う</td></tr>
+    <tr><td>runtime</td><td>Workers の ESM entrypoint に載せる JS を生成</td><td>Node サーバーを常駐させて Rack を動かす</td></tr>
+  </tbody>
+</table>

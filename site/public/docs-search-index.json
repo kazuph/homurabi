@@ -1,8 +1,13 @@
 [
   {
-    "t": "概要 — 3 つの gem",
+    "t": "概要 — 公開 gem の全体像",
     "h": "/docs#gems",
-    "k": "概要 3 つの gem"
+    "k": "概要 公開 gem の全体像"
+  },
+  {
+    "t": "概要 — アプリケーションの形",
+    "h": "/docs#app-shapes",
+    "k": "概要 アプリケーションの形"
   },
   {
     "t": "概要 — 次のステップ",
@@ -65,39 +70,79 @@
     "k": "Migration 動かない・優先度を下げる例"
   },
   {
-    "t": "sinatra-cloudflare-workers — 概要",
+    "t": "opal-homura — 役割",
+    "h": "/docs/opal-homura#role",
+    "k": "opal-homura 役割"
+  },
+  {
+    "t": "opal-homura — Gemfile",
+    "h": "/docs/opal-homura#gemfile",
+    "k": "opal-homura Gemfile"
+  },
+  {
+    "t": "opal-homura — ビルド内での位置",
+    "h": "/docs/opal-homura#build-path",
+    "k": "opal-homura ビルド内での位置"
+  },
+  {
+    "t": "opal-homura — できること / できないこと",
+    "h": "/docs/opal-homura#matrix",
+    "k": "opal-homura できること / できないこと"
+  },
+  {
+    "t": "homura-runtime — 役割",
+    "h": "/docs/runtime#role",
+    "k": "homura-runtime 役割"
+  },
+  {
+    "t": "homura-runtime — ビルド CLI",
+    "h": "/docs/runtime#build",
+    "k": "homura-runtime ビルド CLI"
+  },
+  {
+    "t": "homura-runtime — build/worker.entrypoint.mjs",
+    "h": "/docs/runtime#entrypoint",
+    "k": "homura-runtime build/worker.entrypoint.mjs"
+  },
+  {
+    "t": "homura-runtime — できること / できないこと",
+    "h": "/docs/runtime#matrix",
+    "k": "homura-runtime できること / できないこと"
+  },
+  {
+    "t": "sinatra-homura — 概要",
     "h": "/docs/sinatra#overview",
-    "k": "sinatra-cloudflare-workers 概要"
+    "k": "sinatra-homura 概要"
   },
   {
-    "t": "sinatra-cloudflare-workers — 登録と require",
+    "t": "sinatra-homura — 登録と require",
     "h": "/docs/sinatra#register",
-    "k": "sinatra-cloudflare-workers 登録と require"
+    "k": "sinatra-homura 登録と require"
   },
   {
-    "t": "sinatra-cloudflare-workers — ERB プリコンパイル",
+    "t": "sinatra-homura — ERB プリコンパイル",
     "h": "/docs/sinatra#erb",
-    "k": "sinatra-cloudflare-workers ERB プリコンパイル"
+    "k": "sinatra-homura ERB プリコンパイル"
   },
   {
-    "t": "sinatra-cloudflare-workers — JWT（Sinatra::JwtAuth）",
+    "t": "sinatra-homura — JWT（Sinatra::JwtAuth）",
     "h": "/docs/sinatra#jwt",
-    "k": "sinatra-cloudflare-workers JWT（Sinatra::JwtAuth）"
+    "k": "sinatra-homura JWT（Sinatra::JwtAuth）"
   },
   {
-    "t": "sinatra-cloudflare-workers — Cron（Sinatra::Scheduled）",
+    "t": "sinatra-homura — Cron（Sinatra::Scheduled）",
     "h": "/docs/sinatra#scheduled",
-    "k": "sinatra-cloudflare-workers Cron（Sinatra::Scheduled）"
+    "k": "sinatra-homura Cron（Sinatra::Scheduled）"
   },
   {
-    "t": "sinatra-cloudflare-workers — Queues（Sinatra::Queue）",
+    "t": "sinatra-homura — Queues（Sinatra::Queue）",
     "h": "/docs/sinatra#queue",
-    "k": "sinatra-cloudflare-workers Queues（Sinatra::Queue）"
+    "k": "sinatra-homura Queues（Sinatra::Queue）"
   },
   {
-    "t": "sinatra-cloudflare-workers — できること / できないこと",
+    "t": "sinatra-homura — できること / できないこと",
     "h": "/docs/sinatra#matrix",
-    "k": "sinatra-cloudflare-workers できること / できないこと"
+    "k": "sinatra-homura できること / できないこと"
   },
   {
     "t": "sequel-d1 — 接続",
@@ -120,24 +165,99 @@
     "k": "sequel-d1 できること / できないこと"
   },
   {
-    "t": "cloudflare-workers-runtime — 役割",
-    "h": "/docs/runtime#role",
-    "k": "cloudflare-workers-runtime 役割"
+    "t": "sinatra-inertia — 役割",
+    "h": "/docs/sinatra-inertia#role",
+    "k": "sinatra-inertia 役割"
   },
   {
-    "t": "cloudflare-workers-runtime — ビルド CLI",
-    "h": "/docs/runtime#build",
-    "k": "cloudflare-workers-runtime ビルド CLI"
+    "t": "sinatra-inertia — セットアップ",
+    "h": "/docs/sinatra-inertia#setup",
+    "k": "sinatra-inertia セットアップ"
   },
   {
-    "t": "cloudflare-workers-runtime — build/worker.entrypoint.mjs",
-    "h": "/docs/runtime#entrypoint",
-    "k": "cloudflare-workers-runtime build/worker.entrypoint.mjs"
+    "t": "sinatra-inertia — ページを render する",
+    "h": "/docs/sinatra-inertia#render",
+    "k": "sinatra-inertia ページを render する"
   },
   {
-    "t": "cloudflare-workers-runtime — できること / できないこと",
-    "h": "/docs/runtime#matrix",
-    "k": "cloudflare-workers-runtime できること / できないこと"
+    "t": "sinatra-inertia — validation errors",
+    "h": "/docs/sinatra-inertia#validation",
+    "k": "sinatra-inertia validation errors"
+  },
+  {
+    "t": "sinatra-inertia — example",
+    "h": "/docs/sinatra-inertia#example",
+    "k": "sinatra-inertia example"
+  },
+  {
+    "t": "sinatra-inertia — できること / できないこと",
+    "h": "/docs/sinatra-inertia#matrix",
+    "k": "sinatra-inertia できること / できないこと"
+  },
+  {
+    "t": "Rack apps — 最小構成",
+    "h": "/docs/rack#minimal",
+    "k": "Rack apps 最小構成"
+  },
+  {
+    "t": "Rack apps — ビルドとデプロイ",
+    "h": "/docs/rack#build",
+    "k": "Rack apps ビルドとデプロイ"
+  },
+  {
+    "t": "Rack apps — Rack から binding を読む",
+    "h": "/docs/rack#bindings",
+    "k": "Rack apps Rack から binding を読む"
+  },
+  {
+    "t": "Rack apps — いつ Rack だけを選ぶか",
+    "h": "/docs/rack#when",
+    "k": "Rack apps いつ Rack だけを選ぶか"
+  },
+  {
+    "t": "Cloudflare bindings — 対応範囲",
+    "h": "/docs/cloudflare#overview",
+    "k": "Cloudflare bindings 対応範囲"
+  },
+  {
+    "t": "Cloudflare bindings — D1",
+    "h": "/docs/cloudflare#d1",
+    "k": "Cloudflare bindings D1"
+  },
+  {
+    "t": "Cloudflare bindings — KV",
+    "h": "/docs/cloudflare#kv",
+    "k": "Cloudflare bindings KV"
+  },
+  {
+    "t": "Cloudflare bindings — R2",
+    "h": "/docs/cloudflare#r2",
+    "k": "Cloudflare bindings R2"
+  },
+  {
+    "t": "Cloudflare bindings — Workers AI",
+    "h": "/docs/cloudflare#ai",
+    "k": "Cloudflare bindings Workers AI"
+  },
+  {
+    "t": "Cloudflare bindings — Queues",
+    "h": "/docs/cloudflare#queues",
+    "k": "Cloudflare bindings Queues"
+  },
+  {
+    "t": "Cloudflare bindings — Durable Objects",
+    "h": "/docs/cloudflare#durable-objects",
+    "k": "Cloudflare bindings Durable Objects"
+  },
+  {
+    "t": "Cloudflare bindings — Cache",
+    "h": "/docs/cloudflare#cache",
+    "k": "Cloudflare bindings Cache"
+  },
+  {
+    "t": "Cloudflare bindings — production safety",
+    "h": "/docs/cloudflare#safety",
+    "k": "Cloudflare bindings production safety"
   },
   {
     "t": "Architecture — セルフホスト",
@@ -145,9 +265,9 @@
     "k": "Architecture セルフホスト"
   },
   {
-    "t": "Architecture — 3 gem の関係",
+    "t": "Architecture — 公開 gem の関係",
     "h": "/docs/architecture#gems",
-    "k": "Architecture 3 gem の関係"
+    "k": "Architecture 公開 gem の関係"
   },
   {
     "t": "Architecture — ビルドパイプライン",

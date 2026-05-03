@@ -26,12 +26,17 @@ Live demo: https://homura.kazu-san.workers.dev
   - Sequel adapter for Cloudflare D1.
   - Owns `homura db:migrate:*`.
 
+- sinatra-inertia
+  - Sinatra adapter for Inertia.js v2.
+  - Page API: `render 'Component'`, `share_props`, `defer`, `page_errors`.
+
 ## Install order
 
 1. opal-homura
 2. homura-runtime
 3. sinatra-homura
 4. sequel-d1 (optional)
+5. sinatra-inertia (optional)
 
 ## Minimal Gemfile
 
@@ -43,6 +48,7 @@ gem 'rake' # generated apps use this for build/dev/deploy
 gem 'homura-runtime', '~> 0.3'
 gem 'sinatra-homura', '~> 0.3'
 gem 'sequel-d1',      '~> 0.3' # optional
+gem 'sinatra-inertia', '~> 0.1' # optional
 ```
 
 ## Minimal flow
@@ -53,6 +59,25 @@ gem 'sequel-d1',      '~> 0.3' # optional
 4. For D1 apps, generated scaffolds also include `db:migrate:compile`, `db:migrate:local`, and `db:migrate:remote`.
 5. Deploy with Wrangler.
 6. Standard layout is `app/app.rb` plus `config.ru`; `app/hello.rb` is optional compatibility, not a requirement.
+
+## Minimal Rack-only app
+
+Rack apps do not need Sinatra:
+
+```ruby
+# app/app.rb
+class App
+  def call(env)
+    [200, { 'content-type' => 'text/plain; charset=utf-8' }, ["hello from Rack\n"]]
+  end
+end
+```
+
+```ruby
+# config.ru
+require_relative 'app/app'
+run App.new
+```
 
 ## Minimal Sinatra + D1 example
 
@@ -106,6 +131,13 @@ Sinatra entry points automatically.
 
 - README.md
 - /llms.txt
+- /docs/opal-homura
+- /docs/runtime
+- /docs/sinatra
+- /docs/sequel-d1
+- /docs/sinatra-inertia
+- /docs/rack
+- /docs/cloudflare
 - skills/homura-workers-gems/quick-start.md
 - skills/homura-workers-gems/gotchas.md
 - docs/TOOLCHAIN_CONTRACT.md
@@ -114,7 +146,7 @@ Sinatra entry points automatically.
 
 - Use `homura` and generated `rake` tasks; do not emit `cloudflare-workers-*` command names.
 - Current releases support ordinary Sinatra `redirect`, `halt`, route params, ERB layout `yield`, and Sequel CRUD on D1.
-- Workers bindings are exposed through Ruby helpers such as `db`, `d1`, `kv`, `bucket`, `ai`, `send_email`, `jobs_queue`, and `durable_object(:counter, 'global')`.
+- Workers bindings are exposed through Ruby helpers such as `db`, `d1`, `kv`, `bucket`, `ai`, `send_email`, `jobs_queue`, `durable_object(:counter, 'global')`, and `Cloudflare::Cache.default`.
 - Common binding/helper paths are auto-awaited at build time; keep examples sync-shaped unless you are handling a raw Promise boundary directly.
 - D1 boolean columns come back as Ruby booleans on normal dataset reads, but custom SQL/projections can still surface raw `0` / `1`.
 - For hand-wired D1/Sequel apps, use `bundle exec homura build --standalone --with-db`.

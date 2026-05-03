@@ -3,18 +3,20 @@
 <h2 id="self-host">セルフホスト</h2>
 <p>このドキュメントサイト自身が homura の Worker 上で配信されており、<code>app/routes/canonical_all.rb</code> のルートと <code>views/docs_*.erb</code> がそのまま本番に載っています。コードとドキュメントのズレを減らすための構成です。</p>
 
-<h2 id="gems">3 gem の関係</h2>
+<h2 id="gems">公開 gem の関係</h2>
 <ul>
+  <li><strong>opal-homura</strong> — Ruby を Workers で実行する JavaScript へ変換する compiler fork。</li>
   <li><strong>homura-runtime</strong> — 土台（ビルド、Rack、バインディング）。</li>
   <li><strong>sinatra-homura</strong> — Sinatra 向け（パッチ + JWT / Scheduled / Queue）。</li>
   <li><strong>sequel-d1</strong> — Sequel の D1 アダプタ（runtime の D1 ラッパ上）。</li>
+  <li><strong>sinatra-inertia</strong> — Sinatra 向け Inertia.js v2 adapter。</li>
 </ul>
 
 <h2 id="pipeline">ビルドパイプライン</h2>
 <p>ERB プリコンパイル → アセット埋め込み → Opal コンパイル → <code>patch-opal-evals.mjs</code> → <code>build/worker.entrypoint.mjs</code> 生成、の順です（ARCHITECTURE.md）。</p>
 
 <h2 id="history">Phase 15 の整理</h2>
-<p>モノリス <code>hello.rb</code> からルートを <code>canonical_all.rb</code> に集約し、3 gem に責務分割。コンシューマが <code>path:</code> なしで組み立てやすいよう CLI とテンプレートを揃えました。</p>
+<p>モノリス <code>hello.rb</code> からルートを <code>canonical_all.rb</code> に集約し、compiler / runtime / Sinatra / D1 / Inertia の責務を分離。コンシューマが <code>path:</code> なしで組み立てやすいよう CLI とテンプレートを揃えました。</p>
 
 <h2 id="diagram">依存関係（Mermaid）</h2>
 <p>レンダラ無しで読めるよう、ソースをそのまま掲載します（Mermaid 対応ビューアで表示可能）。</p>

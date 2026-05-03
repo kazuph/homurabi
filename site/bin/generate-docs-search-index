@@ -13,9 +13,13 @@ PAGES = [
   { file: 'docs_index.erb', path: '/docs', title: '概要' },
   { file: 'docs_quick_start.erb', path: '/docs/quick-start', title: 'Quick Start' },
   { file: 'docs_migration.erb', path: '/docs/migration', title: 'Migration' },
-  { file: 'docs_sinatra.erb', path: '/docs/sinatra', title: 'sinatra-cloudflare-workers' },
+  { file: 'docs_opal_homura.erb', path: '/docs/opal-homura', title: 'opal-homura' },
+  { file: 'docs_runtime.erb', path: '/docs/runtime', title: 'homura-runtime' },
+  { file: 'docs_sinatra.erb', path: '/docs/sinatra', title: 'sinatra-homura' },
   { file: 'docs_sequel_d1.erb', path: '/docs/sequel-d1', title: 'sequel-d1' },
-  { file: 'docs_runtime.erb', path: '/docs/runtime', title: 'cloudflare-workers-runtime' },
+  { file: 'docs_sinatra_inertia.erb', path: '/docs/sinatra-inertia', title: 'sinatra-inertia' },
+  { file: 'docs_rack.erb', path: '/docs/rack', title: 'Rack apps' },
+  { file: 'docs_cloudflare.erb', path: '/docs/cloudflare', title: 'Cloudflare bindings' },
   { file: 'docs_architecture.erb', path: '/docs/architecture', title: 'Architecture' },
   { file: 'docs_email.erb', path: '/docs/email', title: 'Email Service' }
 ].freeze

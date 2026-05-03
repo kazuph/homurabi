@@ -1,0 +1,58 @@
+<h1>sinatra-inertia</h1>
+<p>Sinatra で Inertia.js v2 protocol を扱う adapter です。アプリケーションのルートは Sinatra らしく <code>render 'Page'</code> と書き、page object、partial reload、deferred props、validation error sweep は gem が引き受けます。</p>
+
+<h2 id="role">役割</h2>
+<ul>
+  <li>初回 GET は ERB layout に <code>@page_json</code> を渡し、以降の Inertia visit は JSON page object を返します。</li>
+  <li><code>X-Inertia-Version</code> mismatch、303 redirect promotion、partial reload、deferred props、merge props を処理します。</li>
+  <li>CSRF double-submit cookie と validation errors の one-redirect sweep を提供します。</li>
+</ul>
+
+<h2 id="setup">セットアップ</h2>
+<pre><code>gem 'sinatra-inertia', '~&gt; 0.1'</code></pre>
+
+<pre><code>require 'sinatra/base'
+require 'sinatra/inertia'
+
+class App &lt; Sinatra::Base
+  register Sinatra::Inertia
+
+  set :page_version, ENV.fetch('ASSETS_VERSION', '1')
+  set :page_layout, :layout
+
+  share_props do
+    { flash: flash_payload, csrfToken: csrf_token }
+  end
+end</code></pre>
+
+<h2 id="render">ページを render する</h2>
+<pre><code>get '/' do
+  render 'Todos/Index',
+         todos: -&gt; { todos },
+         stats: defer(group: 'meta') { todo_stats }
+end</code></pre>
+<p>route 内に Inertia 固有の protocol 語彙を置かないのが推奨形です。互換 API として <code>inertia</code> / <code>inertia_share</code> / <code>Inertia.defer</code> も残っています。</p>
+
+<h2 id="validation">validation errors</h2>
+<pre><code>post '/todos' do
+  if params[:title].to_s.strip.empty?
+    page_errors title: 'title is required'
+    redirect to('/'), 303
+  end
+
+  # write model...
+  redirect to('/'), 303
+end</code></pre>
+
+<h2 id="example">example</h2>
+<p>完全な Workers + D1 + React の例は <code>examples/inertia-todo</code> です。production deploy は <a href="https://inertia-todo.kazu-san.workers.dev/">inertia-todo.kazu-san.workers.dev</a> で動いています。</p>
+
+<h2 id="matrix">できること / できないこと</h2>
+<table>
+  <thead><tr><th></th><th>できること</th><th>できないこと</th></tr></thead>
+  <tbody>
+    <tr><td>Page protocol</td><td>Inertia v2 page object、partial reload、deferred props、merge props</td><td>Rails controller / ActiveSupport 前提の API</td></tr>
+    <tr><td>Frontend</td><td>React / Vue / Svelte など Inertia client と接続</td><td>クライアント bundle の生成そのもの</td></tr>
+    <tr><td>Workers</td><td>homura build の auto-await と D1 route props に対応</td><td>ブラウザ history / component rendering をサーバーだけで完結</td></tr>
+  </tbody>
+</table>

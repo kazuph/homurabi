@@ -1750,7 +1750,8 @@
     ]
     @docs_toc = [
       %w[hero このサイトについて],
-      %w[gems 3つの gem],
+      %w[gems 公開 gem の全体像],
+      %w[app-shapes アプリケーションの形],
       %w[next 次のステップ]
     ]
     erb :docs_index, layout: :layout_docs
@@ -1878,6 +1879,81 @@
       %w[diagram 依存関係 (Mermaid)]
     ]
     erb :docs_architecture, layout: :layout_docs
+  end
+  get '/docs/opal-homura' do
+    @title = 'opal-homura — homura Docs'
+    @docs_page = 'opal-homura'
+    @docs_section = :reference
+    @docs_breadcrumb = [
+      ['Docs', '/docs'],
+      ['API Reference', '/docs/runtime'],
+      ['opal-homura', nil]
+    ]
+    @docs_toc = [
+      %w[role 役割],
+      %w[gemfile Gemfile],
+      %w[build-path ビルド内での位置],
+      %w[matrix できること / できないこと]
+    ]
+    erb :docs_opal_homura, layout: :layout_docs
+  end
+  get '/docs/sinatra-inertia' do
+    @title = 'sinatra-inertia — homura Docs'
+    @docs_page = 'sinatra-inertia'
+    @docs_section = :reference
+    @docs_breadcrumb = [
+      ['Docs', '/docs'],
+      ['API Reference', '/docs/runtime'],
+      ['sinatra-inertia', nil]
+    ]
+    @docs_toc = [
+      %w[role 役割],
+      %w[setup セットアップ],
+      %w[render ページを render する],
+      %w[validation validation errors],
+      %w[example example],
+      %w[matrix できること / できないこと]
+    ]
+    erb :docs_sinatra_inertia, layout: :layout_docs
+  end
+  get '/docs/rack' do
+    @title = 'Rack apps — homura Docs'
+    @docs_page = 'rack'
+    @docs_section = :reference
+    @docs_breadcrumb = [
+      ['Docs', '/docs'],
+      ['Runtime Features', '/docs/rack'],
+      ['Rack apps', nil]
+    ]
+    @docs_toc = [
+      %w[minimal 最小構成],
+      %w[build ビルドとデプロイ],
+      %w[bindings Rack から binding を読む],
+      %w[when いつ Rack だけを選ぶか]
+    ]
+    erb :docs_rack, layout: :layout_docs
+  end
+  get '/docs/cloudflare' do
+    @title = 'Cloudflare bindings — homura Docs'
+    @docs_page = 'cloudflare'
+    @docs_section = :reference
+    @docs_breadcrumb = [
+      ['Docs', '/docs'],
+      ['Runtime Features', '/docs/cloudflare'],
+      ['Cloudflare bindings', nil]
+    ]
+    @docs_toc = [
+      %w[overview 対応範囲],
+      %w[d1 D1],
+      %w[kv KV],
+      %w[r2 R2],
+      %w[ai Workers AI],
+      %w[queues Queues],
+      %w[durable-objects Durable Objects],
+      %w[cache Cache],
+      %w[safety production safety]
+    ]
+    erb :docs_cloudflare, layout: :layout_docs
   end
   # Phase 17 — Cloudflare Email Service (SEND_EMAIL) manual test
   get '/debug/mail' do

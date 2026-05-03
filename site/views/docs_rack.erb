@@ -1,0 +1,50 @@
+<h1>Rack apps</h1>
+<p>homura-runtime は Sinatra に依存しない Rack adapter を持っています。つまり <code>config.ru</code> に <code>run app</code> を書く、普通の Rack アプリケーションだけでも Workers にデプロイできます。</p>
+
+<h2 id="minimal">最小構成</h2>
+<pre><code># app/app.rb
+class App
+  def call(env)
+    [
+      200,
+      { 'content-type' =&gt; 'text/plain; charset=utf-8' },
+      ["hello from Rack\n"]
+    ]
+  end
+end
+</code></pre>
+
+<pre><code># config.ru
+require_relative 'app/app'
+
+run App.new
+</code></pre>
+
+<p><code>run app</code> は Rack の標準形です。Sinatra では <code>run App</code> を省略できる場面がありますが、それは Sinatra が Rack app を組み立ててくれるためです。Rack だけで書く場合は <code>config.ru</code> の <code>run</code> がアプリの入口になります。</p>
+
+<h2 id="build">ビルドとデプロイ</h2>
+<pre><code>bundle exec homura build --standalone
+npx wrangler deploy</code></pre>
+<p><code>wrangler.toml</code> の <code>main</code> は生成物の <code>build/worker.entrypoint.mjs</code> を指します。</p>
+
+<h2 id="bindings">Rack から binding を読む</h2>
+<p>Workers の binding は Rack env に載ります。低レベル Rack app では <code>env['cloudflare.env']</code> や runtime が用意する wrapper を直接使い、Sinatra を使う場合は <code>d1</code> / <code>kv</code> / <code>bucket</code> などの helper が薄く包みます。</p>
+
+<pre><code>class App
+  def call(env)
+    cf_env = env['cloudflare.env']
+    name = cf_env ? `(#{cf_env}.APP_NAME || 'homura')`.to_s : 'homura'
+    [200, { 'content-type' =&gt; 'text/plain' }, ["#{name}\n"]]
+  end
+end
+</code></pre>
+
+<h2 id="when">いつ Rack だけを選ぶか</h2>
+<table>
+  <thead><tr><th>選ぶ理由</th><th>説明</th></tr></thead>
+  <tbody>
+    <tr><td>HTTP endpoint が少ない</td><td>health check、webhook、proxy のような薄い Worker なら Rack だけで十分です。</td></tr>
+    <tr><td>Sinatra DSL が不要</td><td>routing や helper より Rack middleware / env を直接扱いたい場合に向きます。</td></tr>
+    <tr><td>gem surface を最小化したい</td><td><code>homura-runtime</code> と <code>opal-homura</code> だけで成立します。</td></tr>
+  </tbody>
+</table>

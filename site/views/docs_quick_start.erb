@@ -32,7 +32,7 @@ npm install</code></pre>
 
 <h2 id="limits">現在の制限</h2>
 <ul>
-  <li><strong>rubygems</strong>: <code>opal-homura</code> / <code>homura-runtime</code> / <code>sinatra-homura</code> / <code>sequel-d1</code> の組み合わせを前提にする。</li>
+  <li><strong>rubygems</strong>: <code>opal-homura</code> / <code>homura-runtime</code> / <code>sinatra-homura</code> を基本にし、D1 では <code>sequel-d1</code>、Inertia では <code>sinatra-inertia</code> を追加します。</li>
   <li><strong>ERB</strong>: Workers 上では実行時 <code>eval</code> 不可のため、<code>bundle exec homura erb:compile</code> で事前コンパイルが必須。</li>
   <li><strong>Opal</strong>: <code>vendor/opal-gem</code> 固定版（Gemfile の <code>path</code>）に合わせる。</li>
   <li><strong>日常操作</strong>: 生成 app では <code>bundle exec rake</code> 系を表の UX にし、<code>homura</code> は Rake の内部実装として扱う。</li>

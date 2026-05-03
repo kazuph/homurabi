@@ -1,0 +1,85 @@
+<h1>Cloudflare bindings</h1>
+<p>homura-runtime は Workers の binding を Ruby オブジェクトとして扱えるようにします。Sinatra アプリでは <code>d1</code>、<code>kv</code>、<code>bucket</code>、<code>ai</code>、<code>jobs_queue</code>、<code>durable_object</code> などの helper から使うのが基本です。</p>
+
+<h2 id="overview">対応範囲</h2>
+<table>
+  <thead><tr><th>Cloudflare 機能</th><th>Ruby 側の入口</th><th>用途</th></tr></thead>
+  <tbody>
+    <tr><td>D1</td><td><code>d1</code>, <code>db</code>, <code>Sequel.connect(adapter: :d1, d1: d1)</code></td><td>SQL database、Sequel dataset、migration</td></tr>
+    <tr><td>KV</td><td><code>kv</code></td><td>session-like state、cache、small JSON documents</td></tr>
+    <tr><td>R2</td><td><code>bucket</code></td><td>object storage、uploads、binary assets</td></tr>
+    <tr><td>Workers AI</td><td><code>ai.run(model, inputs)</code></td><td>LLM / embedding / image など Workers AI models</td></tr>
+    <tr><td>Queues</td><td><code>jobs_queue</code>, <code>consume_queue</code></td><td>background jobs、DLQ、retry</td></tr>
+    <tr><td>Durable Objects</td><td><code>durable_object(:name, id)</code>, <code>Cloudflare::DurableObject.define</code></td><td>per-id state、coordination、WebSocket dispatch</td></tr>
+    <tr><td>Cache API</td><td><code>Cloudflare::Cache.default</code></td><td>edge cache read/write/delete</td></tr>
+    <tr><td>Cron Triggers</td><td><code>schedule '*/5 * * * *'</code></td><td>scheduled jobs</td></tr>
+    <tr><td>Email Routing / Send</td><td><code>send_email</code> / Email Service docs</td><td>mail send / debug mail demo</td></tr>
+  </tbody>
+</table>
+
+<h2 id="d1">D1</h2>
+<pre><code>require 'sequel'
+
+get '/posts' do
+  db = Sequel.connect(adapter: :d1, d1: d1)
+  content_type 'application/json'
+  db[:posts].order(Sequel.desc(:id)).all.to_json
+end</code></pre>
+
+<h2 id="kv">KV</h2>
+<pre><code>get '/counter' do
+  raw = kv.get('counter')
+  count = raw.to_i + 1
+  kv.put('counter', count.to_s)
+  count.to_s
+end</code></pre>
+
+<h2 id="r2">R2</h2>
+<pre><code>post '/upload' do
+  file = params[:file]
+  bucket.put("uploads/#{file[:filename]}", file[:tempfile].read)
+  redirect to('/uploads'), 303
+end</code></pre>
+
+<h2 id="ai">Workers AI</h2>
+<pre><code>post '/chat' do
+  result = ai.run('@cf/google/gemma-4-26b-a4b-it',
+                  messages: [{ role: 'user', content: params[:message] }])
+  result.to_json
+end</code></pre>
+
+<h2 id="queues">Queues</h2>
+<pre><code>post '/jobs' do
+  jobs_queue.send({ kind: 'refresh', id: params[:id] })
+  redirect to('/jobs'), 303
+end
+
+consume_queue 'jobs' do |batch|
+  batch.messages.each do |msg|
+    # work...
+    msg.ack
+  end
+end</code></pre>
+
+<h2 id="durable-objects">Durable Objects</h2>
+<pre><code>Cloudflare::DurableObject.define(:counter) do |request, storage|
+  count = storage.get('count').to_i + 1
+  storage.put('count', count)
+  [200, { 'content-type' =&gt; 'text/plain' }, [count.to_s]]
+end
+
+get '/counter/:name' do
+  durable_object(:counter, params[:name]).get('/').body
+end</code></pre>
+
+<h2 id="cache">Cache</h2>
+<pre><code>cache = Cloudflare::Cache.default
+cached = cache.match(request.url)
+return cached.body if cached
+
+body = expensive_render
+cache.put(request.url, [200, { 'cache-control' =&gt; 'max-age=60' }, [body]])
+body</code></pre>
+
+<h2 id="safety">production safety</h2>
+<p>公開 demo route は <code>HOMURA_ENABLE_*_DEMOS</code> のような env flag で無効化できます。binding が存在しない環境では helper が <code>nil</code> を返すか、明示的な binding error を出すため、production では <code>wrangler.toml</code> と secret / binding 設定を source of truth にしてください。</p>

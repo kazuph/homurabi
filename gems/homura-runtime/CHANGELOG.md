@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.6 (2026-05-03)
+
+- Release the no-await-surface examples/docs baseline: public Rack,
+  Sinatra, D1, Email, and Durable Object examples should stay sync-shaped
+  and avoid exposing Opal/Workers await internals in user-written Ruby.
+- No runtime code changes vs. 0.3.5.
+
 ## 0.3.5 (2026-05-03)
 
 - Add Ruby-shaped Cloudflare binding helpers for HTTP, scheduled, queue,

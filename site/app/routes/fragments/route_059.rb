@@ -1,13 +1,13 @@
 # frozen_string_literal: true
 # Route fragment 59 — demo /docs/quick-start
-get '/docs/quick-start' do
-  @title = 'クイックスタート — homura Docs'
-  @docs_page = 'quick-start'
+get "/docs/quick-start" do
+  @title = "クイックスタート — homura Docs"
+  @docs_page = "quick-start"
   @docs_section = :getting_started
   @docs_breadcrumb = [
-    ['Docs', '/docs'],
-    ['Getting Started', '/docs'],
-    ['Quick Start', nil]
+    %w[Docs /docs],
+    ["Getting Started", "/docs"],
+    ["Quick Start", nil]
   ]
   @docs_toc = [
     %w[prereq 前提],

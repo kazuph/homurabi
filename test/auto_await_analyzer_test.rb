@@ -1,34 +1,38 @@
 # frozen_string_literal: true
 
-require_relative '../gems/homura-runtime/lib/homura/runtime/async_registry'
-require_relative '../gems/homura-runtime/lib/homura/runtime/auto_await/analyzer'
-require_relative '../gems/homura-runtime/lib/homura/runtime/auto_await/transformer'
+require_relative "../gems/homura-runtime/lib/homura/runtime/async_registry"
+require_relative "../gems/homura-runtime/lib/homura/runtime/auto_await/analyzer"
+require_relative "../gems/homura-runtime/lib/homura/runtime/auto_await/transformer"
 
 registry = HomuraRuntime::AsyncRegistry.new
-HomuraRuntime::AsyncRegistry::Builder.new(registry).instance_eval do
-  async_method 'Cloudflare::D1Database', :execute
-  async_method 'Cloudflare::D1Database', :execute_insert
-  async_method 'Cloudflare::D1Database', :prepare
-  taint_return 'Cloudflare::D1Database', :[], 'Sequel::Dataset'
-  async_method 'Sequel::Dataset', :insert
-  async_method 'Sequel::Dataset', :all
-  async_method 'Sequel::Dataset', :first
-  taint_return 'Sequel::Dataset', :where, 'Sequel::Dataset'
-  taint_return 'Sequel::Dataset', :order, 'Sequel::Dataset'
-  taint_return 'Sequel::Dataset', :limit, 'Sequel::Dataset'
-  async_factory 'Cloudflare::Email', :new
-  async_method 'Cloudflare::Email', :send
-  helper_factory :kv, 'Cloudflare::KVNamespace'
-  async_method 'Cloudflare::KVNamespace', :get
-  taint_return 'Cloudflare::DurableObjectState', :storage, 'Cloudflare::DurableObjectStorage'
-  async_method 'Cloudflare::DurableObjectStorage', :get
-  async_method 'Cloudflare::DurableObjectStorage', :put
-  async_accessor :env, :DB, 'Cloudflare::D1Database'
-  async_accessor :env, :SEND_EMAIL, 'Cloudflare::Email'
-  helper_factory :send_email, 'Cloudflare::Email'
-  async_helper :cache_get, 'Homura::CloudflareBindingHelpers'
-  async_method 'JWT', :decode
-end
+HomuraRuntime::AsyncRegistry::Builder
+  .new(registry)
+  .instance_eval do
+    async_method "Cloudflare::D1Database", :execute
+    async_method "Cloudflare::D1Database", :execute_insert
+    async_method "Cloudflare::D1Database", :prepare
+    taint_return "Cloudflare::D1Database", :[], "Sequel::Dataset"
+    async_method "Sequel::Dataset", :insert
+    async_method "Sequel::Dataset", :all
+    async_method "Sequel::Dataset", :first
+    taint_return "Sequel::Dataset", :where, "Sequel::Dataset"
+    taint_return "Sequel::Dataset", :order, "Sequel::Dataset"
+    taint_return "Sequel::Dataset", :limit, "Sequel::Dataset"
+    async_factory "Cloudflare::Email", :new
+    async_method "Cloudflare::Email", :send
+    helper_factory :kv, "Cloudflare::KVNamespace"
+    async_method "Cloudflare::KVNamespace", :get
+    taint_return "Cloudflare::DurableObjectState",
+                 :storage,
+                 "Cloudflare::DurableObjectStorage"
+    async_method "Cloudflare::DurableObjectStorage", :get
+    async_method "Cloudflare::DurableObjectStorage", :put
+    async_accessor :env, :DB, "Cloudflare::D1Database"
+    async_accessor :env, :SEND_EMAIL, "Cloudflare::Email"
+    helper_factory :send_email, "Cloudflare::Email"
+    async_helper :cache_get, "Homura::CloudflareBindingHelpers"
+    async_method "JWT", :decode
+  end
 
 passed = 0
 failed = 0
@@ -46,9 +50,12 @@ end
 
 def assert_transform(source, expected, registry)
   analyzer = HomuraRuntime::AutoAwait::Analyzer.new(registry)
-  buffer, nodes = analyzer.process(source, '(test)')
+  buffer, nodes = analyzer.process(source, "(test)")
   actual = nodes.map { |n| n.loc.expression.source }
-  [assert_eq(expected, actual, "transform targets for: #{source[0..50]}"), actual]
+  [
+    assert_eq(expected, actual, "transform targets for: #{source[0..50]}"),
+    actual
+  ]
 end
 
 # Test 1: basic accessor chain
@@ -65,7 +72,12 @@ src2 = <<~RUBY
   db = env['cloudflare.env'].DB
   db[:users].where(active: true).insert(name: 'foo')
 RUBY
-ok, _ = assert_transform(src2, ["db[:users].where(active: true).insert(name: 'foo')"], registry)
+ok, _ =
+  assert_transform(
+    src2,
+    ["db[:users].where(active: true).insert(name: 'foo')"],
+    registry
+  )
 passed += 1 if ok
 failed += 1 unless ok
 
@@ -84,7 +96,12 @@ src4 = <<~RUBY
   email = Cloudflare::Email.new(env.SEND_EMAIL)
   email.send(to: 'a@b.com', subject: 'hi', text: 'hello')
 RUBY
-ok, _ = assert_transform(src4, ["email.send(to: 'a@b.com', subject: 'hi', text: 'hello')"], registry)
+ok, _ =
+  assert_transform(
+    src4,
+    ["email.send(to: 'a@b.com', subject: 'hi', text: 'hello')"],
+    registry
+  )
 passed += 1 if ok
 failed += 1 unless ok
 
@@ -111,8 +128,9 @@ src6 = <<~RUBY
   end
 RUBY
 analyzer = HomuraRuntime::AutoAwait::Analyzer.new(registry)
-buffer, nodes = analyzer.process(src6, '(test)')
-transformed = HomuraRuntime::AutoAwait::Transformer.transform(src6, nodes, buffer)
+buffer, nodes = analyzer.process(src6, "(test)")
+transformed =
+  HomuraRuntime::AutoAwait::Transformer.transform(src6, nodes, buffer)
 
 expected_lines = [
   "db[:users].where(active: true).insert(name: 'foo')",
@@ -151,7 +169,12 @@ src7 = <<~RUBY
     next [401, { 'error' => e.message }.to_json]
   end
 RUBY
-ok, _ = assert_transform(src7, ["JWT.decode(token, verify_key, true, algorithm: algorithm)"], registry)
+ok, _ =
+  assert_transform(
+    src7,
+    ["JWT.decode(token, verify_key, true, algorithm: algorithm)"],
+    registry
+  )
 passed += 1 if ok
 failed += 1 unless ok
 
@@ -161,7 +184,14 @@ src8 = <<~RUBY
   ctx = Homura::DebugMailController.prepare_send(params, env, self, mail)
   mail.send(to: ctx[:final_to], subject: ctx[:subject_line], text: ctx[:text_body])
 RUBY
-ok, _ = assert_transform(src8, ["mail.send(to: ctx[:final_to], subject: ctx[:subject_line], text: ctx[:text_body])"], registry)
+ok, _ =
+  assert_transform(
+    src8,
+    [
+      "mail.send(to: ctx[:final_to], subject: ctx[:subject_line], text: ctx[:text_body])"
+    ],
+    registry
+  )
 passed += 1 if ok
 failed += 1 unless ok
 
@@ -170,7 +200,12 @@ src9 = <<~RUBY
   compute_body = proc { 'ok' }
   body = cache_get(cache_key, ttl: ttl, &compute_body)
 RUBY
-ok, _ = assert_transform(src9, ["cache_get(cache_key, ttl: ttl, &compute_body)"], registry)
+ok, _ =
+  assert_transform(
+    src9,
+    ["cache_get(cache_key, ttl: ttl, &compute_body)"],
+    registry
+  )
 passed += 1 if ok
 failed += 1 unless ok
 
@@ -181,7 +216,12 @@ src10 = <<~RUBY
     state.storage.put('count', prev + 1)
   end
 RUBY
-ok, _ = assert_transform(src10, ["state.storage.get('count')", "state.storage.put('count', prev + 1)"], registry)
+ok, _ =
+  assert_transform(
+    src10,
+    ["state.storage.get('count')", "state.storage.put('count', prev + 1)"],
+    registry
+  )
 passed += 1 if ok
 failed += 1 unless ok
 
@@ -193,7 +233,7 @@ src11 = <<~RUBY
 
   payload = load_rows
 RUBY
-ok, _ = assert_transform(src11, ["kv.get('todos')", 'load_rows'], registry)
+ok, _ = assert_transform(src11, %w[kv.get('todos') load_rows], registry)
 passed += 1 if ok
 failed += 1 unless ok
 

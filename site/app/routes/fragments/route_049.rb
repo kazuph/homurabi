@@ -1,23 +1,29 @@
 # frozen_string_literal: true
 # Route fragment 49 — demo /demo/faraday
-get '/demo/faraday' do
-  content_type 'application/json'
+get "/demo/faraday" do
+  content_type "application/json"
   unless foundations_demos_enabled?
     status 404
-    next({ 'error' => 'foundations demos disabled (set HOMURA_ENABLE_FOUNDATIONS_DEMOS=1)' }.to_json)
+    next(
+      {
+        "error" =>
+          "foundations demos disabled (set HOMURA_ENABLE_FOUNDATIONS_DEMOS=1)"
+      }.to_json
+    )
   end
-  client = Faraday.new(url: 'https://api.ipify.org') do |c|
-    c.request :json
-    c.response :json
-    c.headers['user-agent'] = 'homura-phase11a/1.0'
-  end
-  res = client.get('/', { 'format' => 'json' })
+  client =
+    Faraday.new(url: "https://api.ipify.org") do |c|
+      c.request :json
+      c.response :json
+      c.headers["user-agent"] = "homura-phase11a/1.0"
+    end
+  res = client.get("/", { "format" => "json" })
   {
-    'demo'        => 'Faraday.new(url:) { request :json; response :json }',
-    'status'      => res.status,
-    'success'     => res.success?,
-    'reason'      => res.reason_phrase,
-    'body'        => res.body,  # parsed Hash thanks to :json middleware
-    'headers_ct'  => res.headers['content-type']
+    "demo" => "Faraday.new(url:) { request :json; response :json }",
+    "status" => res.status,
+    "success" => res.success?,
+    "reason" => res.reason_phrase,
+    "body" => res.body, # parsed Hash thanks to :json middleware
+    "headers_ct" => res.headers["content-type"]
   }.to_json
 end

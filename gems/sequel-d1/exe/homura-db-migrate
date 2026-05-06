@@ -14,13 +14,13 @@
 #   CLOUDFLARE_D1_DATABASE   default D1 database name for `apply`
 #   WRANGLER_D1_DATABASE     alias for CLOUDFLARE_D1_DATABASE
 
-require 'fileutils'
-require 'optparse'
-require 'logger'
+require "fileutils"
+require "optparse"
+require "logger"
 
 def wrangler_executable
-  bin = ENV['WRANGLER_BIN'].to_s.strip
-  bin.empty? ? 'wrangler' : bin
+  bin = ENV["WRANGLER_BIN"].to_s.strip
+  bin.empty? ? "wrangler" : bin
 end
 
 def usage!(msg = nil)
@@ -39,16 +39,16 @@ end
 
 def require_sequel_sqlite!
   begin
-    require 'sequel'
+    require "sequel"
     Sequel.extension :migration
   rescue LoadError
-    warn 'ERROR: `sequel` gem is required.'
+    warn "ERROR: `sequel` gem is required."
     exit 1
   end
   begin
-    require 'sqlite3'
+    require "sqlite3"
   rescue LoadError
-    warn 'ERROR: `sqlite3` gem is required.'
+    warn "ERROR: `sqlite3` gem is required."
     exit 1
   end
 end
@@ -61,22 +61,27 @@ def run_compile
   end
 
   out_dir = migrations_dir
-  OptionParser.new do |o|
-    o.on('--out DIR', 'Output directory for compiled SQL files') { |v| out_dir = v }
-  end.parse!(ARGV)
+  OptionParser
+    .new do |o|
+      o.on("--out DIR", "Output directory for compiled SQL files") do |v|
+        out_dir = v
+      end
+    end
+    .parse!(ARGV)
   FileUtils.mkdir_p(out_dir)
 
   require_sequel_sqlite!
 
-  migration_files = Dir.glob(File.join(migrations_dir, '*.rb')).sort
+  migration_files = Dir.glob(File.join(migrations_dir, "*.rb")).sort
   if migration_files.empty?
     warn "ERROR: no .rb migration files found in #{migrations_dir}"
     exit 1
   end
 
   migration_files.each_with_index do |rb, idx|
-    base = File.basename(rb, '.rb')
-    number = (base =~ /\A(\d+)_/) ? Regexp.last_match(1) : format('%04d', idx + 1)
+    base = File.basename(rb, ".rb")
+    number =
+      (base =~ /\A(\d+)_/) ? Regexp.last_match(1) : format("%04d", idx + 1)
 
     captured = []
     db = Sequel.sqlite(logger: Logger.new(nil))
@@ -89,11 +94,12 @@ def run_compile
     # Cloudflare D1 forbids both (`not authorized to use function:
     # sqlite_version`, `no such table` for the probe), so the entire
     # `.sql` fails to apply. Filter them out at capture time.
-    skip_re = Regexp.union(
-      /\ASELECT\s+sqlite_version\s*\(\s*\)/i,
-      /\ASELECT\s+NULL\s+AS\s+'nil'\s+FROM\s+/i,
-      /\APRAGMA\b/i
-    )
+    skip_re =
+      Regexp.union(
+        /\ASELECT\s+sqlite_version\s*\(\s*\)/i,
+        /\ASELECT\s+NULL\s+AS\s+'nil'\s+FROM\s+/i,
+        /\APRAGMA\b/i
+      )
     sqls = captured
     db.define_singleton_method(:log_connection_yield) do |sql, _conn, *, &blk|
       sqls << sql unless sql.strip.match?(skip_re)
@@ -110,14 +116,15 @@ def run_compile
     migration = eval(File.read(rb), binding, rb)
     migration.apply(db, :up)
 
-    out_path = File.join(out_dir, "#{number}_#{base.sub(/\A\d+_/, '')}.sql")
+    out_path = File.join(out_dir, "#{number}_#{base.sub(/\A\d+_/, "")}.sql")
     File.write(out_path, captured.map { |s| "#{s};" }.join("\n") + "\n")
-    puts "→ #{out_path} (#{captured.size} statement#{'s' if captured.size != 1})"
+    puts "→ #{out_path} (#{captured.size} statement#{"s" if captured.size != 1})"
   end
 
   puts
   puts "✓ Compiled #{migration_files.size} migration(s) to #{out_dir}/"
-  dbname = ENV['CLOUDFLARE_D1_DATABASE'] || ENV['WRANGLER_D1_DATABASE'] || '<database>'
+  dbname =
+    ENV["CLOUDFLARE_D1_DATABASE"] || ENV["WRANGLER_D1_DATABASE"] || "<database>"
   puts "  Apply with: homura db:migrate:apply --database #{dbname}"
   puts "            or: homura db:migrate:apply --remote --database #{dbname}"
 end
@@ -125,30 +132,34 @@ end
 def run_apply
   remote = false
   database = nil
-  OptionParser.new do |o|
-    o.on('--remote', 'Apply migrations to remote D1') { remote = true }
-    o.on('--database NAME', 'D1 database name (as in wrangler.toml)') { |v| database = v }
-  end.parse!(ARGV)
+  OptionParser
+    .new do |o|
+      o.on("--remote", "Apply migrations to remote D1") { remote = true }
+      o.on("--database NAME", "D1 database name (as in wrangler.toml)") do |v|
+        database = v
+      end
+    end
+    .parse!(ARGV)
 
-  database ||= ENV['CLOUDFLARE_D1_DATABASE'] || ENV['WRANGLER_D1_DATABASE']
+  database ||= ENV["CLOUDFLARE_D1_DATABASE"] || ENV["WRANGLER_D1_DATABASE"]
   unless database
-    warn 'ERROR: database name required (--database or CLOUDFLARE_D1_DATABASE)'
+    warn "ERROR: database name required (--database or CLOUDFLARE_D1_DATABASE)"
     exit 1
   end
 
   wr = wrangler_executable
-  cmd = [wr, 'd1', 'migrations', 'apply', database]
-  cmd << (remote ? '--remote' : '--local')
+  cmd = [wr, "d1", "migrations", "apply", database]
+  cmd << (remote ? "--remote" : "--local")
 
-  warn "+ #{cmd.join(' ')}"
+  warn "+ #{cmd.join(" ")}"
   exec(*cmd)
 end
 
 cmd = ARGV.shift
 case cmd
-when 'compile'
+when "compile"
   run_compile
-when 'apply'
+when "apply"
   run_apply
 else
   usage!(cmd ? "Unknown command: #{cmd}" : nil)

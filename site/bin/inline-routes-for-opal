@@ -3,9 +3,9 @@
 # Reads app/routes/canonical_all.rb and emits build/routes_app_class_eval.rb
 # wrapped in App.class_eval so route DSL runs in the App class (Opal + Workers).
 
-ROOT   = File.expand_path('..', __dir__)
-SOURCE = File.join(ROOT, 'app/routes/canonical_all.rb')
-OUT    = File.join(ROOT, 'build/routes_app_class_eval.rb')
+ROOT = File.expand_path("..", __dir__)
+SOURCE = File.join(ROOT, "app/routes/canonical_all.rb")
+OUT = File.join(ROOT, "build/routes_app_class_eval.rb")
 
 lines = File.readlines(SOURCE)
 

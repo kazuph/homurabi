@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
-require 'parser/current'
-require 'parser/source/tree_rewriter'
-require 'set'
+require "parser/current"
+require "parser/source/tree_rewriter"
+require "set"
 
 module HomuraRuntime
   module AutoAwait
@@ -16,7 +16,7 @@ module HomuraRuntime
         @async_local_methods = Set.new
       end
 
-      def process(source, filename = '(auto-await)')
+      def process(source, filename = "(auto-await)")
         buffer = Parser::Source::Buffer.new(filename)
         buffer.source = source
         parser = Parser::CurrentRuby.new
@@ -52,7 +52,9 @@ module HomuraRuntime
         # Bottom-up traversal: process children first so helper-factory
         # sends (e.g. bare +db+) populate @env before their parent
         # send (e.g. +db.execute(...)+) is checked by should_await?.
-        node.children.each { |child| process_node(child) if child.is_a?(Parser::AST::Node) }
+        node.children.each do |child|
+          process_node(child) if child.is_a?(Parser::AST::Node)
+        end
         case node.type
         when :lvasgn
           process_lvasgn(node)
@@ -85,13 +87,16 @@ module HomuraRuntime
         before_awaits = @await_nodes.length
         @env = @registry.helper_factories.dup
 
-        node.children[1..-1].each { |child| process_node(child) if child.is_a?(Parser::AST::Node) }
+        node.children[1..-1].each do |child|
+          process_node(child) if child.is_a?(Parser::AST::Node)
+        end
 
         body = node.children[2]
         return_cls = infer_class(body)
         @method_returns[method_name] = return_cls if return_cls
         body_source = node.loc.expression&.source.to_s
-        if @await_nodes.length > before_awaits || body_source.include?('.__await__')
+        if @await_nodes.length > before_awaits ||
+             body_source.include?(".__await__")
           @async_local_methods << method_name
         end
 
@@ -115,7 +120,8 @@ module HomuraRuntime
 
       def process_send(node)
         receiver, method_name = *node
-        if receiver.nil? && (factory_cls = @registry.helper_factories[method_name])
+        if receiver.nil? &&
+             (factory_cls = @registry.helper_factories[method_name])
           @env[method_name] = factory_cls
         end
         if should_await?(node)
@@ -144,7 +150,9 @@ module HomuraRuntime
         when :send
           receiver, method_name = *node
           if receiver.nil?
-            return @method_returns[method_name] if @method_returns.key?(method_name)
+            if @method_returns.key?(method_name)
+              return @method_returns[method_name]
+            end
             return @env[method_name] if @env.key?(method_name)
           end
           infer_send_class(node)
@@ -175,7 +183,8 @@ module HomuraRuntime
             key_node = node.children[2]
             if key_node&.type == :str
               key = key_node.children[0]
-              mapped = @registry.async_accessors[[env_name(receiver), key.to_sym]]
+              mapped =
+                @registry.async_accessors[[env_name(receiver), key.to_sym]]
               return mapped if mapped
             end
           end
@@ -189,7 +198,9 @@ module HomuraRuntime
             return ret if ret
           end
         else
-          return @method_returns[method_name] if @method_returns.key?(method_name)
+          if @method_returns.key?(method_name)
+            return @method_returns[method_name]
+          end
         end
         nil
       end
@@ -198,14 +209,17 @@ module HomuraRuntime
         return {} unless durable_object_define_call?(call_node)
         return {} unless args_node&.type == :args
 
-        arg_names = args_node.children.filter_map do |arg|
-          next unless arg&.type == :arg
-          arg.children[0]
-        end
+        arg_names =
+          args_node.children.filter_map do |arg|
+            next unless arg&.type == :arg
+            arg.children[0]
+          end
         return {} if arg_names.empty?
 
-        bindings = { arg_names[0] => 'Cloudflare::DurableObjectState' }
-        bindings[arg_names[1]] = 'Cloudflare::DurableObjectRequest' if arg_names.length > 1
+        bindings = { arg_names[0] => "Cloudflare::DurableObjectState" }
+        bindings[
+          arg_names[1]
+        ] = "Cloudflare::DurableObjectRequest" if arg_names.length > 1
         bindings
       end
 
@@ -213,7 +227,8 @@ module HomuraRuntime
         return false unless call_node&.type == :send
 
         receiver, method_name = *call_node
-        method_name == :define && const_path(receiver) == 'Cloudflare::DurableObject'
+        method_name == :define &&
+          const_path(receiver) == "Cloudflare::DurableObject"
       end
 
       def infer_index_class(node)
@@ -273,7 +288,7 @@ module HomuraRuntime
           parts.unshift(n.children[1])
           n = n.children[0]
         end
-        parts.join('::')
+        parts.join("::")
       end
 
       def debug(msg)

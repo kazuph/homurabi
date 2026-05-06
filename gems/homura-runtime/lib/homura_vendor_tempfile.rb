@@ -1,18 +1,19 @@
 # frozen_string_literal: true
 
-require 'stringio'
+require "stringio"
 
 class Tempfile < StringIO
   def initialize(*)
-    super('')
+    super("")
   end
 
   def self.open(*)
-    raise NotImplementedError, 'Tempfile is stubbed in homura (Workers have no writable FS)'
+    raise NotImplementedError,
+          "Tempfile is stubbed in homura (Workers have no writable FS)"
   end
 
   def path
-    raise NotImplementedError, 'Tempfile#path stubbed (no FS)'
+    raise NotImplementedError, "Tempfile#path stubbed (no FS)"
   end
 
   def unlink

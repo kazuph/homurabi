@@ -34,12 +34,12 @@
 # needed when bypassing that build step.
 
 begin
-  require 'homura/runtime'
+  require "homura/runtime"
 rescue LoadError
   # Workers / Opal builds compile this file with `-r homura/runtime`
   # already applied; standalone specs may omit the runtime gem.
 end
-require 'sequel/adapters/shared/sqlite'
+require "sequel/adapters/shared/sqlite"
 
 module Sequel
   module D1
@@ -56,7 +56,8 @@ module Sequel
       end
     end
 
-    class MissingMetaError < Error; end
+    class MissingMetaError < Error
+    end
 
     # Thin wrapper around a duck-typed D1 binding. Backed by Opal
     # `.__await__` resolution so Ruby callers see a synchronous
@@ -118,8 +119,9 @@ module Sequel
       def connect(_server)
         d1_binding = @opts[:d1] || @opts[:database]
         unless d1_binding
-          raise Error, "Sequel D1 adapter requires a :d1 option (object responding to #prepare). " \
-                       "Example: Sequel.connect(adapter: :d1, d1: d1)"
+          raise Error,
+                "Sequel D1 adapter requires a :d1 option (object responding to #prepare). " \
+                  "Example: Sequel.connect(adapter: :d1, d1: d1)"
         end
         Connection.new(d1_binding)
       end
@@ -137,37 +139,38 @@ module Sequel
         # bubbled via Opal) are caught and re-raised as Sequel::D1::Error
         # with the offending SQL attached so Sequel's error handling
         # path classifies them via database_error_classes.
-        rows = synchronize(opts[:server]) do |conn|
-          conn.query(sql, Array(opts[:arguments])).__await__
-        end.__await__
+        rows =
+          synchronize(opts[:server]) do |conn|
+            conn.query(sql, Array(opts[:arguments])).__await__
+          end.__await__
         rows.each(&block) if block
         rows
       rescue Error
         raise
       rescue ::Exception => e
-        raise wrap_d1_error(e, sql, 'execute')
+        raise wrap_d1_error(e, sql, "execute")
       end
 
       def execute_insert(sql, opts = OPTS)
         synchronize(opts[:server]) do |conn|
           raw = conn.run(sql, Array(opts[:arguments])).__await__
-          d1_meta_value(raw, 'last_row_id')
+          d1_meta_value(raw, "last_row_id")
         end.__await__
       rescue Error
         raise
       rescue ::Exception => e
-        raise wrap_d1_error(e, sql, 'execute_insert')
+        raise wrap_d1_error(e, sql, "execute_insert")
       end
 
       def execute_dui(sql, opts = OPTS)
         synchronize(opts[:server]) do |conn|
           raw = conn.run(sql, Array(opts[:arguments])).__await__
-          d1_meta_value(raw, 'changes')
+          d1_meta_value(raw, "changes")
         end.__await__
       rescue Error
         raise
       rescue ::Exception => e
-        raise wrap_d1_error(e, sql, 'execute_dui')
+        raise wrap_d1_error(e, sql, "execute_dui")
       end
 
       private
@@ -181,15 +184,16 @@ module Sequel
       # that's a contract violation worth surfacing).
       def d1_meta_value(raw, key)
         unless raw.is_a?(::Hash)
-          raise MissingMetaError, "D1 run() returned non-Hash #{raw.class}: #{raw.inspect[0, 120]}"
+          raise MissingMetaError,
+                "D1 run() returned non-Hash #{raw.class}: #{raw.inspect[0, 120]}"
         end
-        meta = raw['meta'].is_a?(::Hash) ? raw['meta'] : raw
+        meta = raw["meta"].is_a?(::Hash) ? raw["meta"] : raw
         value = meta[key] || meta[key.to_sym]
         if value.nil?
           raise MissingMetaError.new(
-            "D1 run() meta missing '#{key}'. Available keys: #{meta.keys.inspect}",
-            meta: meta
-          )
+                  "D1 run() meta missing '#{key}'. Available keys: #{meta.keys.inspect}",
+                  meta: meta
+                )
         end
         value
       end
@@ -211,14 +215,12 @@ module Sequel
       public
 
       def execute_ddl(sql, opts = OPTS)
-        synchronize(opts[:server]) do |conn|
-          conn.exec(sql).__await__
-        end.__await__
+        synchronize(opts[:server]) { |conn| conn.exec(sql).__await__ }.__await__
         nil
       rescue Error
         raise
       rescue ::Exception => e
-        raise wrap_d1_error(e, sql, 'execute_ddl')
+        raise wrap_d1_error(e, sql, "execute_ddl")
       end
 
       # -----------------------------------------------------------
@@ -287,15 +289,19 @@ module Sequel
 
       def homura_boolean_columns
         from = opts[:from]
-        return nil if !from || from.length != 1 || opts.include?(:join) || opts.include?(:sql)
+        if !from || from.length != 1 || opts.include?(:join) ||
+             opts.include?(:sql)
+          return nil
+        end
 
         table = first_source_table
         quoted_table = table.to_s.gsub("'", "''")
-        pragma_rows = db.execute("PRAGMA table_xinfo('#{quoted_table}')").__await__
+        pragma_rows =
+          db.execute("PRAGMA table_xinfo('#{quoted_table}')").__await__
         columns = {}
         pragma_rows.each do |row|
-          name = row['name'] || row[:name]
-          db_type = row['type'] || row[:type]
+          name = row["name"] || row[:name]
+          db_type = row["type"] || row[:type]
           next unless name && db_type
           next unless db.send(:schema_column_type, db_type) == :boolean
 
@@ -325,4 +331,4 @@ module Sequel
   end
 end
 
-require 'sequel/d1_async_source'
+require "sequel/d1_async_source"

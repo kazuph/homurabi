@@ -41,15 +41,17 @@
 # HTTP fetch-style interaction with DO instances, which is enough for
 # counters / session state / rate limiters.
 
-require 'json'
+require "json"
 
 module Cloudflare
   class DurableObjectError < StandardError
     attr_reader :operation, :do_class
     def initialize(message, operation: nil, do_class: nil)
       @operation = operation
-      @do_class  = do_class
-      super("[Cloudflare::DurableObject] class=#{do_class || '?'} op=#{operation || 'fetch'}: #{message}")
+      @do_class = do_class
+      super(
+        "[Cloudflare::DurableObject] class=#{do_class || "?"} op=#{operation || "fetch"}: #{message}"
+      )
     end
   end
 
@@ -136,7 +138,7 @@ module Cloudflare
     # responses — the 101 Response carries its WebSocket in a
     # `.webSocket` property that disappears if we reconstruct the
     # Response via the HTTPResponse wrapper.
-    def fetch_raw(url_or_request, method: 'GET', headers: nil, body: nil)
+    def fetch_raw(url_or_request, method: "GET", headers: nil, body: nil)
       hdrs = headers || {}
       method_str = method.to_s.upcase
       js_headers = Cloudflare::HTTP.ruby_headers_to_js(hdrs)
@@ -152,7 +154,7 @@ module Cloudflare
     # the prefix), so user code can use any pathname it wants as its
     # internal DO command channel. Returns a JS Promise the caller
     # `__await__`s to get a `Cloudflare::HTTPResponse`.
-    def fetch(url_or_request, method: 'GET', headers: nil, body: nil)
+    def fetch(url_or_request, method: "GET", headers: nil, body: nil)
       js_stub = @js
       hdrs = headers || {}
       method_str = method.to_s.upcase
@@ -161,11 +163,12 @@ module Cloudflare
       url_str = url_or_request.to_s
       err_klass = Cloudflare::DurableObjectError
       response_klass = Cloudflare::HTTPResponse
-      do_class_label = 'DurableObjectStub'
+      do_class_label = "DurableObjectStub"
 
       # Single-line IIFE — see `lib/homura/runtime/cache.rb#put`
       # for why Opal can silently drop a multi-line x-string Promise.
-      js_promise = `(async function(stub, url_str, method_str, js_headers, js_body, Kernel, err_klass, do_class_label) { var init = { method: method_str, headers: js_headers }; if (js_body !== null && js_body !== undefined && js_body !== Opal.nil) { init.body = js_body; } var resp; try { resp = await stub.fetch(url_str, init); } catch (e) { Kernel.$raise(err_klass.$new(e && e.message ? e.message : String(e), Opal.hash({ operation: 'stub.fetch', do_class: do_class_label }))); } var text = ''; try { text = await resp.text(); } catch (_) { text = ''; } var hk = []; var hv = []; if (resp.headers && typeof resp.headers.forEach === 'function') { resp.headers.forEach(function(v, k) { hk.push(String(k).toLowerCase()); hv.push(String(v)); }); } return { status: resp.status|0, text: text, hkeys: hk, hvals: hv }; })(#{js_stub}, #{url_str}, #{method_str}, #{js_headers}, #{js_body}, #{Kernel}, #{err_klass}, #{do_class_label})`
+      js_promise =
+        `(async function(stub, url_str, method_str, js_headers, js_body, Kernel, err_klass, do_class_label) { var init = { method: method_str, headers: js_headers }; if (js_body !== null && js_body !== undefined && js_body !== Opal.nil) { init.body = js_body; } var resp; try { resp = await stub.fetch(url_str, init); } catch (e) { Kernel.$raise(err_klass.$new(e && e.message ? e.message : String(e), Opal.hash({ operation: 'stub.fetch', do_class: do_class_label }))); } var text = ''; try { text = await resp.text(); } catch (_) { text = ''; } var hk = []; var hv = []; if (resp.headers && typeof resp.headers.forEach === 'function') { resp.headers.forEach(function(v, k) { hk.push(String(k).toLowerCase()); hv.push(String(v)); }); } return { status: resp.status|0, text: text, hkeys: hk, hvals: hv }; })(#{js_stub}, #{url_str}, #{method_str}, #{js_headers}, #{js_body}, #{Kernel}, #{err_klass}, #{do_class_label})`
 
       js_result = js_promise.__await__
       hkeys = `#{js_result}.hkeys`
@@ -179,39 +182,39 @@ module Cloudflare
       end
 
       response_klass.new(
-        status:  `#{js_result}.status`,
+        status: `#{js_result}.status`,
         headers: h,
-        body:    `#{js_result}.text`,
-        url:     url_str
+        body: `#{js_result}.text`,
+        url: url_str
       )
     end
 
-    def request(path, method: 'GET', headers: nil, body: nil)
+    def request(path, method: "GET", headers: nil, body: nil)
       hdrs = headers ? headers.dup : {}
       request_body = body
       if body.is_a?(Hash) || body.is_a?(Array)
         request_body = body.to_json
-        unless hdrs.key?('content-type') || hdrs.key?('Content-Type')
-          hdrs['content-type'] = 'application/json'
+        unless hdrs.key?("content-type") || hdrs.key?("Content-Type")
+          hdrs["content-type"] = "application/json"
         end
       end
       fetch(path, method: method, headers: hdrs, body: request_body)
     end
 
     def get(path, headers: nil)
-      request(path, method: 'GET', headers: headers)
+      request(path, method: "GET", headers: headers)
     end
 
     def post(path, body = nil, headers: nil)
-      request(path, method: 'POST', headers: headers, body: body)
+      request(path, method: "POST", headers: headers, body: body)
     end
 
     def put(path, body = nil, headers: nil)
-      request(path, method: 'PUT', headers: headers, body: body)
+      request(path, method: "PUT", headers: headers, body: body)
     end
 
     def delete(path, headers: nil)
-      request(path, method: 'DELETE', headers: headers)
+      request(path, method: "DELETE", headers: headers)
     end
   end
 
@@ -251,12 +254,15 @@ module Cloudflare
     # The block must return a Rack-style triple `[status, headers, body]`.
     # `body` may be a String or an object that responds to `to_s`.
     def self.define(class_name, &block)
-      raise ArgumentError, 'define requires a block' unless block
-      raise ArgumentError, 'class_name must be a String' unless class_name.is_a?(String)
+      raise ArgumentError, "define requires a block" unless block
+      unless class_name.is_a?(String)
+        raise ArgumentError, "class_name must be a String"
+      end
       @handlers ||= {}
       # Wrap via define_method so Opal's `# await: true` picks it up as
       # async (same trick Sinatra::Scheduled uses for its jobs).
-      method_name = "__do_handler_#{class_name.gsub(/[^A-Za-z0-9_]/, '_')}".to_sym
+      method_name =
+        "__do_handler_#{class_name.gsub(/[^A-Za-z0-9_]/, "_")}".to_sym
       DurableObjectRequestContext.send(:define_method, method_name, &block)
       unbound = DurableObjectRequestContext.instance_method(method_name)
       DurableObjectRequestContext.send(:remove_method, method_name)
@@ -279,12 +285,17 @@ module Cloudflare
     # class (wired by the exported HomuraCounterDO in
     # src/worker.mjs). Return value is ignored — the runtime doesn't
     # expect a body.
-    def self.define_web_socket_handlers(class_name, on_message: nil, on_close: nil, on_error: nil)
+    def self.define_web_socket_handlers(
+      class_name,
+      on_message: nil,
+      on_close: nil,
+      on_error: nil
+    )
       @ws_handlers ||= {}
       @ws_handlers[class_name] = {
         on_message: on_message,
-        on_close:   on_close,
-        on_error:   on_error
+        on_close: on_close,
+        on_error: on_error
       }.compact
       nil
     end
@@ -303,8 +314,12 @@ module Cloudflare
     def self.dispatch_js(class_name, js_state, js_env, js_request, body_text)
       handler = handler_for(class_name)
       if handler.nil?
-        body = { 'error' => "no Ruby handler for DurableObject class #{class_name}" }.to_json
-        return build_js_response(500, { 'content-type' => 'application/json' }, body)
+        body = {
+          "error" => "no Ruby handler for DurableObject class #{class_name}"
+        }.to_json
+        return(
+          build_js_response(500, { "content-type" => "application/json" }, body)
+        )
       end
 
       state = DurableObjectState.new(js_state)
@@ -334,12 +349,12 @@ module Cloudflare
         [result[0].to_i, result[1] || {}, result[2].to_s]
       elsif result.is_a?(Hash)
         [
-          (result['status'] || result[:status] || 200).to_i,
-          result['headers'] || result[:headers] || {},
-          (result['body'] || result[:body] || '').to_s
+          (result["status"] || result[:status] || 200).to_i,
+          result["headers"] || result[:headers] || {},
+          (result["body"] || result[:body] || "").to_s
         ]
       else
-        [200, { 'content-type' => 'text/plain; charset=utf-8' }, result.to_s]
+        [200, { "content-type" => "text/plain; charset=utf-8" }, result.to_s]
       end
     end
 
@@ -358,7 +373,13 @@ module Cloudflare
     # WebSocket dispatchers — called from the JS DO class's
     # `webSocketMessage` / `webSocketClose` / `webSocketError`
     # methods. Each returns a JS Promise that resolves to undefined.
-    def self.dispatch_ws_message(class_name, js_ws, js_message, js_state, js_env)
+    def self.dispatch_ws_message(
+      class_name,
+      js_ws,
+      js_message,
+      js_state,
+      js_env
+    )
       h = web_socket_handlers_for(class_name)
       return nil if h.nil? || h[:on_message].nil?
       state = DurableObjectState.new(js_state)
@@ -366,7 +387,15 @@ module Cloudflare
       nil
     end
 
-    def self.dispatch_ws_close(class_name, js_ws, code, reason, was_clean, js_state, js_env)
+    def self.dispatch_ws_close(
+      class_name,
+      js_ws,
+      code,
+      reason,
+      was_clean,
+      js_state,
+      js_env
+    )
       h = web_socket_handlers_for(class_name)
       return nil if h.nil? || h[:on_close].nil?
       state = DurableObjectState.new(js_state)
@@ -411,7 +440,7 @@ module Cloudflare
 
     def initialize(js_state)
       @js_state = js_state
-      @storage  = DurableObjectStorage.new(`#{js_state} && #{js_state}.storage`)
+      @storage = DurableObjectStorage.new(`#{js_state} && #{js_state}.storage`)
     end
 
     # Unique id of this DO instance as a hex String.
@@ -442,7 +471,10 @@ module Cloudflare
       js_state = @js_state
       if tags && !tags.empty?
         js_tags = `([])`
-        tags.each { |t| ts = t.to_s; `#{js_tags}.push(#{ts})` }
+        tags.each do |t|
+          ts = t.to_s
+          `#{js_tags}.push(#{ts})`
+        end
         `#{js_state}.acceptWebSocket(#{js_ws}, #{js_tags})`
       else
         `#{js_state}.acceptWebSocket(#{js_ws})`
@@ -455,12 +487,13 @@ module Cloudflare
     # `getWebSockets(tag)`.
     def web_sockets(tag: nil)
       js_state = @js_state
-      js_arr = if tag
-                 ts = tag.to_s
-                 `(#{js_state}.getWebSockets ? #{js_state}.getWebSockets(#{ts}) : [])`
-               else
-                 `(#{js_state}.getWebSockets ? #{js_state}.getWebSockets() : [])`
-               end
+      js_arr =
+        if tag
+          ts = tag.to_s
+          `(#{js_state}.getWebSockets ? #{js_state}.getWebSockets(#{ts}) : [])`
+        else
+          `(#{js_state}.getWebSockets ? #{js_state}.getWebSockets() : [])`
+        end
       out = []
       len = `#{js_arr}.length`
       i = 0
@@ -494,7 +527,7 @@ module Cloudflare
     def put(key, value)
       js = @js
       err_klass = Cloudflare::DurableObjectError
-      js_value = value.nil? ? 'null' : value.to_json
+      js_value = value.nil? ? "null" : value.to_json
       `#{js}.put(#{key.to_s}, #{js_value}).catch(function(e) { #{Kernel}.$raise(#{err_klass}.$new(e && e.message ? e.message : String(e), Opal.hash({ operation: 'storage.put' }))); })`
     end
 
@@ -530,11 +563,12 @@ module Cloudflare
       err_klass = Cloudflare::DurableObjectError
       js_opts = `({})`
       `#{js_opts}.prefix  = #{prefix.to_s}` unless prefix.nil?
-      `#{js_opts}.limit   = #{limit.to_i}`  unless limit.nil?
-      `#{js_opts}.reverse = #{!!reverse}`   unless reverse.nil?
-      `#{js_opts}.start   = #{start.to_s}`  unless start.nil?
+      `#{js_opts}.limit   = #{limit.to_i}` unless limit.nil?
+      `#{js_opts}.reverse = #{!!reverse}` unless reverse.nil?
+      `#{js_opts}.start   = #{start.to_s}` unless start.nil?
       `#{js_opts}.end     = #{end_key.to_s}` unless end_key.nil?
-      js_promise = `#{js}.list(#{js_opts}).catch(function(e) { #{Kernel}.$raise(#{err_klass}.$new(e && e.message ? e.message : String(e), Opal.hash({ operation: 'storage.list' }))); })`
+      js_promise =
+        `#{js}.list(#{js_opts}).catch(function(e) { #{Kernel}.$raise(#{err_klass}.$new(e && e.message ? e.message : String(e), Opal.hash({ operation: 'storage.list' }))); })`
       js_result = js_promise.__await__
       out = {}
       return out if `#{js_result} == null`
@@ -549,7 +583,7 @@ module Cloudflare
   class DurableObjectRequest
     attr_reader :js_request, :body
 
-    def initialize(js_request, body_text = '')
+    def initialize(js_request, body_text = "")
       @js_request = js_request
       @body = body_text.to_s
     end
@@ -566,7 +600,7 @@ module Cloudflare
 
     def path
       u = url
-      return '' if u.nil? || u.empty?
+      return "" if u.nil? || u.empty?
       begin
         # Extract pathname via URL() so relative paths aren't mangled.
         u_str = u
@@ -609,17 +643,37 @@ module Cloudflare
       @request = request
     end
 
-    def storage; @state.storage; end
-    def cf_env; env['cloudflare.env']; end
-    def cf_ctx; env['cloudflare.ctx']; end
+    def storage
+      @state.storage
+    end
+    def cf_env
+      env["cloudflare.env"]
+    end
+    def cf_ctx
+      env["cloudflare.ctx"]
+    end
 
-    def d1; env['cloudflare.DB']; end
-    def db; d1; end
-    def kv; env['cloudflare.KV']; end
-    def bucket; env['cloudflare.BUCKET']; end
-    def ai; Cloudflare::Bindings.ai(env); end
-    def send_email; env['cloudflare.SEND_EMAIL']; end
-    def jobs_queue; env['cloudflare.QUEUE_JOBS']; end
+    def d1
+      env["cloudflare.DB"]
+    end
+    def db
+      d1
+    end
+    def kv
+      env["cloudflare.KV"]
+    end
+    def bucket
+      env["cloudflare.BUCKET"]
+    end
+    def ai
+      Cloudflare::Bindings.ai(env)
+    end
+    def send_email
+      env["cloudflare.SEND_EMAIL"]
+    end
+    def jobs_queue
+      env["cloudflare.QUEUE_JOBS"]
+    end
     def durable_object(name, id_or_name = nil)
       Cloudflare::Bindings.durable_object(env, name, id_or_name)
     end

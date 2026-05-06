@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 # Route fragment 32 — login /chat
-get '/chat' do
+get "/chat" do
   # /chat's body is async (load_chat_history is auto-awaited), so
   # `redirect` (which throws :halt) would surface as
   # `UncaughtThrowError: uncaught throw "halt"` past the async
@@ -9,14 +9,14 @@ get '/chat' do
   # return a 2-element `[status, body]` tuple that the JS
   # override in `lib/homura/runtime.rb` recognises.
   unless current_session_user
-    response['Location'] = "/login?return_to=#{Rack::Utils.escape('/chat')}"
-    next [302, '']
+    response["Location"] = "/login?return_to=#{Rack::Utils.escape("/chat")}"
+    next 302, ""
   end
 
-  @title = 'homura /chat — Workers AI'
-  @primary_model  = App::CHAT_MODELS[:primary]
+  @title = "homura /chat — Workers AI"
+  @primary_model = App::CHAT_MODELS[:primary]
   @fallback_model = App::CHAT_MODELS[:fallback]
-  @session_id = normalize_session_id(params['session'])
+  @session_id = normalize_session_id(params["session"])
   @history = ai_demos_enabled? ? load_chat_history(@session_id) : []
   @content = erb :chat
   erb :layout

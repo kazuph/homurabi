@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
-require 'securerandom'
-require 'rack/utils'
+require "securerandom"
+require "rack/utils"
 
 module Sinatra
   module Inertia
@@ -36,9 +36,9 @@ module Sinatra
     # this only when the consumer ships its own CSRF defence. Safer
     # defaults assume the gem is responsible.
     class CSRFMiddleware
-      COOKIE_NAME = 'XSRF-TOKEN'
-      HEADER_KEY = 'HTTP_X_XSRF_TOKEN'
-      ENV_TOKEN_KEY = 'sinatra.inertia.csrf_token'
+      COOKIE_NAME = "XSRF-TOKEN"
+      HEADER_KEY = "HTTP_X_XSRF_TOKEN"
+      ENV_TOKEN_KEY = "sinatra.inertia.csrf_token"
       SAFE_METHODS = %w[GET HEAD OPTIONS].freeze
 
       def initialize(app, same_site: :Lax)
@@ -54,31 +54,35 @@ module Sinatra
         unless safe_method?(env)
           header = env[HEADER_KEY].to_s
           if existing.nil? || header.empty? || !secure_compare(header, existing)
-            return forbidden('CSRF token mismatch (expected matching X-XSRF-TOKEN header to XSRF-TOKEN cookie)')
+            return(
+              forbidden(
+                "CSRF token mismatch (expected matching X-XSRF-TOKEN header to XSRF-TOKEN cookie)"
+              )
+            )
           end
         end
 
         status, headers, body = @app.call(env)
-        unless existing == token
-          set_cookie!(headers, token)
-        end
+        set_cookie!(headers, token) unless existing == token
         [status, headers, body]
       end
 
       private
 
       def safe_method?(env)
-        SAFE_METHODS.include?(env['REQUEST_METHOD'])
+        SAFE_METHODS.include?(env["REQUEST_METHOD"])
       end
 
       def read_cookie(env)
-        cookie_header = env['HTTP_COOKIE'].to_s
+        cookie_header = env["HTTP_COOKIE"].to_s
         return nil if cookie_header.empty?
-        cookie_header.split(/;\s*/).each do |pair|
-          name, value = pair.split('=', 2)
-          next unless name == COOKIE_NAME
-          return value
-        end
+        cookie_header
+          .split(/;\s*/)
+          .each do |pair|
+            name, value = pair.split("=", 2)
+            next unless name == COOKIE_NAME
+            return value
+          end
         nil
       end
 
@@ -99,26 +103,34 @@ module Sinatra
 
       def set_cookie!(headers, token)
         attrs = "#{COOKIE_NAME}=#{token}; Path=/; SameSite=#{@same_site}"
-        existing = headers['Set-Cookie']
+        existing = headers["Set-Cookie"]
         # Normalise to a newline-joined String regardless of Rack 2/3
         # conventions or downstream worker-runtime quirks. The Cloudflare
         # Workers adapter that homura ships with serialises Array-shaped
         # `Set-Cookie` headers as a literal JSON array, which breaks
         # cookie parsing on the client.
-        prev = case existing
-               when nil, '' then nil
-               when Array then existing.join("\n")
-               else existing.to_s
-               end
-        headers['Set-Cookie'] = prev ? "#{prev}\n#{attrs}" : attrs
+        prev =
+          case existing
+          when nil, ""
+            nil
+          when Array
+            existing.join("\n")
+          else
+            existing.to_s
+          end
+        headers["Set-Cookie"] = prev ? "#{prev}\n#{attrs}" : attrs
       end
 
       def forbidden(message)
         body = "#{message}\n"
-        [403, {
-          'Content-Type' => 'text/plain; charset=utf-8',
-          'Content-Length' => body.bytesize.to_s
-        }, [body]]
+        [
+          403,
+          {
+            "Content-Type" => "text/plain; charset=utf-8",
+            "Content-Length" => body.bytesize.to_s
+          },
+          [body]
+        ]
       end
     end
   end

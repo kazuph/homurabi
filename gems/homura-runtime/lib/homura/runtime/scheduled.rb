@@ -30,7 +30,7 @@
 # Workers runtime takes is exercised under Node, without needing the
 # JS dispatcher.
 
-require 'time'
+require "time"
 
 module Cloudflare
   # Wrapper around the JS ScheduledEvent. The Workers runtime gives us:
@@ -44,7 +44,7 @@ module Cloudflare
   class ScheduledEvent
     attr_reader :cron, :scheduled_time, :type, :raw
 
-    def initialize(cron:, scheduled_time:, type: 'scheduled', raw: nil)
+    def initialize(cron:, scheduled_time:, type: "scheduled", raw: nil)
       @cron = cron.to_s.freeze
       @scheduled_time = scheduled_time
       @type = type.to_s.freeze
@@ -60,26 +60,28 @@ module Cloudflare
     # JS undefined into Ruby's nil — calling `.nil?` on it raises
     # TypeError.
     def self.from_js(js_event)
-      return new(cron: '', scheduled_time: Time.now) if `#{js_event} == null`
+      return new(cron: "", scheduled_time: Time.now) if `#{js_event} == null`
 
-      cron      = `(#{js_event}.cron == null ? '' : String(#{js_event}.cron))`
-      type      = `(#{js_event}.type == null ? 'scheduled' : String(#{js_event}.type))`
+      cron = `(#{js_event}.cron == null ? '' : String(#{js_event}.cron))`
+      type =
+        `(#{js_event}.type == null ? 'scheduled' : String(#{js_event}.type))`
       has_sched = `(#{js_event}.scheduledTime != null)`
-      sched_t   = if has_sched
-                    sched_ms = `Number(#{js_event}.scheduledTime)`
-                    Time.at(sched_ms.to_f / 1000.0)
-                  else
-                    Time.now
-                  end
+      sched_t =
+        if has_sched
+          sched_ms = `Number(#{js_event}.scheduledTime)`
+          Time.at(sched_ms.to_f / 1000.0)
+        else
+          Time.now
+        end
 
       new(cron: cron, scheduled_time: sched_t, type: type, raw: js_event)
     end
 
     def to_h
       {
-        'cron'           => cron,
-        'scheduled_time' => scheduled_time.to_i,
-        'type'           => type
+        "cron" => cron,
+        "scheduled_time" => scheduled_time.to_i,
+        "type" => type
       }
     end
   end
@@ -119,8 +121,10 @@ module Cloudflare
       event = ScheduledEvent.from_js(js_event)
       target = resolve_app
       if target.nil?
-        warn '[Cloudflare::Scheduled] no app registered; ignoring scheduled event'
-        return { 'fired' => 0, 'total' => 0, 'results' => [], 'error' => 'no_app' }
+        warn "[Cloudflare::Scheduled] no app registered; ignoring scheduled event"
+        return(
+          { "fired" => 0, "total" => 0, "results" => [], "error" => "no_app" }
+        )
       end
       target.dispatch_scheduled(event, js_env, js_ctx).__await__
     end
@@ -130,10 +134,15 @@ module Cloudflare
     # hook. `cron` / `scheduled_time` are plain Ruby values. Returns
     # the awaited result Hash (callers can still `__await__` the
     # outer Promise — this method is async since it uses `__await__`).
-    def self.dispatch(cron, scheduled_time = Time.now, js_env = nil, js_ctx = nil)
+    def self.dispatch(
+      cron,
+      scheduled_time = Time.now,
+      js_env = nil,
+      js_ctx = nil
+    )
       event = ScheduledEvent.new(cron: cron, scheduled_time: scheduled_time)
       target = resolve_app
-      raise 'no app registered for Cloudflare::Scheduled' if target.nil?
+      raise "no app registered for Cloudflare::Scheduled" if target.nil?
       target.dispatch_scheduled(event, js_env, js_ctx).__await__
     end
 
@@ -170,7 +179,8 @@ module Cloudflare
       # mistake is visible.
       if candidate.respond_to?(:dispatch_scheduled)
         candidate
-      elsif candidate.respond_to?(:class) && candidate.class.respond_to?(:dispatch_scheduled)
+      elsif candidate.respond_to?(:class) &&
+            candidate.class.respond_to?(:dispatch_scheduled)
         candidate.class
       else
         candidate

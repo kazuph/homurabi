@@ -9,7 +9,7 @@
 # Loaded AFTER sequel/core (see vendor/sequel.rb), so every class /
 # method reference here exists.
 
-require 'sequel/core'
+require "sequel/core"
 
 module Sequel
   class Database
@@ -68,9 +68,8 @@ class Sequel::Dataset
   end
 
   def homura_sql_value(value)
-    if value.is_a?(::String) &&
-       !value.is_a?(::Sequel::LiteralString) &&
-       !value.is_a?(::Sequel::SQL::Blob)
+    if value.is_a?(::String) && !value.is_a?(::Sequel::LiteralString) &&
+         !value.is_a?(::Sequel::SQL::Blob)
       ::HomuraSqlStringLiteral.new(value)
     else
       value
@@ -126,15 +125,14 @@ class Sequel::Dataset
 
   alias_method :__homura_orig_update_sql_values_hash, :update_sql_values_hash
   def update_sql_values_hash(sql, values)
-    values = values.each_with_object({}) { |(k, v), acc| acc[k] = homura_sql_value(v) }
+    values =
+      values.each_with_object({}) { |(k, v), acc| acc[k] = homura_sql_value(v) }
     __homura_orig_update_sql_values_hash(sql, values)
   end
 
   alias_method :__homura_orig__insert_values_sql, :_insert_values_sql
   def _insert_values_sql(sql, values)
-    if values.is_a?(Array)
-      values = values.map { |v| homura_sql_value(v) }
-    end
+    values = values.map { |v| homura_sql_value(v) } if values.is_a?(Array)
     __homura_orig__insert_values_sql(sql, values)
   end
 end
@@ -144,9 +142,8 @@ class Sequel::SQL::BooleanExpression
     alias_method :__homura_orig_from_value_pair, :from_value_pair
 
     def from_value_pair(l, r)
-      if r.is_a?(::String) &&
-         !r.is_a?(::Sequel::LiteralString) &&
-         !r.is_a?(::Sequel::SQL::Blob)
+      if r.is_a?(::String) && !r.is_a?(::Sequel::LiteralString) &&
+           !r.is_a?(::Sequel::SQL::Blob)
         r = ::HomuraSqlStringLiteral.new(r)
       end
       __homura_orig_from_value_pair(l, r)

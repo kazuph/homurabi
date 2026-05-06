@@ -1,12 +1,12 @@
 # frozen_string_literal: true
-source 'https://rubygems.org'
+source "https://rubygems.org"
 
-ruby '>= 3.4.0'
+ruby ">= 3.4.0"
 
-gem 'rake'
-gem 'opal-homura', '= 1.8.3.rc1.5', require: 'opal'
-gem 'homura-runtime', '= 0.3.6'
-gem 'sinatra-homura', '= 0.3.2'
-gem 'sequel-d1', '= 0.3.1'
-gem 'sequel', '~> 5.0'
-gem 'sqlite3', '>= 2.0'
+gem "rake"
+gem "opal-homura", "= 1.8.3.rc1.5", require: "opal"
+gem "homura-runtime", "= 0.3.6"
+gem "sinatra-homura", "= 0.3.2"
+gem "sequel-d1", "= 0.3.1"
+gem "sequel", "~> 5.0"
+gem "sqlite3", ">= 2.0"

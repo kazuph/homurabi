@@ -332,6 +332,26 @@ runtime regressions show up the moment they ship.
 
 ---
 
+## Repo maintenance
+
+Tracked first-party Ruby is mechanically formatted with Syntax Tree. Vendored
+and generated paths stay outside that boundary.
+
+```bash
+npm run format:ruby
+npm run format:ruby:check
+ruby bin/install-git-hooks
+```
+
+The formatter scope is defined once in [`bin/first-party-ruby-files`](bin/first-party-ruby-files)
+and shared by the formatter and `ruby -c` CI gates.
+
+`ruby bin/install-git-hooks` configures `core.hooksPath=.githooks` for the
+current clone. The pre-commit hook auto-formats **staged** first-party Ruby so
+local commits fail earlier, while CI remains the source of truth.
+
+---
+
 ## License
 
 MIT. See [`LICENSE`](LICENSE).

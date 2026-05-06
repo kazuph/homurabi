@@ -1,0 +1,30 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "open3"
+
+repo_root, status = Open3.capture2("git", "rev-parse", "--show-toplevel")
+unless status.success?
+  abort("bin/install-git-hooks: not inside a git repository")
+end
+
+repo_root = repo_root.strip
+Dir.chdir(repo_root)
+
+hooks_path = ".githooks"
+unless Dir.exist?(hooks_path)
+  abort("bin/install-git-hooks: missing #{hooks_path}/")
+end
+
+success = system("git", "config", "--local", "core.hooksPath", hooks_path)
+unless success
+  abort("bin/install-git-hooks: failed to configure core.hooksPath")
+end
+
+configured_path, status =
+  Open3.capture2("git", "config", "--local", "--get", "core.hooksPath")
+unless status.success? && configured_path.strip == hooks_path
+  abort("bin/install-git-hooks: could not verify core.hooksPath")
+end
+
+puts "Configured core.hooksPath=#{hooks_path}"

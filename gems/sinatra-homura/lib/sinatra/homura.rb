@@ -10,13 +10,13 @@
 # Order: runtime (Cloudflare::BinaryBody, Rack handler) → Opal/Sinatra
 # patches → Sinatra::Base → extensions.
 
-require 'homura/runtime'
-require 'sinatra_opal_patches'
-require 'sinatra/base'
+require "homura/runtime"
+require "sinatra_opal_patches"
+require "sinatra/base"
 
-require 'sinatra/jwt_auth'
-require 'sinatra/scheduled'
-require 'sinatra/queue'
+require "sinatra/jwt_auth"
+require "sinatra/scheduled"
+require "sinatra/queue"
 
 module Sinatra
   module Homura
@@ -83,7 +83,9 @@ module Sinatra
   end
 end
 
-Sinatra::Base.helpers Cloudflare::BindingHelpers if defined?(Sinatra::Base) && defined?(Cloudflare::BindingHelpers)
+if defined?(Sinatra::Base) && defined?(Cloudflare::BindingHelpers)
+  Sinatra::Base.helpers Cloudflare::BindingHelpers
+end
 
 # Kept for backward compatibility with code that still wires up at_exit
 # explicitly; harmless on Workers because the isolate doesn't exit.
@@ -93,4 +95,6 @@ at_exit { Sinatra::Homura.ensure_rack_app! }
 # `run` was called still lands inside
 # `Rack::Handler::Homura#call`, where the lazy
 # `ensure_rack_app!` discovery kicks in.
-Rack::Handler::Homura.ensure_dispatcher_installed! if defined?(Rack::Handler::Homura)
+if defined?(Rack::Handler::Homura)
+  Rack::Handler::Homura.ensure_dispatcher_installed!
+end

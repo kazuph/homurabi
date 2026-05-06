@@ -3,7 +3,7 @@
 # Phase 17 — `/debug/mail` の送信準備・結果整形（実際の `mail.send` はルート本体に置く。
 # Opal は `# await: true` ブロック外のヘルパー内では `.__await__` が Promise を解決しない。
 
-require 'json'
+require "json"
 
 module Homura
   module DebugMailController
@@ -15,29 +15,56 @@ module Homura
       # (HOMURA_MAIL_DEFAULT_TO). Never hard-coded — the route helper passes
       # it in so this module stays free of personal address strings.
       def parse_form_params(params, default_to: nil)
-        to = sanitize_form(params['to']).strip
+        to = sanitize_form(params["to"]).strip
         to = default_to.to_s if to.empty? && default_to
         {
           to: to,
-          subject: sanitize_form(params['subject']).strip,
-          text: sanitize_form(params['text']),
-          html: sanitize_form(params['html'])
+          subject: sanitize_form(params["subject"]).strip,
+          text: sanitize_form(params["text"]),
+          html: sanitize_form(params["html"])
         }
       end
 
       # バリデーション済みコンテキスト。`:error_result` があれば送信しない。
       def prepare_send(params, env, route, mail)
-        default_to = route.respond_to?(:homura_mail_default_to) ? route.homura_mail_default_to : ''
+        default_to =
+          (
+            if route.respond_to?(:homura_mail_default_to)
+              route.homura_mail_default_to
+            else
+              ""
+            end
+          )
         form = parse_form_params(params, default_to: default_to)
         mail_from = route.homura_mail_from
         final_to = form[:to].empty? ? default_to.to_s : form[:to]
 
         if mail_from.empty?
-          return { error_result: error_result(form, mail_from, nil, 'HOMURA_MAIL_FROM が未設定です。ドメイン onboarding 後に wrangler [vars] で verified の送信元アドレスを設定してください。') }
+          return(
+            {
+              error_result:
+                error_result(
+                  form,
+                  mail_from,
+                  nil,
+                  "HOMURA_MAIL_FROM が未設定です。ドメイン onboarding 後に wrangler [vars] で verified の送信元アドレスを設定してください。"
+                )
+            }
+          )
         end
 
         if mail.nil? || !mail.available?
-          return { error_result: error_result(form, mail_from, nil, 'SEND_EMAIL バインディングが利用できません（wrangler.toml の [[send_email]] を確認）。') }
+          return(
+            {
+              error_result:
+                error_result(
+                  form,
+                  mail_from,
+                  nil,
+                  "SEND_EMAIL バインディングが利用できません（wrangler.toml の [[send_email]] を確認）。"
+                )
+            }
+          )
         end
 
         vid = vid_from_env(env)
@@ -61,17 +88,36 @@ module Homura
         subject_line = ctx[:subject_line]
 
         if `(#{raw} == null || #{raw} === undefined || #{raw} === Opal.nil)`
-          return error_result(form, mail_from, subject_line, 'SEND_EMAIL.send の戻りが null です。メールは送信されていません。')
+          return(
+            error_result(
+              form,
+              mail_from,
+              subject_line,
+              "SEND_EMAIL.send の戻りが null です。メールは送信されていません。"
+            )
+          )
         end
 
         message_id = extract_message_id(raw)
         cf_raw = extract_cf_raw(raw)
-        success_result(form, mail_from, final_to, subject_line, message_id, cf_raw)
+        success_result(
+          form,
+          mail_from,
+          final_to,
+          subject_line,
+          message_id,
+          cf_raw
+        )
       end
 
       def after_send_failure(error, ctx)
         code = error.code.to_s
-        error_result(ctx[:form], ctx[:mail_from], ctx[:subject_line], "#{code}: #{error.message}".strip)
+        error_result(
+          ctx[:form],
+          ctx[:mail_from],
+          ctx[:subject_line],
+          "#{code}: #{error.message}".strip
+        )
       end
 
       private
@@ -82,7 +128,7 @@ module Homura
       end
 
       def vid_from_env(env)
-        ray = env['HTTP_CF_RAY'].to_s.split('-').first
+        ray = env["HTTP_CF_RAY"].to_s.split("-").first
         ray.nil? || ray.empty? ? Time.now.to_i.to_s : ray
       end
 
@@ -96,44 +142,52 @@ module Homura
 
       def resolve_bodies(form_text, form_html)
         html = form_html.strip.empty? ? nil : form_html
-        text = if form_text.strip.empty?
-                 html ? nil : 'This is a test mail from homura'
-               else
-                 form_text
-               end
+        text =
+          if form_text.strip.empty?
+            html ? nil : "This is a test mail from homura"
+          else
+            form_text
+          end
         [text, html]
       end
 
       def extract_message_id(result)
-        return '' unless result.respond_to?(:[])
+        return "" unless result.respond_to?(:[])
 
-        result['message_id'].to_s.strip
+        result["message_id"].to_s.strip
       end
 
       def extract_cf_raw(result)
-        return '' unless result.respond_to?(:[])
+        return "" unless result.respond_to?(:[])
 
-        result['cf_send_result_json'].to_s
+        result["cf_send_result_json"].to_s
       end
 
-      def success_result(form, mail_from, final_to, subject_line, message_id, cf_raw)
+      def success_result(
+        form,
+        mail_from,
+        final_to,
+        subject_line,
+        message_id,
+        cf_raw
+      )
         accepted = !message_id.strip.empty?
         warning =
           if accepted
             nil
           else
-            'message_id が空です。cf_send_result_json を確認してください。送信はキューに載っていない可能性があります。'
+            "message_id が空です。cf_send_result_json を確認してください。送信はキューに載っていない可能性があります。"
           end
 
         payload = {
-          'ok' => accepted,
-          'message_id' => message_id,
-          'cf_send_result_json' => cf_raw,
-          'to' => final_to,
-          'from' => mail_from,
-          'subject' => subject_line
+          "ok" => accepted,
+          "message_id" => message_id,
+          "cf_send_result_json" => cf_raw,
+          "to" => final_to,
+          "from" => mail_from,
+          "subject" => subject_line
         }
-        payload['warning'] = warning if warning
+        payload["warning"] = warning if warning
 
         {
           ok: accepted,

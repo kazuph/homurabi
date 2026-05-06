@@ -21,7 +21,7 @@
 # Events response. See `lib/homura/runtime.rb#build_js_response`
 # for the SSE / ReadableStream pass-through.
 
-require 'json'
+require "json"
 
 module Cloudflare
   class AIError < StandardError
@@ -29,7 +29,9 @@ module Cloudflare
     def initialize(message, model: nil, operation: nil)
       @model = model
       @operation = operation
-      super("[Cloudflare::AI] model=#{model || '?'} op=#{operation || 'run'}: #{message}")
+      super(
+        "[Cloudflare::AI] model=#{model || "?"} op=#{operation || "run"}: #{message}"
+      )
     end
   end
 
@@ -51,13 +53,15 @@ module Cloudflare
 
       def run(model, inputs = nil, options: nil, **input_options)
         payload = inputs || input_options
-        payload = payload.merge(input_options) if inputs.is_a?(Hash) && !input_options.empty?
+        payload = payload.merge(input_options) if inputs.is_a?(Hash) &&
+          !input_options.empty?
         Cloudflare::AI.run(model, payload, binding: @js, options: options)
       end
 
       def run_stream(model, inputs = nil, **input_options)
         payload = inputs || input_options
-        payload = payload.merge(input_options) if inputs.is_a?(Hash) && !input_options.empty?
+        payload = payload.merge(input_options) if inputs.is_a?(Hash) &&
+          !input_options.empty?
         run(model, payload.merge(stream: true))
       end
     end
@@ -71,22 +75,32 @@ module Cloudflare
     # @param binding [JS object] env.AI binding (required)
     # @param options [Hash] gateway / extra options forwarded as the 3rd arg
     def self.run(model, inputs, binding: nil, options: nil)
-      binding = binding.js if defined?(Binding) && `(#{binding} != null && #{binding}.$$class === #{Binding})`
+      binding = binding.js if defined?(Binding) &&
+        `(#{binding} != null && #{binding}.$$class === #{Binding})`
       # Use a JS-side null check because `binding` may be a raw JS object
       # (env.AI), which has no Ruby `#nil?` method on the prototype.
       bound = !`(#{binding} == null)`
-      raise AIError.new('AI binding not bound (env.AI is null)', model: model) unless bound
+      unless bound
+        raise AIError.new("AI binding not bound (env.AI is null)", model: model)
+      end
       js_inputs = ruby_to_js(inputs)
       js_options = options ? ruby_to_js(options) : `({})`
       ai_binding = binding
       err_klass = Cloudflare::AIError
       stream_klass = Cloudflare::AI::Stream
       # Streaming may be requested either via `inputs[:stream]` (the
-       # newer Workers AI shape) or `options: { stream: true }` (the
-       # 3rd-arg "options" contract). Accept both so callers can use
-       # whichever idiom matches the model docs they're following.
-      streaming = (inputs.is_a?(Hash) && (inputs[:stream] == true || inputs['stream'] == true)) ||
-                  (options.is_a?(Hash) && (options[:stream] == true || options['stream'] == true))
+      # newer Workers AI shape) or `options: { stream: true }` (the
+      # 3rd-arg "options" contract). Accept both so callers can use
+      # whichever idiom matches the model docs they're following.
+      streaming =
+        (
+          inputs.is_a?(Hash) &&
+            (inputs[:stream] == true || inputs["stream"] == true)
+        ) ||
+          (
+            options.is_a?(Hash) &&
+              (options[:stream] == true || options["stream"] == true)
+          )
       cf = Cloudflare
 
       # NOTE: multi-line backtick → Promise works HERE because the
@@ -96,7 +110,8 @@ module Cloudflare
       # or the Promise will be silently dropped (same pitfall
       # documented in lib/homura/runtime/{cache,queue}.rb —
       # Phase 11B audit).
-      js_promise = `
+      js_promise =
+        `
         (async function() {
           var out;
           try {
@@ -174,16 +189,25 @@ module Cloudflare
       # this file still loads if stream.rb hasn't been required yet
       # (Phase 11A load-order flip: ai.rb currently loads first).
       def response_headers
-        defaults = defined?(::Cloudflare::SSEStream) ?
-          ::Cloudflare::SSEStream::DEFAULT_HEADERS :
-          { 'content-type' => 'text/event-stream; charset=utf-8',
-            'cache-control' => 'no-cache, no-transform',
-            'x-accel-buffering' => 'no' }
+        defaults =
+          (
+            if defined?(::Cloudflare::SSEStream)
+              ::Cloudflare::SSEStream::DEFAULT_HEADERS
+            else
+              {
+                "content-type" => "text/event-stream; charset=utf-8",
+                "cache-control" => "no-cache, no-transform",
+                "x-accel-buffering" => "no"
+              }
+            end
+          )
         defaults.merge(@extra_headers)
       end
 
-      def each; end
-      def close; end
+      def each
+      end
+      def close
+      end
     end
   end
 
@@ -192,7 +216,9 @@ module Cloudflare
   # Recursively converts nested objects + arrays.
   def self.js_to_ruby(js_val)
     return nil if `#{js_val} == null`
-    return js_val if `typeof #{js_val} === 'string' || typeof #{js_val} === 'number' || typeof #{js_val} === 'boolean'`
+    if `typeof #{js_val} === 'string' || typeof #{js_val} === 'number' || typeof #{js_val} === 'boolean'`
+      return js_val
+    end
     if `Array.isArray(#{js_val})`
       out = []
       len = `#{js_val}.length`

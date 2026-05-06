@@ -35,10 +35,10 @@ module Cloudflare
   # `new Response(readable, { headers })`.
   class SSEStream
     DEFAULT_HEADERS = {
-      'content-type'       => 'text/event-stream; charset=utf-8',
-      'cache-control'      => 'no-cache, no-transform',
-      'x-accel-buffering'  => 'no',
-      'connection'         => 'keep-alive'
+      "content-type" => "text/event-stream; charset=utf-8",
+      "cache-control" => "no-cache, no-transform",
+      "x-accel-buffering" => "no",
+      "connection" => "keep-alive"
     }.freeze
 
     def initialize(headers: nil, ctx: nil, &block)
@@ -65,7 +65,7 @@ module Cloudflare
       return @js_stream if @js_stream
       blk = @block
       ctx = @ctx
-      raise ArgumentError, 'SSEStream needs a block' if blk.nil?
+      raise ArgumentError, "SSEStream needs a block" if blk.nil?
 
       ts = `new TransformStream()`
       writer = `#{ts}.writable.getWriter()`
@@ -86,8 +86,10 @@ module Cloudflare
     # through the JS pipe. Sinatra's content-length calculator therefore
     # sees no body and leaves the header out, which is exactly right for
     # a chunked streaming response.
-    def each; end
-    def close; end
+    def each
+    end
+    def close
+    end
 
     private
 
@@ -168,7 +170,8 @@ module Cloudflare
       # enforced but the promise graph stays flat (Copilot review #3 —
       # prior implementation pushed every write into an unbounded
       # array which would leak memory on long-running streams).
-      @tail = `#{@tail}.then(function() { return #{w}.write(#{enc}.encode(#{s})); })`
+      @tail =
+        `#{@tail}.then(function() { return #{w}.write(#{enc}.encode(#{s})); })`
       self
     end
     alias_method :<<, :write
@@ -176,7 +179,7 @@ module Cloudflare
     # Helper: emit a well-formed SSE event. `data` is split on LF and
     # each line prefixed with `data:` per the SSE spec.
     def event(data, event: nil, id: nil, retry_ms: nil)
-      buf = ''
+      buf = ""
       buf += "event: #{event}\n" if event
       buf += "id: #{id}\n" if id
       buf += "retry: #{retry_ms.to_i}\n" if retry_ms
@@ -224,7 +227,8 @@ module Cloudflare
 
     # Rack-body compatibility so the SSEOut itself is also iterable by
     # `build_js_response` when used as a body (unusual but supported).
-    def each; end
+    def each
+    end
   end
 end
 
@@ -239,7 +243,7 @@ module Sinatra
     # for framed events. The block runs in an async task attached to
     # `ctx.waitUntil`, so the isolate stays alive until the block ends.
     def sse(headers: nil, &block)
-      ctx = env['cloudflare.ctx']
+      ctx = env["cloudflare.ctx"]
       ::Cloudflare::SSEStream.new(headers: headers, ctx: ctx, &block)
     end
 
@@ -267,17 +271,18 @@ module Sinatra
     # `keep_open:` は本家互換だが Workers では意味がない（EM 前提）ため
     # 受け取るだけで使わない。
     def stream(keep_open: false, type: :plain, headers: nil, &block)
-      ctx = env['cloudflare.ctx']
+      ctx = env["cloudflare.ctx"]
       extra_headers = headers || {}
-      merged = case type
-               when :sse, :event_stream
-                 extra_headers  # SSE defaults は SSEStream 側で入る
-               else
-                 # Plain streaming — start from an empty default set so
-                 # the SSE headers don't get force-injected into e.g. a
-                 # log-tailing or chunked-JSON endpoint.
-                 { 'content-type' => 'text/plain; charset=utf-8' }.merge(extra_headers)
-               end
+      merged =
+        case type
+        when :sse, :event_stream
+          extra_headers # SSE defaults は SSEStream 側で入る
+        else
+          # Plain streaming — start from an empty default set so
+          # the SSE headers don't get force-injected into e.g. a
+          # log-tailing or chunked-JSON endpoint.
+          { "content-type" => "text/plain; charset=utf-8" }.merge(extra_headers)
+        end
       ::Cloudflare::SSEStream.new(headers: merged, ctx: ctx, &block)
     end
 
@@ -305,13 +310,14 @@ module Sinatra
     # route through Cloudflare::SSEStream. Upstream's `Stream` class
     # is not used on Workers (no EventMachine / Thread pool).
     def stream(keep_open = false, &block)
-      ctx = env['cloudflare.ctx']
+      ctx = env["cloudflare.ctx"]
       ::Cloudflare::SSEStream.new(
-        headers: { 'content-type' => 'text/plain; charset=utf-8' },
+        headers: {
+          "content-type" => "text/plain; charset=utf-8"
+        },
         ctx: ctx,
         &block
       )
     end
   end
 end
-

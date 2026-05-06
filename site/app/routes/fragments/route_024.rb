@@ -1,10 +1,10 @@
 # frozen_string_literal: true
 # Route fragment 24 — api /api/login/refresh
-post '/api/login/refresh' do
-  content_type 'application/json'
+post "/api/login/refresh" do
+  content_type "application/json"
   if kv.nil?
     status 500
-    next { 'error' => 'KV not bound' }.to_json
+    next { "error" => "KV not bound" }.to_json
   end
 
   begin
@@ -12,46 +12,46 @@ post '/api/login/refresh' do
   rescue JSON::ParserError, StandardError
     body = {}
   end
-  refresh = body['refresh_token'].to_s
+  refresh = body["refresh_token"].to_s
   if refresh.empty?
     status 400
-    next { 'error' => 'refresh_token required' }.to_json
+    next { "error" => "refresh_token required" }.to_json
   end
 
   raw = kv.get("refresh:#{refresh}")
   if raw.nil?
     status 401
-    next { 'error' => 'unknown refresh_token' }.to_json
+    next { "error" => "unknown refresh_token" }.to_json
   end
 
   begin
     entry = JSON.parse(raw)
   rescue JSON::ParserError
     status 500
-    next { 'error' => 'corrupt refresh entry' }.to_json
+    next { "error" => "corrupt refresh entry" }.to_json
   end
 
-  if entry['exp'].to_i < Time.now.to_i
+  if entry["exp"].to_i < Time.now.to_i
     kv.delete("refresh:#{refresh}")
     status 401
-    next { 'error' => 'refresh_token expired' }.to_json
+    next { "error" => "refresh_token expired" }.to_json
   end
 
-  alg = entry['alg'] || 'HS256'
-  sub = entry['sub']
+  alg = entry["alg"] || "HS256"
+  sub = entry["sub"]
   sign_key, _ = jwt_keys_for(alg)
   payload = {
-    'sub'  => sub,
-    'role' => entry['role'] || 'user',
-    'iat'  => Time.now.to_i,
-    'exp'  => Time.now.to_i + App::JWT_ACCESS_TTL
+    "sub" => sub,
+    "role" => entry["role"] || "user",
+    "iat" => Time.now.to_i,
+    "exp" => Time.now.to_i + App::JWT_ACCESS_TTL
   }
   access_token = JWT.encode(payload, sign_key, alg)
 
   {
-    'access_token' => access_token,
-    'token_type'   => 'Bearer',
-    'expires_in'   => App::JWT_ACCESS_TTL,
-    'alg'          => alg
+    "access_token" => access_token,
+    "token_type" => "Bearer",
+    "expires_in" => App::JWT_ACCESS_TTL,
+    "alg" => alg
   }.to_json
 end

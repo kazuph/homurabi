@@ -5,29 +5,29 @@ module HomuraCLI
   module_function
 
   COMMANDS = {
-    'build' => {
-      gem: 'homura-runtime',
-      script: 'exe/homura-build',
+    "build" => {
+      gem: "homura-runtime",
+      script: "exe/homura-build",
       argv_prefix: []
     },
-    'erb:compile' => {
-      gem: 'sinatra-homura',
-      script: 'exe/homura-erb-compile',
+    "erb:compile" => {
+      gem: "sinatra-homura",
+      script: "exe/homura-erb-compile",
       argv_prefix: []
     },
-    'db:migrate:compile' => {
-      gem: 'sequel-d1',
-      script: 'exe/homura-db-migrate',
-      argv_prefix: ['compile']
+    "db:migrate:compile" => {
+      gem: "sequel-d1",
+      script: "exe/homura-db-migrate",
+      argv_prefix: ["compile"]
     },
-    'db:migrate:apply' => {
-      gem: 'sequel-d1',
-      script: 'exe/homura-db-migrate',
-      argv_prefix: ['apply']
+    "db:migrate:apply" => {
+      gem: "sequel-d1",
+      script: "exe/homura-db-migrate",
+      argv_prefix: ["apply"]
     },
-    'new' => {
-      gem: 'sinatra-homura',
-      script: 'exe/homura-new',
+    "new" => {
+      gem: "sinatra-homura",
+      script: "exe/homura-new",
       argv_prefix: []
     }
   }.freeze

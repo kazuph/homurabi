@@ -28,8 +28,8 @@
 # Note: Opal Strings are immutable (they map to JS Strings), so this file
 # uses reassignment (`@buffer = @buffer + str`) instead of `<<` mutation.
 
-require 'stringio'
-require 'await'
+require "stringio"
+require "await"
 
 # ---------------------------------------------------------------------------
 # 1. stdout / stderr → console.log / console.error
@@ -37,8 +37,8 @@ require 'await'
 
 class HomuraRuntimeIO
   def initialize(channel)
-    @channel = channel  # 'log' or 'error'
-    @buffer = ''
+    @channel = channel # 'log' or 'error'
+    @buffer = ""
   end
 
   def write(*args)
@@ -54,7 +54,7 @@ class HomuraRuntimeIO
 
   def puts(*args)
     if args.empty?
-      emit('')
+      emit("")
       return nil
     end
     args.each do |arg|
@@ -78,22 +78,31 @@ class HomuraRuntimeIO
   def flush
     return self if @buffer.empty?
     emit(@buffer)
-    @buffer = ''
+    @buffer = ""
     self
   end
 
-  def sync; true; end
-  def sync=(_); end
-  def tty?; false; end
-  def isatty; false; end
-  def closed?; false; end
+  def sync
+    true
+  end
+  def sync=(_)
+  end
+  def tty?
+    false
+  end
+  def isatty
+    false
+  end
+  def closed?
+    false
+  end
 
   private
 
   def flush_lines
     while (idx = @buffer.index("\n"))
       line = @buffer[0...idx]
-      @buffer = @buffer[(idx + 1)..-1] || ''
+      @buffer = @buffer[(idx + 1)..-1] || ""
       emit(line)
     end
   end
@@ -105,10 +114,14 @@ class HomuraRuntimeIO
   end
 end
 
-$stdout = HomuraRuntimeIO.new('log')
-$stderr = HomuraRuntimeIO.new('error')
-Object.const_set(:STDOUT, $stdout) unless Object.const_defined?(:STDOUT) && STDOUT.is_a?(HomuraRuntimeIO)
-Object.const_set(:STDERR, $stderr) unless Object.const_defined?(:STDERR) && STDERR.is_a?(HomuraRuntimeIO)
+$stdout = HomuraRuntimeIO.new("log")
+$stderr = HomuraRuntimeIO.new("error")
+unless Object.const_defined?(:STDOUT) && STDOUT.is_a?(HomuraRuntimeIO)
+  Object.const_set(:STDOUT, $stdout)
+end
+unless Object.const_defined?(:STDERR) && STDERR.is_a?(HomuraRuntimeIO)
+  Object.const_set(:STDERR, $stderr)
+end
 
 # ---------------------------------------------------------------------------
 # 2. Rack::Handler::Homura
@@ -122,7 +135,7 @@ Object.const_set(:STDERR, $stderr) unless Object.const_defined?(:STDERR) && STDE
 module Rack
   module Handler
     module Homura
-      EMPTY_STRING_IO = StringIO.new('').freeze
+      EMPTY_STRING_IO = StringIO.new("").freeze
 
       def self.run(app, **_options)
         @app = app
@@ -168,18 +181,21 @@ module Rack
       # `js_ctx` is the ExecutionContext, `body_text` is the pre-resolved
       # request body (the worker.mjs front awaits req.text() before
       # handing control to Ruby because Opal runs synchronously).
-      def self.call(js_req, js_env, js_ctx, body_text = '')
+      def self.call(js_req, js_env, js_ctx, body_text = "")
         if @app.nil?
           if defined?(::Sinatra::Homura) &&
-             ::Sinatra::Homura.respond_to?(:ensure_rack_app!)
+               ::Sinatra::Homura.respond_to?(:ensure_rack_app!)
             ::Sinatra::Homura.ensure_rack_app!
           end
-          raise '`run app` was never called from user code, and no Sinatra app was discoverable (define `class App < Sinatra::Base` or use top-level classic Sinatra routes)' if @app.nil?
+          if @app.nil?
+            raise "`run app` was never called from user code, and no Sinatra app was discoverable (define `class App < Sinatra::Base` or use top-level classic Sinatra routes)"
+          end
         end
 
         env = build_rack_env(js_req, js_env, js_ctx, body_text)
         result = @app.call(env)
-        result = result.__await__ if defined?(::Cloudflare) && ::Cloudflare.js_promise?(result)
+        result = result.__await__ if defined?(::Cloudflare) &&
+          ::Cloudflare.js_promise?(result)
 
         status, headers, body = result
         build_js_response(status, headers, body)
@@ -201,43 +217,50 @@ module Rack
 
         # Build a Rack-compliant env Hash from a Cloudflare Workers Request.
         # See https://github.com/rack/rack/blob/main/SPEC.rdoc for the contract.
-        def build_rack_env(js_req, js_env, js_ctx, body_text = '')
-          method  = `#{js_req}.method`
+        def build_rack_env(js_req, js_env, js_ctx, body_text = "")
+          method = `#{js_req}.method`
           url_obj = `new URL(#{js_req}.url)`
-          path    = `#{url_obj}.pathname`
+          path = `#{url_obj}.pathname`
           # Phase 16 docs: Sinatra + Opal builds responses with String#<< and raises on PATH_INFO `/docs/`.
-          path    = '/docs' if path == '/docs/'
-          raw_qs  = `#{url_obj}.search`  # includes leading '?' or empty string
-          qs      = raw_qs && raw_qs.length > 0 ? raw_qs[1..-1] : ''
-          scheme  = `#{url_obj}.protocol`.sub(/:\z/, '')
-          host    = `#{url_obj}.hostname`
-          port    = `#{url_obj}.port`
-          port    = (scheme == 'https' ? '443' : '80') if port.nil? || port.empty?
+          path = "/docs" if path == "/docs/"
+          raw_qs = `#{url_obj}.search` # includes leading '?' or empty string
+          qs = raw_qs && raw_qs.length > 0 ? raw_qs[1..-1] : ""
+          scheme = `#{url_obj}.protocol`.sub(/:\z/, "")
+          host = `#{url_obj}.hostname`
+          port = `#{url_obj}.port`
+          port = (scheme == "https" ? "443" : "80") if port.nil? || port.empty?
 
           env = {
-            'REQUEST_METHOD'    => method,
-            'SCRIPT_NAME'       => '',
-            'PATH_INFO'         => path,
-            'QUERY_STRING'      => qs,
-            'SERVER_NAME'       => host,
-            'SERVER_PORT'       => port,
-            'SERVER_PROTOCOL'   => 'HTTP/1.1',
-            'HTTPS'             => scheme == 'https' ? 'on' : 'off',
-            'rack.url_scheme'   => scheme,
-            'rack.input'        => body_text.nil? || body_text.empty? ? EMPTY_STRING_IO : StringIO.new(body_text),
-            'rack.errors'       => $stderr,
-            'rack.multithread'  => false,
-            'rack.multiprocess' => false,
-            'rack.run_once'     => false,
-            'rack.hijack?'      => false,
+            "REQUEST_METHOD" => method,
+            "SCRIPT_NAME" => "",
+            "PATH_INFO" => path,
+            "QUERY_STRING" => qs,
+            "SERVER_NAME" => host,
+            "SERVER_PORT" => port,
+            "SERVER_PROTOCOL" => "HTTP/1.1",
+            "HTTPS" => scheme == "https" ? "on" : "off",
+            "rack.url_scheme" => scheme,
+            "rack.input" =>
+              (
+                if body_text.nil? || body_text.empty?
+                  EMPTY_STRING_IO
+                else
+                  StringIO.new(body_text)
+                end
+              ),
+            "rack.errors" => $stderr,
+            "rack.multithread" => false,
+            "rack.multiprocess" => false,
+            "rack.run_once" => false,
+            "rack.hijack?" => false
           }
 
           copy_headers_into_env(js_req, env)
-          env['HTTP_HOST'] = if port == (scheme == 'https' ? '443' : '80')
-                               host
-                             else
-                               "#{host}:#{port}"
-                             end
+          env["HTTP_HOST"] = if port == (scheme == "https" ? "443" : "80")
+            host
+          else
+            "#{host}:#{port}"
+          end
 
           Cloudflare::Bindings.attach!(env, js_env, js_ctx)
         end
@@ -283,7 +306,8 @@ module Rack
           raw = nil
           if body.is_a?(::Cloudflare::RawResponse)
             raw = body
-          elsif body.respond_to?(:first) && body.first.is_a?(::Cloudflare::RawResponse)
+          elsif body.respond_to?(:first) &&
+                body.first.is_a?(::Cloudflare::RawResponse)
             raw = body.first
           end
           if raw
@@ -293,28 +317,49 @@ module Rack
 
           # Binary body fast-path: pass the JS ReadableStream directly
           # to Response without touching Opal's String encoding.
-          if body.is_a?(::Cloudflare::BinaryBody) || (body.respond_to?(:first) && body.first.is_a?(::Cloudflare::BinaryBody))
+          if body.is_a?(::Cloudflare::BinaryBody) ||
+               (
+                 body.respond_to?(:first) &&
+                   body.first.is_a?(::Cloudflare::BinaryBody)
+               )
             bin = body.is_a?(::Cloudflare::BinaryBody) ? body : body.first
             js_stream = bin.stream
             ct = bin.content_type
             cc = bin.cache_control
             js_headers = `({})`
-            headers.each { |k, v| ks = k.to_s; vs = v.to_s; `#{js_headers}[#{ks}] = #{vs}` }
+            headers.each do |k, v|
+              ks = k.to_s
+              vs = v.to_s
+              `#{js_headers}[#{ks}] = #{vs}`
+            end
             `#{js_headers}['content-type'] = #{ct}` if ct
             `#{js_headers}['cache-control'] = #{cc}` if cc
-            return `new Response(#{js_stream}, { status: #{status.to_i}, headers: #{js_headers} })`
+            return(
+              `new Response(#{js_stream}, { status: #{status.to_i}, headers: #{js_headers} })`
+            )
           end
 
-          if body.is_a?(::Cloudflare::EmbeddedBinaryBody) || (body.respond_to?(:first) && body.first.is_a?(::Cloudflare::EmbeddedBinaryBody))
-            bin = body.is_a?(::Cloudflare::EmbeddedBinaryBody) ? body : body.first
+          if body.is_a?(::Cloudflare::EmbeddedBinaryBody) ||
+               (
+                 body.respond_to?(:first) &&
+                   body.first.is_a?(::Cloudflare::EmbeddedBinaryBody)
+               )
+            bin =
+              body.is_a?(::Cloudflare::EmbeddedBinaryBody) ? body : body.first
             js_stream = bin.stream
             ct = bin.content_type
             cc = bin.cache_control
             js_headers = `({})`
-            headers.each { |k, v| ks = k.to_s; vs = v.to_s; `#{js_headers}[#{ks}] = #{vs}` }
+            headers.each do |k, v|
+              ks = k.to_s
+              vs = v.to_s
+              `#{js_headers}[#{ks}] = #{vs}`
+            end
             `#{js_headers}['content-type'] = #{ct}` if ct
             `#{js_headers}['cache-control'] = #{cc}` if cc
-            return `new Response(#{js_stream}, { status: #{status.to_i}, headers: #{js_headers} })`
+            return(
+              `new Response(#{js_stream}, { status: #{status.to_i}, headers: #{js_headers} })`
+            )
           end
 
           # Phase 10 — Workers AI streaming: a Cloudflare::AI::Stream wraps
@@ -324,7 +369,8 @@ module Rack
           stream_obj = nil
           if body.respond_to?(:sse_stream?) && body.sse_stream?
             stream_obj = body
-          elsif body.respond_to?(:first) && body.first.respond_to?(:sse_stream?) && body.first.sse_stream?
+          elsif body.respond_to?(:first) &&
+                body.first.respond_to?(:sse_stream?) && body.first.sse_stream?
             stream_obj = body.first
           end
           if stream_obj
@@ -336,9 +382,17 @@ module Rack
             # dropped any `headers:` hash the caller passed to `sse`.
             # Merge the stream's own response_headers if it exposes them
             # (duck-type; non-SSE stream wrappers may not).
-            headers.each { |k, v| ks = k.to_s; vs = v.to_s; `#{js_headers}[#{ks}] = #{vs}` }
+            headers.each do |k, v|
+              ks = k.to_s
+              vs = v.to_s
+              `#{js_headers}[#{ks}] = #{vs}`
+            end
             if stream_obj.respond_to?(:response_headers)
-              stream_obj.response_headers.each { |k, v| ks = k.to_s; vs = v.to_s; `#{js_headers}[#{ks}] = #{vs}` }
+              stream_obj.response_headers.each do |k, v|
+                ks = k.to_s
+                vs = v.to_s
+                `#{js_headers}[#{ks}] = #{vs}`
+              end
             else
               # Legacy Cloudflare::AI::Stream (Phase 10.3) doesn't expose
               # response_headers; keep the hardcoded SSE defaults for
@@ -347,7 +401,9 @@ module Rack
               `#{js_headers}['cache-control'] = 'no-cache, no-transform'`
               `#{js_headers}['x-accel-buffering'] = 'no'`
             end
-            return `new Response(#{js_stream}, { status: #{status.to_i}, headers: #{js_headers} })`
+            return(
+              `new Response(#{js_stream}, { status: #{status.to_i}, headers: #{js_headers} })`
+            )
           end
 
           chunks = []
@@ -382,7 +438,8 @@ module Rack
           # Convert any `{ __multi__: true, values: [...] }` markers into
           # a real `Headers` object that Workers' `new Response(headers:)`
           # accepts. Single-valued headers stay as plain string values.
-          js_headers = `(function(h) {
+          js_headers =
+            `(function(h) {
             var hasMulti = false;
             for (var key in h) {
               if (h[key] && typeof h[key] === 'object' && h[key].__multi__ === true) {
@@ -411,7 +468,8 @@ module Rack
           has_promise = false
           chunks.each do |c|
             `#{js_chunks}.push(#{c})`
-            has_promise = true if `#{c} != null && typeof #{c}.then === 'function'`
+            has_promise =
+              true if `#{c} != null && typeof #{c}.then === 'function'`
           end
 
           if has_promise
@@ -429,7 +487,7 @@ module Rack
             # (`.webSocket`) that a reconstructed Response would lose.
             `Promise.all(#{js_chunks}).then(function(resolved) { var bodyToText = function(v) { if (v == null) { return ''; } if (Array.isArray(v)) { var joined = ''; for (var j = 0; j < v.length; j++) { joined += bodyToText(v[j]); } return joined; } if (typeof v === 'string') { return v; } if (v != null && v.$$is_string) { return v.toString(); } try { return JSON.stringify(v); } catch (e) { return String(v); } }; for (var i = 0; i < resolved.length; i++) { var r = resolved[i]; if (r != null && typeof r === 'object' && typeof r['$raw_response?'] === 'function' && typeof r['$js_response'] === 'function') { try { if (r['$raw_response?']()) { return r['$js_response'](); } } catch (_) {} } } for (var i = 0; i < resolved.length; i++) { var r = resolved[i]; if (r != null && r.stream != null && r.content_type != null) { var bh = {}; bh['content-type'] = r.content_type; if (r.cache_control) bh['cache-control'] = r.cache_control; return new Response(r.stream, { status: #{status_int}, headers: bh }); } } if (resolved.length === 1 && resolved[0] != null && Array.isArray(resolved[0]) && resolved[0].length >= 1 && typeof resolved[0][0] === 'number') { var ov = resolved[0]; var ovs = ov[0]|0; var ovh = #{Cloudflare}.$headers_to_js(nil, #{js_headers}); var ovb = ''; if (ov.length >= 3 && ov[1] != null) { ovh = #{Cloudflare}.$headers_to_js(ov[1], #{js_headers}); ovb = bodyToText(ov[2]); } else if (ov.length >= 2) { ovb = bodyToText(ov[ov.length - 1]); } return new Response(ovb, { status: ovs, headers: ovh }); } var parts = []; for (var i = 0; i < resolved.length; i++) { var r = resolved[i]; if (r == null) { parts.push(''); continue; } if (typeof r === 'string') { parts.push(r); continue; } if (r != null && r.$$is_string) { parts.push(r.toString()); continue; } try { parts.push(JSON.stringify(r)); } catch (e) { parts.push(String(r)); } } return new Response(parts.join(''), { status: #{status_int}, headers: #{js_headers} }); })`
           else
-            body_str = ''
+            body_str = ""
             chunks.each { |c| body_str = body_str + c.to_s }
             `new Response(#{body_str}, { status: #{status_int}, headers: #{js_headers} })`
           end
@@ -487,9 +545,12 @@ module Cloudflare
     end
   end
 
-  class D1Error < BindingError; end
-  class KVError < BindingError; end
-  class R2Error < BindingError; end
+  class D1Error < BindingError
+  end
+  class KVError < BindingError
+  end
+  class R2Error < BindingError
+  end
 
   # Check whether the argument is a native JS Promise / thenable.
   # Ruby's `Object#then` (alias of `yield_self`) is a universal method
@@ -521,7 +582,7 @@ module Cloudflare
     h = {}
     return h if `#{js_obj} == null`
     keys = `Object.keys(#{js_obj})`
-    len  = `#{keys}.length`
+    len = `#{keys}.length`
     i = 0
     while i < len
       k = `#{keys}[#{i}]`
@@ -529,7 +590,7 @@ module Cloudflare
       # Normalize bare JS null/undefined to Ruby nil before storing them.
       if `#{v} == null`
         v = nil
-      # Recurse for nested plain objects (but not Arrays, Dates, etc.)
+        # Recurse for nested plain objects (but not Arrays, Dates, etc.)
       elsif `typeof #{v} === 'object' && !Array.isArray(#{v}) && !(#{v} instanceof Date)`
         v = js_object_to_hash(v)
       end
@@ -570,9 +631,11 @@ module Cloudflare
 
     # Rack body contract — yield nothing. The bytes never flow
     # through Ruby; the JS Response goes straight to the runtime.
-    def each; end
+    def each
+    end
 
-    def close; end
+    def close
+    end
 
     def raw_response?
       true
@@ -586,7 +649,11 @@ module Cloudflare
   class BinaryBody
     attr_reader :stream, :content_type, :cache_control
 
-    def initialize(stream, content_type = 'application/octet-stream', cache_control = nil)
+    def initialize(
+      stream,
+      content_type = "application/octet-stream",
+      cache_control = nil
+    )
       @stream = stream
       @content_type = content_type
       @cache_control = cache_control
@@ -594,9 +661,11 @@ module Cloudflare
 
     # Rack body contract — yield nothing so Sinatra's content-length
     # calculation skips this body. The real bytes go through JS.
-    def each; end
+    def each
+    end
 
-    def close; end
+    def close
+    end
   end
 
   # EmbeddedBinaryBody carries a base64-encoded asset payload produced at
@@ -605,22 +674,34 @@ module Cloudflare
   class EmbeddedBinaryBody
     attr_reader :body_base64, :content_type, :cache_control
 
-    def initialize(body_base64, content_type = 'application/octet-stream', cache_control = nil)
-      @body_base64 = body_base64 || ''
+    def initialize(
+      body_base64,
+      content_type = "application/octet-stream",
+      cache_control = nil
+    )
+      @body_base64 = body_base64 || ""
       @content_type = content_type
       @cache_control = cache_control
     end
 
-    def each; end
+    def each
+    end
 
-    def close; end
+    def close
+    end
 
     def raw_response(status, headers = {})
       js_headers = `({})`
-      headers.each { |k, v| ks = k.to_s; vs = v.to_s; `#{js_headers}[#{ks}] = #{vs}` }
+      headers.each do |k, v|
+        ks = k.to_s
+        vs = v.to_s
+        `#{js_headers}[#{ks}] = #{vs}`
+      end
       `#{js_headers}['content-type'] = #{@content_type}` if @content_type
       `#{js_headers}['cache-control'] = #{@cache_control}` if @cache_control
-      RawResponse.new(`new Response(#{stream}, { status: #{status.to_i}, headers: #{js_headers} })`)
+      RawResponse.new(
+        `new Response(#{stream}, { status: #{status.to_i}, headers: #{js_headers} })`
+      )
     end
 
     def stream
@@ -721,12 +802,17 @@ module Cloudflare
         result = result.__await__
       end
       return result unless result.is_a?(Hash)
-      nested = result['meta']
+      nested = result["meta"]
       return result unless nested.is_a?(Hash)
 
-      %w[last_row_id changes duration size_after rows_read rows_written].each do |k|
-        result[k] = nested[k] unless result.key?(k)
-      end
+      %w[
+        last_row_id
+        changes
+        duration
+        size_after
+        rows_read
+        rows_written
+      ].each { |k| result[k] = nested[k] unless result.key?(k) }
       result
     end
 
@@ -855,7 +941,7 @@ module Cloudflare
     end
 
     # Put a value. `body` may be a String. Returns a JS Promise.
-    def put(key, body, content_type = 'application/octet-stream')
+    def put(key, body, content_type = "application/octet-stream")
       js_bucket = @js
       `#{js_bucket}.put(#{key}, #{body}, { httpMetadata: { contentType: #{content_type} } })`
     end
@@ -891,7 +977,10 @@ module Cloudflare
       `#{opts}.cursor = #{cursor}` if cursor
       if include && !include.empty?
         js_include = `[]`
-        include.each { |v| vs = v.to_s; `#{js_include}.push(#{vs})` }
+        include.each do |v|
+          vs = v.to_s
+          `#{js_include}.push(#{vs})`
+        end
         `#{opts}.include = #{js_include}`
       end
       `#{js_bucket}.list(#{opts}).then(function(res) { var rows = []; var arr = res && res.objects ? res.objects : []; for (var i = 0; i < arr.length; i++) { var o = arr[i]; var ct = (o.httpMetadata && o.httpMetadata.contentType) || 'application/octet-stream'; var h = new Map(); h.set('key', o.key); h.set('size', o.size|0); h.set('uploaded', o.uploaded ? o.uploaded.toISOString() : null); h.set('content_type', ct); rows.push(h); } return rows; })`
@@ -907,29 +996,45 @@ module Cloudflare
     end
 
     def attach!(env, js_env, js_ctx = nil)
-      env['cloudflare.env'] = js_env
-      env['cloudflare.ctx'] = js_ctx unless `(#{js_ctx} == null || #{js_ctx} === undefined || #{js_ctx} === Opal.nil)`
-      return env if `(#{js_env} == null || #{js_env} === undefined || #{js_env} === Opal.nil)`
+      env["cloudflare.env"] = js_env
+      env[
+        "cloudflare.ctx"
+      ] = js_ctx unless `(#{js_ctx} == null || #{js_ctx} === undefined || #{js_ctx} === Opal.nil)`
+      if `(#{js_env} == null || #{js_env} === undefined || #{js_env} === Opal.nil)`
+        return env
+      end
 
       js_db = `#{js_env} && #{js_env}.DB`
       js_kv = `#{js_env} && #{js_env}.KV`
       js_r2 = `#{js_env} && #{js_env}.BUCKET`
       js_ai = `#{js_env} && #{js_env}.AI`
-      env['cloudflare.DB']     = D1Database.new(js_db)  if `#{js_db} != null`
-      env['cloudflare.KV']     = KVNamespace.new(js_kv) if `#{js_kv} != null`
-      env['cloudflare.BUCKET'] = R2Bucket.new(js_r2)    if `#{js_r2} != null`
-      env['cloudflare.AI']     = js_ai                  if `#{js_ai} != null`
+      env["cloudflare.DB"] = D1Database.new(js_db) if `#{js_db} != null`
+      env["cloudflare.KV"] = KVNamespace.new(js_kv) if `#{js_kv} != null`
+      env["cloudflare.BUCKET"] = R2Bucket.new(js_r2) if `#{js_r2} != null`
+      env["cloudflare.AI"] = js_ai if `#{js_ai} != null`
 
       attach_durable_object!(env, :counter, `#{js_env} && #{js_env}.COUNTER`)
-      attach_queue!(env, :jobs, `#{js_env} && #{js_env}.JOBS_QUEUE`, 'JOBS_QUEUE')
-      attach_queue!(env, :jobs_dlq, `#{js_env} && #{js_env}.JOBS_DLQ`, 'JOBS_DLQ')
+      attach_queue!(
+        env,
+        :jobs,
+        `#{js_env} && #{js_env}.JOBS_QUEUE`,
+        "JOBS_QUEUE"
+      )
+      attach_queue!(
+        env,
+        :jobs_dlq,
+        `#{js_env} && #{js_env}.JOBS_DLQ`,
+        "JOBS_DLQ"
+      )
       attach_send_email!(env, js_env)
 
       env
     end
 
     def attach_durable_object!(env, name, js_binding)
-      return env if `(#{js_binding} == null || #{js_binding} === undefined || #{js_binding} === Opal.nil)`
+      if `(#{js_binding} == null || #{js_binding} === undefined || #{js_binding} === Opal.nil)`
+        return env
+      end
       return env unless defined?(::Cloudflare::DurableObjectNamespace)
 
       suffix = normalize_binding_name(name)
@@ -938,7 +1043,9 @@ module Cloudflare
     end
 
     def attach_queue!(env, name, js_binding, binding_name)
-      return env if `(#{js_binding} == null || #{js_binding} === undefined || #{js_binding} === Opal.nil)`
+      if `(#{js_binding} == null || #{js_binding} === undefined || #{js_binding} === Opal.nil)`
+        return env
+      end
       return env unless defined?(::Cloudflare::Queue)
 
       suffix = normalize_binding_name(name)
@@ -951,14 +1058,17 @@ module Cloudflare
 
       js_send_email = `#{js_env} && #{js_env}.SEND_EMAIL`
       if `#{js_send_email} == null || #{js_send_email} === undefined`
-        js_send_email = `(typeof globalThis !== 'undefined' && globalThis.__OPAL_WORKERS__ && globalThis.__OPAL_WORKERS__.sendEmailBinding) || null`
+        js_send_email =
+          `(typeof globalThis !== 'undefined' && globalThis.__OPAL_WORKERS__ && globalThis.__OPAL_WORKERS__.sendEmailBinding) || null`
       end
-      env['cloudflare.SEND_EMAIL'] = Email.new(js_send_email) if `#{js_send_email} != null`
+      env["cloudflare.SEND_EMAIL"] = Email.new(
+        js_send_email
+      ) if `#{js_send_email} != null`
       env
     end
 
     def normalize_binding_name(name)
-      name.to_s.upcase.gsub(/[^A-Z0-9]+/, '_').sub(/\A_+/, '').sub(/_+\z/, '')
+      name.to_s.upcase.gsub(/[^A-Z0-9]+/, "_").sub(/\A_+/, "").sub(/_+\z/, "")
     end
 
     def durable_object(env, name, id_or_name = nil)
@@ -971,28 +1081,59 @@ module Cloudflare
     end
 
     def ai(env)
-      raw = env['cloudflare.AI']
-      return nil if `(#{raw} == null || #{raw} === undefined || #{raw} === Opal.nil)`
-      return raw if defined?(::Cloudflare::AI::Binding) && `(#{raw} != null && #{raw}.$$class === #{::Cloudflare::AI::Binding})`
-      return ::Cloudflare::AI::Binding.new(raw) if defined?(::Cloudflare::AI::Binding)
+      raw = env["cloudflare.AI"]
+      if `(#{raw} == null || #{raw} === undefined || #{raw} === Opal.nil)`
+        return nil
+      end
+      if defined?(::Cloudflare::AI::Binding) &&
+           `(#{raw} != null && #{raw}.$$class === #{::Cloudflare::AI::Binding})`
+        return raw
+      end
+      if defined?(::Cloudflare::AI::Binding)
+        return ::Cloudflare::AI::Binding.new(raw)
+      end
 
       raw
     end
   end
 
   module BindingHelpers
-    def cf_env; env['cloudflare.env']; end
-    def cf_ctx; env['cloudflare.ctx']; end
-    def d1; env['cloudflare.DB']; end
-    def db; d1; end
-    def kv; env['cloudflare.KV']; end
-    def bucket; env['cloudflare.BUCKET']; end
-    def ai; Cloudflare::Bindings.ai(env); end
-    def send_email; env['cloudflare.SEND_EMAIL']; end
-    def jobs_queue; env['cloudflare.QUEUE_JOBS']; end
-    def jobs_dlq; env['cloudflare.QUEUE_JOBS_DLQ']; end
-    def do_counter; env['cloudflare.DO_COUNTER']; end
-    def cache; @__homura_cache ||= Cloudflare::Cache.default; end
+    def cf_env
+      env["cloudflare.env"]
+    end
+    def cf_ctx
+      env["cloudflare.ctx"]
+    end
+    def d1
+      env["cloudflare.DB"]
+    end
+    def db
+      d1
+    end
+    def kv
+      env["cloudflare.KV"]
+    end
+    def bucket
+      env["cloudflare.BUCKET"]
+    end
+    def ai
+      Cloudflare::Bindings.ai(env)
+    end
+    def send_email
+      env["cloudflare.SEND_EMAIL"]
+    end
+    def jobs_queue
+      env["cloudflare.QUEUE_JOBS"]
+    end
+    def jobs_dlq
+      env["cloudflare.QUEUE_JOBS_DLQ"]
+    end
+    def do_counter
+      env["cloudflare.DO_COUNTER"]
+    end
+    def cache
+      @__homura_cache ||= Cloudflare::Cache.default
+    end
 
     def durable_object(name, id_or_name = nil)
       Cloudflare::Bindings.durable_object(env, name, id_or_name)
@@ -1003,7 +1144,7 @@ end
 # Phase 6 — HTTP client foundation. Loaded as part of the Cloudflare
 # Workers adapter so user code can simply `require 'sinatra/base'`
 # and use Net::HTTP / Cloudflare::HTTP.fetch without an extra require.
-require 'homura/runtime/http'
+require "homura/runtime/http"
 
 # Phase 9 — Scheduled (Cron Triggers) dispatcher. Installs the JS
 # `globalThis.__HOMURA_SCHEDULED_DISPATCH__` hook that
@@ -1011,11 +1152,11 @@ require 'homura/runtime/http'
 # Must be loaded after the Cloudflare::* binding wrappers above
 # because it constructs D1Database/KVNamespace/R2Bucket instances
 # inside the dispatcher's per-job env.
-require 'homura/runtime/scheduled'
+require "homura/runtime/scheduled"
 
 # Phase 10 — Workers AI binding wrapper. Loaded here so any Sinatra
 # route can call the `ai` helper without an extra require.
-require 'homura/runtime/ai'
+require "homura/runtime/ai"
 
 # Phase 11A — HTTP foundations.
 #
@@ -1024,17 +1165,17 @@ require 'homura/runtime/ai'
 # `stream`    adds `Cloudflare::SSEStream` + `Sinatra::Streaming#sse`
 #             so a route can `sse do |out| ... end` and flush chunks
 #             through a Workers ReadableStream.
-require 'homura/runtime/multipart'
-require 'homura/runtime/stream'
+require "homura/runtime/multipart"
+require "homura/runtime/stream"
 
 # Phase 11B — Cloudflare native bindings (Durable Objects / Cache /
 # Queues). Each file registers its own globalThis dispatcher hook
 # where applicable (DO / Queue consumer). Loaded here so user code
 # just needs `require 'sinatra/base'` — no extra `require` per
 # binding.
-require 'homura/runtime/cache'
-require 'homura/runtime/queue'
-require 'homura/runtime/email'
-require 'homura/runtime/durable_object'
+require "homura/runtime/cache"
+require "homura/runtime/queue"
+require "homura/runtime/email"
+require "homura/runtime/durable_object"
 
-require 'homura/runtime/async_registry'
+require "homura/runtime/async_registry"

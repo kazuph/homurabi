@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require 'parser/source/tree_rewriter'
+require "parser/source/tree_rewriter"
 
 module HomuraRuntime
   module AutoAwait

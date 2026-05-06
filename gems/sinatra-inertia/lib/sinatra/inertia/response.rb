@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require_relative 'deferred'
+require_relative "deferred"
 
 module Sinatra
   module Inertia
@@ -12,12 +12,27 @@ module Sinatra
     # responses, or interpolated into the layout's `data-page` attribute
     # for full HTML responses.
     class Response
-      attr_reader :component, :props, :request, :version, :url,
-                  :encrypt_history, :clear_history, :shared, :errors
+      attr_reader :component,
+                  :props,
+                  :request,
+                  :version,
+                  :url,
+                  :encrypt_history,
+                  :clear_history,
+                  :shared,
+                  :errors
 
-      def initialize(component:, props:, request:, version:, url: nil,
-                     encrypt_history: false, clear_history: false,
-                     shared: {}, errors: nil)
+      def initialize(
+        component:,
+        props:,
+        request:,
+        version:,
+        url: nil,
+        encrypt_history: false,
+        clear_history: false,
+        shared: {},
+        errors: nil
+      )
         @component = component
         @props = props || {}
         @request = request
@@ -55,7 +70,8 @@ module Sinatra
           key = keys[i]
           value = merged_props[key]
           k = key.to_sym
-          included, materialized = decide(value, k, partial, partial_data, partial_except)
+          included, materialized =
+            decide(value, k, partial, partial_data, partial_except)
           if included
             resolved[k] = await_if_promise(materialized)
             if value.is_a?(Prop) && value.merge? && !reset.include?(k)
@@ -85,19 +101,19 @@ module Sinatra
       private
 
       def partial_request?
-        request.env['HTTP_X_INERTIA_PARTIAL_COMPONENT'] == component
+        request.env["HTTP_X_INERTIA_PARTIAL_COMPONENT"] == component
       end
 
       def partial_data_keys
-        raw = request.env['HTTP_X_INERTIA_PARTIAL_DATA'].to_s
+        raw = request.env["HTTP_X_INERTIA_PARTIAL_DATA"].to_s
         return nil if raw.empty?
-        raw.split(',').map(&:strip).reject(&:empty?).map(&:to_sym)
+        raw.split(",").map(&:strip).reject(&:empty?).map(&:to_sym)
       end
 
       def partial_except_keys
-        raw = request.env['HTTP_X_INERTIA_PARTIAL_EXCEPT'].to_s
+        raw = request.env["HTTP_X_INERTIA_PARTIAL_EXCEPT"].to_s
         return nil if raw.empty?
-        raw.split(',').map(&:strip).reject(&:empty?).map(&:to_sym)
+        raw.split(",").map(&:strip).reject(&:empty?).map(&:to_sym)
       end
 
       # Inertia 2.0: `X-Inertia-Reset: a,b` tells the server "the client
@@ -106,29 +122,29 @@ module Sinatra
       # outbound `mergeProps` array — the value itself is still resolved
       # and emitted, so the client just doesn't accumulate it.
       def reset_keys
-        raw = request.env['HTTP_X_INERTIA_RESET'].to_s
+        raw = request.env["HTTP_X_INERTIA_RESET"].to_s
         return [] if raw.empty?
-        raw.split(',').map(&:strip).reject(&:empty?).map(&:to_sym)
+        raw.split(",").map(&:strip).reject(&:empty?).map(&:to_sym)
       end
 
       # Returns [included?, resolved_value]
       def decide(value, key, partial, partial_data, partial_except)
         if value.is_a?(Prop)
           if value.always?
-            return [true, value.resolve]
+            return true, value.resolve
           elsif value.deferred?
-            return [false, nil] unless partial && partial_data&.include?(key)
-            return [true, value.resolve]
+            return false, nil unless partial && partial_data&.include?(key)
+            return true, value.resolve
           elsif value.optional?
-            return [false, nil] unless partial && partial_data&.include?(key)
-            return [true, value.resolve]
+            return false, nil unless partial && partial_data&.include?(key)
+            return true, value.resolve
           else
             # merge / once / plain Prop
             if partial
-              return [false, nil] if partial_data && !partial_data.include?(key)
-              return [false, nil] if partial_except&.include?(key)
+              return false, nil if partial_data && !partial_data.include?(key)
+              return false, nil if partial_except&.include?(key)
             end
-            return [true, value.resolve]
+            return true, value.resolve
           end
         end
 
@@ -136,16 +152,16 @@ module Sinatra
           # A bare Proc/Lambda is treated as plain lazy: resolved every
           # request, but only when included.
           if partial
-            return [false, nil] if partial_data && !partial_data.include?(key)
-            return [false, nil] if partial_except&.include?(key)
+            return false, nil if partial_data && !partial_data.include?(key)
+            return false, nil if partial_except&.include?(key)
           end
-          return [true, value.call]
+          return true, value.call
         end
 
         # Plain value
         if partial
-          return [false, nil] if partial_data && !partial_data.include?(key)
-          return [false, nil] if partial_except&.include?(key)
+          return false, nil if partial_data && !partial_data.include?(key)
+          return false, nil if partial_except&.include?(key)
         end
         [true, value]
       end
@@ -167,7 +183,8 @@ module Sinatra
       # via `.__await__`. On MRI this branch is dead code (no Cloudflare
       # constant, no js_promise?), so plain Ruby tests are unaffected.
       def await_if_promise(value)
-        if defined?(::Cloudflare) && ::Cloudflare.respond_to?(:js_promise?) && ::Cloudflare.js_promise?(value)
+        if defined?(::Cloudflare) && ::Cloudflare.respond_to?(:js_promise?) &&
+             ::Cloudflare.js_promise?(value)
           value.__await__
         else
           value

@@ -1,0 +1,48 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "open3"
+
+files_script = File.expand_path("first-party-ruby-files", __dir__)
+
+staged = ARGV.delete("--staged")
+mode = ARGV.delete("--check") ? "check" : "write"
+
+if ARGV.any? { |arg| arg.start_with?("-") }
+  abort("usage: ruby bin/format-ruby [--check] [--staged] [PATH ...]")
+end
+
+candidate_paths =
+  if staged
+    stdout, status =
+      Open3.capture2(
+        "git",
+        "diff",
+        "--cached",
+        "--name-only",
+        "--diff-filter=ACMR",
+        "-z"
+      )
+    abort("bin/format-ruby: git diff --cached failed") unless status.success?
+
+    stdout.split("\0").reject(&:empty?)
+  else
+    ARGV
+  end
+
+command = [files_script, "--print0", *candidate_paths]
+files = IO.popen(command, &:read).split("\0").reject(&:empty?)
+
+if files.empty?
+  exit 0 if staged
+
+  abort("bin/format-ruby: no first-party Ruby files found")
+end
+
+success = system("bundle", "exec", "stree", mode, *files)
+exit 1 unless success
+
+if staged && mode == "write"
+  success = system("git", "add", "--", *files)
+  exit 1 unless success
+end

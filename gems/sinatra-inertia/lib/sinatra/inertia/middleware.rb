@@ -19,8 +19,8 @@ module Sinatra
     # The middleware is `register`-ed automatically by `Sinatra::Inertia`
     # via `app.use`, so consumer apps don't need to wire it manually.
     class Middleware
-      INERTIA_HEADER = 'HTTP_X_INERTIA'
-      INERTIA_VERSION_HEADER = 'HTTP_X_INERTIA_VERSION'
+      INERTIA_HEADER = "HTTP_X_INERTIA"
+      INERTIA_VERSION_HEADER = "HTTP_X_INERTIA_VERSION"
 
       def initialize(app, version:)
         @app = app
@@ -29,10 +29,10 @@ module Sinatra
 
       def call(env)
         if inertia_get?(env) && version_mismatch?(env)
-          location = env['REQUEST_URI'] || build_url(env)
+          location = env["REQUEST_URI"] || build_url(env)
           return [
             409,
-            { 'X-Inertia-Location' => location, 'Vary' => 'X-Inertia' },
+            { "X-Inertia-Location" => location, "Vary" => "X-Inertia" },
             []
           ]
         end
@@ -44,8 +44,8 @@ module Sinatra
         # requests: a Sinatra app may serve plain REST endpoints alongside
         # Inertia pages, and rewriting their 302s would silently change
         # HTTP semantics for non-Inertia clients.
-        if status == 302 && env[INERTIA_HEADER] == 'true' &&
-           %w[POST PUT PATCH DELETE].include?(env['REQUEST_METHOD'])
+        if status == 302 && env[INERTIA_HEADER] == "true" &&
+             %w[POST PUT PATCH DELETE].include?(env["REQUEST_METHOD"])
           status = 303
         end
 
@@ -55,7 +55,7 @@ module Sinatra
       private
 
       def inertia_get?(env)
-        env[INERTIA_HEADER] == 'true' && env['REQUEST_METHOD'] == 'GET'
+        env[INERTIA_HEADER] == "true" && env["REQUEST_METHOD"] == "GET"
       end
 
       def version_mismatch?(env)
@@ -70,10 +70,10 @@ module Sinatra
       end
 
       def build_url(env)
-        scheme = env['rack.url_scheme'] || 'http'
-        host = env['HTTP_HOST'] || env['SERVER_NAME']
-        path = env['PATH_INFO']
-        qs = env['QUERY_STRING']
+        scheme = env["rack.url_scheme"] || "http"
+        host = env["HTTP_HOST"] || env["SERVER_NAME"]
+        path = env["PATH_INFO"]
+        qs = env["QUERY_STRING"]
         full = +"#{scheme}://#{host}#{path}"
         full << "?#{qs}" if qs && !qs.empty?
         full

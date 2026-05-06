@@ -12,11 +12,11 @@
 #   npm run test:auto-await
 #   npm test
 
-require 'json'
+require "json"
 
-$LOAD_PATH.unshift(File.expand_path('../gems/homura-runtime/lib', __dir__))
-require 'homura/runtime/async_registry'
-require 'homura/runtime/auto_await/analyzer'
+$LOAD_PATH.unshift(File.expand_path("../gems/homura-runtime/lib", __dir__))
+require "homura/runtime/async_registry"
+require "homura/runtime/auto_await/analyzer"
 
 module SmokeTest
   @passed = 0
@@ -53,14 +53,14 @@ end
 HomuraRuntime::AsyncRegistry.reset!
 
 HomuraRuntime::AsyncRegistry.register_async_source do
-  async_accessor :env, :'cloudflare.DB', 'Cloudflare::D1Database'
-  async_accessor :env, :'cloudflare.KV', 'Cloudflare::KVNamespace'
-  helper_factory :db,  'Cloudflare::D1Database'
-  helper_factory :kv,  'Cloudflare::KVNamespace'
-  async_method 'Cloudflare::D1Database', :execute
-  async_method 'Cloudflare::KVNamespace', :get
-  async_method 'Cloudflare::AI', :run
-  async_helper :load_chat_history, 'Homura::ChatHistoryHelpers'
+  async_accessor :env, :"cloudflare.DB", "Cloudflare::D1Database"
+  async_accessor :env, :"cloudflare.KV", "Cloudflare::KVNamespace"
+  helper_factory :db, "Cloudflare::D1Database"
+  helper_factory :kv, "Cloudflare::KVNamespace"
+  async_method "Cloudflare::D1Database", :execute
+  async_method "Cloudflare::KVNamespace", :get
+  async_method "Cloudflare::AI", :run
+  async_helper :load_chat_history, "Homura::ChatHistoryHelpers"
 end
 
 # ------------------------------------------------------------------
@@ -71,7 +71,7 @@ end
 def analyze(source)
   registry = HomuraRuntime::AsyncRegistry.instance
   analyzer = HomuraRuntime::AutoAwait::Analyzer.new(registry)
-  _buffer, nodes = analyzer.process(source, '(smoke)')
+  _buffer, nodes = analyzer.process(source, "(smoke)")
   nodes.map { |n| n.loc.expression.source }
 end
 
@@ -172,7 +172,7 @@ SmokeTest.assert("async_helper load_chat_history is awaited") do
       history.size
     end
   RUBY
-  analyze(source).include?('load_chat_history(session_id)')
+  analyze(source).include?("load_chat_history(session_id)")
 end
 
 # 9. Async class methods like Cloudflare::AI.run are awaited
@@ -183,7 +183,9 @@ SmokeTest.assert("Cloudflare::AI.run is awaited") do
       result.to_s
     end
   RUBY
-  analyze(source).include?("Cloudflare::AI.run(model, { messages: [] }, binding: env['cloudflare.AI'])")
+  analyze(source).include?(
+    "Cloudflare::AI.run(model, { messages: [] }, binding: env['cloudflare.AI'])"
+  )
 end
 
 SmokeTest.summary

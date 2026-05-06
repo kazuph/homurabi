@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
-require 'json'
-require_relative 'response'
+require "json"
+require_relative "response"
 
 module Sinatra
   module Inertia
@@ -22,13 +22,14 @@ module Sinatra
 
         version = current_inertia_version
         shared = current_inertia_shared
-        encrypt = if !@inertia_encrypt_history_override.nil?
-                    @inertia_encrypt_history_override == true
-                  elsif settings.respond_to?(:inertia_encrypt_history)
-                    settings.inertia_encrypt_history == true
-                  else
-                    false
-                  end
+        encrypt =
+          if !@inertia_encrypt_history_override.nil?
+            @inertia_encrypt_history_override == true
+          elsif settings.respond_to?(:inertia_encrypt_history)
+            settings.inertia_encrypt_history == true
+          else
+            false
+          end
         clear = @inertia_clear_history == true
 
         # Set the protocol response headers BEFORE we touch any async
@@ -40,8 +41,8 @@ module Sinatra
         # regardless of how the underlying runtime schedules the
         # awaited continuation.
         if inertia_request?
-          content_type 'application/json; charset=utf-8'
-          headers 'X-Inertia' => 'true', 'Vary' => 'X-Inertia'
+          content_type "application/json; charset=utf-8"
+          headers "X-Inertia" => "true", "Vary" => "X-Inertia"
         end
 
         # Read errors *before* sweeping so the response carries them, then
@@ -51,17 +52,18 @@ module Sinatra
         errors_payload = inertia_errors_payload
         sweep_inertia_session!
 
-        response_obj = Sinatra::Inertia::Response.new(
-          component: component,
-          props: props,
-          request: request,
-          version: version,
-          url: request.fullpath,
-          encrypt_history: encrypt,
-          clear_history: clear,
-          shared: shared,
-          errors: errors_payload
-        )
+        response_obj =
+          Sinatra::Inertia::Response.new(
+            component: component,
+            props: props,
+            request: request,
+            version: version,
+            url: request.fullpath,
+            encrypt_history: encrypt,
+            clear_history: clear,
+            shared: shared,
+            errors: errors_payload
+          )
         page_hash = response_obj.to_h
         page_json = page_hash.to_json
 
@@ -80,10 +82,19 @@ module Sinatra
       def render(*args, **kwargs, &block)
         first = args.first
         if args.length == 1 && first.is_a?(Hash) && first.key?(:inertia)
-          inertia(first[:inertia], props: first[:props] || {}, layout: first[:layout])
+          inertia(
+            first[:inertia],
+            props: first[:props] || {},
+            layout: first[:layout]
+          )
         elsif kwargs.key?(:inertia) && args.empty?
-          inertia(kwargs[:inertia], props: kwargs[:props] || {}, layout: kwargs[:layout])
-        elsif first.is_a?(String) && args.length <= 2 && (args.length == 1 || args[1].is_a?(Hash))
+          inertia(
+            kwargs[:inertia],
+            props: kwargs[:props] || {},
+            layout: kwargs[:layout]
+          )
+        elsif first.is_a?(String) && args.length <= 2 &&
+              (args.length == 1 || args[1].is_a?(Hash))
           layout = kwargs.delete(:layout)
           props = {}
           props.merge!(args[1]) if args[1].is_a?(Hash)
@@ -97,7 +108,7 @@ module Sinatra
       end
 
       def inertia_request?
-        request.env['HTTP_X_INERTIA'] == 'true'
+        request.env["HTTP_X_INERTIA"] == "true"
       end
 
       def page_request?
@@ -112,14 +123,14 @@ module Sinatra
       # exchange is already handled by the Inertia client; this helper is
       # mainly for hidden-field forms or non-XHR submissions.
       def csrf_token
-        request.env['sinatra.inertia.csrf_token']
+        request.env["sinatra.inertia.csrf_token"]
       end
 
       def always(value = nil, &block)
         Sinatra::Inertia.always(value, &block)
       end
 
-      def defer(group: 'default', &block)
+      def defer(group: "default", &block)
         Sinatra::Inertia.defer(group: group, &block)
       end
 
@@ -143,9 +154,7 @@ module Sinatra
         merged = {}
         blocks.each do |b|
           v = instance_exec(&b)
-          if v.is_a?(Hash)
-            merged = deep_merge(merged, v)
-          end
+          merged = deep_merge(merged, v) if v.is_a?(Hash)
         end
         merged
       end
@@ -153,11 +162,12 @@ module Sinatra
       # ------------------------------------------------------------------
       # Asset version
       def current_inertia_version
-        v = if settings.respond_to?(:page_version)
-              settings.page_version
-            elsif settings.respond_to?(:inertia_version)
-              settings.inertia_version
-            end
+        v =
+          if settings.respond_to?(:page_version)
+            settings.page_version
+          elsif settings.respond_to?(:inertia_version)
+            settings.inertia_version
+          end
         v.respond_to?(:call) ? v.call.to_s : v.to_s
       end
 
@@ -210,9 +220,7 @@ module Sinatra
         # assigning nil instead, which the JSON encoder still emits as
         # `null` and makes `inertia_errors_payload` treat the field as
         # absent on the next visit.
-        if session.respond_to?(:[]=)
-          session[:_inertia_errors] = nil
-        end
+        session[:_inertia_errors] = nil if session.respond_to?(:[]=)
       end
 
       private

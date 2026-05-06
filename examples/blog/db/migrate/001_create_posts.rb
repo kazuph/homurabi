@@ -5,7 +5,7 @@ Sequel.migration do
     create_table?(:posts) do
       primary_key :id
       String :title, null: false
-      String :body, null: false, default: ''
+      String :body, null: false, default: ""
       Integer :created_at, null: false
     end
   end

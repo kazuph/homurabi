@@ -20,9 +20,9 @@
 #
 # Tests stub globalThis.fetch so they are deterministic and offline.
 
-require 'json'
-require 'homura/runtime/http'
-require 'net/http'
+require "json"
+require "homura/runtime/http"
+require "net/http"
 
 # =====================================================================
 # Stub globalThis.fetch with a deterministic mock that records the
@@ -112,51 +112,60 @@ $stdout.puts ""
 
 $stdout.puts "--- Cloudflare::HTTP.fetch ---"
 
-SmokeTest.assert("GET returns Cloudflare::HTTPResponse with status 200") {
-  res = Cloudflare::HTTP.fetch('https://example.test/').__await__
+SmokeTest.assert("GET returns Cloudflare::HTTPResponse with status 200") do
+  res = Cloudflare::HTTP.fetch("https://example.test/").__await__
   res.is_a?(Cloudflare::HTTPResponse) && res.status == 200
-}
+end
 
-SmokeTest.assert("response.body returns String") {
-  res = Cloudflare::HTTP.fetch('https://example.test/').__await__
-  res.body == 'hello from stub'
-}
+SmokeTest.assert("response.body returns String") do
+  res = Cloudflare::HTTP.fetch("https://example.test/").__await__
+  res.body == "hello from stub"
+end
 
-SmokeTest.assert("response.headers is a Hash with lowercased keys") {
-  res = Cloudflare::HTTP.fetch('https://example.test/').__await__
-  res.headers['content-type'].to_s.include?('text/plain') &&
-    res.headers['x-stub'] == 'on'
-}
+SmokeTest.assert("response.headers is a Hash with lowercased keys") do
+  res = Cloudflare::HTTP.fetch("https://example.test/").__await__
+  res.headers["content-type"].to_s.include?("text/plain") &&
+    res.headers["x-stub"] == "on"
+end
 
-SmokeTest.assert("response.json parses application/json body") {
-  res = Cloudflare::HTTP.fetch('https://example.test/json').__await__
+SmokeTest.assert("response.json parses application/json body") do
+  res = Cloudflare::HTTP.fetch("https://example.test/json").__await__
   parsed = res.json
-  parsed['ok'] == true && parsed['n'] == 42
-}
+  parsed["ok"] == true && parsed["n"] == 42
+end
 
-SmokeTest.assert("404 response has status 404 and body 'gone'") {
-  res = Cloudflare::HTTP.fetch('https://example.test/notfound').__await__
-  res.status == 404 && res.body == 'gone' && !res.ok?
-}
+SmokeTest.assert("404 response has status 404 and body 'gone'") do
+  res = Cloudflare::HTTP.fetch("https://example.test/notfound").__await__
+  res.status == 404 && res.body == "gone" && !res.ok?
+end
 
-SmokeTest.assert("ok? is true for 2xx, false otherwise") {
-  ok  = Cloudflare::HTTP.fetch('https://example.test/').__await__.ok?
-  bad = Cloudflare::HTTP.fetch('https://example.test/notfound').__await__.ok?
+SmokeTest.assert("ok? is true for 2xx, false otherwise") do
+  ok = Cloudflare::HTTP.fetch("https://example.test/").__await__.ok?
+  bad = Cloudflare::HTTP.fetch("https://example.test/notfound").__await__.ok?
   ok == true && bad == false
-}
+end
 
-SmokeTest.assert("POST with body sends the body to the server") {
-  res = Cloudflare::HTTP.fetch('https://example.test/echo',
-                               method: 'POST', body: 'hi-there').__await__
-  res.body == 'POST:hi-there'
-}
+SmokeTest.assert("POST with body sends the body to the server") do
+  res =
+    Cloudflare::HTTP.fetch(
+      "https://example.test/echo",
+      method: "POST",
+      body: "hi-there"
+    ).__await__
+  res.body == "POST:hi-there"
+end
 
-SmokeTest.assert("POST forwards custom headers") {
-  res = Cloudflare::HTTP.fetch('https://example.test/headers',
-                               method: 'POST',
-                               headers: { 'x-marker' => 'm1' }).__await__
-  res.headers['x-custom'].to_s.include?('received:m1')
-}
+SmokeTest.assert("POST forwards custom headers") do
+  res =
+    Cloudflare::HTTP.fetch(
+      "https://example.test/headers",
+      method: "POST",
+      headers: {
+        "x-marker" => "m1"
+      }
+    ).__await__
+  res.headers["x-custom"].to_s.include?("received:m1")
+end
 
 $stdout.puts ""
 $stdout.puts "--- Net::HTTP shim ---"
@@ -165,42 +174,52 @@ $stdout.puts "--- Net::HTTP shim ---"
 # this file as async, so any helper that itself awaits a Promise still
 # returns a Promise. Sinatra routes (and these tests) need an explicit
 # `.__await__` on the call site, exactly like the D1/KV/R2 wrappers.
-SmokeTest.assert("Net::HTTP.get(URI) returns body String") {
-  body = Net::HTTP.get(URI('https://example.test/')).__await__
-  body == 'hello from stub'
-}
+SmokeTest.assert("Net::HTTP.get(URI) returns body String") do
+  body = Net::HTTP.get(URI("https://example.test/")).__await__
+  body == "hello from stub"
+end
 
-SmokeTest.assert("Net::HTTP.get(URI) accepts an HTTP URL") {
-  body = Net::HTTP.get(URI('http://example.test/')).__await__
-  body == 'hello from stub'
-}
+SmokeTest.assert("Net::HTTP.get(URI) accepts an HTTP URL") do
+  body = Net::HTTP.get(URI("http://example.test/")).__await__
+  body == "hello from stub"
+end
 
-SmokeTest.assert("Net::HTTP.get_response returns Net::HTTPResponse with code/body") {
-  res = Net::HTTP.get_response(URI('https://example.test/json')).__await__
-  res.is_a?(Net::HTTPResponse) && res.code == '200' && res.body.include?('"ok":true')
-}
+SmokeTest.assert(
+  "Net::HTTP.get_response returns Net::HTTPResponse with code/body"
+) do
+  res = Net::HTTP.get_response(URI("https://example.test/json")).__await__
+  res.is_a?(Net::HTTPResponse) && res.code == "200" &&
+    res.body.include?('"ok":true')
+end
 
-SmokeTest.assert("Net::HTTPResponse#[] reads a header (case insensitive)") {
-  res = Net::HTTP.get_response(URI('https://example.test/json')).__await__
-  res['content-type'].to_s.include?('application/json') &&
-    res['Content-Type'].to_s.include?('application/json')
-}
+SmokeTest.assert("Net::HTTPResponse#[] reads a header (case insensitive)") do
+  res = Net::HTTP.get_response(URI("https://example.test/json")).__await__
+  res["content-type"].to_s.include?("application/json") &&
+    res["Content-Type"].to_s.include?("application/json")
+end
 
-SmokeTest.assert("Net::HTTP.post_form sends urlencoded body") {
-  res = Net::HTTP.post_form(URI('https://example.test/form'),
-                            'name' => 'kazu', 'lang' => 'ja').__await__
+SmokeTest.assert("Net::HTTP.post_form sends urlencoded body") do
+  res =
+    Net::HTTP.post_form(
+      URI("https://example.test/form"),
+      "name" => "kazu",
+      "lang" => "ja"
+    ).__await__
   # body comes back as 'form:<urlencoded>'; both keys must appear
   b = res.body
-  b.start_with?('form:') && b.include?('name=kazu') && b.include?('lang=ja')
-}
+  b.start_with?("form:") && b.include?("name=kazu") && b.include?("lang=ja")
+end
 
 $stdout.puts ""
 $stdout.puts "--- URI sanity (Phase 6 prerequisites) ---"
 
-SmokeTest.assert("URI.parse('https://x.test/p?q=1#f') exposes scheme/host/path/query/fragment") {
-  u = URI.parse('https://x.test/p?q=1#f')
-  u.scheme == 'https' && u.host == 'x.test' && u.path == '/p' && u.query == 'q=1' && u.fragment == 'f'
-}
+SmokeTest.assert(
+  "URI.parse('https://x.test/p?q=1#f') exposes scheme/host/path/query/fragment"
+) do
+  u = URI.parse("https://x.test/p?q=1#f")
+  u.scheme == "https" && u.host == "x.test" && u.path == "/p" &&
+    u.query == "q=1" && u.fragment == "f"
+end
 
 # =====================================================================
 # Report

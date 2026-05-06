@@ -23,7 +23,7 @@
 # Each method keeps upstream semantics visible (same return value
 # shape, same block contract); only the control-flow shape differs.
 
-require 'sequel/core'
+require "sequel/core"
 
 module Sequel
   class Dataset
@@ -37,9 +37,9 @@ module Sequel
     # inner block fire first.
     def each
       if rp = row_proc
-        fetch_rows(select_sql){|r| yield rp.call(r)}.__await__
+        fetch_rows(select_sql) { |r| yield rp.call(r) }.__await__
       else
-        fetch_rows(select_sql){|r| yield r}.__await__
+        fetch_rows(select_sql) { |r| yield r }.__await__
       end
       self
     end
@@ -64,9 +64,9 @@ module Sequel
     # #with_sql_single_value which expect the block to have fired.
     def with_sql_each(sql)
       if rp = row_proc
-        _with_sql_dataset.fetch_rows(sql){|r| yield rp.call(r)}.__await__
+        _with_sql_dataset.fetch_rows(sql) { |r| yield rp.call(r) }.__await__
       else
-        _with_sql_dataset.fetch_rows(sql){|r| yield r}.__await__
+        _with_sql_dataset.fetch_rows(sql) { |r| yield r }.__await__
       end
       self
     end
@@ -79,9 +79,7 @@ module Sequel
       result = nil
       # with_sql_each is async now (awaits fetch_rows internally); we must
       # await here so `result` is populated before returning.
-      (with_sql_each(sql) do |r|
-        result = r if result.nil?
-      end).__await__
+      (with_sql_each(sql) { |r| result = r if result.nil? }).__await__
       result
     end
 
@@ -92,14 +90,16 @@ module Sequel
       value = nil
       found = false
       # each is async (patched in this file); must await.
-      (single_value_ds.each do |r|
-        next if found
-        r.each do |_, v|
+      (
+        single_value_ds.each do |r|
           next if found
-          value = v
-          found = true
+          r.each do |_, v|
+            next if found
+            value = v
+            found = true
+          end
         end
-      end).__await__
+      ).__await__
       found ? value : nil
     end
 

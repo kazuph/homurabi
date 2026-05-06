@@ -18,8 +18,8 @@
 # `/test/sequel`, `/test/jwt`, `/test/scheduled` and the dogfooded
 # routes in app/hello.rb.
 
-require 'cgi'
-require 'sinatra/base'
+require "cgi"
+require "sinatra/base"
 
 module Sinatra
   # ---------------------------------------------------------------
@@ -47,26 +47,29 @@ module Sinatra
         def parse_cookies_header(value)
           return {} if value.nil?
 
-          value.split(/; */n).each_with_object({}) do |cookie, cookies|
-            next if cookie.empty?
-            key, val = cookie.split('=', 2)
-            next if key.nil?
+          value
+            .split(/; */n)
+            .each_with_object({}) do |cookie, cookies|
+              next if cookie.empty?
+              key, val = cookie.split("=", 2)
+              next if key.nil?
 
-            decoded = if val.nil?
-                        nil
-                      else
-                        begin
-                          # decodeURIComponent semantics: decode every
-                          # percent-encoded octet but DO NOT touch literal `+`.
-                          # Cookies are not form-encoded, so the form-data
-                          # convention of mapping `+` to space does not apply.
-                          ::CGI.unescapeURIComponent(val)
-                        rescue ::StandardError
-                          val
-                        end
-                      end
-            cookies[key] = decoded unless cookies.key?(key)
-          end
+              decoded =
+                if val.nil?
+                  nil
+                else
+                  begin
+                    # decodeURIComponent semantics: decode every
+                    # percent-encoded octet but DO NOT touch literal `+`.
+                    # Cookies are not form-encoded, so the form-data
+                    # convention of mapping `+` to space does not apply.
+                    ::CGI.unescapeURIComponent(val)
+                  rescue ::StandardError
+                    val
+                  end
+                end
+              cookies[key] = decoded unless cookies.key?(key)
+            end
         end
 
         def parse_cookies(env)
@@ -86,7 +89,7 @@ module Sinatra
   # ---------------------------------------------------------------
   class Request < Rack::Request
     def forwarded?
-      @env.include?('HTTP_X_FORWARDED_HOST')
+      @env.include?("HTTP_X_FORWARDED_HOST")
     end
   end
 
@@ -106,7 +109,7 @@ module Sinatra
 
     def initialize(payload)
       @payload = payload
-      super('halt')
+      super("halt")
     end
   end
 
@@ -125,11 +128,15 @@ module Sinatra
     private
 
     def calculate_content_length?
-      return false unless headers['content-type']
-      return false if headers['content-length']
+      return false unless headers["content-type"]
+      return false if headers["content-length"]
       return false unless Array === body
-      return false if defined?(::Cloudflare) &&
-                      body.any? { |c| ::Cloudflare.js_promise?(c) || c.is_a?(::Cloudflare::BinaryBody) }
+      if defined?(::Cloudflare) &&
+           body.any? { |c|
+             ::Cloudflare.js_promise?(c) || c.is_a?(::Cloudflare::BinaryBody)
+           }
+        return false
+      end
       true
     end
   end
@@ -144,15 +151,18 @@ module Sinatra
   module Helpers
     def body(value = nil, &block)
       if block_given?
-        def block.each; yield(call) end
+        def block.each
+          yield(call)
+        end
         response.body = block
       elsif value
-        files_iterator = defined?(::Rack::Files::Iterator) ? ::Rack::Files::Iterator : nil
-        stream_cls     = defined?(::Sinatra::Stream) ? ::Sinatra::Stream : nil
+        files_iterator =
+          defined?(::Rack::Files::Iterator) ? ::Rack::Files::Iterator : nil
+        stream_cls = defined?(::Sinatra::Stream) ? ::Sinatra::Stream : nil
         unless request.head? ||
-               (files_iterator && value.is_a?(files_iterator)) ||
-               (stream_cls && value.is_a?(stream_cls))
-          headers.delete('content-length')
+                 (files_iterator && value.is_a?(files_iterator)) ||
+                 (stream_cls && value.is_a?(stream_cls))
+          headers.delete("content-length")
         end
         response.body = value
       else
@@ -181,14 +191,17 @@ module Sinatra
     def uri(addr = nil, absolute = true, add_script_name = true)
       return addr if addr.to_s =~ /\A[a-z][a-z0-9+.\-]*:/i
 
-      host = ''
+      host = ""
       if absolute
-        host = host + "http#{'s' if request.secure?}://"
-        host = host + if request.forwarded? || (request.port != (request.secure? ? 443 : 80))
-                       request.host_with_port
-                     else
-                       request.host
-                     end
+        host = host + "http#{"s" if request.secure?}://"
+        host =
+          host +
+            if request.forwarded? ||
+                 (request.port != (request.secure? ? 443 : 80))
+              request.host_with_port
+            else
+              request.host
+            end
       end
       uri = [host]
       uri << request.script_name.to_s if add_script_name
@@ -206,14 +219,18 @@ module Sinatra
     # preserve the redirect status/location reliably.
     # -------------------------------------------------------------
     def redirect(uri_value, *args)
-      http_version = env['SERVER_PROTOCOL'] || env['HTTP_VERSION']
-      if (http_version == 'HTTP/1.1') && (env['REQUEST_METHOD'] != 'GET')
+      http_version = env["SERVER_PROTOCOL"] || env["HTTP_VERSION"]
+      if (http_version == "HTTP/1.1") && (env["REQUEST_METHOD"] != "GET")
         status 303
       else
         status 302
       end
 
-      response['Location'] = uri(uri_value.to_s, settings.absolute_redirects?, settings.prefixed_redirects?)
+      response["Location"] = uri(
+        uri_value.to_s,
+        settings.absolute_redirects?,
+        settings.prefixed_redirects?
+      )
       raise HaltResponse.new(materialize_halt_payload(*args))
     end
 
@@ -227,25 +244,29 @@ module Sinatra
     # how Rack normalises Content-Type. Preserved that behaviour here.
     # -------------------------------------------------------------
     def content_type(type = nil, params = {})
-      return response['content-type'] unless type
+      return response["content-type"] unless type
 
       default = params.delete :default
       mime_type = mime_type(type) || default
-      raise format('Unknown media type: %p', type) if mime_type.nil?
+      raise format("Unknown media type: %p", type) if mime_type.nil?
 
       mime_type = mime_type.dup
-      unless params.include?(:charset) || settings.add_charset.all? { |p| !(p === mime_type) }
-        params[:charset] = params.delete('charset') || settings.default_encoding
+      unless params.include?(:charset) ||
+               settings.add_charset.all? { |p| !(p === mime_type) }
+        params[:charset] = params.delete("charset") || settings.default_encoding
       end
-      params.delete(:charset) if mime_type.include?('charset')
+      params.delete(:charset) if mime_type.include?("charset")
       unless params.empty?
-        mime_type += (mime_type.include?(';') ? ', ' : ';')
-        mime_type += params.map do |key, val|
-          val = val.inspect if val =~ /[";,]/
-          "#{key}=#{val}"
-        end.join(', ')
+        mime_type += (mime_type.include?(";") ? ", " : ";")
+        mime_type +=
+          params
+            .map do |key, val|
+              val = val.inspect if val =~ /[";,]/
+              "#{key}=#{val}"
+            end
+            .join(", ")
       end
-      response['content-type'] = mime_type
+      response["content-type"] = mime_type
     end
 
     # -------------------------------------------------------------
@@ -255,9 +276,9 @@ module Sinatra
     # is equivalent and slightly faster.
     # -------------------------------------------------------------
     def etag_matches?(list, new_resource = request.post?)
-      return !new_resource if list == '*'
+      return !new_resource if list == "*"
 
-      list.to_s.split(/\s*,\s*/).include?(response['ETag'])
+      list.to_s.split(/\s*,\s*/).include?(response["ETag"])
     end
 
     private
@@ -267,7 +288,7 @@ module Sinatra
       final_headers = response.headers.dup
       final_body = response.body
 
-      return [final_status, final_headers, final_body] if halt_response.empty?
+      return final_status, final_headers, final_body if halt_response.empty?
 
       res = halt_response.length == 1 ? halt_response.first : halt_response
       res = [res] if (Integer === res) || (String === res)
@@ -313,14 +334,17 @@ module Sinatra
     def uri(addr = nil, absolute = true, add_script_name = true)
       return addr if addr.to_s =~ /\A[a-z][a-z0-9+.\-]*:/i
 
-      host = ''
+      host = ""
       if absolute
-        host = host + "http#{'s' if request.secure?}://"
-        host = host + if request.forwarded? || (request.port != (request.secure? ? 443 : 80))
-                        request.host_with_port
-                      else
-                        request.host
-                      end
+        host = host + "http#{"s" if request.secure?}://"
+        host =
+          host +
+            if request.forwarded? ||
+                 (request.port != (request.secure? ? 443 : 80))
+              request.host_with_port
+            else
+              request.host
+            end
       end
       uri = [host]
       uri << request.script_name.to_s if add_script_name
@@ -328,40 +352,48 @@ module Sinatra
       File.join(uri)
     end
     alias_method :url, :uri
-    alias_method :to,  :uri
+    alias_method :to, :uri
 
     def redirect(uri_value, *args)
-      http_version = env['SERVER_PROTOCOL'] || env['HTTP_VERSION']
-      if (http_version == 'HTTP/1.1') && (env['REQUEST_METHOD'] != 'GET')
+      http_version = env["SERVER_PROTOCOL"] || env["HTTP_VERSION"]
+      if (http_version == "HTTP/1.1") && (env["REQUEST_METHOD"] != "GET")
         status 303
       else
         status 302
       end
 
-      response['Location'] = uri(uri_value.to_s, settings.absolute_redirects?, settings.prefixed_redirects?)
+      response["Location"] = uri(
+        uri_value.to_s,
+        settings.absolute_redirects?,
+        settings.prefixed_redirects?
+      )
       raise HaltResponse.new(materialize_halt_payload(*args))
     end
 
     def content_type(type = nil, params = {})
-      return response['content-type'] unless type
+      return response["content-type"] unless type
 
       default = params.delete :default
       mime_type = mime_type(type) || default
-      raise format('Unknown media type: %p', type) if mime_type.nil?
+      raise format("Unknown media type: %p", type) if mime_type.nil?
 
       mime_type = mime_type.dup
-      unless params.include?(:charset) || settings.add_charset.all? { |p| !(p === mime_type) }
-        params[:charset] = params.delete('charset') || settings.default_encoding
+      unless params.include?(:charset) ||
+               settings.add_charset.all? { |p| !(p === mime_type) }
+        params[:charset] = params.delete("charset") || settings.default_encoding
       end
-      params.delete(:charset) if mime_type.include?('charset')
+      params.delete(:charset) if mime_type.include?("charset")
       unless params.empty?
-        mime_type += (mime_type.include?(';') ? ', ' : ';')
-        mime_type += params.map do |key, val|
-          val = val.inspect if val =~ /[";,]/
-          "#{key}=#{val}"
-        end.join(', ')
+        mime_type += (mime_type.include?(";") ? ", " : ";")
+        mime_type +=
+          params
+            .map do |key, val|
+              val = val.inspect if val =~ /[";,]/
+              "#{key}=#{val}"
+            end
+            .join(", ")
       end
-      response['content-type'] = mime_type
+      response["content-type"] = mime_type
     end
 
     def halt(*halt_response)
@@ -393,8 +425,10 @@ module Sinatra
 
       return unless File.file?(path)
 
-      env['sinatra.static_file'] = path
-      cache_control(*settings.static_cache_control) if settings.static_cache_control?
+      env["sinatra.static_file"] = path
+      if settings.static_cache_control?
+        cache_control(*settings.static_cache_control)
+      end
       send_file(path, options.merge(disposition: nil))
     end
 
@@ -414,17 +448,17 @@ module Sinatra
     # allowing async route bodies to flow through `apply_invoke_result`.
     # -------------------------------------------------------------
     def call!(env)
-      @env      = env
-      @params   = IndifferentHash.new
-      @request  = Request.new(env)
+      @env = env
+      @params = IndifferentHash.new
+      @request = Request.new(env)
       @response = Response.new
       @pinned_response = nil
       template_cache.clear if settings.reload_templates
 
       dispatch!
-      invoke { error_block!(response.status) } unless @env['sinatra.error']
+      invoke { error_block!(response.status) } unless @env["sinatra.error"]
 
-      unless @response['content-type']
+      unless @response["content-type"]
         if Array === body && body[0].respond_to?(:content_type)
           content_type body[0].content_type
         elsif (default = settings.default_content_type)
@@ -515,7 +549,7 @@ module Sinatra
     def route_eval
       result = yield
       if defined?(::Cloudflare) && ::Cloudflare.js_promise?(result)
-        env['homura.async_route_active'] = true
+        env["homura.async_route_active"] = true
         result = capture_final_response_after(result)
       end
       throw :halt, result
@@ -549,7 +583,8 @@ module Sinatra
       return triple unless triple.length >= 3
 
       body = triple[2]
-      if body.nil? || `#{body} === null || #{body} === undefined || #{body} === Opal.nil`
+      if body.nil? ||
+           `#{body} === null || #{body} === undefined || #{body} === Opal.nil`
         triple = triple.dup
         triple[2] = []
       end
@@ -575,22 +610,34 @@ module Sinatra
     # -------------------------------------------------------------
     def process_route(pattern, conditions, block = nil, values = [])
       route = @request.path_info
-      route = '/' if route.empty? && !settings.empty_path_info?
-      route = route[0..-2] if !settings.strict_paths? && route != '/' && route.end_with?('/')
+      route = "/" if route.empty? && !settings.empty_path_info?
+      route = route[0..-2] if !settings.strict_paths? && route != "/" &&
+        route.end_with?("/")
 
       params = pattern.params(route)
       return unless params
 
-      params.delete('ignore')
+      params.delete("ignore")
       force_encoding(params)
       @params = @params.merge(params) { |_k, v1, v2| v2 || v1 } if params.any?
 
-      regexp_exists = pattern.is_a?(Mustermann::Regular) ||
-                      (pattern.respond_to?(:patterns) && pattern.patterns.any? { |subpattern| subpattern.is_a?(Mustermann::Regular) })
+      regexp_exists =
+        pattern.is_a?(Mustermann::Regular) ||
+          (
+            pattern.respond_to?(:patterns) &&
+              pattern.patterns.any? do |subpattern|
+                subpattern.is_a?(Mustermann::Regular)
+              end
+          )
       if regexp_exists
-        captures = pattern.match(route).captures.map { |c| URI_INSTANCE.unescape(c) if c }
+        captures =
+          pattern
+            .match(route)
+            .captures
+            .map { |c| URI_INSTANCE.unescape(c) if c }
         values += captures
-        @params[:captures] = force_encoding(captures) unless captures.nil? || captures.empty?
+        @params[:captures] = force_encoding(captures) unless captures.nil? ||
+          captures.empty?
       else
         values += params.values.flatten
       end
@@ -600,11 +647,13 @@ module Sinatra
         block ? block[self, values] : yield(self, values)
       end
     rescue StandardError
-      @env['sinatra.error.params'] = @params
+      @env["sinatra.error.params"] = @params
       raise
     ensure
       params ||= {}
-      params.each { |k, _| @params.delete(k) } unless @env['sinatra.error.params'] || @env['homura.async_route_active']
+      unless @env["sinatra.error.params"] || @env["homura.async_route_active"]
+        params.each { |k, _| @params.delete(k) }
+      end
     end
     private :process_route
 
@@ -633,7 +682,7 @@ module Sinatra
       # -----------------------------------------------------------
       def setup_default_middleware(builder)
         builder.use ExtendedRack
-        builder.use ShowExceptions       if show_exceptions?
+        builder.use ShowExceptions if show_exceptions?
         builder.use ::Rack::MethodOverride if method_override?
         builder.use ::Rack::Head
         setup_logging(builder)
@@ -671,7 +720,8 @@ module Sinatra
       def force_encoding(data, encoding = default_encoding)
         return if data == settings || data.is_a?(Tempfile)
 
-        present = `#{data} !== null && #{data} !== undefined && #{data} !== Opal.nil`
+        present =
+          `#{data} !== null && #{data} !== undefined && #{data} !== Opal.nil`
 
         if present && data.respond_to?(:force_encoding)
           data.force_encoding(encoding)
@@ -695,17 +745,22 @@ module Sinatra
     # malformed param entries.
     # -------------------------------------------------------------
     def dispatch!
-      @params.merge!(@request.params).each do |key, val|
-        next unless `#{val} !== null && #{val} !== undefined && #{val} !== Opal.nil` && val.respond_to?(:force_encoding)
+      @params
+        .merge!(@request.params)
+        .each do |key, val|
+          unless `#{val} !== null && #{val} !== undefined && #{val} !== Opal.nil` &&
+                   val.respond_to?(:force_encoding)
+            next
+          end
 
-        val = val.dup if val.frozen?
-        @params[key] = force_encoding(val)
-      end
+          val = val.dup if val.frozen?
+          @params[key] = force_encoding(val)
+        end
 
       invoke do
         static! if settings.static? && (request.get? || request.head?)
         filter! :before do
-          @pinned_response = !response['content-type'].nil?
+          @pinned_response = !response["content-type"].nil?
         end
         route!
       end
@@ -713,9 +768,9 @@ module Sinatra
       invoke { handle_exception!(e) }
     ensure
       begin
-        filter! :after unless env['sinatra.static_file']
+        filter! :after unless env["sinatra.static_file"]
       rescue ::Exception => e
-        invoke { handle_exception!(e) } unless @env['sinatra.error']
+        invoke { handle_exception!(e) } unless @env["sinatra.error"]
       end
     end
     private :dispatch!
@@ -759,10 +814,35 @@ module Sinatra
   # `enable'"). Re-delegate the canonical upstream list NOW so every
   # instance method is regenerated with the patched body.
   Delegator.delegate(
-    :get, :patch, :put, :post, :delete, :head, :options, :link, :unlink,
-    :template, :layout, :before, :after, :error, :not_found, :configure,
-    :set, :mime_type, :enable, :disable, :use, :development?, :test?,
-    :production?, :helpers, :settings, :register, :on_start, :on_stop
+    :get,
+    :patch,
+    :put,
+    :post,
+    :delete,
+    :head,
+    :options,
+    :link,
+    :unlink,
+    :template,
+    :layout,
+    :before,
+    :after,
+    :error,
+    :not_found,
+    :configure,
+    :set,
+    :mime_type,
+    :enable,
+    :disable,
+    :use,
+    :development?,
+    :test?,
+    :production?,
+    :helpers,
+    :settings,
+    :register,
+    :on_start,
+    :on_stop
   )
 end
 
@@ -775,5 +855,9 @@ end
 # just removes a no-op `headers(...)` call from `static!`, which we
 # already overrode above.
 # ---------------------------------------------------------------
-Sinatra::Base.set :host_authorization, {} if Sinatra::Base.respond_to?(:host_authorization)
-Sinatra::Base.set :static_headers, false if Sinatra::Base.respond_to?(:static_headers)
+if Sinatra::Base.respond_to?(:host_authorization)
+  Sinatra::Base.set :host_authorization, {}
+end
+if Sinatra::Base.respond_to?(:static_headers)
+  Sinatra::Base.set :static_headers, false
+end

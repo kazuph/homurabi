@@ -11,31 +11,31 @@
 # pipeline precompiles those templates with `bin/compile-erb` so the
 # Workers sandbox never has to call `eval` / `new Function` at runtime.
 
-require 'json'
-require 'time'
-require 'sinatra/homura'
-require 'net/http'
-require 'openssl'
-require 'securerandom'
-require 'base64'
-require 'jwt'
-require 'homura_markdown'
+require "json"
+require "time"
+require "sinatra/homura"
+require "net/http"
+require "openssl"
+require "securerandom"
+require "base64"
+require "jwt"
+require "homura_markdown"
 # Phase 11A — HTTP foundations. `faraday` is the compat shim living
 # under vendor/ (NOT the real ruby-faraday gem — see file header for
 # the rationale). The Cloudflare::Multipart parser and the SSEStream
 # helper are auto-required from lib/homura/runtime.rb.
-require 'faraday'
+require "faraday"
 # Phase 12 — Sequel (vendored v5.103.0) + D1 adapter (`sequel-d1` gem).
 # `Sequel.connect(adapter: :d1, d1: …)` uses the per-request D1 binding
 # from `d1` (wired by homura-runtime), and Dataset DSL compiles
 # to SQLite-dialect SQL which D1 speaks natively.
-require 'sequel'
+require "sequel"
 
-require_relative 'helpers/session_cookie'
-require_relative 'helpers/chat_history'
-require_relative 'helpers/debug_mail'
-require_relative 'lib/debug_mail_controller'
-require_relative 'helpers/markdown_render'
+require_relative "helpers/session_cookie"
+require_relative "helpers/chat_history"
+require_relative "helpers/debug_mail"
+require_relative "lib/debug_mail_controller"
+require_relative "helpers/markdown_render"
 
 class App < Sinatra::Base
   # Phase 8 — JWT auth. The secret is the default HS256 path; asymmetric
@@ -46,8 +46,8 @@ class App < Sinatra::Base
   # from a Workers secret (wrangler secret put JWT_SECRET) pulled via
   # `cf_env.JWT_SECRET`.
   register Sinatra::JwtAuth
-  set :jwt_secret, 'homura-phase8-demo-secret-change-me-in-prod'
-  set :jwt_algorithm, 'HS256'
+  set :jwt_secret, "homura-phase8-demo-secret-change-me-in-prod"
+  set :jwt_algorithm, "HS256"
   # Phase 9 — Cron Trigger DSL. Use `schedule '*/5 * * * *' do ... end`
   # below; matching jobs are dispatched from `src/worker.mjs#scheduled`
   # via `globalThis.__HOMURA_SCHEDULED_DISPATCH__`.
@@ -71,50 +71,57 @@ class App < Sinatra::Base
   #     end
   # ------------------------------------------------------------------
 
-  JWT_ACCESS_TTL  = 3600          # 1 hour
-  JWT_REFRESH_TTL = 86_400 * 30   # 30 days
+  JWT_ACCESS_TTL = 3600 # 1 hour
+  JWT_REFRESH_TTL = 86_400 * 30 # 30 days
 
   helpers Homura::JwtKeyHelpers
 
   # ------------------------------------------------------------------
   # Phase 9 — Cron Trigger handlers (see also /test/scheduled* routes).
   # ------------------------------------------------------------------
-  schedule '*/5 * * * *', name: 'heartbeat' do |event|
-    enabled = cf_env && `(#{cf_env}.HOMURA_ENABLE_SCHEDULED_DEMOS || '')`.to_s == '1'
+  schedule "*/5 * * * *", name: "heartbeat" do |event|
+    enabled =
+      cf_env && `(#{cf_env}.HOMURA_ENABLE_SCHEDULED_DEMOS || '')`.to_s == "1"
     next unless enabled
     # Insert one row into D1's heartbeats table per cron firing.
     # Falls back to a no-op when DB is not bound (test envs).
     if db
       db.execute_insert(
-        'INSERT INTO heartbeats (cron, scheduled_at, fired_at, note) VALUES (?, ?, ?, ?)',
-        [event.cron, event.scheduled_time.to_i, Time.now.to_i, 'phase9-heartbeat']
+        "INSERT INTO heartbeats (cron, scheduled_at, fired_at, note) VALUES (?, ?, ?, ?)",
+        [
+          event.cron,
+          event.scheduled_time.to_i,
+          Time.now.to_i,
+          "phase9-heartbeat"
+        ]
       )
     end
   end
 
-  schedule '0 */1 * * *', name: 'hourly-housekeeping' do |event|
-    enabled = cf_env && `(#{cf_env}.HOMURA_ENABLE_SCHEDULED_DEMOS || '')`.to_s == '1'
+  schedule "0 */1 * * *", name: "hourly-housekeeping" do |event|
+    enabled =
+      cf_env && `(#{cf_env}.HOMURA_ENABLE_SCHEDULED_DEMOS || '')`.to_s == "1"
     next unless enabled
     # Demo: bump a KV counter so we can prove hourly cron runs from
     # outside a test by inspecting `/kv/cron:hourly-counter` over HTTP.
     # Falls back to a no-op when KV is not bound (test envs).
     if kv
-      raw  = kv.get('cron:hourly-counter')
+      raw = kv.get("cron:hourly-counter")
       prev = 0
       if raw
         begin
-          prev = JSON.parse(raw)['count'].to_i
+          prev = JSON.parse(raw)["count"].to_i
         rescue StandardError
           prev = 0
         end
       end
       payload = {
-        'count'        => prev + 1,
-        'last_cron'    => event.cron,
-        'last_run_at'  => Time.now.to_i,
-        'last_sched_t' => event.scheduled_time.to_i
+        "count" => prev + 1,
+        "last_cron" => event.cron,
+        "last_run_at" => Time.now.to_i,
+        "last_sched_t" => event.scheduled_time.to_i
       }.to_json
-      kv.put('cron:hourly-counter', payload)
+      kv.put("cron:hourly-counter", payload)
     end
   end
 
@@ -132,12 +139,13 @@ class App < Sinatra::Base
   #                                    without waiting 5 minutes.
   # ------------------------------------------------------------------
   CHAT_MODELS = {
-    primary:  '@cf/google/gemma-4-26b-a4b-it',
-    fallback: '@cf/openai/gpt-oss-120b'
+    primary: "@cf/google/gemma-4-26b-a4b-it",
+    fallback: "@cf/openai/gpt-oss-120b"
   }.freeze
-  CHAT_HISTORY_LIMIT = 32       # last N messages kept in KV per session
-  CHAT_HISTORY_TTL   = 86_400 * 7  # 1 week
-  CHAT_SYSTEM_PROMPT = 'You are homura, a friendly Sinatra-on-Cloudflare-Workers assistant. Reply concisely. If the user writes Japanese, reply in Japanese. If the user writes English, reply in English.'
+  CHAT_HISTORY_LIMIT = 32 # last N messages kept in KV per session
+  CHAT_HISTORY_TTL = 86_400 * 7 # 1 week
+  CHAT_SYSTEM_PROMPT =
+    "You are homura, a friendly Sinatra-on-Cloudflare-Workers assistant. Reply concisely. If the user writes Japanese, reply in Japanese. If the user writes English, reply in English."
 
   # Workers AI response shaping lives in `Homura::ChatHistoryClassMethods#extract_ai_text`.
   extend Homura::ChatHistoryClassMethods
@@ -160,11 +168,11 @@ class App < Sinatra::Base
   # `helpers do ... end` so startup cost stays minimal — the
   # previous `helpers` block form pushed the Cloudflare deploy
   # startup past its CPU budget (code 10021).
-  SESSION_COOKIE_TTL  = 86_400
-  SESSION_COOKIE_NAME = 'homura_session'
+  SESSION_COOKIE_TTL = 86_400
+  SESSION_COOKIE_NAME = "homura_session"
 
   # Phase 17 — production /debug/mail gate (session username must match).
-  DEBUG_MAIL_ADMIN_USERNAME = 'kazuph'
+  DEBUG_MAIL_ADMIN_USERNAME = "kazuph"
 
   include Homura::SessionCookieInstanceMethods
   helpers Homura::DebugMailHelpers
@@ -173,18 +181,18 @@ class App < Sinatra::Base
   # mints an HMAC-signed session cookie carrying `username:exp`.
   # No password check — this is a demo of the signed-cookie
   # session flow, not an identity provider.
-  consume_queue 'homura-jobs-dlq' do |batch|
+  consume_queue "homura-jobs-dlq" do |batch|
     if kv
       msgs = batch.messages
       i = 0
       while i < msgs.length
         msg = msgs[i]
         record = {
-          'id'           => msg.id,
-          'body'         => msg.body,
-          'from_queue'   => batch.queue,
-          'dead_at'      => Time.now.to_i,
-          'batch_index'  => i
+          "id" => msg.id,
+          "body" => msg.body,
+          "from_queue" => batch.queue,
+          "dead_at" => Time.now.to_i,
+          "batch_index" => i
         }
         kv.put("queue:dlq:#{i}", record.to_json, expiration_ttl: 86_400)
         msg.ack
@@ -196,7 +204,7 @@ class App < Sinatra::Base
     batch.size
   end
 
-  consume_queue 'homura-jobs' do |batch|
+  consume_queue "homura-jobs" do |batch|
     # Under `# await: true`, using `Array#each` with an internal
     # `__await__` is unreliable because Opal yields to an async
     # callback whose return value is never awaited by `each` — some
@@ -214,17 +222,21 @@ class App < Sinatra::Base
         # exhausting `max_retries`. Exists so
         # `GET /demo/queue/dlq-status` can observe a live DLQ flow in
         # `wrangler dev` without a real failing job.
-        if body_hash['fail'] == true
+        if body_hash["fail"] == true
           msg.retry
         else
           record = {
-            'id'           => msg.id,
-            'body'         => msg.body,
-            'queue'        => batch.queue,
-            'consumed_at'  => Time.now.to_i,
-            'batch_index'  => i
+            "id" => msg.id,
+            "body" => msg.body,
+            "queue" => batch.queue,
+            "consumed_at" => Time.now.to_i,
+            "batch_index" => i
           }
-          kv.put("queue:last-consumed:#{i}", record.to_json, expiration_ttl: 86_400)
+          kv.put(
+            "queue:last-consumed:#{i}",
+            record.to_json,
+            expiration_ttl: 86_400
+          )
           msg.ack
         end
         i += 1
@@ -241,9 +253,11 @@ class App < Sinatra::Base
   # hibernation-aware storage writes. Uses state.storage (same path
   # that HTTP /inc uses) so `wrangler dev` + `/demo/do?action=peek`
   # sees the increments after a WebSocket session.
-  Cloudflare::DurableObject.define_web_socket_handlers('HomuraCounterDO',
-    on_message: ->(ws, message, state) {
-      text = `typeof #{message} === 'string' ? #{message} : (typeof Buffer !== 'undefined' && Buffer.isBuffer(#{message}) ? #{message}.toString('utf8') : '')`
+  Cloudflare::DurableObject.define_web_socket_handlers(
+    "HomuraCounterDO",
+    on_message: ->(ws, message, state) do
+      text =
+        `typeof #{message} === 'string' ? #{message} : (typeof Buffer !== 'undefined' && Buffer.isBuffer(#{message}) ? #{message}.toString('utf8') : '')`
       # Fire-and-forget the storage increment inside the async IIFE
       # so the ws.send is not blocked by the round-trip. We pass the
       # JS state into a single-line async fn to avoid the multi-line
@@ -251,8 +265,8 @@ class App < Sinatra::Base
       js_state_raw = state.js_state
       `(async function(ws, state, text) { try { var prev = (await state.storage.get('count')) || 0; var next = (typeof prev === 'number' ? prev : parseInt(prev, 10) || 0) + 1; await state.storage.put('count', next); ws.send('echo:' + text + ' count=' + next); } catch (e) { try { ws.send('error: ' + String(e && e.message || e)); } catch (_) {} } })(#{ws}, #{js_state_raw}, #{text})`
       nil
-    },
-    on_close: ->(ws, code, reason, _clean, _state) {
+    end,
+    on_close: ->(ws, code, reason, _clean, _state) do
       # Mirror the close back to the client so both sides agree on
       # the shutdown code. Hibernation API requires an explicit
       # server-side close call.
@@ -260,12 +274,12 @@ class App < Sinatra::Base
       r = reason.to_s
       `(function(ws, c, r) { try { ws.close(c, r); } catch (_) {} })(#{ws}, #{c}, #{r})`
       nil
-    },
-    on_error: ->(ws, err, _state) {
+    end,
+    on_error: ->(ws, err, _state) do
       # Just log the error — nothing meaningful to do beyond record it.
       `try { globalThis.console.error('[HomuraCounterDO.ws] error:', #{err}); } catch (_) {}`
       nil
-    }
+    end
   )
 
   # GET /demo/do/ws — upgrades to a WebSocket routed into the DO.
@@ -273,35 +287,35 @@ class App < Sinatra::Base
   # "echo:<text> count=<n>" where <n> is the shared counter, so a
   # single WS session also increments the same counter that
   # `/demo/do?action=peek` reads from over HTTP.
-  Cloudflare::DurableObject.define('HomuraCounterDO') do |state, request|
+  Cloudflare::DurableObject.define("HomuraCounterDO") do |state, request|
     path = request.path
-    prev = (state.storage.get('count') || 0).to_i
-    if path.end_with?('/inc')
+    prev = (state.storage.get("count") || 0).to_i
+    if path.end_with?("/inc")
       next_count = prev + 1
-      state.storage.put('count', next_count)
+      state.storage.put("count", next_count)
       [
         200,
-        { 'content-type' => 'application/json' },
+        { "content-type" => "application/json" },
         {
-          'count'       => next_count,
-          'previous'    => prev,
-          'path'        => path,
-          'do_id'       => state.id,
-          'updated_at'  => Time.now.to_i
+          "count" => next_count,
+          "previous" => prev,
+          "path" => path,
+          "do_id" => state.id,
+          "updated_at" => Time.now.to_i
         }.to_json
       ]
-    elsif path.end_with?('/reset')
-      state.storage.delete('count')
+    elsif path.end_with?("/reset")
+      state.storage.delete("count")
       [
         200,
-        { 'content-type' => 'application/json' },
-        { 'reset' => true, 'do_id' => state.id }.to_json
+        { "content-type" => "application/json" },
+        { "reset" => true, "do_id" => state.id }.to_json
       ]
     else
       [
         200,
-        { 'content-type' => 'application/json' },
-        { 'count' => prev, 'path' => path, 'do_id' => state.id }.to_json
+        { "content-type" => "application/json" },
+        { "count" => prev, "path" => path, "do_id" => state.id }.to_json
       ]
     end
   end
@@ -316,7 +330,7 @@ class App < Sinatra::Base
     def foundations_demos_enabled?
       return false unless cf_env
       val = `(#{cf_env} && #{cf_env}.HOMURA_ENABLE_FOUNDATIONS_DEMOS) || ''`
-      val.to_s == '1'
+      val.to_s == "1"
     end
   end
 
@@ -331,7 +345,7 @@ class App < Sinatra::Base
   # Routes are inlined into `build/routes_app_class_eval.rb` (App.class_eval)
   # by `bin/inline-routes-for-opal` before Opal compile — plain `require` of
   # route files would register on main, not App. Source: canonical_all.rb.
-  require 'routes_app_class_eval'
+  require "routes_app_class_eval"
 end
 
 run App

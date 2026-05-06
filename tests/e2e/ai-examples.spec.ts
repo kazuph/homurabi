@@ -3,11 +3,19 @@ import { expect, test } from '@playwright/test';
 const aiChatUrl = process.env.AI_CHAT_URL;
 const aiTranscribeChatUrl = process.env.AI_TRANSCRIBE_CHAT_URL;
 const aiVoiceChatUrl = process.env.AI_VOICE_CHAT_URL;
+const aiVoiceChatToken = process.env.AI_VOICE_CHAT_TOKEN;
 const audioSample = process.env.AUDIO_SAMPLE;
 const artifactDir = process.env.ARTIFACT_DIR;
 
 function screenshotPath(name: string) {
   return artifactDir ? `${artifactDir}/${name}.png` : undefined;
+}
+
+function withToken(url: string, token?: string) {
+  if (!token) return url;
+  const parsed = new URL(url);
+  parsed.searchParams.set('token', token);
+  return parsed.toString();
 }
 
 test.describe('Workers AI examples', () => {
@@ -51,7 +59,12 @@ test.describe('Workers AI examples', () => {
   });
 
   test('ai-voice-chat embeds playable audio', async ({ page }) => {
-    await page.goto(aiVoiceChatUrl!);
+    if (aiVoiceChatToken) {
+      const locked = await page.context().request.get(aiVoiceChatUrl!);
+      expect(locked.status()).toBe(404);
+    }
+
+    await page.goto(withToken(aiVoiceChatUrl!, aiVoiceChatToken));
     await page.waitForLoadState('networkidle');
 
     await page.getByLabel('Audio clip').setInputFiles(audioSample!);
@@ -67,6 +80,11 @@ test.describe('Workers AI examples', () => {
     await expect(page.locator('pre').nth(1)).not.toContainText(
       'The model returned an empty reply.'
     );
+    await expect(page.getByRole('heading', { name: 'Spoken script' })).toBeVisible();
+
+    const spokenScript = (await page.locator('pre').nth(2).textContent()) || '';
+    expect(spokenScript).toMatch(/^[\x20-\x7E\s]+$/);
+    expect(spokenScript).not.toMatch(/[ぁ-んァ-ヶ一-龠々ー]/);
 
     const src = await audio.getAttribute('src');
     expect(src).toContain('data:audio/mpeg;base64,');

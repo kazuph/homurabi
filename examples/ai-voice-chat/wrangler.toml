@@ -5,3 +5,14 @@ compatibility_flags = ["nodejs_compat"]
 
 [ai]
 binding = "AI"
+
+[[durable_objects.bindings]]
+name = "VOICE_LIMIT"
+class_name = "HomuraCounterDO"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["HomuraCounterDO"]
+
+[vars]
+VOICE_CHAT_DAILY_LIMIT = "20"

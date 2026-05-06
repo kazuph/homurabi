@@ -1071,6 +1071,7 @@ module Cloudflare
       env["cloudflare.BUCKET"] = R2Bucket.new(js_r2) if `#{js_r2} != null`
       env["cloudflare.AI"] = js_ai if `#{js_ai} != null`
 
+      attach_all_durable_objects!(env, js_env)
       attach_durable_object!(env, :counter, `#{js_env} && #{js_env}.COUNTER`)
       attach_queue!(
         env,
@@ -1097,6 +1098,26 @@ module Cloudflare
 
       suffix = normalize_binding_name(name)
       env["cloudflare.DO_#{suffix}"] = DurableObjectNamespace.new(js_binding)
+      env
+    end
+
+    def attach_all_durable_objects!(env, js_env)
+      return env unless defined?(::Cloudflare::DurableObjectNamespace)
+      if `(#{js_env} == null || #{js_env} === undefined || #{js_env} === Opal.nil)`
+        return env
+      end
+
+      keys = `Object.keys(#{js_env})`
+      i = 0
+      len = `#{keys}.length`
+      while i < len
+        key = `#{keys}[#{i}]`
+        js_binding = `#{js_env}[#{key}]`
+        is_do =
+          `#{js_binding} != null && typeof #{js_binding}.idFromName === 'function' && typeof #{js_binding}.get === 'function'`
+        attach_durable_object!(env, key, js_binding) if is_do
+        i += 1
+      end
       env
     end
 

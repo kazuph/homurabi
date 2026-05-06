@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.8 (2026-05-06)
+
+- Discover and attach arbitrary Durable Object bindings from `env`, not just
+  the built-in `COUNTER` demo binding. This lets app code use
+  `durable_object(:voice_limit, ...)` and other custom DO names without
+  gem-side shims.
+- `examples/ai-voice-chat` now uses that generic DO binding path for its
+  daily request cap.
+
 ## 0.3.7 (2026-05-06)
 
 - Add Ruby-shaped Workers AI helpers for the staged voice examples:

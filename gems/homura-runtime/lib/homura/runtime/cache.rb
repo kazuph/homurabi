@@ -50,7 +50,7 @@ module Cloudflare
     attr_reader :operation
     def initialize(message, operation: nil)
       @operation = operation
-      super("[Cloudflare::Cache] op=#{operation || 'match'}: #{message}")
+      super("[Cloudflare::Cache] op=#{operation || "match"}: #{message}")
     end
   end
 
@@ -62,7 +62,10 @@ module Cloudflare
     # Returns a fresh wrapper each call; the underlying JS object is a
     # singleton per isolate.
     def self.default
-      Cache.new(`(typeof caches !== 'undefined' && caches ? caches.default : null)`, 'default')
+      Cache.new(
+        `(typeof caches !== 'undefined' && caches ? caches.default : null)`,
+        "default"
+      )
     end
 
     # caches.open(name) — named cache partitions. Returns a JS Promise
@@ -71,12 +74,13 @@ module Cloudflare
     # don't re-open the handle.
     def self.open(name)
       name_str = name.to_s
-      js_promise = `(typeof caches !== 'undefined' && caches && caches.open ? caches.open(#{name_str}) : Promise.resolve(null))`
+      js_promise =
+        `(typeof caches !== 'undefined' && caches && caches.open ? caches.open(#{name_str}) : Promise.resolve(null))`
       js_cache = js_promise.__await__
       Cache.new(js_cache, name_str)
     end
 
-    def initialize(js_cache, name = 'default')
+    def initialize(js_cache, name = "default")
       @js_cache = js_cache
       @name = name.to_s
     end
@@ -109,19 +113,22 @@ module Cloudflare
       # JS Request. Derive the URL from the same shapes supported by
       # `request_to_js` so the `url` field on the returned
       # HTTPResponse is always a real URL.
-      url_str = if request_or_url.is_a?(String)
-                  request_or_url
-                elsif defined?(Cloudflare::HTTPResponse) && request_or_url.is_a?(Cloudflare::HTTPResponse)
-                  request_or_url.url.to_s
-                elsif `(#{request_or_url} != null && typeof #{request_or_url} === 'object' && typeof #{request_or_url}.url === 'string')`
-                  `String(#{request_or_url}.url)`
-                else
-                  request_or_url.to_s
-                end
+      url_str =
+        if request_or_url.is_a?(String)
+          request_or_url
+        elsif defined?(Cloudflare::HTTPResponse) &&
+              request_or_url.is_a?(Cloudflare::HTTPResponse)
+          request_or_url.url.to_s
+        elsif `(#{request_or_url} != null && typeof #{request_or_url} === 'object' && typeof #{request_or_url}.url === 'string')`
+          `String(#{request_or_url}.url)`
+        else
+          request_or_url.to_s
+        end
 
       # Single-line backtick IIFE — see `put` for the Opal multi-line
       # x-string quirk that silently drops the returned Promise.
-      js_promise = `(async function(js, req, Kernel, err_klass) { if (js == null || js === Opal.nil) return null; var cached; try { cached = await js.match(req); } catch (e) { Kernel.$raise(err_klass.$new(e && e.message ? e.message : String(e), Opal.hash({ operation: 'match' }))); } if (cached == null) return null; var text = ''; try { text = await cached.text(); } catch (_) { text = ''; } var hk = []; var hv = []; if (cached.headers && typeof cached.headers.forEach === 'function') { cached.headers.forEach(function(v, k) { hk.push(String(k).toLowerCase()); hv.push(String(v)); }); } return { status: cached.status|0, text: text, hkeys: hk, hvals: hv }; })(#{js}, #{req}, #{Kernel}, #{err_klass})`
+      js_promise =
+        `(async function(js, req, Kernel, err_klass) { if (js == null || js === Opal.nil) return null; var cached; try { cached = await js.match(req); } catch (e) { Kernel.$raise(err_klass.$new(e && e.message ? e.message : String(e), Opal.hash({ operation: 'match' }))); } if (cached == null) return null; var text = ''; try { text = await cached.text(); } catch (_) { text = ''; } var hk = []; var hv = []; if (cached.headers && typeof cached.headers.forEach === 'function') { cached.headers.forEach(function(v, k) { hk.push(String(k).toLowerCase()); hv.push(String(v)); }); } return { status: cached.status|0, text: text, hkeys: hk, hvals: hv }; })(#{js}, #{req}, #{Kernel}, #{err_klass})`
       js_result = js_promise.__await__
       return nil if `#{js_result} == null`
 
@@ -135,10 +142,10 @@ module Cloudflare
         i += 1
       end
       response_klass.new(
-        status:  `#{js_result}.status`,
+        status: `#{js_result}.status`,
         headers: h,
-        body:    `#{js_result}.text`,
-        url:     url_str
+        body: `#{js_result}.text`,
+        url: url_str
       )
     end
 
@@ -203,17 +210,17 @@ module Cloudflare
     # support but the impl only covered JS Request-like objects — both
     # the docs AND the code now line up.)
     def request_to_js(request_or_url)
-      if request_or_url.is_a?(String)
-        return `new Request(#{request_or_url})`
-      end
-      if defined?(Cloudflare::HTTPResponse) && request_or_url.is_a?(Cloudflare::HTTPResponse)
+      return `new Request(#{request_or_url})` if request_or_url.is_a?(String)
+      if defined?(Cloudflare::HTTPResponse) &&
+           request_or_url.is_a?(Cloudflare::HTTPResponse)
         url_str = request_or_url.url.to_s
         return `new Request(#{url_str})`
       end
       if `(#{request_or_url} != null && typeof #{request_or_url} === 'object' && typeof #{request_or_url}.url === 'string')`
         return request_or_url
       end
-      raise ArgumentError, "Cloudflare::Cache request must be a String URL, Cloudflare::HTTPResponse, or JS Request (got #{request_or_url.class})"
+      raise ArgumentError,
+            "Cloudflare::Cache request must be a String URL, Cloudflare::HTTPResponse, or JS Request (got #{request_or_url.class})"
     end
 
     def ruby_headers_to_js(hash)

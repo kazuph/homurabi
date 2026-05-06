@@ -1,12 +1,12 @@
 # frozen_string_literal: true
 # Route fragment 67 — demo /debug/mail
-post '/debug/mail' do
+post "/debug/mail" do
   gate = debug_mail_gate_response
   next gate if gate
 
-  content_type 'text/html; charset=utf-8'
+  content_type "text/html; charset=utf-8"
 
-  @title = 'Debug — mail'
+  @title = "Debug — mail"
   @mail_from = homura_mail_from
 
   mail = send_email
@@ -15,13 +15,14 @@ post '/debug/mail' do
     @result = ctx[:error_result]
   else
     begin
-      raw = mail.send(
-        to: ctx[:final_to],
-        from: ctx[:mail_from],
-        subject: ctx[:subject_line],
-        text: ctx[:text_body],
-        html: ctx[:html_body]
-      )
+      raw =
+        mail.send(
+          to: ctx[:final_to],
+          from: ctx[:mail_from],
+          subject: ctx[:subject_line],
+          text: ctx[:text_body],
+          html: ctx[:html_body]
+        )
       @result = Homura::DebugMailController.after_send_success(raw, ctx)
     rescue Cloudflare::Email::Error => e
       @result = Homura::DebugMailController.after_send_failure(e, ctx)

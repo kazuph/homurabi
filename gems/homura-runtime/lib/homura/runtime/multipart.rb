@@ -43,12 +43,12 @@ module Cloudflare
   class UploadedFile
     attr_reader :filename, :content_type, :name, :head, :bytes_binstr
 
-    def initialize(filename:, content_type:, name:, head: '', bytes_binstr: '')
+    def initialize(filename:, content_type:, name:, head: "", bytes_binstr: "")
       @filename = filename
-      @content_type = content_type || 'application/octet-stream'
+      @content_type = content_type || "application/octet-stream"
       @name = name
       @head = head
-      @bytes_binstr = bytes_binstr || ''
+      @bytes_binstr = bytes_binstr || ""
     end
 
     # Byte length of the part (not the JS string length — they're the
@@ -100,9 +100,9 @@ module Cloudflare
     def to_h
       {
         filename: @filename,
-        type:     @content_type,
-        name:     @name,
-        head:     @head,
+        type: @content_type,
+        name: @name,
+        head: @head,
         tempfile: self
       }
     end
@@ -127,7 +127,7 @@ module Cloudflare
     def self.parse_boundary(content_type)
       return nil if content_type.nil?
       ct = content_type.to_s
-      return nil unless ct.downcase.include?('multipart/')
+      return nil unless ct.downcase.include?("multipart/")
       # Prefer the quoted form. The quoted value may contain any byte
       # except a literal `"` (RFC 2046 §5.1.1 bans `"` in the value).
       if (m = ct.match(/boundary="([^"]+)"/i))
@@ -151,20 +151,18 @@ module Cloudflare
       return {} if boundary.nil?
       return {} if body_binstr.nil? || body_binstr.empty?
 
-      sep       = '--' + boundary
-      term      = '--' + boundary + '--'
-      sep_line  = sep + CRLF
-      sep_last  = sep + CRLF  # the very first boundary may skip the leading CRLF
-      body      = body_binstr.to_s
+      sep = "--" + boundary
+      term = "--" + boundary + "--"
+      sep_line = sep + CRLF
+      sep_last = sep + CRLF # the very first boundary may skip the leading CRLF
+      body = body_binstr.to_s
 
       # Skip any preamble before the first boundary.
       start_idx = body.index(sep)
       return {} if start_idx.nil?
       cursor = start_idx + sep.length
       # consume possible CRLF right after the first boundary
-      if body[cursor, 2] == CRLF
-        cursor += 2
-      end
+      cursor += 2 if body[cursor, 2] == CRLF
 
       parts = {}
 
@@ -181,28 +179,32 @@ module Cloudflare
         headers_end = part.index(CRLF + CRLF)
         if headers_end
           raw_headers = part[0...headers_end]
-          raw_body    = part[(headers_end + 4)..-1] || ''
+          raw_body = part[(headers_end + 4)..-1] || ""
         else
           raw_headers = part
-          raw_body    = ''
+          raw_body = ""
         end
 
         disposition = nil
-        ctype       = nil
-        raw_headers.split(CRLF).each do |line|
-          name, value = line.split(':', 2)
-          next if name.nil? || value.nil?
-          name = name.strip.downcase
-          value = value.strip
-          case name
-          when 'content-disposition' then disposition = value
-          when 'content-type'        then ctype = value
+        ctype = nil
+        raw_headers
+          .split(CRLF)
+          .each do |line|
+            name, value = line.split(":", 2)
+            next if name.nil? || value.nil?
+            name = name.strip.downcase
+            value = value.strip
+            case name
+            when "content-disposition"
+              disposition = value
+            when "content-type"
+              ctype = value
+            end
           end
-        end
 
         if disposition
-          field_name = extract_disposition_param(disposition, 'name')
-          filename   = extract_disposition_param(disposition, 'filename')
+          field_name = extract_disposition_param(disposition, "name")
+          filename = extract_disposition_param(disposition, "filename")
           if field_name
             if filename && !filename.empty?
               parts[field_name] = UploadedFile.new(
@@ -220,12 +222,8 @@ module Cloudflare
 
         cursor = next_sep + CRLF.length + sep.length
         # Check whether this is the terminator `--boundary--`
-        if body[cursor, 2] == '--'
-          break
-        end
-        if body[cursor, 2] == CRLF
-          cursor += 2
-        end
+        break if body[cursor, 2] == "--"
+        cursor += 2 if body[cursor, 2] == CRLF
       end
 
       parts
@@ -274,14 +272,14 @@ module Cloudflare
     #
     # Called lazily from our patched Rack::Request#POST.
     def self.rack_params(env)
-      cached = env['cloudflare.multipart']
+      cached = env["cloudflare.multipart"]
       return cached if cached
 
-      ct = env['CONTENT_TYPE']
-      return ({}) unless ct && ct.to_s.downcase.include?('multipart/')
+      ct = env["CONTENT_TYPE"]
+      return({}) unless ct && ct.to_s.downcase.include?("multipart/")
 
-      io = env['rack.input']
-      return ({}) if io.nil?
+      io = env["rack.input"]
+      return({}) if io.nil?
 
       # `rack.input` is normally a StringIO wrapping the body_binstr
       # we staged in src/worker.mjs. Read the full body; it's already
@@ -290,14 +288,14 @@ module Cloudflare
       if io.respond_to?(:rewind)
         begin
           io.rewind
-        rescue
+        rescue StandardError
           # some stubs don't support rewind — ignore
         end
       end
-      body = io.respond_to?(:read) ? io.read.to_s : ''
+      body = io.respond_to?(:read) ? io.read.to_s : ""
 
       parsed = parse(body, ct)
-      env['cloudflare.multipart'] = parsed
+      env["cloudflare.multipart"] = parsed
       parsed
     end
   end
@@ -314,15 +312,17 @@ end
 # bespoke Cloudflare::Multipart parser for multipart requests, falling
 # back to the gem implementation for everything else.
 
-require 'rack/request'
+require "rack/request"
 
 module Rack
   class Request
-    alias_method :__homura_original_POST, :POST unless method_defined?(:__homura_original_POST)
+    unless method_defined?(:__homura_original_POST)
+      alias_method :__homura_original_POST, :POST
+    end
 
     def POST
-      ct = env['CONTENT_TYPE']
-      if ct && ct.to_s.downcase.include?('multipart/')
+      ct = env["CONTENT_TYPE"]
+      if ct && ct.to_s.downcase.include?("multipart/")
         ::Cloudflare::Multipart.rack_params(env)
       else
         __homura_original_POST

@@ -58,11 +58,18 @@ end
 # Opal 1.8.3.rc1 does ship a minimal Thread class; only patch if
 # missing to avoid fighting Opal.
 # -----------------------------------------------------------------
-unless defined?(::Thread) && ::Thread.respond_to?(:current) && (::Thread.current.respond_to?(:status) rescue false)
+unless defined?(::Thread) && ::Thread.respond_to?(:current) &&
+         (
+           begin
+             ::Thread.current.respond_to?(:status)
+           rescue StandardError
+             false
+           end
+         )
   module ::HomuraThreadStub
     class FauxThread
       def status
-        'run'
+        "run"
       end
 
       def [](k)
@@ -82,7 +89,8 @@ unless defined?(::Thread) && ::Thread.respond_to?(:current) && (::Thread.current
   end
 
   unless defined?(::Thread)
-    class ::Thread; end
+    class ::Thread
+    end
   end
 
   class ::Thread
@@ -197,7 +205,7 @@ end
 # String does. This avoids silent mutation bugs if Sequel (or a
 # future patch) freezes a cached SQL buffer.
 class ::HomuraSqlBuffer
-  def initialize(init = '')
+  def initialize(init = "")
     @chunks = init.empty? ? [] : [init.to_s]
     @frozen = false
   end
@@ -310,7 +318,10 @@ class ::HomuraSqlBuffer
   private
 
   def ensure_not_frozen!
-    raise ::FrozenError, "can't modify frozen HomuraSqlBuffer: #{to_s.inspect}" if @frozen
+    if @frozen
+      raise ::FrozenError,
+            "can't modify frozen HomuraSqlBuffer: #{to_s.inspect}"
+    end
   end
 
   public
@@ -325,7 +336,7 @@ class ::HomuraSqlBuffer
   end
 
   def respond_to_missing?(name, include_private = false)
-    ''.respond_to?(name, include_private) || super
+    "".respond_to?(name, include_private) || super
   end
 end
 

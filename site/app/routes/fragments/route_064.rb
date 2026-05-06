@@ -1,14 +1,10 @@
 # frozen_string_literal: true
 # Route fragment 64 — demo /docs/auto-await
-get '/docs/auto-await' do
-  @title = 'Auto-Await — homura Docs'
-  @docs_page = 'auto-await'
+get "/docs/auto-await" do
+  @title = "Auto-Await — homura Docs"
+  @docs_page = "auto-await"
   @docs_section = :guides
-  @docs_breadcrumb = [
-    ['Docs', '/docs'],
-    ['Guides', '/docs'],
-    ['Auto-Await', nil]
-  ]
+  @docs_breadcrumb = [%w[Docs /docs], %w[Guides /docs], ["Auto-Await", nil]]
   @docs_toc = [
     %w[concept 概念],
     %w[before-after Before / After],

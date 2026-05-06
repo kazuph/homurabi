@@ -36,7 +36,7 @@
 #      lib/sinatra/queue.rb) and invokes whichever matches the batch's
 #      `queue` name.
 
-require 'json'
+require "json"
 
 module Cloudflare
   class QueueError < StandardError
@@ -44,7 +44,9 @@ module Cloudflare
     def initialize(message, operation: nil, queue: nil)
       @operation = operation
       @queue = queue
-      super("[Cloudflare::Queue] queue=#{queue || '?'} op=#{operation || 'send'}: #{message}")
+      super(
+        "[Cloudflare::Queue] queue=#{queue || "?"} op=#{operation || "send"}: #{message}"
+      )
     end
   end
 
@@ -57,7 +59,7 @@ module Cloudflare
 
     def initialize(js, name = nil)
       @js = js
-      @name = (name || 'queue').to_s
+      @name = (name || "queue").to_s
     end
 
     def available?
@@ -79,12 +81,18 @@ module Cloudflare
       js = @js
       qname = @name
       err_klass = Cloudflare::QueueError
-      raise QueueError.new('queue binding not bound', operation: 'send', queue: qname) unless available?
+      unless available?
+        raise QueueError.new(
+                "queue binding not bound",
+                operation: "send",
+                queue: qname
+              )
+      end
 
       js_body = ruby_to_js(body)
       js_opts = `({})`
       `#{js_opts}.delaySeconds = #{delay_seconds.to_i}` if delay_seconds
-      `#{js_opts}.contentType  = #{content_type.to_s}`  if content_type
+      `#{js_opts}.contentType  = #{content_type.to_s}` if content_type
 
       # Single-line IIFE — see `lib/homura/runtime/cache.rb#put`
       # for the Opal multi-line x-string quirk. Passing arguments in
@@ -99,14 +107,20 @@ module Cloudflare
       js = @js
       qname = @name
       err_klass = Cloudflare::QueueError
-      raise QueueError.new('queue binding not bound', operation: 'send_batch', queue: qname) unless available?
+      unless available?
+        raise QueueError.new(
+                "queue binding not bound",
+                operation: "send_batch",
+                queue: qname
+              )
+      end
 
       js_msgs = `([])`
       messages.each do |m|
         if m.is_a?(Hash)
-          body = m['body'] || m[:body]
-          ct   = m['content_type'] || m[:content_type]
-          ds   = m['delay_seconds'] || m[:delay_seconds]
+          body = m["body"] || m[:body]
+          ct = m["content_type"] || m[:content_type]
+          ds = m["delay_seconds"] || m[:delay_seconds]
           js_body = ruby_to_js(body)
           js_msg = `({ body: #{js_body} })`
           `#{js_msg}.contentType  = #{ct.to_s}` if ct
@@ -129,10 +143,11 @@ module Cloudflare
     # Same Ruby→JS conversion that Cloudflare::AI.ruby_to_js uses, but
     # local to avoid cross-wrapper coupling.
     def ruby_to_js(val)
-      return val if val.is_a?(String) || val.is_a?(Numeric) || val == true || val == false || val.nil?
-      if val.is_a?(Symbol)
-        return val.to_s
+      if val.is_a?(String) || val.is_a?(Numeric) || val == true ||
+           val == false || val.nil?
+        return val
       end
+      return val.to_s if val.is_a?(Symbol)
       if val.is_a?(Hash)
         obj = `({})`
         val.each do |k, v|
@@ -144,7 +159,10 @@ module Cloudflare
       end
       if val.is_a?(Array)
         arr = `([])`
-        val.each { |v| jv = ruby_to_js(v); `#{arr}.push(#{jv})` }
+        val.each do |v|
+          jv = ruby_to_js(v)
+          `#{arr}.push(#{jv})`
+        end
         return arr
       end
       val
@@ -167,7 +185,8 @@ module Cloudflare
 
     def timestamp
       js = @js
-      ms = `(#{js} && #{js}.timestamp && typeof #{js}.timestamp.getTime === 'function' ? #{js}.timestamp.getTime() : null)`
+      ms =
+        `(#{js} && #{js}.timestamp && typeof #{js}.timestamp.getTime === 'function' ? #{js}.timestamp.getTime() : null)`
       return nil if `#{ms} == null`
       Time.at(ms.to_f / 1000.0)
     end
@@ -222,7 +241,9 @@ module Cloudflare
 
     def js_to_ruby(v)
       return nil if `#{v} == null`
-      return v if `typeof #{v} === 'string' || typeof #{v} === 'number' || typeof #{v} === 'boolean'`
+      if `typeof #{v} === 'string' || typeof #{v} === 'number' || typeof #{v} === 'boolean'`
+        return v
+      end
       if `Array.isArray(#{v})`
         out = []
         len = `#{v}.length`
@@ -333,7 +354,14 @@ module Cloudflare
       handler = handler_for(queue_name)
       if handler.nil?
         warn "[Cloudflare::QueueConsumer] no handler registered for queue #{queue_name.inspect}; messages will time out and retry"
-        return { 'queue' => queue_name, 'handled' => false, 'size' => batch.size, 'reason' => 'no_handler' }
+        return(
+          {
+            "queue" => queue_name,
+            "handled" => false,
+            "size" => batch.size,
+            "reason" => "no_handler"
+          }
+        )
       end
 
       ctx = QueueContext.new(batch, js_env, js_ctx)
@@ -341,7 +369,12 @@ module Cloudflare
       if `(#{result} != null && typeof #{result}.then === 'function')`
         result = result.__await__
       end
-      { 'queue' => queue_name, 'handled' => true, 'size' => batch.size, 'result' => result.is_a?(Hash) ? result : nil }
+      {
+        "queue" => queue_name,
+        "handled" => true,
+        "size" => batch.size,
+        "result" => result.is_a?(Hash) ? result : nil
+      }
     end
 
     # Single-line backtick (see scheduled.rb for the Opal multi-line
@@ -367,15 +400,33 @@ module Cloudflare
       @env = build_env(js_env)
     end
 
-    def d1;     env['cloudflare.DB'];     end
-    def db;     d1;                    end
-    def cf_env; env['cloudflare.env']; end
-    def cf_ctx; env['cloudflare.ctx']; end
-    def kv;     env['cloudflare.KV'];     end
-    def bucket; env['cloudflare.BUCKET']; end
-    def ai; Cloudflare::Bindings.ai(env); end
-    def send_email; env['cloudflare.SEND_EMAIL']; end
-    def jobs_queue; env['cloudflare.QUEUE_JOBS']; end
+    def d1
+      env["cloudflare.DB"]
+    end
+    def db
+      d1
+    end
+    def cf_env
+      env["cloudflare.env"]
+    end
+    def cf_ctx
+      env["cloudflare.ctx"]
+    end
+    def kv
+      env["cloudflare.KV"]
+    end
+    def bucket
+      env["cloudflare.BUCKET"]
+    end
+    def ai
+      Cloudflare::Bindings.ai(env)
+    end
+    def send_email
+      env["cloudflare.SEND_EMAIL"]
+    end
+    def jobs_queue
+      env["cloudflare.QUEUE_JOBS"]
+    end
     def durable_object(name, id_or_name = nil)
       Cloudflare::Bindings.durable_object(env, name, id_or_name)
     end
@@ -392,9 +443,11 @@ module Cloudflare
     private
 
     def build_env(js_env)
-      Cloudflare::Bindings.build_env(js_env, @js_ctx, {
-        'cloudflare.queue' => true,
-      })
+      Cloudflare::Bindings.build_env(
+        js_env,
+        @js_ctx,
+        { "cloudflare.queue" => true }
+      )
     end
   end
 end

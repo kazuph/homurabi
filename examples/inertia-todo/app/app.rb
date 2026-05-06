@@ -1,41 +1,39 @@
 # frozen_string_literal: true
-require 'sinatra/base'
-require 'sinatra/inertia'
-require 'sequel'
-require 'json'
+require "sinatra/base"
+require "sinatra/inertia"
+require "sequel"
+require "json"
 
 class App < Sinatra::Base
   register Sinatra::Inertia
 
-  set :page_version, ENV.fetch('ASSETS_VERSION', '3')
+  set :page_version, ENV.fetch("ASSETS_VERSION", "3")
   set :page_layout, :layout
-  set :logging, false   # Rack::CommonLogger uses gsub! (not Opal-compatible)
+  set :logging, false # Rack::CommonLogger uses gsub! (not Opal-compatible)
   enable :sessions
-  set :session_secret, ENV.fetch('SESSION_SECRET', 'a' * 64)
+  set :session_secret, ENV.fetch("SESSION_SECRET", "a" * 64)
 
-  share_props do
-    {
-      flash: flash_payload,
-      csrfToken: csrf_token
-    }
-  end
+  share_props { { flash: flash_payload, csrfToken: csrf_token } }
 
   helpers do
     def db
-      raise 'D1 binding missing' unless d1
+      raise "D1 binding missing" unless d1
       Sequel.connect(adapter: :d1, d1: d1)
     end
 
     def todos
-      db[:todos].order(Sequel.desc(:id)).all.map do |row|
-        {
-          id: row[:id],
-          title: row[:title],
-          description: row[:description],
-          done: row[:done].to_i == 1,
-          created_at: row[:created_at]
-        }
-      end
+      db[:todos]
+        .order(Sequel.desc(:id))
+        .all
+        .map do |row|
+          {
+            id: row[:id],
+            title: row[:title],
+            description: row[:description],
+            done: row[:done].to_i == 1,
+            created_at: row[:created_at]
+          }
+        end
     end
 
     def todo_stats
@@ -50,8 +48,8 @@ class App < Sinatra::Base
     def parse_body_params
       result = {}
       result.merge!(params) if params.is_a?(Hash)
-      ctype = request.env['CONTENT_TYPE'].to_s
-      if ctype.include?('application/json')
+      ctype = request.env["CONTENT_TYPE"].to_s
+      if ctype.include?("application/json")
         body = request.body.read
         unless body.empty?
           begin
@@ -75,27 +73,29 @@ class App < Sinatra::Base
     end
   end
 
-  get '/' do
-    render 'Todos/Index',
+  get "/" do
+    render "Todos/Index",
            todos: -> { todos },
-           stats: defer(group: 'meta') { todo_stats }
+           stats: defer(group: "meta") { todo_stats }
   end
 
-  post '/todos' do
+  post "/todos" do
     body = parse_body_params
-    title = body['title'].to_s.strip
-    description = body['description'].to_s.strip
+    title = body["title"].to_s.strip
+    description = body["description"].to_s.strip
 
     errors = {}
-    errors[:title] = 'title is required' if title.empty?
-    errors[:title] = 'title must be 40 chars or less' if title.length > 40
-    errors[:description] = 'description must be 200 chars or less' if description.length > 200
+    errors[:title] = "title is required" if title.empty?
+    errors[:title] = "title must be 40 chars or less" if title.length > 40
+    errors[
+      :description
+    ] = "description must be 200 chars or less" if description.length > 200
 
     unless errors.empty?
       page_errors errors
       # Re-render the same page with the previous values so the form is preserved.
       set_flash(values: { title: title, description: description })
-      redirect to('/'), 303
+      redirect to("/"), 303
     end
 
     db[:todos].insert(
@@ -104,18 +104,20 @@ class App < Sinatra::Base
       done: 0,
       created_at: Time.now.to_i
     )
-    set_flash(notice: 'Todo added')
-    redirect to('/'), 303
+    set_flash(notice: "Todo added")
+    redirect to("/"), 303
   end
 
-  post '/todos/:id/toggle' do
-    db[:todos].where(id: params['id'].to_i).update(Sequel.lit('done = 1 - done'))
-    redirect to('/'), 303
+  post "/todos/:id/toggle" do
+    db[:todos].where(id: params["id"].to_i).update(
+      Sequel.lit("done = 1 - done")
+    )
+    redirect to("/"), 303
   end
 
-  post '/todos/:id/delete' do
-    db[:todos].where(id: params['id'].to_i).delete
-    set_flash(notice: 'Todo deleted')
-    redirect to('/'), 303
+  post "/todos/:id/delete" do
+    db[:todos].where(id: params["id"].to_i).delete
+    set_flash(notice: "Todo deleted")
+    redirect to("/"), 303
   end
 end

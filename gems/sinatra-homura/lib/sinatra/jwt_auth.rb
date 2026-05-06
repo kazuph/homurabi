@@ -39,8 +39,8 @@
 # provided as a helper so login routes can mint JWTs with the same
 # configured algorithm and keys without re-plumbing.
 
-require 'json'
-require 'jwt'
+require "json"
+require "jwt"
 
 module Sinatra
   module JwtAuth
@@ -69,27 +69,42 @@ module Sinatra
       def authenticate!
         warn "DEPRECATION WARNING: authenticate! uses halt which is unsafe in async routes. Use authenticate_or_401 instead."
         token = extract_bearer_token
-        halt_unauthorized!('missing bearer token') if token.nil?
+        halt_unauthorized!("missing bearer token") if token.nil?
 
-        verify_key = settings.respond_to?(:jwt_verify_key) && settings.jwt_verify_key ? settings.jwt_verify_key : settings.jwt_secret
-        algorithm  = settings.respond_to?(:jwt_algorithm) ? settings.jwt_algorithm : 'HS256'
+        verify_key =
+          (
+            if settings.respond_to?(:jwt_verify_key) && settings.jwt_verify_key
+              settings.jwt_verify_key
+            else
+              settings.jwt_secret
+            end
+          )
+        algorithm =
+          (
+            if settings.respond_to?(:jwt_algorithm)
+              settings.jwt_algorithm
+            else
+              "HS256"
+            end
+          )
 
         begin
-          payload, header = JWT.decode(token, verify_key, true, algorithm: algorithm).__await__
+          payload, header =
+            JWT.decode(token, verify_key, true, algorithm: algorithm).__await__
         rescue JWT::ExpiredSignature
-          halt_unauthorized!('token expired')
+          halt_unauthorized!("token expired")
         rescue JWT::ImmatureSignature
-          halt_unauthorized!('token not yet valid')
+          halt_unauthorized!("token not yet valid")
         rescue JWT::IncorrectAlgorithm
-          halt_unauthorized!('algorithm mismatch')
+          halt_unauthorized!("algorithm mismatch")
         rescue JWT::VerificationError
-          halt_unauthorized!('signature verification failed')
+          halt_unauthorized!("signature verification failed")
         rescue JWT::DecodeError => e
           halt_unauthorized!("invalid token: #{e.message}")
         end
 
         @jwt_payload = payload
-        @jwt_header  = header
+        @jwt_header = header
         payload
       end
 
@@ -99,27 +114,77 @@ module Sinatra
       # status and returning early with +status N; next(body)+.
       def authenticate_or_401
         token = extract_bearer_token
-        return [401, { 'error' => 'unauthorized', 'reason' => 'missing bearer token' }.to_json] if token.nil?
+        if token.nil?
+          return [
+            401,
+            {
+              "error" => "unauthorized",
+              "reason" => "missing bearer token"
+            }.to_json
+          ]
+        end
 
-        verify_key = settings.respond_to?(:jwt_verify_key) && settings.jwt_verify_key ? settings.jwt_verify_key : settings.jwt_secret
-        algorithm  = settings.respond_to?(:jwt_algorithm) ? settings.jwt_algorithm : 'HS256'
+        verify_key =
+          (
+            if settings.respond_to?(:jwt_verify_key) && settings.jwt_verify_key
+              settings.jwt_verify_key
+            else
+              settings.jwt_secret
+            end
+          )
+        algorithm =
+          (
+            if settings.respond_to?(:jwt_algorithm)
+              settings.jwt_algorithm
+            else
+              "HS256"
+            end
+          )
 
         begin
-          payload, header = JWT.decode(token, verify_key, true, algorithm: algorithm).__await__
+          payload, header =
+            JWT.decode(token, verify_key, true, algorithm: algorithm).__await__
         rescue JWT::ExpiredSignature
-          return [401, { 'error' => 'unauthorized', 'reason' => 'token expired' }.to_json]
+          return [
+            401,
+            { "error" => "unauthorized", "reason" => "token expired" }.to_json
+          ]
         rescue JWT::ImmatureSignature
-          return [401, { 'error' => 'unauthorized', 'reason' => 'token not yet valid' }.to_json]
+          return [
+            401,
+            {
+              "error" => "unauthorized",
+              "reason" => "token not yet valid"
+            }.to_json
+          ]
         rescue JWT::IncorrectAlgorithm
-          return [401, { 'error' => 'unauthorized', 'reason' => 'algorithm mismatch' }.to_json]
+          return [
+            401,
+            {
+              "error" => "unauthorized",
+              "reason" => "algorithm mismatch"
+            }.to_json
+          ]
         rescue JWT::VerificationError
-          return [401, { 'error' => 'unauthorized', 'reason' => 'signature verification failed' }.to_json]
+          return [
+            401,
+            {
+              "error" => "unauthorized",
+              "reason" => "signature verification failed"
+            }.to_json
+          ]
         rescue JWT::DecodeError => e
-          return [401, { 'error' => 'unauthorized', 'reason' => "invalid token: #{e.message}" }.to_json]
+          return [
+            401,
+            {
+              "error" => "unauthorized",
+              "reason" => "invalid token: #{e.message}"
+            }.to_json
+          ]
         end
 
         @jwt_payload = payload
-        @jwt_header  = header
+        @jwt_header = header
         [nil, payload]
       end
 
@@ -128,12 +193,26 @@ module Sinatra
       # to leave it off. `extra_headers` is merged into the JWT header
       # alongside the alg.
       def issue_token(payload, expires_in: 3600, extra_headers: {})
-        sign_key  = settings.respond_to?(:jwt_sign_key) && settings.jwt_sign_key ? settings.jwt_sign_key : settings.jwt_secret
-        algorithm = settings.respond_to?(:jwt_algorithm) ? settings.jwt_algorithm : 'HS256'
-        claims    = payload.dup
+        sign_key =
+          (
+            if settings.respond_to?(:jwt_sign_key) && settings.jwt_sign_key
+              settings.jwt_sign_key
+            else
+              settings.jwt_secret
+            end
+          )
+        algorithm =
+          (
+            if settings.respond_to?(:jwt_algorithm)
+              settings.jwt_algorithm
+            else
+              "HS256"
+            end
+          )
+        claims = payload.dup
         if expires_in
-          claims['exp'] = Time.now.to_i + expires_in.to_i
-          claims['iat'] = Time.now.to_i
+          claims["exp"] = Time.now.to_i + expires_in.to_i
+          claims["iat"] = Time.now.to_i
         end
         JWT.encode(claims, sign_key, algorithm, extra_headers).__await__
       end
@@ -141,13 +220,13 @@ module Sinatra
       private
 
       def extract_bearer_token
-        header = request.env['HTTP_AUTHORIZATION']
+        header = request.env["HTTP_AUTHORIZATION"]
         return nil if header.nil? || header.empty?
 
         # Match "Bearer <token>" — case-insensitive scheme, exactly one
         # space. Guards against "Basic" headers sneaking in.
-        parts = header.split(' ', 2)
-        return nil unless parts.length == 2 && parts[0].downcase == 'bearer'
+        parts = header.split(" ", 2)
+        return nil unless parts.length == 2 && parts[0].downcase == "bearer"
 
         # Also treat a whitespace-only token as missing so authenticate!
         # reports "missing bearer token" instead of falling through to
@@ -159,8 +238,8 @@ module Sinatra
       end
 
       def halt_unauthorized!(reason)
-        content_type 'application/json'
-        halt 401, { 'error' => 'unauthorized', 'reason' => reason }.to_json
+        content_type "application/json"
+        halt 401, { "error" => "unauthorized", "reason" => reason }.to_json
       end
     end
 
@@ -169,7 +248,7 @@ module Sinatra
     # a missing config trips a loud NoMethodError on first use.
     def self.registered(app)
       app.helpers Helpers
-      app.set :jwt_algorithm, 'HS256' unless app.respond_to?(:jwt_algorithm)
+      app.set :jwt_algorithm, "HS256" unless app.respond_to?(:jwt_algorithm)
     end
   end
 
@@ -177,10 +256,10 @@ module Sinatra
   Base.register JwtAuth if defined?(::Sinatra::Base)
 end
 
-require 'homura/runtime/async_registry'
+require "homura/runtime/async_registry"
 
 HomuraRuntime::AsyncRegistry.register_async_source do
-  async_helper :authenticate!, 'Sinatra::JwtAuth'
-  async_helper :authenticate_or_401, 'Sinatra::JwtAuth'
-  async_helper :issue_token, 'Sinatra::JwtAuth'
+  async_helper :authenticate!, "Sinatra::JwtAuth"
+  async_helper :authenticate_or_401, "Sinatra::JwtAuth"
+  async_helper :issue_token, "Sinatra::JwtAuth"
 end

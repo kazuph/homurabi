@@ -1,9 +1,10 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-require 'bundler/setup'
+require "bundler/setup"
 
-gem_name = ARGV.shift or abort('usage: ruby bin/gem-path GEM_NAME [RELATIVE_PATH]')
+gem_name = ARGV.shift or
+  abort("usage: ruby bin/gem-path GEM_NAME [RELATIVE_PATH]")
 relative_path = ARGV.shift
 
 spec = Gem::Specification.find_by_name(gem_name)

@@ -38,6 +38,7 @@ GEM
     parser (3.3.11.1)
       ast (~> 2.4.1)
       racc
+    prettier_print (1.2.1)
     racc (1.8.1)
     sequel (5.103.0)
       bigdecimal
@@ -51,6 +52,8 @@ GEM
     sqlite3 (2.9.3-x86_64-darwin)
     sqlite3 (2.9.3-x86_64-linux-gnu)
     sqlite3 (2.9.3-x86_64-linux-musl)
+    syntax_tree (6.3.0)
+      prettier_print (>= 1.2.0)
 
 PLATFORMS
   aarch64-linux-gnu
@@ -69,6 +72,7 @@ DEPENDENCIES
   opal-homura!
   sequel-d1!
   sinatra-homura!
+  syntax_tree
 
 RUBY VERSION
    ruby 3.4.9p82

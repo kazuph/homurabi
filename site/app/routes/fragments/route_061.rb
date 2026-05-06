@@ -1,13 +1,13 @@
 # frozen_string_literal: true
 # Route fragment 61 — demo /docs/sinatra
-get '/docs/sinatra' do
-  @title = 'sinatra-homura — homura Docs'
-  @docs_page = 'sinatra'
+get "/docs/sinatra" do
+  @title = "sinatra-homura — homura Docs"
+  @docs_page = "sinatra"
   @docs_section = :reference
   @docs_breadcrumb = [
-    ['Docs', '/docs'],
-    ['API Reference', '/docs/runtime'],
-    ['sinatra-homura', nil]
+    %w[Docs /docs],
+    ["API Reference", "/docs/runtime"],
+    ["sinatra-homura", nil]
   ]
   @docs_toc = [
     %w[overview 概要],

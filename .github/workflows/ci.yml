@@ -39,6 +39,23 @@ jobs:
         run: npm test
 
   # ---------------------------------------------------------------------------
+  # Ruby formatting gate — keeps first-party Ruby on a single mechanical style
+  # and explicitly excludes vendored / generated trees from the formatter scope.
+  # ---------------------------------------------------------------------------
+  ruby-format:
+    name: syntax_tree check (first-party Ruby)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.4'
+          bundler-cache: true
+      - name: Check Ruby formatting
+        run: ruby bin/format-ruby --check
+
+  # ---------------------------------------------------------------------------
   # sinatra-inertia gem unit tests — pure-Sinatra side, runs under MRI
   # against rack-test + minitest. Has its own Gemfile because the gem is
   # supposed to work without homura-runtime.
@@ -91,7 +108,8 @@ jobs:
         run: npm run build
 
   # ---------------------------------------------------------------------------
-  # Ruby syntax check across every gem + example app — fast canary that
+  # Ruby syntax check across the same first-party Ruby scope used by the
+  # formatter gate — fast canary that
   # catches typos / incomplete modernizations (the kind that surfaced when
   # the `sinatra/cloudflare_workers` shim was retired in favour of plain
   # `require 'sinatra'` / `require 'sinatra/base'`). Doesn't run code,
@@ -109,21 +127,13 @@ jobs:
       - name: Parse all .rb files
         run: |
           set -euo pipefail
-          # Skip vendored upstream code (vendor/opal-gem, vendor/bundle,
-          # gems/*/vendor) — those are pristine third-party copies and any
-          # parser disagreement there is upstream's problem, not ours.
           fail=0
-          while IFS= read -r f; do
+          while IFS= read -r -d '' f; do
             if ! ruby -c "$f" >/dev/null 2>err; then
               echo "::error file=$f::ruby -c failed:"
               cat err
               fail=1
             fi
-          done < <(git ls-files -- '*.rb' \
-            ':!vendor/**' \
-            ':!vendor/opal-gem/**' \
-            ':!gems/*/vendor/**' \
-            ':!.worktree/**' \
-            ':!.worktrees/**')
+          done < <(ruby bin/first-party-ruby-files --print0)
           rm -f err
           exit $fail

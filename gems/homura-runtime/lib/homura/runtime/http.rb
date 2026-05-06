@@ -15,7 +15,7 @@
 # goes through `globalThis.fetch`, because Cloudflare Workers does not
 # expose a TCP socket API.
 
-require 'json'
+require "json"
 
 module Cloudflare
   class HTTPError < StandardError
@@ -23,7 +23,7 @@ module Cloudflare
     def initialize(message, url: nil, method: nil)
       @url = url
       @method = method
-      super("[Cloudflare::HTTP] #{method || 'GET'} #{url}: #{message}")
+      super("[Cloudflare::HTTP] #{method || "GET"} #{url}: #{message}")
     end
   end
 
@@ -67,7 +67,7 @@ module Cloudflare
     #
     # The whole response body is awaited and returned as a String.
     # Use `Cloudflare::HTTPResponse#body` to access raw text.
-    def self.fetch(url, method: 'GET', headers: nil, body: nil)
+    def self.fetch(url, method: "GET", headers: nil, body: nil)
       hdrs = headers || DEFAULT_HEADERS
       method_str = method.to_s.upcase
       js_headers = ruby_headers_to_js(hdrs)
@@ -87,7 +87,8 @@ module Cloudflare
       # expression. See the single-line IIFE pattern used in
       # lib/homura/runtime/{cache,queue,durable_object}.rb#put for
       # the alternative that survives either position. (Phase 11B audit.)
-      js_promise = `
+      js_promise =
+        `
         (async function() {
           var init = { method: #{method_str}, headers: #{js_headers}, redirect: 'follow' };
           if (#{js_body} !== nil && #{js_body} != null) { init.body = #{js_body}; }

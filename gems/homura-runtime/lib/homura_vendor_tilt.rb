@@ -1,7 +1,8 @@
 # frozen_string_literal: true
 
 module Tilt
-  class TemplateNotFound < StandardError; end
+  class TemplateNotFound < StandardError
+  end
 
   class Cache
     def initialize
@@ -56,8 +57,8 @@ module Tilt
 
     def new(file = nil, line = nil, options = {}, &block)
       raise NotImplementedError,
-            'Tilt template rendering is not available in homura Phase 2 ' \
-            '(stubbed). Return Strings or arrays from your Sinatra handlers.'
+            "Tilt template rendering is not available in homura Phase 2 " \
+              "(stubbed). Return Strings or arrays from your Sinatra handlers."
     end
   end
 end

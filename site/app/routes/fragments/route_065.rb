@@ -1,13 +1,10 @@
 # frozen_string_literal: true
 # Route fragment 65 — demo /docs/architecture
-get '/docs/architecture' do
-  @title = 'アーキテクチャ — homura Docs'
-  @docs_page = 'architecture'
+get "/docs/architecture" do
+  @title = "アーキテクチャ — homura Docs"
+  @docs_page = "architecture"
   @docs_section = :architecture
-  @docs_breadcrumb = [
-    ['Docs', '/docs'],
-    ['Architecture', nil]
-  ]
+  @docs_breadcrumb = [%w[Docs /docs], ["Architecture", nil]]
   @docs_toc = [
     %w[self-host セルフホスト],
     %w[gems 3 gem の関係],

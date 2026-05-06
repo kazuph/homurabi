@@ -24,7 +24,8 @@
 # approximate here as a no-op (Opal has no const-access hook to warn
 # from, and a warning-only behaviour does not affect program output).
 class Module
-  unless private_method_defined?(:deprecate_constant) || method_defined?(:deprecate_constant)
+  unless private_method_defined?(:deprecate_constant) ||
+           method_defined?(:deprecate_constant)
     def deprecate_constant(*_names)
       self
     end
@@ -69,9 +70,9 @@ class Module
 
   def const_defined?(name, inherit = true)
     name_str = name.to_s
-    if name_str.include?('::')
-      parts = name_str.split('::')
-      parts.shift if parts.first.empty?  # leading "::Foo::Bar"
+    if name_str.include?("::")
+      parts = name_str.split("::")
+      parts.shift if parts.first.empty? # leading "::Foo::Bar"
       current = self
       parts.each do |part|
         return false unless current.__homura_const_defined_simple(part, inherit)
@@ -92,7 +93,7 @@ end
 # as nil, which breaks gems that call `File.expand_path($0)` at class-
 # body time (sinatra/main.rb: `proc { File.expand_path($0) }`).
 # Install a harmless default string.
-$0 ||= '(homura)'
+$0 ||= "(homura)"
 $PROGRAM_NAME ||= $0
 
 # (Previously this file force-set APP_ENV/RACK_ENV to 'production' to
@@ -106,7 +107,7 @@ $PROGRAM_NAME ||= $0
 # Load Opal's stdlib Forwardable BEFORE patching it, so our overrides
 # are applied last and are not clobbered when a vendored gem requires
 # 'forwardable' transitively.
-require 'forwardable'
+require "forwardable"
 
 # -----------------------------------------------------------------
 # (removed) Debug method_missing logger — was used while iterating
@@ -152,25 +153,30 @@ module ForwardableAccessor
   def resolve(instance, expr)
     expr = expr.to_s
     current = instance
-    expr.split('.').each do |part|
-      current = if part == 'self'
-                  instance
-                elsif part.start_with?('@')
-                  instance.instance_variable_get(part)
-                else
-                  current.__send__(part)
-                end
-    end
+    expr
+      .split(".")
+      .each do |part|
+        current =
+          if part == "self"
+            instance
+          elsif part.start_with?("@")
+            instance.instance_variable_get(part)
+          else
+            current.__send__(part)
+          end
+      end
     current
   end
 end
 
 module Forwardable
-  remove_method :def_instance_delegator if method_defined?(:def_instance_delegator)
+  if method_defined?(:def_instance_delegator)
+    remove_method :def_instance_delegator
+  end
 
   def def_instance_delegator(accessor, method, ali = method)
     accessor_str = accessor.to_s
-    if accessor_str.start_with?('@') && !accessor_str.include?('.')
+    if accessor_str.start_with?("@") && !accessor_str.include?(".")
       define_method ali do |*args, &block|
         instance_variable_get(accessor_str).__send__(method, *args, &block)
       end
@@ -182,7 +188,11 @@ module Forwardable
     else
       # Dot-path expression like 'self.class'. Resolve without eval.
       define_method ali do |*args, &block|
-        ForwardableAccessor.resolve(self, accessor_str).__send__(method, *args, &block)
+        ForwardableAccessor.resolve(self, accessor_str).__send__(
+          method,
+          *args,
+          &block
+        )
       end
     end
   end
@@ -193,7 +203,7 @@ module SingleForwardable
 
   def def_single_delegator(accessor, method, ali = method)
     accessor_str = accessor.to_s
-    if accessor_str.start_with?('@') && !accessor_str.include?('.')
+    if accessor_str.start_with?("@") && !accessor_str.include?(".")
       define_singleton_method ali do |*args, &block|
         instance_variable_get(accessor_str).__send__(method, *args, &block)
       end
@@ -203,7 +213,11 @@ module SingleForwardable
       end
     else
       define_singleton_method ali do |*args, &block|
-        ForwardableAccessor.resolve(self, accessor_str).__send__(method, *args, &block)
+        ForwardableAccessor.resolve(self, accessor_str).__send__(
+          method,
+          *args,
+          &block
+        )
       end
     end
   end
@@ -223,26 +237,31 @@ end
 # We install a module-shaped URI::DEFAULT_PARSER that wraps CGI so
 # that gems that only call escape / unescape / regexp[:UNSAFE] on it
 # continue to work.
-require 'uri' rescue nil
-require 'cgi'
+begin
+  require "uri"
+rescue StandardError
+  nil
+end
+require "cgi"
 
 module ::URI
   unless const_defined?(:DEFAULT_PARSER)
-    DEFAULT_PARSER = Module.new do
-      UNSAFE = Regexp.compile('[^\-_.!~*\'()a-zA-Z0-9;/?:@&=+$,\[\]]').freeze
+    DEFAULT_PARSER =
+      Module.new do
+        UNSAFE = Regexp.compile('[^\-_.!~*\'()a-zA-Z0-9;/?:@&=+$,\[\]]').freeze
 
-      def self.regexp
-        { UNSAFE: UNSAFE }
-      end
+        def self.regexp
+          { UNSAFE: UNSAFE }
+        end
 
-      def self.escape(s, unsafe = UNSAFE)
-        CGI.escape(s.to_s)
-      end
+        def self.escape(s, unsafe = UNSAFE)
+          CGI.escape(s.to_s)
+        end
 
-      def self.unescape(s)
-        CGI.unescape(s.to_s)
+        def self.unescape(s)
+          CGI.unescape(s.to_s)
+        end
       end
-    end
   end
 
   # CRuby's URI.decode_www_form_component / encode_www_form_component are used
@@ -256,7 +275,7 @@ module ::URI
   # bodies need **decodeURIComponent** semantics (same as CGI.unescapeURIComponent).
   # Without this, HTML like `</h1>` survives as literal `<%2Fh1>` in params.
   def self.decode_www_form_component(str, _enc = nil)
-    s = str.to_s.tr('+', ' ')
+    s = str.to_s.tr("+", " ")
     CGI.unescapeURIComponent(s)
   rescue ::Exception
     str.to_s
@@ -268,9 +287,7 @@ module ::URI
     end
   end
 
-  unless const_defined?(:RFC2396_PARSER)
-    RFC2396_PARSER = DEFAULT_PARSER
-  end
+  RFC2396_PARSER = DEFAULT_PARSER unless const_defined?(:RFC2396_PARSER)
 
   unless const_defined?(:Parser)
     # Some gems instantiate URI::Parser.new directly. Return the
@@ -285,11 +302,13 @@ module ::URI
   # Rack::Protection::JsonCsrf#has_vector? does `rescue URI::InvalidURIError`,
   # so the constant needs to exist even if the referrer is actually valid.
   unless const_defined?(:InvalidURIError)
-    class InvalidURIError < StandardError; end
+    class InvalidURIError < StandardError
+    end
   end
 
   unless const_defined?(:Error)
-    class Error < StandardError; end
+    class Error < StandardError
+    end
   end
 
   # Opal's stdlib does not implement URI.parse. Rack::Protection calls
@@ -310,9 +329,21 @@ module ::URI
 
   def self.parse(str)
     s = str.to_s
-    return Generic.new(host: nil, scheme: nil, port: nil, path: '', query: nil, fragment: nil) if s.empty?
+    if s.empty?
+      return(
+        Generic.new(
+          host: nil,
+          scheme: nil,
+          port: nil,
+          path: "",
+          query: nil,
+          fragment: nil
+        )
+      )
+    end
 
-    js_url = `
+    js_url =
+      `
       (function() {
         try { return new URL(#{s}); }
         catch (e) {
@@ -321,24 +352,33 @@ module ::URI
         }
       })()
     `
-    raise ::URI::InvalidURIError, "bad URI(is not URI?): #{s}" if `#{js_url} == null`
+    if `#{js_url} == null`
+      raise ::URI::InvalidURIError, "bad URI(is not URI?): #{s}"
+    end
 
-    host     = `#{js_url}.host` || ''
-    host     = nil if host == '' || host.include?('__homura.invalid')
-    scheme   = `#{js_url}.protocol` || ''
-    scheme   = scheme.sub(/:$/, '')
-    scheme   = nil if scheme == ''
-    port_raw = `#{js_url}.port` || ''
-    port     = port_raw == '' ? nil : port_raw.to_i
-    path     = `#{js_url}.pathname` || ''
-    query    = `#{js_url}.search` || ''
-    query    = query.sub(/^\?/, '')
-    query    = nil if query == ''
-    frag     = `#{js_url}.hash` || ''
-    frag     = frag.sub(/^#/, '')
-    frag     = nil if frag == ''
+    host = `#{js_url}.host` || ""
+    host = nil if host == "" || host.include?("__homura.invalid")
+    scheme = `#{js_url}.protocol` || ""
+    scheme = scheme.sub(/:$/, "")
+    scheme = nil if scheme == ""
+    port_raw = `#{js_url}.port` || ""
+    port = port_raw == "" ? nil : port_raw.to_i
+    path = `#{js_url}.pathname` || ""
+    query = `#{js_url}.search` || ""
+    query = query.sub(/^\?/, "")
+    query = nil if query == ""
+    frag = `#{js_url}.hash` || ""
+    frag = frag.sub(/^#/, "")
+    frag = nil if frag == ""
 
-    Generic.new(host: host, scheme: scheme, port: port, path: path, query: query, fragment: frag)
+    Generic.new(
+      host: host,
+      scheme: scheme,
+      port: port,
+      path: path,
+      query: query,
+      fragment: frag
+    )
   end
 
   # Net::HTTP.get(URI('https://...')) is the canonical entry point in
@@ -347,7 +387,7 @@ module ::URI
   # omits that; install it here so vendored gems (and our Net::HTTP
   # shim) can use the idiomatic short form.
   def self.HTTP_class_for(scheme)
-    HTTP if scheme == 'http'
+    HTTP if scheme == "http"
   end
 end
 
@@ -400,11 +440,11 @@ end
 # `opal_patches` is loaded directly through the plain Opal CLI as well as
 # through `homura build`. Digest itself now lives in opal-homura stdlib;
 # the remaining Workers-specific shims stay local to this gem.
-require 'digest'
-require 'digest/sha2'
-require 'homura_vendor_zlib'
-require 'homura_vendor_tempfile'
-require 'homura_vendor_tilt'
+require "digest"
+require "digest/sha2"
+require "homura_vendor_zlib"
+require "homura_vendor_tempfile"
+require "homura_vendor_tilt"
 
 module ::SecureRandom
   # Raised when neither node:crypto.randomBytes nor Web Crypto
@@ -423,21 +463,28 @@ module ::SecureRandom
   # cryptographic randomness; only the module-load case ever falls
   # back, and Sinatra's session secret is the lone caller that
   # actually does that gracefully.
-  class EntropyError < ::NotImplementedError; end
+  class EntropyError < ::NotImplementedError
+  end
 
   def self.random_bytes(n = 16)
     n = n.to_i
     n = 16 if n <= 0
     hex_string = secure_hex_bytes(n)
-    raise EntropyError, 'no source of cryptographic entropy available (node:crypto AND Web Crypto both unreachable)' if hex_string.nil?
-    [hex_string].pack('H*')
+    if hex_string.nil?
+      raise EntropyError,
+            "no source of cryptographic entropy available (node:crypto AND Web Crypto both unreachable)"
+    end
+    [hex_string].pack("H*")
   end
 
   def self.hex(n = 16)
     n = n.to_i
     n = 16 if n <= 0
     out = secure_hex_bytes(n)
-    raise EntropyError, 'no source of cryptographic entropy available (node:crypto AND Web Crypto both unreachable)' if out.nil?
+    if out.nil?
+      raise EntropyError,
+            "no source of cryptographic entropy available (node:crypto AND Web Crypto both unreachable)"
+    end
     out
   end
 
@@ -447,13 +494,13 @@ module ::SecureRandom
   end
 
   def self.base64(n = 16)
-    require 'base64'
+    require "base64"
     Base64.strict_encode64(random_bytes(n))
   end
 
   def self.urlsafe_base64(n = 16, padding = false)
-    s = base64(n).tr('+/', '-_')
-    padding ? s : s.delete('=')
+    s = base64(n).tr("+/", "-_")
+    padding ? s : s.delete("=")
   end
 
   # NOTE: `SecureRandom.random_number` is provided by `Random::Formatter`
@@ -471,7 +518,8 @@ module ::SecureRandom
   def self.secure_hex_bytes(n)
     # Opal does not always auto-return backtick IIFEs; assign first
     # so the method's last expression is a normal Ruby reference.
-    result = `(function(n) {
+    result =
+      `(function(n) {
       try {
         if (typeof globalThis.__nodeCrypto__ !== 'undefined' && globalThis.__nodeCrypto__) {
           return globalThis.__nodeCrypto__.randomBytes(n).toString('hex');
@@ -516,16 +564,19 @@ class ::Array
   # this divergence in the initial Phase 7 PR.
   def pack(format)
     fmt = format.to_s
-    return pack_without_homura_hex(format) unless fmt == 'H*' || fmt =~ /\AH(\d+)\z/
+    unless fmt == "H*" || fmt =~ /\AH(\d+)\z/
+      return pack_without_homura_hex(format)
+    end
 
     hex = self.first.to_s
-    nibble_count = if fmt == 'H*'
-                     hex.length
-                   else
-                     [fmt[1..-1].to_i, hex.length].min
-                   end
-    nibble_count -= 1 if nibble_count.odd?  # round down to whole bytes
-    out = ''
+    nibble_count =
+      if fmt == "H*"
+        hex.length
+      else
+        [fmt[1..-1].to_i, hex.length].min
+      end
+    nibble_count -= 1 if nibble_count.odd? # round down to whole bytes
+    out = ""
     i = 0
     while i < nibble_count
       out = out + hex[i, 2].to_i(16).chr
@@ -553,20 +604,23 @@ class ::String
   # `n` nibbles (rounded down to whole bytes for an odd `n`).
   def unpack1(format)
     fmt = format.to_s
-    return unpack1_without_homura_hex(format) unless fmt == 'H*' || fmt =~ /\AH(\d+)\z/
+    unless fmt == "H*" || fmt =~ /\AH(\d+)\z/
+      return unpack1_without_homura_hex(format)
+    end
 
-    requested_nibbles = if fmt == 'H*'
-                          self.length * 2
-                        else
-                          fmt[1..-1].to_i
-                        end
-    out = ''
+    requested_nibbles =
+      if fmt == "H*"
+        self.length * 2
+      else
+        fmt[1..-1].to_i
+      end
+    out = ""
     i = 0
     n = self.length
     while i < n && out.length < requested_nibbles
       b = `(#{self}.charCodeAt(#{i}) & 0xff)`
       h = b.to_s(16)
-      h = '0' + h if h.length == 1
+      h = "0" + h if h.length == 1
       out = out + h
       i += 1
     end
@@ -588,7 +642,8 @@ end
 # Install the same stubs on File defensively.
 begin
   file_class = ::File
-  unless file_class.respond_to?(:read) && !file_class.method(:read).source_location.nil?
+  unless file_class.respond_to?(:read) &&
+           !file_class.method(:read).source_location.nil?
     def file_class.read(*args)
       raise ::Errno::ENOENT, args.first.to_s
     end
@@ -606,10 +661,14 @@ begin
       while i < p.length
         c = p[i]
         case c
-        when '*' then regex += '.*'
-        when '?' then regex += '.'
-        when '.', '(', ')', '[', ']', '+', '^', '$' then regex += "\\#{c}"
-        else regex += c
+        when "*"
+          regex += ".*"
+        when "?"
+          regex += "."
+        when ".", "(", ")", "[", "]", "+", "^", "$"
+          regex += "\\#{c}"
+        else
+          regex += c
         end
         i += 1
       end
@@ -628,7 +687,7 @@ end
 # Gem::Version at class body eval to gate the `except` override. Opal
 # does not bundle RubyGems — pre-require our minimal stub so the
 # reference resolves before upstream Sinatra loads.
-require 'rubygems/version'
+require "rubygems/version"
 
 # Phase 13 originally required `opal-parser` because upstream Sinatra's
 # `set` helper used `class_eval("def ...")` for primitive option values.
@@ -636,19 +695,47 @@ require 'rubygems/version'
 # (Proc-based getters / predicate) so the Workers bundle no longer needs the
 # full Opal compiler + whitequark parser at runtime.
 
-[
-  :ISO_2022_JP,
-  :SHIFT_JIS, :Shift_JIS, :WINDOWS_31J, :CP932, :SJIS,
-  :EUC_JP, :EUC_KR, :EUC_CN, :EUC_TW,
-  :BIG5, :GB18030, :GBK, :GB2312,
-  :WINDOWS_1250, :WINDOWS_1251, :WINDOWS_1252, :WINDOWS_1253,
-  :WINDOWS_1254, :WINDOWS_1255, :WINDOWS_1256, :WINDOWS_1257, :WINDOWS_1258,
-  :KOI8_R, :KOI8_U,
-  :ISO_8859_2, :ISO_8859_3, :ISO_8859_4, :ISO_8859_5,
-  :ISO_8859_6, :ISO_8859_7, :ISO_8859_8, :ISO_8859_9,
-  :ISO_8859_10, :ISO_8859_11, :ISO_8859_13, :ISO_8859_14,
-  :ISO_8859_15, :ISO_8859_16,
-  :MACROMAN
+%i[
+  ISO_2022_JP
+  SHIFT_JIS
+  Shift_JIS
+  WINDOWS_31J
+  CP932
+  SJIS
+  EUC_JP
+  EUC_KR
+  EUC_CN
+  EUC_TW
+  BIG5
+  GB18030
+  GBK
+  GB2312
+  WINDOWS_1250
+  WINDOWS_1251
+  WINDOWS_1252
+  WINDOWS_1253
+  WINDOWS_1254
+  WINDOWS_1255
+  WINDOWS_1256
+  WINDOWS_1257
+  WINDOWS_1258
+  KOI8_R
+  KOI8_U
+  ISO_8859_2
+  ISO_8859_3
+  ISO_8859_4
+  ISO_8859_5
+  ISO_8859_6
+  ISO_8859_7
+  ISO_8859_8
+  ISO_8859_9
+  ISO_8859_10
+  ISO_8859_11
+  ISO_8859_13
+  ISO_8859_14
+  ISO_8859_15
+  ISO_8859_16
+  MACROMAN
 ].each do |name|
   unless Encoding.const_defined?(name)
     Encoding.const_set(name, Encoding::ASCII_8BIT)

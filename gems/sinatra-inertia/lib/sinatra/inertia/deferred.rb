@@ -18,7 +18,7 @@ module Sinatra
     class Prop
       attr_reader :block, :value, :group
 
-      def initialize(block: nil, value: nil, group: 'default')
+      def initialize(block: nil, value: nil, group: "default")
         @block = block
         @value = value
         @group = group
@@ -43,7 +43,6 @@ module Sinatra
       # Should arrays returned by this prop be merged with the client's
       # existing array (Inertia 2 merge semantics)?
       def merge? = false
-
     end
 
     class AlwaysProp < Prop
@@ -71,7 +70,8 @@ module Sinatra
     module_function
 
     def always(value = nil, &block) = AlwaysProp.new(block: block, value: value)
-    def defer(group: 'default', &block) = DeferredProp.new(block: block, group: group)
+    def defer(group: "default", &block) =
+      DeferredProp.new(block: block, group: group)
     def optional(&block) = OptionalProp.new(block: block)
     def lazy(&block) = LazyProp.new(block: block)
     def merge(value = nil, &block) = MergeProp.new(block: block, value: value)

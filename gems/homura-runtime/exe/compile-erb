@@ -22,8 +22,8 @@
 # The output registers each template with `HomuraTemplates` and
 # monkey-patches `Sinatra::Templates#erb` to dispatch there.
 
-require 'fileutils'
-require 'optparse'
+require "fileutils"
+require "optparse"
 
 HELP = <<~USAGE
   Usage:
@@ -53,7 +53,7 @@ module HomuraERB
   end
 
   def normalize_fragment(fragment)
-    return '__homura_template_yield__' if supported_yield_fragment?(fragment)
+    return "__homura_template_yield__" if supported_yield_fragment?(fragment)
     rewrite_class_variables(fragment)
   end
 
@@ -75,13 +75,15 @@ module HomuraERB
   # comments are vanishingly rare in real templates. Anything more
   # ambitious would need a Ruby parser, which is overkill for the
   # `@@ivar` shape we actually have to handle here.
-  CVAR_OP_ASSIGN_RE = /(?<![@\w])@@([A-Za-z_]\w*)\s*(\|\||&&|\+|-|\*|\/|%|\*\*|<<|>>|\||&|\^)=\s*([^;\n]+)/.freeze
+  CVAR_OP_ASSIGN_RE =
+    %r{(?<![@\w])@@([A-Za-z_]\w*)\s*(\|\||&&|\+|-|\*|/|%|\*\*|<<|>>|\||&|\^)=\s*([^;\n]+)}.freeze
   CVAR_ASSIGN_RE = /(?<![@\w])@@([A-Za-z_]\w*)\s*=(?!=)\s*([^;\n]+)/.freeze
   # Read pattern excludes `@@name` that appears on the left-hand side
   # of an assignment (`@@name =`, `@@name +=`, `@@name ||=`, etc.) so
   # the assignment passes still see the raw token to rewrite. The
   # `=(?!=)` guard keeps `==` (comparison) treated as a read.
-  CVAR_READ_RE = %r{
+  CVAR_READ_RE =
+    %r{
     (?<![@\w])@@([A-Za-z_]\w*)\b
     (?!
       \s*
@@ -94,13 +96,14 @@ module HomuraERB
   CVAR_PLACEHOLDER_SUFFIX = "\x01".freeze
 
   def rewrite_class_variables(fragment)
-    return fragment unless fragment.include?('@@')
+    return fragment unless fragment.include?("@@")
 
     placeholders = []
-    record = lambda do |replacement|
-      placeholders << replacement
-      "#{CVAR_PLACEHOLDER_PREFIX}#{placeholders.length - 1}#{CVAR_PLACEHOLDER_SUFFIX}"
-    end
+    record =
+      lambda do |replacement|
+        placeholders << replacement
+        "#{CVAR_PLACEHOLDER_PREFIX}#{placeholders.length - 1}#{CVAR_PLACEHOLDER_SUFFIX}"
+      end
 
     # Reads first: rewrite every `@@name` that is *not* the target of
     # an assignment, including occurrences on the right-hand side of
@@ -108,36 +111,41 @@ module HomuraERB
     # later assignment passes see the original `@@name = ...` shape
     # (without their RHS reads being clobbered) and so the final
     # output never re-enters this same rewrite loop.
-    work = fragment.gsub(CVAR_READ_RE) do
-      name = Regexp.last_match(1)
-      record.call("self.class.class_variable_get(:@@#{name})")
-    end
+    work =
+      fragment.gsub(CVAR_READ_RE) do
+        name = Regexp.last_match(1)
+        record.call("self.class.class_variable_get(:@@#{name})")
+      end
 
-    work = work.gsub(CVAR_OP_ASSIGN_RE) do
-      name = Regexp.last_match(1)
-      op = Regexp.last_match(2)
-      value = Regexp.last_match(3)
-      replacement =
-        case op
-        when '||'
-          "self.class.class_variable_set(:@@#{name}, (self.class.class_variable_defined?(:@@#{name}) ? self.class.class_variable_get(:@@#{name}) : nil) || (#{value}))"
-        when '&&'
-          "self.class.class_variable_set(:@@#{name}, (self.class.class_variable_defined?(:@@#{name}) ? self.class.class_variable_get(:@@#{name}) : nil) && (#{value}))"
-        else
-          "self.class.class_variable_set(:@@#{name}, self.class.class_variable_get(:@@#{name}) #{op} (#{value}))"
-        end
-      record.call(replacement)
-    end
+    work =
+      work.gsub(CVAR_OP_ASSIGN_RE) do
+        name = Regexp.last_match(1)
+        op = Regexp.last_match(2)
+        value = Regexp.last_match(3)
+        replacement =
+          case op
+          when "||"
+            "self.class.class_variable_set(:@@#{name}, (self.class.class_variable_defined?(:@@#{name}) ? self.class.class_variable_get(:@@#{name}) : nil) || (#{value}))"
+          when "&&"
+            "self.class.class_variable_set(:@@#{name}, (self.class.class_variable_defined?(:@@#{name}) ? self.class.class_variable_get(:@@#{name}) : nil) && (#{value}))"
+          else
+            "self.class.class_variable_set(:@@#{name}, self.class.class_variable_get(:@@#{name}) #{op} (#{value}))"
+          end
+        record.call(replacement)
+      end
 
-    work = work.gsub(CVAR_ASSIGN_RE) do
-      name = Regexp.last_match(1)
-      value = Regexp.last_match(2)
-      record.call("self.class.class_variable_set(:@@#{name}, (#{value}))")
-    end
+    work =
+      work.gsub(CVAR_ASSIGN_RE) do
+        name = Regexp.last_match(1)
+        value = Regexp.last_match(2)
+        record.call("self.class.class_variable_set(:@@#{name}, (#{value}))")
+      end
 
-    placeholder_re = /#{Regexp.escape(CVAR_PLACEHOLDER_PREFIX)}(\d+)#{Regexp.escape(CVAR_PLACEHOLDER_SUFFIX)}/
+    placeholder_re =
+      /#{Regexp.escape(CVAR_PLACEHOLDER_PREFIX)}(\d+)#{Regexp.escape(CVAR_PLACEHOLDER_SUFFIX)}/
     loop do
-      replaced = work.gsub(placeholder_re) { placeholders[Regexp.last_match(1).to_i] }
+      replaced =
+        work.gsub(placeholder_re) { placeholders[Regexp.last_match(1).to_i] }
       break if replaced == work
       work = replaced
     end
@@ -146,7 +154,10 @@ module HomuraERB
 
   def validate_code_fragment!(fragment)
     stripped = fragment.strip
-    return unless supported_yield_fragment?(stripped) || yield_with_args_fragment?(stripped)
+    unless supported_yield_fragment?(stripped) ||
+             yield_with_args_fragment?(stripped)
+      return
+    end
 
     raise <<~MSG.strip
       Unsupported ERB yield form `<% #{stripped} %>`.
@@ -176,7 +187,7 @@ module HomuraERB
     ruby = +"_out = ''\n"
     cursor = 0
     while cursor < source.length
-      open_idx = source.index('<%', cursor)
+      open_idx = source.index("<%", cursor)
       if open_idx.nil?
         static = source[cursor..]
         ruby << "_out = _out + #{static.inspect}\n" unless static.empty?
@@ -189,21 +200,23 @@ module HomuraERB
         ruby << "_out = _out + #{static.inspect}\n"
       end
 
-      close_idx = source.index('%>', open_idx + 2)
-      raise "Unmatched `<%` in ERB source (starting at #{open_idx})" if close_idx.nil?
+      close_idx = source.index("%>", open_idx + 2)
+      if close_idx.nil?
+        raise "Unmatched `<%` in ERB source (starting at #{open_idx})"
+      end
 
       inner = source[(open_idx + 2)...close_idx]
 
-      if inner.start_with?('#')
+      if inner.start_with?("#")
         # `<%# comment %>` — drop
-      elsif inner.start_with?('==')
+      elsif inner.start_with?("==")
         # `<%== expression %>` — identical to `<%= %>` in this minimal
         # dialect (no HTML escaping yet; the author is responsible).
         expr = inner[2..].strip
         validate_expression_fragment!(expr)
         expr = normalize_fragment(expr)
         ruby << "_out = _out + ((#{expr})).to_s\n"
-      elsif inner.start_with?('=')
+      elsif inner.start_with?("=")
         # `<%= expression %>`
         expr = inner[1..].strip
         validate_expression_fragment!(expr)
@@ -243,17 +256,17 @@ end
 def default_inputs_for(dir)
   # Recursive so `views/posts/index.erb` becomes `:'posts/index'`,
   # matching upstream Sinatra's subdirectory convention.
-  Dir.glob(File.join(dir, '**', '*.erb')).sort
+  Dir.glob(File.join(dir, "**", "*.erb")).sort
 end
 
 def template_name_for(path, root)
   rel = path.dup
   if root
-    root_with_sep = root.end_with?('/') ? root : "#{root}/"
+    root_with_sep = root.end_with?("/") ? root : "#{root}/"
     rel = rel[root_with_sep.length..] if rel.start_with?(root_with_sep)
   end
-  rel = File.basename(rel) unless rel.include?('/')
-  rel.delete_suffix('.erb').to_sym
+  rel = File.basename(rel) unless rel.include?("/")
+  rel.delete_suffix(".erb").to_sym
 end
 
 def emit_header(io, namespace)
@@ -479,25 +492,34 @@ end
 # Entry point
 # ---------------------------------------------------------------------------
 
-if ARGV.include?('-h') || ARGV.include?('--help')
+if ARGV.include?("-h") || ARGV.include?("--help")
   puts HELP
   exit 0
 end
 
 options = {
-  input_dir: 'views',
-  output: 'build/homura_templates.rb',
-  namespace: 'HomuraTemplates',
+  input_dir: "views",
+  output: "build/homura_templates.rb",
+  namespace: "HomuraTemplates",
   stdout: false
 }
 
-parser = OptionParser.new do |op|
-  op.banner = 'Usage: bin/compile-erb [options] [--] [files...]'
-  op.on('--input DIR', 'Directory containing *.erb templates') { |d| options[:input_dir] = d }
-  op.on('--output PATH', 'Write generated Ruby to PATH') { |p| options[:output] = p }
-  op.on('--namespace NAME', 'Ruby module name for the registry') { |n| options[:namespace] = n }
-  op.on('--stdout', 'Write generated Ruby to stdout') { options[:stdout] = true }
-end
+parser =
+  OptionParser.new do |op|
+    op.banner = "Usage: bin/compile-erb [options] [--] [files...]"
+    op.on("--input DIR", "Directory containing *.erb templates") do |d|
+      options[:input_dir] = d
+    end
+    op.on("--output PATH", "Write generated Ruby to PATH") do |p|
+      options[:output] = p
+    end
+    op.on("--namespace NAME", "Ruby module name for the registry") do |n|
+      options[:namespace] = n
+    end
+    op.on("--stdout", "Write generated Ruby to stdout") do
+      options[:stdout] = true
+    end
+  end
 parser.parse!
 
 positional = ARGV.dup
@@ -505,12 +527,15 @@ namespace = options[:namespace]
 
 inputs =
   if positional.any?
-    positional.flat_map { |a| File.directory?(a) ? Dir.glob(File.join(a, '**', '*.erb')).sort : [a] }
+    positional.flat_map do |a|
+      File.directory?(a) ? Dir.glob(File.join(a, "**", "*.erb")).sort : [a]
+    end
   else
     default_inputs_for(options[:input_dir])
   end
 
-template_root = positional.find { |a| File.directory?(a) } || options[:input_dir]
+template_root =
+  positional.find { |a| File.directory?(a) } || options[:input_dir]
 
 write_file = !options[:stdout] && (positional.empty? || options[:output])
 out_path = options[:output]
@@ -524,7 +549,7 @@ end
 
 if write_file
   FileUtils.mkdir_p(File.dirname(out_path))
-  File.open(out_path, 'w') do |io|
+  File.open(out_path, "w") do |io|
     emit_header(io, namespace)
     emit_templates(io, inputs, namespace, template_root)
     emit_sinatra_patch(io, namespace) unless inputs.empty?

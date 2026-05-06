@@ -4,40 +4,44 @@
 # Scaffolds a minimal Sinatra-on-Workers project (Phase 15-E).
 # Preferred usage: homura new myapp [--with-db]
 
-require 'erb'
-require 'fileutils'
-require 'optparse'
-require 'pathname'
+require "erb"
+require "fileutils"
+require "optparse"
+require "pathname"
 
 options = { with_db: false }
 
-OptionParser.new do |o|
-  o.banner = 'usage: homura new APP_NAME [--with-db]'
-  o.on('--with-db', 'Add sequel-d1 + sample migration') { options[:with_db] = true }
-end.parse!
+OptionParser
+  .new do |o|
+    o.banner = "usage: homura new APP_NAME [--with-db]"
+    o.on("--with-db", "Add sequel-d1 + sample migration") do
+      options[:with_db] = true
+    end
+  end
+  .parse!
 
-app_name = ARGV[0] or abort('homura new: APP_NAME required')
+app_name = ARGV[0] or abort("homura new: APP_NAME required")
 
 def sinatra_gem_dir
-  spec = Gem.loaded_specs['sinatra-homura']
+  spec = Gem.loaded_specs["sinatra-homura"]
   return Pathname(spec.full_gem_path) if spec
-  Pathname(__FILE__).expand_path.join('..', '..')
+  Pathname(__FILE__).expand_path.join("..", "..")
 end
 
 def required_spec(name)
   Gem.loaded_specs[name] || Gem::Specification.find_by_name(name)
 end
 
-opal_spec = required_spec('opal-homura')
-runtime_spec = required_spec('homura-runtime')
-sinatra_spec = required_spec('sinatra-homura')
-sequel_spec = options[:with_db] ? required_spec('sequel-d1') : nil
+opal_spec = required_spec("opal-homura")
+runtime_spec = required_spec("homura-runtime")
+sinatra_spec = required_spec("sinatra-homura")
+sequel_spec = options[:with_db] ? required_spec("sequel-d1") : nil
 
 target = Pathname(app_name).expand_path
 app_slug = target.basename.to_s
 abort "homura new: #{target} already exists" if target.exist?
 
-tpl_root = sinatra_gem_dir.join('templates/project')
+tpl_root = sinatra_gem_dir.join("templates/project")
 abort "homura new: templates missing #{tpl_root}" unless tpl_root.directory?
 
 locals = {
@@ -47,29 +51,32 @@ locals = {
   sinatra_version: sinatra_spec.version.to_s,
   sequel_version: sequel_spec&.version&.to_s,
   with_db: options[:with_db],
-  compat_date: Time.now.utc.strftime('%Y-%m-%d')
+  compat_date: Time.now.utc.strftime("%Y-%m-%d")
 }
 
 FileUtils.mkdir_p(target)
 
-Dir.glob(tpl_root.join('**', '*'), File::FNM_DOTMATCH).sort.each do |src|
-  rel = Pathname(src).relative_path_from(tpl_root)
-  next if rel.to_s == '.'
-  next if !options[:with_db] && rel.each_filename.first == 'db'
+Dir
+  .glob(tpl_root.join("**", "*"), File::FNM_DOTMATCH)
+  .sort
+  .each do |src|
+    rel = Pathname(src).relative_path_from(tpl_root)
+    next if rel.to_s == "."
+    next if !options[:with_db] && rel.each_filename.first == "db"
 
-  dest = target.join(rel)
-  if File.directory?(src)
-    FileUtils.mkdir_p(dest)
-  elsif src.end_with?('.tt')
-    dest = dest.sub(/\.tt\z/, '')
-    FileUtils.mkdir_p(dest.dirname)
-    erb = ERB.new(File.read(src), trim_mode: '-')
-    File.write(dest, erb.result_with_hash(locals))
-  else
-    FileUtils.mkdir_p(dest.dirname)
-    FileUtils.cp(src, dest)
+    dest = target.join(rel)
+    if File.directory?(src)
+      FileUtils.mkdir_p(dest)
+    elsif src.end_with?(".tt")
+      dest = dest.sub(/\.tt\z/, "")
+      FileUtils.mkdir_p(dest.dirname)
+      erb = ERB.new(File.read(src), trim_mode: "-")
+      File.write(dest, erb.result_with_hash(locals))
+    else
+      FileUtils.mkdir_p(dest.dirname)
+      FileUtils.cp(src, dest)
+    end
   end
-end
 
 # NOTE: from 0.2.20 onward the runtime .mjs files (setup-node-crypto /
 # worker_module) live under `build/cf-runtime/` and are written by

@@ -7,26 +7,45 @@ module Homura
     # requests skip the 2048-bit RSA generation.
     def jwt_keys_for(alg)
       case alg
-      when 'HS256', 'HS384', 'HS512'
+      when "HS256", "HS384", "HS512"
         [settings.jwt_secret, settings.jwt_secret]
-      when 'RS256', 'RS384', 'RS512', 'PS256', 'PS384', 'PS512'
-        App.class_variable_set(:@@rsa_key, OpenSSL::PKey::RSA.new(2048)) unless App.class_variable_defined?(:@@rsa_key)
+      when "RS256", "RS384", "RS512", "PS256", "PS384", "PS512"
+        unless App.class_variable_defined?(:@@rsa_key)
+          App.class_variable_set(:@@rsa_key, OpenSSL::PKey::RSA.new(2048))
+        end
         rsa = App.class_variable_get(:@@rsa_key)
         [rsa, rsa.public_key]
-      when 'ES256'
-        App.class_variable_set(:@@ec256_key, OpenSSL::PKey::EC.generate('prime256v1')) unless App.class_variable_defined?(:@@ec256_key)
+      when "ES256"
+        unless App.class_variable_defined?(:@@ec256_key)
+          App.class_variable_set(
+            :@@ec256_key,
+            OpenSSL::PKey::EC.generate("prime256v1")
+          )
+        end
         ec = App.class_variable_get(:@@ec256_key)
         [ec, ec]
-      when 'ES384'
-        App.class_variable_set(:@@ec384_key, OpenSSL::PKey::EC.generate('secp384r1')) unless App.class_variable_defined?(:@@ec384_key)
+      when "ES384"
+        unless App.class_variable_defined?(:@@ec384_key)
+          App.class_variable_set(
+            :@@ec384_key,
+            OpenSSL::PKey::EC.generate("secp384r1")
+          )
+        end
         ec = App.class_variable_get(:@@ec384_key)
         [ec, ec]
-      when 'ES512'
-        App.class_variable_set(:@@ec521_key, OpenSSL::PKey::EC.generate('secp521r1')) unless App.class_variable_defined?(:@@ec521_key)
+      when "ES512"
+        unless App.class_variable_defined?(:@@ec521_key)
+          App.class_variable_set(
+            :@@ec521_key,
+            OpenSSL::PKey::EC.generate("secp521r1")
+          )
+        end
         ec = App.class_variable_get(:@@ec521_key)
         [ec, ec]
-      when 'EdDSA', 'ED25519'
-        App.class_variable_set(:@@ed_key, OpenSSL::PKey::Ed25519.generate) unless App.class_variable_defined?(:@@ed_key)
+      when "EdDSA", "ED25519"
+        unless App.class_variable_defined?(:@@ed_key)
+          App.class_variable_set(:@@ed_key, OpenSSL::PKey::Ed25519.generate)
+        end
         ed = App.class_variable_get(:@@ed_key)
         [ed, ed]
       else
@@ -38,10 +57,10 @@ module Homura
     # verification key. Safe to do because we always re-verify the
     # signature with the detected alg.
     def alg_from_token(token)
-      header_seg = token.to_s.split('.').first.to_s
-      padded     = header_seg + ('=' * ((4 - header_seg.length % 4) % 4))
-      json       = Base64.urlsafe_decode64(padded)
-      JSON.parse(json)['alg']
+      header_seg = token.to_s.split(".").first.to_s
+      padded = header_seg + ("=" * ((4 - header_seg.length % 4) % 4))
+      json = Base64.urlsafe_decode64(padded)
+      JSON.parse(json)["alg"]
     rescue StandardError
       nil
     end
@@ -55,14 +74,19 @@ module Homura
   # stays minimal.
   module SessionCookieInstanceMethods
     def verify_session_cookie(raw)
-      return nil unless raw.is_a?(String) && raw.include?('.')
-      payload, sig = raw.split('.', 2)
+      return nil unless raw.is_a?(String) && raw.include?(".")
+      payload, sig = raw.split(".", 2)
       return nil if payload.nil? || sig.nil? || payload.empty? || sig.empty?
-      expected = OpenSSL::HMAC.hexdigest('SHA256', settings.jwt_secret, payload)
+      expected = OpenSSL::HMAC.hexdigest("SHA256", settings.jwt_secret, payload)
       return nil unless Rack::Utils.secure_compare(expected, sig)
-      decoded = Base64.urlsafe_decode64(payload) rescue nil
+      decoded =
+        begin
+          Base64.urlsafe_decode64(payload)
+        rescue StandardError
+          nil
+        end
       return nil if decoded.nil?
-      username, exp = decoded.split(':', 2)
+      username, exp = decoded.split(":", 2)
       return nil if username.nil? || exp.nil?
       return nil if Time.now.to_i > exp.to_i
       username
@@ -71,7 +95,7 @@ module Homura
     def mint_session_cookie(username)
       exp = Time.now.to_i + App::SESSION_COOKIE_TTL
       payload = Base64.urlsafe_encode64("#{username}:#{exp}", padding: false)
-      sig = OpenSSL::HMAC.hexdigest('SHA256', settings.jwt_secret, payload)
+      sig = OpenSSL::HMAC.hexdigest("SHA256", settings.jwt_secret, payload)
       "#{payload}.#{sig}"
     end
 

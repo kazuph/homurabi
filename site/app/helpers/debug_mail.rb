@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require 'uri'
+require "uri"
 
 module Homura
   # Phase 17 — `/debug/mail` is open on localhost only; deployed Workers require session user App::DEBUG_MAIL_ADMIN_USERNAME.
@@ -15,14 +15,14 @@ module Homura
     # 既に `/` まで decode 済みの値は URI 実装によりほぼそのまま返る。
     def self.www_decode(s)
       s = s.to_s
-      URI.decode_www_form_component(s.tr('+', ' '))
+      URI.decode_www_form_component(s.tr("+", " "))
     rescue StandardError
       s
     end
 
     def debug_mail_local_request?
       h = request.host.to_s
-      h == '127.0.0.1' || h == 'localhost'
+      h == "127.0.0.1" || h == "localhost"
     end
 
     # Returns a Rack triple [status, headers, body] when access must be denied, else nil.
@@ -31,7 +31,14 @@ module Homura
       return nil if current_session_user.to_s == App::DEBUG_MAIL_ADMIN_USERNAME
 
       body_str = debug_mail_forbidden_body
-      [403, { 'Content-Type' => 'text/html; charset=utf-8', 'Content-Length' => body_str.bytesize.to_s }, [body_str]]
+      [
+        403,
+        {
+          "Content-Type" => "text/html; charset=utf-8",
+          "Content-Length" => body_str.bytesize.to_s
+        },
+        [body_str]
+      ]
     end
 
     private

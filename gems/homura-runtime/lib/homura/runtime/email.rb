@@ -42,19 +42,30 @@ module Cloudflare
     def send(to:, from:, subject:, text: nil, html: nil, reply_to: nil)
       js = @js
       err_klass = Cloudflare::Email::Error
-      raise Error, 'send_email binding not bound' unless available?
+      raise Error, "send_email binding not bound" unless available?
 
-      raise Error, 'subject is required' if subject.nil? || subject.to_s.strip.empty?
+      if subject.nil? || subject.to_s.strip.empty?
+        raise Error, "subject is required"
+      end
 
       has_text = !(text.nil? || text.to_s.empty?)
       has_html = !(html.nil? || html.to_s.empty?)
-      raise Error, 'text or html is required' unless has_text || has_html
+      raise Error, "text or html is required" unless has_text || has_html
 
-      payload = build_send_payload(to: to, from: from, subject: subject.to_s, text: text, html: html, reply_to: reply_to)
+      payload =
+        build_send_payload(
+          to: to,
+          from: from,
+          subject: subject.to_s,
+          text: text,
+          html: html,
+          reply_to: reply_to
+        )
 
       cf = Cloudflare
       # 多行 x-string をメソッド末尾に置くと Opal が Promise を返さない出力になることがあるため return を明示する。
-      return `(async function(binding, payload, Kernel, Err, cf) {
+      return(
+        `(async function(binding, payload, Kernel, Err, cf) {
         try {
           var r = await binding.send(payload);
           if (r == null || r === undefined) {
@@ -73,6 +84,7 @@ module Cloudflare
           Kernel.$raise(Err.$new(msg, Opal.hash({ code: code })));
         }
       })(#{js}, #{payload}, #{Kernel}, #{err_klass}, #{cf})`
+      )
     end
 
     private
@@ -103,7 +115,7 @@ module Cloudflare
     # Returns a JS array: mix of address strings and `{ email, name? }` objects (Workers API shape).
     def normalize_to_js(raw)
       entries = flatten_recipients(raw)
-      raise Error, 'to is empty' if entries.empty?
+      raise Error, "to is empty" if entries.empty?
 
       arr = `([])`
       entries.each do |e|
@@ -113,7 +125,9 @@ module Cloudflare
         when Hash
           js = `({})`
           `#{js}.email = #{e[:email]}`
-          `#{js}.name = #{e[:name].to_s}` if e[:name] && !e[:name].to_s.strip.empty?
+          if e[:name] && !e[:name].to_s.strip.empty?
+            `#{js}.name = #{e[:name].to_s}`
+          end
           `#{arr}.push(#{js})`
         end
       end
@@ -129,9 +143,9 @@ module Cloudflare
         s = raw.strip
         s.empty? ? [] : [s]
       when Hash
-        em = raw[:email] || raw['email']
+        em = raw[:email] || raw["email"]
         return [] if em.nil? || em.to_s.strip.empty?
-        nm = raw[:name] || raw['name']
+        nm = raw[:name] || raw["name"]
         if nm.nil? || nm.to_s.strip.empty?
           [em.to_s.strip]
         else
@@ -162,12 +176,12 @@ module Cloudflare
       case raw
       when String
         s = raw.strip
-        raise Error, 'from address is empty' if s.empty?
+        raise Error, "from address is empty" if s.empty?
         return s
       when Hash
-        em = raw[:email] || raw['email']
-        nm = raw[:name] || raw['name']
-        raise Error, 'from.email is required' if em.nil? || em.to_s.strip.empty?
+        em = raw[:email] || raw["email"]
+        nm = raw[:name] || raw["name"]
+        raise Error, "from.email is required" if em.nil? || em.to_s.strip.empty?
         js = `({})`
         `#{js}.email = #{em.to_s.strip}`
         `#{js}.name = #{nm.to_s}` unless nm.nil? || nm.to_s.strip.empty?

@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require 'set'
+require "set"
 
 module HomuraRuntime
   class AsyncRegistry
@@ -22,11 +22,15 @@ module HomuraRuntime
       end
 
       def taint_return(class_name, method_name, return_class_name)
-        (@registry.taint_returns[class_name] ||= {})[method_name] = return_class_name
+        (@registry.taint_returns[class_name] ||= {})[
+          method_name
+        ] = return_class_name
       end
 
       def async_accessor(lvar_name, accessor_name, class_name)
-        @registry.async_accessors[[lvar_name.to_sym, accessor_name.to_sym]] = class_name
+        @registry.async_accessors[
+          [lvar_name.to_sym, accessor_name.to_sym]
+        ] = class_name
       end
 
       def async_helper(method_name, class_name)
@@ -75,28 +79,46 @@ module HomuraRuntime
         Gem.loaded_specs.each_value do |spec|
           next if spec.full_gem_path.nil?
 
-          lib_dir = File.join(spec.full_gem_path, 'lib')
+          lib_dir = File.join(spec.full_gem_path, "lib")
           next unless Dir.exist?(lib_dir)
 
-          Dir.glob(File.join(lib_dir, '**', '*.rb')).each do |path|
-            next unless File.read(path).include?('register_async_source')
+          Dir
+            .glob(File.join(lib_dir, "**", "*.rb"))
+            .each do |path|
+              next unless File.read(path).include?("register_async_source")
 
-            require_path = path.sub(Regexp.new("^#{Regexp.escape(lib_dir)}/"), '').sub(/\.rb\z/, '')
-            begin
-              require require_path
-              loaded += 1
-              puts "[auto-await] loaded async source from #{spec.name}: #{require_path}" if debug
-            rescue LoadError, StandardError => e
-              warn "[auto-await] Warning: failed to load async source from #{spec.name}/#{require_path}: #{e.message}" if debug
+              require_path =
+                path.sub(Regexp.new("^#{Regexp.escape(lib_dir)}/"), "").sub(
+                  /\.rb\z/,
+                  ""
+                )
+              begin
+                require require_path
+                loaded += 1
+                if debug
+                  puts "[auto-await] loaded async source from #{spec.name}: #{require_path}"
+                end
+              rescue LoadError, StandardError => e
+                if debug
+                  warn "[auto-await] Warning: failed to load async source from #{spec.name}/#{require_path}: #{e.message}"
+                end
+              end
             end
-          end
         end
 
-        puts "[auto-await] auto-loaded #{loaded} async source file(s)" if debug && loaded.positive?
+        if debug && loaded.positive?
+          puts "[auto-await] auto-loaded #{loaded} async source file(s)"
+        end
       end
     end
 
-    attr_reader :async_classes, :async_methods, :async_factories, :taint_returns, :async_accessors, :async_helpers, :helper_factories
+    attr_reader :async_classes,
+                :async_methods,
+                :async_factories,
+                :taint_returns,
+                :async_accessors,
+                :async_helpers,
+                :helper_factories
 
     def initialize
       @async_classes = {}
@@ -113,7 +135,10 @@ module HomuraRuntime
       methods = @async_methods[class_name]
       return true if methods&.include?(method_name)
       except = @async_classes[class_name]
-      return true if except && !except.include?(method_name.to_s) && !except.include?(method_name.to_sym)
+      if except && !except.include?(method_name.to_s) &&
+           !except.include?(method_name.to_sym)
+        return true
+      end
       false
     end
 
@@ -126,10 +151,8 @@ module HomuraRuntime
     end
 
     def tainted_class?(class_name)
-      @async_classes.key?(class_name) ||
-        @async_methods.key?(class_name) ||
-        @async_factories.key?(class_name) ||
-        @taint_returns.key?(class_name)
+      @async_classes.key?(class_name) || @async_methods.key?(class_name) ||
+        @async_factories.key?(class_name) || @taint_returns.key?(class_name)
     end
   end
 end
@@ -138,86 +161,92 @@ end
 # Each binding declares which methods return Promises so the
 # build-time analyzer can insert .__await__ automatically.
 HomuraRuntime::AsyncRegistry.register_async_source do
-  async_method 'Cloudflare::D1Database', :execute
-  async_method 'Cloudflare::D1Database', :get_first_row
-  async_method 'Cloudflare::D1Database', :execute_insert
-  async_method 'Cloudflare::D1Database', :execute_batch
-  taint_return 'Cloudflare::D1Database', :prepare, 'Cloudflare::D1Statement'
-  taint_return 'Cloudflare::D1Database', :[], 'Cloudflare::D1Statement'
+  async_method "Cloudflare::D1Database", :execute
+  async_method "Cloudflare::D1Database", :get_first_row
+  async_method "Cloudflare::D1Database", :execute_insert
+  async_method "Cloudflare::D1Database", :execute_batch
+  taint_return "Cloudflare::D1Database", :prepare, "Cloudflare::D1Statement"
+  taint_return "Cloudflare::D1Database", :[], "Cloudflare::D1Statement"
 
-  async_method 'Cloudflare::D1Statement', :all
-  async_method 'Cloudflare::D1Statement', :first
-  async_method 'Cloudflare::D1Statement', :run
+  async_method "Cloudflare::D1Statement", :all
+  async_method "Cloudflare::D1Statement", :first
+  async_method "Cloudflare::D1Statement", :run
   # `bind` returns a new D1Statement for further chaining. Tainting the
   # return preserves the type so the auto-await pass keeps chaining
   # `.run` / `.all` / `.first` on the bound statement (otherwise
   # `db.prepare(sql).bind(...).run` drops await on `.run` and
   # `flatten_meta` ends up receiving a JS Promise instead of the
   # metadata Hash).
-  taint_return 'Cloudflare::D1Statement', :bind, 'Cloudflare::D1Statement'
+  taint_return "Cloudflare::D1Statement", :bind, "Cloudflare::D1Statement"
 
-  async_method 'Cloudflare::KVNamespace', :get
-  async_method 'Cloudflare::KVNamespace', :get_with_metadata
-  async_method 'Cloudflare::KVNamespace', :put
-  async_method 'Cloudflare::KVNamespace', :delete
-  async_method 'Cloudflare::KVNamespace', :list
+  async_method "Cloudflare::KVNamespace", :get
+  async_method "Cloudflare::KVNamespace", :get_with_metadata
+  async_method "Cloudflare::KVNamespace", :put
+  async_method "Cloudflare::KVNamespace", :delete
+  async_method "Cloudflare::KVNamespace", :list
 
-  async_method 'Cloudflare::R2Bucket', :get
-  async_method 'Cloudflare::R2Bucket', :get_binary
-  async_method 'Cloudflare::R2Bucket', :put
-  async_method 'Cloudflare::R2Bucket', :delete
-  async_method 'Cloudflare::R2Bucket', :list
-  async_method 'Cloudflare::R2Bucket', :head
+  async_method "Cloudflare::R2Bucket", :get
+  async_method "Cloudflare::R2Bucket", :get_binary
+  async_method "Cloudflare::R2Bucket", :put
+  async_method "Cloudflare::R2Bucket", :delete
+  async_method "Cloudflare::R2Bucket", :list
+  async_method "Cloudflare::R2Bucket", :head
 
-  async_method 'Cloudflare::AI', :run
-  taint_return 'Cloudflare::AI', :run_stream, 'Cloudflare::AI::Stream'
-  async_method 'Cloudflare::AI::Binding', :run
-  taint_return 'Cloudflare::AI::Binding', :run_stream, 'Cloudflare::AI::Stream'
+  async_method "Cloudflare::AI", :run
+  taint_return "Cloudflare::AI", :run_stream, "Cloudflare::AI::Stream"
+  async_method "Cloudflare::AI::Binding", :run
+  taint_return "Cloudflare::AI::Binding", :run_stream, "Cloudflare::AI::Stream"
 
-  async_method 'Cloudflare::Cache', :match
-  async_method 'Cloudflare::Cache', :put
-  async_method 'Cloudflare::Cache', :delete
+  async_method "Cloudflare::Cache", :match
+  async_method "Cloudflare::Cache", :put
+  async_method "Cloudflare::Cache", :delete
 
-  async_factory 'Cloudflare::Email', :new
-  async_method 'Cloudflare::Email', :send
+  async_factory "Cloudflare::Email", :new
+  async_method "Cloudflare::Email", :send
 
-  async_method 'Cloudflare::Queue', :send
-  async_method 'Cloudflare::Queue', :send_batch
+  async_method "Cloudflare::Queue", :send
+  async_method "Cloudflare::Queue", :send_batch
 
-  async_factory 'Cloudflare::DurableObjectNamespace', :new
-  taint_return 'Cloudflare::DurableObjectNamespace', :get, 'Cloudflare::DurableObjectStub'
-  taint_return 'Cloudflare::DurableObjectNamespace', :get_by_name, 'Cloudflare::DurableObjectStub'
-  taint_return 'Cloudflare::DurableObjectState', :storage, 'Cloudflare::DurableObjectStorage'
-  async_method 'Cloudflare::DurableObjectStub', :fetch
-  async_method 'Cloudflare::DurableObjectStub', :request
-  async_method 'Cloudflare::DurableObjectStub', :get
-  async_method 'Cloudflare::DurableObjectStub', :post
-  async_method 'Cloudflare::DurableObjectStub', :put
-  async_method 'Cloudflare::DurableObjectStub', :delete
+  async_factory "Cloudflare::DurableObjectNamespace", :new
+  taint_return "Cloudflare::DurableObjectNamespace",
+               :get,
+               "Cloudflare::DurableObjectStub"
+  taint_return "Cloudflare::DurableObjectNamespace",
+               :get_by_name,
+               "Cloudflare::DurableObjectStub"
+  taint_return "Cloudflare::DurableObjectState",
+               :storage,
+               "Cloudflare::DurableObjectStorage"
+  async_method "Cloudflare::DurableObjectStub", :fetch
+  async_method "Cloudflare::DurableObjectStub", :request
+  async_method "Cloudflare::DurableObjectStub", :get
+  async_method "Cloudflare::DurableObjectStub", :post
+  async_method "Cloudflare::DurableObjectStub", :put
+  async_method "Cloudflare::DurableObjectStub", :delete
 
-  async_method 'Cloudflare::DurableObjectStorage', :get
-  async_method 'Cloudflare::DurableObjectStorage', :put
-  async_method 'Cloudflare::DurableObjectStorage', :delete
-  async_method 'Cloudflare::DurableObjectStorage', :list
-  async_method 'Cloudflare::DurableObjectStorage', :transaction
+  async_method "Cloudflare::DurableObjectStorage", :get
+  async_method "Cloudflare::DurableObjectStorage", :put
+  async_method "Cloudflare::DurableObjectStorage", :delete
+  async_method "Cloudflare::DurableObjectStorage", :list
+  async_method "Cloudflare::DurableObjectStorage", :transaction
 
-  async_method 'Cloudflare::HTTP', :fetch
+  async_method "Cloudflare::HTTP", :fetch
 
-  async_method 'Faraday::Connection', :get
-  async_method 'Faraday::Connection', :post
-  async_method 'Faraday::Connection', :put
-  async_method 'Faraday::Connection', :delete
-  async_method 'Faraday::Connection', :patch
-  async_method 'Faraday::Connection', :head
+  async_method "Faraday::Connection", :get
+  async_method "Faraday::Connection", :post
+  async_method "Faraday::Connection", :put
+  async_method "Faraday::Connection", :delete
+  async_method "Faraday::Connection", :patch
+  async_method "Faraday::Connection", :head
 
-  helper_factory :d1, 'Cloudflare::D1Database'
-  helper_factory :db, 'Cloudflare::D1Database'
-  helper_factory :kv, 'Cloudflare::KVNamespace'
-  helper_factory :bucket, 'Cloudflare::R2Bucket'
-  helper_factory :ai, 'Cloudflare::AI::Binding'
-  helper_factory :send_email, 'Cloudflare::Email'
-  helper_factory :jobs_queue, 'Cloudflare::Queue'
-  helper_factory :jobs_dlq, 'Cloudflare::Queue'
-  helper_factory :do_counter, 'Cloudflare::DurableObjectNamespace'
-  helper_factory :durable_object, 'Cloudflare::DurableObjectStub'
+  helper_factory :d1, "Cloudflare::D1Database"
+  helper_factory :db, "Cloudflare::D1Database"
+  helper_factory :kv, "Cloudflare::KVNamespace"
+  helper_factory :bucket, "Cloudflare::R2Bucket"
+  helper_factory :ai, "Cloudflare::AI::Binding"
+  helper_factory :send_email, "Cloudflare::Email"
+  helper_factory :jobs_queue, "Cloudflare::Queue"
+  helper_factory :jobs_dlq, "Cloudflare::Queue"
+  helper_factory :do_counter, "Cloudflare::DurableObjectNamespace"
+  helper_factory :durable_object, "Cloudflare::DurableObjectStub"
 end

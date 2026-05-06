@@ -10,16 +10,16 @@
 #   npm run test:jwt-auth
 #   npm test
 
-require 'json'
-require 'digest'
-require 'digest/sha2'
-require 'openssl'
-require 'securerandom'
-require 'base64'
+require "json"
+require "digest"
+require "digest/sha2"
+require "openssl"
+require "securerandom"
+require "base64"
 
 # vendor/ 配下の jwt を読めるようにする
-$LOAD_PATH.unshift(File.expand_path('../vendor', __dir__))
-require 'jwt'
+$LOAD_PATH.unshift(File.expand_path("../vendor", __dir__))
+require "jwt"
 
 # CRuby 上では __await__ は定義されていない（Opal 専用）。
 # テスト用に no-op を定義しておく。
@@ -30,8 +30,8 @@ module Kernel
 end
 
 # Load the Sinatra::JwtAuth helpers in isolation
-$LOAD_PATH.unshift(File.expand_path('../gems/sinatra-homura/lib', __dir__))
-require 'sinatra/jwt_auth'
+$LOAD_PATH.unshift(File.expand_path("../gems/sinatra-homura/lib", __dir__))
+require "sinatra/jwt_auth"
 
 module SmokeTest
   @passed = 0
@@ -64,11 +64,11 @@ end
 # Minimal mock request / settings for helper tests
 class MockSettings
   def jwt_secret
-    'test-secret'
+    "test-secret"
   end
 
   def jwt_algorithm
-    'HS256'
+    "HS256"
   end
 
   def jwt_verify_key
@@ -106,12 +106,14 @@ $stdout.puts "Sinatra::JwtAuth Halt-Boundary Smoke Tests"
 $stdout.puts "=" * 40
 
 # 1. authenticate_or_401 returns [nil, payload] for a valid token
-SmokeTest.assert("authenticate_or_401 returns [nil, payload] for valid token") do
-  token = JWT.encode({ 'sub' => 'alice' }, 'test-secret', 'HS256')
-  req = MockRequest.new('HTTP_AUTHORIZATION' => "Bearer #{token}")
+SmokeTest.assert(
+  "authenticate_or_401 returns [nil, payload] for valid token"
+) do
+  token = JWT.encode({ "sub" => "alice" }, "test-secret", "HS256")
+  req = MockRequest.new("HTTP_AUTHORIZATION" => "Bearer #{token}")
   helper = MockHelper.new(req)
   status, payload = helper.authenticate_or_401
-  status.nil? && payload.is_a?(Hash) && payload['sub'] == 'alice'
+  status.nil? && payload.is_a?(Hash) && payload["sub"] == "alice"
 end
 
 # 2. authenticate_or_401 returns [401, json] for missing token
@@ -119,34 +121,39 @@ SmokeTest.assert("authenticate_or_401 returns [401, json] for missing token") do
   req = MockRequest.new({})
   helper = MockHelper.new(req)
   status, body = helper.authenticate_or_401
-  status == 401 && body.include?('missing bearer token')
+  status == 401 && body.include?("missing bearer token")
 end
 
 # 3. authenticate_or_401 returns [401, json] for expired token
 SmokeTest.assert("authenticate_or_401 returns [401, json] for expired token") do
-  token = JWT.encode({ 'sub' => 'alice', 'exp' => Time.now.to_i - 10 }, 'test-secret', 'HS256')
-  req = MockRequest.new('HTTP_AUTHORIZATION' => "Bearer #{token}")
+  token =
+    JWT.encode(
+      { "sub" => "alice", "exp" => Time.now.to_i - 10 },
+      "test-secret",
+      "HS256"
+    )
+  req = MockRequest.new("HTTP_AUTHORIZATION" => "Bearer #{token}")
   helper = MockHelper.new(req)
   status, body = helper.authenticate_or_401
-  status == 401 && body.include?('token expired')
+  status == 401 && body.include?("token expired")
 end
 
 # 4. authenticate_or_401 returns [401, json] for bad signature
 SmokeTest.assert("authenticate_or_401 returns [401, json] for bad signature") do
-  token = JWT.encode({ 'sub' => 'alice' }, 'wrong-secret', 'HS256')
-  req = MockRequest.new('HTTP_AUTHORIZATION' => "Bearer #{token}")
+  token = JWT.encode({ "sub" => "alice" }, "wrong-secret", "HS256")
+  req = MockRequest.new("HTTP_AUTHORIZATION" => "Bearer #{token}")
   helper = MockHelper.new(req)
   status, body = helper.authenticate_or_401
-  status == 401 && body.include?('signature verification failed')
+  status == 401 && body.include?("signature verification failed")
 end
 
 # 5. authenticate_or_401 sets @jwt_payload on success
 SmokeTest.assert("authenticate_or_401 sets @jwt_payload on success") do
-  token = JWT.encode({ 'sub' => 'alice' }, 'test-secret', 'HS256')
-  req = MockRequest.new('HTTP_AUTHORIZATION' => "Bearer #{token}")
+  token = JWT.encode({ "sub" => "alice" }, "test-secret", "HS256")
+  req = MockRequest.new("HTTP_AUTHORIZATION" => "Bearer #{token}")
   helper = MockHelper.new(req)
   helper.authenticate_or_401
-  helper.jwt_payload['sub'] == 'alice'
+  helper.jwt_payload["sub"] == "alice"
 end
 
 # 6. authenticate_or_401 does NOT use halt (no throw)

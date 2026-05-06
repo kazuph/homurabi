@@ -13,34 +13,47 @@
 # output directory earlier on the Opal load path and fall back to
 # the original input for unchanged files.
 
-require 'fileutils'
-require 'pathname'
-require_relative '../lib/homura/runtime/build_support'
+require "fileutils"
+require "pathname"
+require_relative "../lib/homura/runtime/build_support"
 
 # homura-runtime lib path resolution (with legacy alias fallback)
-runtime_lib = ENV['CFW_RUNTIME_LIB']
+runtime_lib = ENV["CFW_RUNTIME_LIB"]
 unless runtime_lib
-  runtime_lib = HomuraRuntime::BuildSupport.runtime_root(current_file: __FILE__).join('lib').to_s
+  runtime_lib =
+    HomuraRuntime::BuildSupport
+      .runtime_root(current_file: __FILE__)
+      .join("lib")
+      .to_s
 end
 $LOAD_PATH.unshift(runtime_lib) unless $LOAD_PATH.include?(runtime_lib)
 
-require 'homura/runtime/async_registry'
-require 'homura/runtime/auto_await/analyzer'
-require 'homura/runtime/auto_await/transformer'
+require "homura/runtime/async_registry"
+require "homura/runtime/auto_await/analyzer"
+require "homura/runtime/auto_await/transformer"
 
-options = { input: nil, output: nil, debug: ENV['CLOUDFLARE_WORKERS_AUTO_AWAIT_DEBUG'] == '1' }
+options = {
+  input: nil,
+  output: nil,
+  debug: ENV["CLOUDFLARE_WORKERS_AUTO_AWAIT_DEBUG"] == "1"
+}
 
 ARGV.each_with_index do |arg, i|
   case arg
-  when '--input'  then options[:input] = ARGV[i + 1]
-  when '--output' then options[:output] = ARGV[i + 1]
-  when '--debug'  then options[:debug] = true
+  when "--input"
+    options[:input] = ARGV[i + 1]
+  when "--output"
+    options[:output] = ARGV[i + 1]
+  when "--debug"
+    options[:debug] = true
   end
 end
 
-abort('Usage: auto-await --input DIR --output DIR [--debug]') unless options[:input] && options[:output]
+unless options[:input] && options[:output]
+  abort("Usage: auto-await --input DIR --output DIR [--debug]")
+end
 
-input_root  = Pathname(options[:input]).expand_path
+input_root = Pathname(options[:input]).expand_path
 output_root = Pathname(options[:output]).expand_path
 
 registry = HomuraRuntime::AsyncRegistry.instance
@@ -49,18 +62,19 @@ registry = HomuraRuntime::AsyncRegistry.instance
 HomuraRuntime::AsyncRegistry.auto_load_gem_async_sources(debug: options[:debug])
 
 # Load project-specific async source registrations if present.
-project_async = File.join(Dir.pwd, 'lib', 'homura_async_sources.rb')
+project_async = File.join(Dir.pwd, "lib", "homura_async_sources.rb")
 require project_async if File.exist?(project_async)
 
 changed = 0
 skipped = 0
-errors  = 0
+errors = 0
 
-paths = if File.directory?(input_root)
-  Dir.glob(input_root.join('**', '*.rb')).sort
-else
-  [input_root.to_s]
-end
+paths =
+  if File.directory?(input_root)
+    Dir.glob(input_root.join("**", "*.rb")).sort
+  else
+    [input_root.to_s]
+  end
 
 paths.each do |path|
   rel = Pathname(path).relative_path_from(input_root)
@@ -72,10 +86,11 @@ paths.each do |path|
   # needed to tell Opal to wrap the file in an async function and to
   # translate #__await__ calls into real JS await keywords.
   has_magic = source.lines.first(5).any? { |l| l.match?(/#\s*await:/) }
-  has_existing_await = source.include?('.__await__')
+  has_existing_await = source.include?(".__await__")
 
   begin
-    analyzer = HomuraRuntime::AutoAwait::Analyzer.new(registry, debug: options[:debug])
+    analyzer =
+      HomuraRuntime::AutoAwait::Analyzer.new(registry, debug: options[:debug])
     buffer, nodes = analyzer.process(source, path)
     needs_magic_only_output = has_existing_await && !has_magic
 
@@ -91,13 +106,13 @@ paths.each do |path|
       else
         HomuraRuntime::AutoAwait::Transformer.transform(source, nodes, buffer)
       end
-    unless has_magic
-      transformed = "# await: true\n" + transformed
-    end
+    transformed = "# await: true\n" + transformed unless has_magic
     out_path = output_root.join(rel)
     FileUtils.mkdir_p(out_path.dirname)
     File.write(out_path, transformed)
-    puts "[auto-await] write #{rel} (#{nodes.length} await#{'s' if nodes.length > 1})" if options[:debug]
+    if options[:debug]
+      puts "[auto-await] write #{rel} (#{nodes.length} await#{"s" if nodes.length > 1})"
+    end
     changed += 1
   rescue => e
     $stderr.puts "[auto-await] ERROR #{rel}: #{e.message}"

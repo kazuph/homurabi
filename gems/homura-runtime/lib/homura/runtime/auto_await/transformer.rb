@@ -13,6 +13,7 @@ module HomuraRuntime
           next if already_awaited?(buffer, range)
           rewriter.replace(range, "#{range.source}.__await__")
         end
+
         rewriter.process
       end
 

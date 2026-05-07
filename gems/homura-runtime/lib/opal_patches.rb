@@ -25,10 +25,11 @@
 # from, and a warning-only behaviour does not affect program output).
 class Module
   unless private_method_defined?(:deprecate_constant) ||
-           method_defined?(:deprecate_constant)
+      method_defined?(:deprecate_constant)
     def deprecate_constant(*_names)
       self
     end
+
     private :deprecate_constant
   end
 end
@@ -72,13 +73,15 @@ class Module
     name_str = name.to_s
     if name_str.include?("::")
       parts = name_str.split("::")
-      parts.shift if parts.first.empty? # leading "::Foo::Bar"
+      # leading "::Foo::Bar"
+      parts.shift if parts.first.empty?
       current = self
       parts.each do |part|
         return false unless current.__homura_const_defined_simple(part, inherit)
         current = current.const_get(part, inherit)
         return false unless current.is_a?(Module)
       end
+
       true
     else
       __homura_const_defined_simple(name, inherit)
@@ -156,15 +159,15 @@ module ForwardableAccessor
     expr
       .split(".")
       .each do |part|
-        current =
-          if part == "self"
-            instance
-          elsif part.start_with?("@")
-            instance.instance_variable_get(part)
-          else
-            current.__send__(part)
-          end
+        current = if part == "self"
+          instance
+        elsif part.start_with?("@")
+          instance.instance_variable_get(part)
+        else
+          current.__send__(part)
+        end
       end
+
     current
   end
 end
@@ -177,17 +180,17 @@ module Forwardable
   def def_instance_delegator(accessor, method, ali = method)
     accessor_str = accessor.to_s
     if accessor_str.start_with?("@") && !accessor_str.include?(".")
-      define_method ali do |*args, &block|
+      define_method(ali) do |*args, &block|
         instance_variable_get(accessor_str).__send__(method, *args, &block)
       end
     elsif accessor_str =~ /\A[A-Za-z_]\w*\z/
       # Plain identifier (method name) — call via __send__ as before.
-      define_method ali do |*args, &block|
+      define_method(ali) do |*args, &block|
         __send__(accessor_str).__send__(method, *args, &block)
       end
     else
       # Dot-path expression like 'self.class'. Resolve without eval.
-      define_method ali do |*args, &block|
+      define_method(ali) do |*args, &block|
         ForwardableAccessor.resolve(self, accessor_str).__send__(
           method,
           *args,
@@ -204,15 +207,15 @@ module SingleForwardable
   def def_single_delegator(accessor, method, ali = method)
     accessor_str = accessor.to_s
     if accessor_str.start_with?("@") && !accessor_str.include?(".")
-      define_singleton_method ali do |*args, &block|
+      define_singleton_method(ali) do |*args, &block|
         instance_variable_get(accessor_str).__send__(method, *args, &block)
       end
     elsif accessor_str =~ /\A[A-Za-z_]\w*\z/
-      define_singleton_method ali do |*args, &block|
+      define_singleton_method(ali) do |*args, &block|
         __send__(accessor_str).__send__(method, *args, &block)
       end
     else
-      define_singleton_method ali do |*args, &block|
+      define_singleton_method(ali) do |*args, &block|
         ForwardableAccessor.resolve(self, accessor_str).__send__(
           method,
           *args,
@@ -239,29 +242,30 @@ end
 # continue to work.
 begin
   require "uri"
+
 rescue StandardError
   nil
 end
+
 require "cgi"
 
 module ::URI
   unless const_defined?(:DEFAULT_PARSER)
-    DEFAULT_PARSER =
-      Module.new do
-        UNSAFE = Regexp.compile('[^\-_.!~*\'()a-zA-Z0-9;/?:@&=+$,\[\]]').freeze
+    DEFAULT_PARSER = Module.new do
+      UNSAFE = Regexp.compile("[^\\-_.!~*'()a-zA-Z0-9;/?:@&=+$,\\[\\]]").freeze
 
-        def self.regexp
-          { UNSAFE: UNSAFE }
-        end
-
-        def self.escape(s, unsafe = UNSAFE)
-          CGI.escape(s.to_s)
-        end
-
-        def self.unescape(s)
-          CGI.unescape(s.to_s)
-        end
+      def self.regexp
+        {UNSAFE: UNSAFE}
       end
+
+      def self.escape(s, unsafe = UNSAFE)
+        CGI.escape(s.to_s)
+      end
+
+      def self.unescape(s)
+        CGI.unescape(s.to_s)
+      end
+    end
   end
 
   # CRuby's URI.decode_www_form_component / encode_www_form_component are used
@@ -330,20 +334,17 @@ module ::URI
   def self.parse(str)
     s = str.to_s
     if s.empty?
-      return(
-        Generic.new(
-          host: nil,
-          scheme: nil,
-          port: nil,
-          path: "",
-          query: nil,
-          fragment: nil
-        )
-      )
+      return (Generic.new(
+        host: nil,
+        scheme: nil,
+        port: nil,
+        path: "",
+        query: nil,
+        fragment: nil
+      ))
     end
 
-    js_url =
-      `
+    js_url = `
       (function() {
         try { return new URL(#{s}); }
         catch (e) {
@@ -398,6 +399,7 @@ module ::Kernel
     return arg if arg.is_a?(::URI::Generic)
     ::URI.parse(arg.to_s)
   end
+
   module_function :URI
 end
 
@@ -471,9 +473,12 @@ module ::SecureRandom
     n = 16 if n <= 0
     hex_string = secure_hex_bytes(n)
     if hex_string.nil?
-      raise EntropyError,
-            "no source of cryptographic entropy available (node:crypto AND Web Crypto both unreachable)"
+      raise(
+        EntropyError,
+        "no source of cryptographic entropy available (node:crypto AND Web Crypto both unreachable)"
+      )
     end
+
     [hex_string].pack("H*")
   end
 
@@ -482,9 +487,12 @@ module ::SecureRandom
     n = 16 if n <= 0
     out = secure_hex_bytes(n)
     if out.nil?
-      raise EntropyError,
-            "no source of cryptographic entropy available (node:crypto AND Web Crypto both unreachable)"
+      raise(
+        EntropyError,
+        "no source of cryptographic entropy available (node:crypto AND Web Crypto both unreachable)"
+      )
     end
+
     out
   end
 
@@ -495,6 +503,7 @@ module ::SecureRandom
 
   def self.base64(n = 16)
     require "base64"
+
     Base64.strict_encode64(random_bytes(n))
   end
 
@@ -518,8 +527,7 @@ module ::SecureRandom
   def self.secure_hex_bytes(n)
     # Opal does not always auto-return backtick IIFEs; assign first
     # so the method's last expression is a normal Ruby reference.
-    result =
-      `(function(n) {
+    result = `(function(n) {
       try {
         if (typeof globalThis.__nodeCrypto__ !== 'undefined' && globalThis.__nodeCrypto__) {
           return globalThis.__nodeCrypto__.randomBytes(n).toString('hex');
@@ -569,19 +577,20 @@ class ::Array
     end
 
     hex = self.first.to_s
-    nibble_count =
-      if fmt == "H*"
-        hex.length
-      else
-        [fmt[1..-1].to_i, hex.length].min
-      end
-    nibble_count -= 1 if nibble_count.odd? # round down to whole bytes
+    nibble_count = if fmt == "H*"
+      hex.length
+    else
+      [fmt[1..-1].to_i, hex.length].min
+    end
+    # round down to whole bytes
+    nibble_count -= 1 if nibble_count.odd?
     out = ""
     i = 0
     while i < nibble_count
       out = out + hex[i, 2].to_i(16).chr
       i += 2
     end
+
     out
   end
 end
@@ -608,12 +617,12 @@ class ::String
       return unpack1_without_homura_hex(format)
     end
 
-    requested_nibbles =
-      if fmt == "H*"
-        self.length * 2
-      else
-        fmt[1..-1].to_i
-      end
+    requested_nibbles = if fmt == "H*"
+      self.length * 2
+    else
+      fmt[1..-1].to_i
+    end
+
     out = ""
     i = 0
     n = self.length
@@ -624,6 +633,7 @@ class ::String
       out = out + h
       i += 1
     end
+
     out[0, requested_nibbles]
   end
 end
@@ -643,19 +653,21 @@ end
 begin
   file_class = ::File
   unless file_class.respond_to?(:read) &&
-           !file_class.method(:read).source_location.nil?
+      !file_class.method(:read).source_location.nil?
     def file_class.read(*args)
       raise ::Errno::ENOENT, args.first.to_s
     end
+
     def file_class.binread(*args)
       raise ::Errno::ENOENT, args.first.to_s
     end
   end
+
   unless file_class.respond_to?(:fnmatch)
     def file_class.fnmatch(pattern, path, *)
       # Very small fnmatch: supports `*` and `?` only, good enough for
       # Sinatra's template extension matching.
-      regex = '\A'
+      regex = "\\A"
       i = 0
       p = pattern.to_s
       while i < p.length
@@ -670,15 +682,19 @@ begin
         else
           regex += c
         end
+
         i += 1
       end
-      regex += '\z'
+
+      regex += "\\z"
       !!(path.to_s =~ Regexp.new(regex))
     end
+
     def file_class.fnmatch?(pattern, path, *)
       fnmatch(pattern, path)
     end
   end
+
 rescue NameError
   # File not available at this load point — ignore.
 end
@@ -736,8 +752,9 @@ require "rubygems/version"
   ISO_8859_15
   ISO_8859_16
   MACROMAN
-].each do |name|
-  unless Encoding.const_defined?(name)
-    Encoding.const_set(name, Encoding::ASCII_8BIT)
+]
+  .each do |name|
+    unless Encoding.const_defined?(name)
+      Encoding.const_set(name, Encoding::ASCII_8BIT)
+    end
   end
-end

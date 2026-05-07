@@ -44,6 +44,7 @@ module HomuraRuntime
           process_def(node)
           return
         end
+
         if node.type == :block
           process_block(node)
           return
@@ -55,6 +56,7 @@ module HomuraRuntime
         node.children.each do |child|
           process_node(child) if child.is_a?(Parser::AST::Node)
         end
+
         case node.type
         when :lvasgn
           process_lvasgn(node)
@@ -96,7 +98,7 @@ module HomuraRuntime
         @method_returns[method_name] = return_cls if return_cls
         body_source = node.loc.expression&.source.to_s
         if @await_nodes.length > before_awaits ||
-             body_source.include?(".__await__")
+            body_source.include?(".__await__")
           @async_local_methods << method_name
         end
 
@@ -121,12 +123,13 @@ module HomuraRuntime
       def process_send(node)
         receiver, method_name = *node
         if receiver.nil? &&
-             (factory_cls = @registry.helper_factories[method_name])
+            (factory_cls = @registry.helper_factories[method_name])
           @env[method_name] = factory_cls
         end
+
         if should_await?(node)
           @await_nodes << node
-          debug "await target: #{node.loc.expression.source}"
+          debug("await target: #{node.loc.expression.source}")
         end
       end
 
@@ -153,8 +156,10 @@ module HomuraRuntime
             if @method_returns.key?(method_name)
               return @method_returns[method_name]
             end
+
             return @env[method_name] if @env.key?(method_name)
           end
+
           infer_send_class(node)
         when :index
           infer_index_class(node)
@@ -178,16 +183,17 @@ module HomuraRuntime
         if method_name == :new && receiver&.type == :const
           return const_path(receiver)
         end
+
         if receiver
           if method_name == :[]
             key_node = node.children[2]
             if key_node&.type == :str
               key = key_node.children[0]
-              mapped =
-                @registry.async_accessors[[env_name(receiver), key.to_sym]]
+              mapped = @registry.async_accessors[[env_name(receiver), key.to_sym]]
               return mapped if mapped
             end
           end
+
           accessor_cls = infer_env_accessor(receiver, method_name)
           return accessor_cls if accessor_cls
           recv_cls = infer_class(receiver)
@@ -202,6 +208,7 @@ module HomuraRuntime
             return @method_returns[method_name]
           end
         end
+
         nil
       end
 
@@ -209,17 +216,18 @@ module HomuraRuntime
         return {} unless durable_object_define_call?(call_node)
         return {} unless args_node&.type == :args
 
-        arg_names =
-          args_node.children.filter_map do |arg|
-            next unless arg&.type == :arg
-            arg.children[0]
-          end
+        arg_names = args_node.children.filter_map do |arg|
+          next unless arg&.type == :arg
+          arg.children[0]
+        end
+
         return {} if arg_names.empty?
 
-        bindings = { arg_names[0] => "Cloudflare::DurableObjectState" }
-        bindings[
-          arg_names[1]
-        ] = "Cloudflare::DurableObjectRequest" if arg_names.length > 1
+        bindings = {arg_names[0] => "Cloudflare::DurableObjectState"}
+        if arg_names.length > 1
+          bindings[arg_names[1]] = "Cloudflare::DurableObjectRequest"
+        end
+
         bindings
       end
 
@@ -244,6 +252,7 @@ module HomuraRuntime
           mapped = @registry.async_accessors[[lvar, method_name.to_sym]]
           return mapped if mapped
         end
+
         if receiver_node.type == :send
           recv, meth = *receiver_node
           if meth == :[] && env_node?(recv)
@@ -253,6 +262,7 @@ module HomuraRuntime
               mapped = @registry.async_accessors[[env_name(recv), key.to_sym]]
               return mapped if mapped
             end
+
             lvar = env_name(recv)
             mapped = @registry.async_accessors[[lvar, method_name.to_sym]]
             return mapped if mapped
@@ -262,6 +272,7 @@ module HomuraRuntime
             mapped = @registry.async_accessors[[lvar, method_name.to_sym]]
             return mapped if mapped
           end
+
           parent_cls = infer_env_accessor(recv, meth) if recv&.type == :send
           return parent_cls if parent_cls
         elsif receiver_node.type == :lvar
@@ -269,6 +280,7 @@ module HomuraRuntime
           mapped = @registry.async_accessors[[lvar, method_name.to_sym]]
           return mapped if mapped
         end
+
         nil
       end
 
@@ -288,11 +300,12 @@ module HomuraRuntime
           parts.unshift(n.children[1])
           n = n.children[0]
         end
+
         parts.join("::")
       end
 
       def debug(msg)
-        puts "[auto-await] #{msg}" if @debug
+        puts("[auto-await] #{msg}") if @debug
       end
     end
   end

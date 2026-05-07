@@ -8,6 +8,7 @@ require "fileutils"
 require "open3"
 require "optparse"
 require "pathname"
+
 require_relative "../lib/homura/runtime/build_support"
 
 module HomuraRuntimeBuild
@@ -55,6 +56,7 @@ OptionParser
     o.on("--root PATH", "Project root (default: cwd)") do |p|
       options[:root] = p
     end
+
     o.on(
       "--standalone",
       "Consumer app (skip inline-routes; use Gemfile-resolved load paths)"
@@ -62,6 +64,7 @@ OptionParser
     o.on("--with-db", "Include sequel-d1 on Opal load path (standalone)") do
       options[:with_db] = true
     end
+
     o.on("--input PATH", "Opal entry .rb") { |p| options[:opal_input] = p }
     o.on("--output PATH", "Opal bundle .mjs") { |p| options[:opal_output] = p }
     o.on(
@@ -71,9 +74,11 @@ OptionParser
     o.on("--setup-import PATH", "setup-node-crypto import in entrypoint") do |p|
       options[:setup_import] = p
     end
+
     o.on("--bundle-import PATH", "Opal bundle import in entrypoint") do |p|
       options[:bundle_import] = p
     end
+
     o.on(
       "--worker-module-import PATH",
       "worker_module.mjs import in entrypoint"
@@ -81,6 +86,7 @@ OptionParser
     o.on("--entrypoint-out PATH", "Where to write worker.entrypoint.mjs") do |p|
       options[:entrypoint_out] = p
     end
+
     o.on(
       "--templates-namespace NAME",
       "Standalone templates module name (default: project-derived)"
@@ -95,16 +101,13 @@ OptionParser
 options[:standalone] = true if options[:with_db]
 
 root = Pathname(options[:root]).expand_path
-options[
-  :templates_namespace
-] ||= HomuraRuntime::BuildSupport.standalone_namespace(
-  root,
-  "Templates"
-) if options[:standalone]
-options[:assets_namespace] ||= HomuraRuntime::BuildSupport.standalone_namespace(
-  root,
-  "Assets"
-) if options[:standalone]
+if options[:standalone]
+  options[:templates_namespace] ||= HomuraRuntime::BuildSupport.standalone_namespace(root, "Templates")
+end
+
+if options[:standalone]
+  options[:assets_namespace] ||= HomuraRuntime::BuildSupport.standalone_namespace(root, "Assets")
+end
 
 if options[:standalone]
   Dir.chdir(root) { require "bundler/setup" }
@@ -175,7 +178,7 @@ def run_opal_homura!(root, opal_input, opal_output)
   ]
   stderr_log = root.join("build/opal.stderr.log")
   FileUtils.mkdir_p(root.join("build"))
-  env = { "OPAL_PREFORK_DISABLE" => "1" }
+  env = {"OPAL_PREFORK_DISABLE" => "1"}
   out_err, status = Open3.capture2e(env, *argv, chdir: root.to_s)
   File.write(stderr_log, out_err)
   abort("homura build: opal failed (see #{stderr_log})") unless status.success?
@@ -186,18 +189,16 @@ def homura_vendor_from_gemfile(project_root)
 end
 
 def run_opal_standalone!(root, opal_input, opal_output, with_db:)
-  load_paths =
-    HomuraRuntime::BuildSupport.standalone_load_paths(root, with_db: with_db)
+  load_paths = HomuraRuntime::BuildSupport.standalone_load_paths(root, with_db: with_db)
 
   argv = %w[bundle exec opal -c -E --esm --no-source-map]
   load_paths.each { |p| argv.push("-I", p) }
-  argv +=
-    %w[-r opal_patches -r homura/runtime -r app_templates -r app_assets -o] +
-      [opal_output, opal_input]
+  argv += %w[-r opal_patches -r homura/runtime -r app_templates -r app_assets -o] +
+    [opal_output, opal_input]
 
   stderr_log = root.join("build/opal.stderr.log")
   FileUtils.mkdir_p(root.join("build"))
-  env = { "OPAL_PREFORK_DISABLE" => "1" }
+  env = {"OPAL_PREFORK_DISABLE" => "1"}
   out_err, status = Open3.capture2e(env, *argv, chdir: root.to_s)
   File.write(stderr_log, out_err)
   abort("homura build: opal failed (see #{stderr_log})") unless status.success?
@@ -367,7 +368,7 @@ else
       chdir: root
     )
   else
-    warn "homura build: no app/ directory or top-level app.rb — skipping auto-await"
+    warn("homura build: no app/ directory or top-level app.rb — skipping auto-await")
   end
 
   # Also run auto-await over every gem we ship to Opal:
@@ -435,4 +436,4 @@ write_entrypoint!(
   worker_mod: options[:worker_module_import]
 )
 
-$stderr.puts "homura build: ok"
+$stderr.puts("homura build: ok")

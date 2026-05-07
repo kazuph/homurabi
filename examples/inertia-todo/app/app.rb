@@ -9,11 +9,12 @@ class App < Sinatra::Base
 
   set :page_version, ENV.fetch("ASSETS_VERSION", "3")
   set :page_layout, :layout
-  set :logging, false # Rack::CommonLogger uses gsub! (not Opal-compatible)
+  # Rack::CommonLogger uses gsub! (not Opal-compatible)
+  set :logging, false
   enable :sessions
   set :session_secret, ENV.fetch("SESSION_SECRET", "a" * 64)
 
-  share_props { { flash: flash_payload, csrfToken: csrf_token } }
+  share_props { {flash: flash_payload, csrfToken: csrf_token} }
 
   helpers do
     def db
@@ -60,6 +61,7 @@ class App < Sinatra::Base
           end
         end
       end
+
       result
     end
 
@@ -74,9 +76,11 @@ class App < Sinatra::Base
   end
 
   get "/" do
-    render "Todos/Index",
-           todos: -> { todos },
-           stats: defer(group: "meta") { todo_stats }
+    render(
+      "Todos/Index",
+      todos: -> { todos },
+      stats: defer(group: "meta") { todo_stats }
+    )
   end
 
   post "/todos" do
@@ -87,14 +91,14 @@ class App < Sinatra::Base
     errors = {}
     errors[:title] = "title is required" if title.empty?
     errors[:title] = "title must be 40 chars or less" if title.length > 40
-    errors[
-      :description
-    ] = "description must be 200 chars or less" if description.length > 200
+    if description.length > 200
+      errors[:description] = "description must be 200 chars or less"
+    end
 
     unless errors.empty?
       page_errors errors
       # Re-render the same page with the previous values so the form is preserved.
-      set_flash(values: { title: title, description: description })
+      set_flash(values: {title: title, description: description})
       redirect to("/"), 303
     end
 

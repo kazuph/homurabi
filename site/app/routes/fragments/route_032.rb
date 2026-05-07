@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 # Route fragment 32 — login /chat
-get "/chat" do
+get("/chat") do
   # /chat's body is async (load_chat_history is auto-awaited), so
   # `redirect` (which throws :halt) would surface as
   # `UncaughtThrowError: uncaught throw "halt"` past the async
@@ -18,6 +18,6 @@ get "/chat" do
   @fallback_model = App::CHAT_MODELS[:fallback]
   @session_id = normalize_session_id(params["session"])
   @history = ai_demos_enabled? ? load_chat_history(@session_id) : []
-  @content = erb :chat
-  erb :layout
+  @content = erb(:chat)
+  erb(:layout)
 end

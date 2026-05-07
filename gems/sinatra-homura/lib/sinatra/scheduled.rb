@@ -67,13 +67,15 @@ module Sinatra
     # Sinatra itself uses the same trick for its routes (see
     # `Sinatra::Base.generate_method`).
     class Job
-      attr_reader :cron,
-                  :name,
-                  :block,
-                  :unbound_method,
-                  :match_proc,
-                  :file,
-                  :line
+      attr_reader(
+        :cron,
+        :name,
+        :block,
+        :unbound_method,
+        :match_proc,
+        :file,
+        :line
+      )
 
       def initialize(
         cron:,
@@ -135,16 +137,20 @@ module Sinatra
         # fields. Cloudflare allows the standard 5-field form.
         fields = cron_str.split(/\s+/)
         unless [5, 6].include?(fields.length)
-          raise ArgumentError,
-                "cron expression must have 5 or 6 fields, got #{fields.length}: #{cron_str.inspect}"
+          raise(
+            ArgumentError,
+            "cron expression must have 5 or 6 fields, got #{fields.length}: #{cron_str.inspect}"
+          )
         end
         # Fail loudly at registration time if a non-callable `match:`
         # was passed — otherwise the failure would surface only when
         # the cron actually fires (as a NoMethodError during dispatch),
         # which is a much worse debugging experience.
         if !match.nil? && !match.respond_to?(:call)
-          raise ArgumentError,
-                "match: must respond to #call (got #{match.class})"
+          raise(
+            ArgumentError,
+            "match: must respond to #call (got #{match.class})"
+          )
         end
 
         loc = block.respond_to?(:source_location) ? block.source_location : nil
@@ -157,21 +163,21 @@ module Sinatra
         # function — without this step, `kv.get(...).__await__` would
         # never resolve because the surrounding scope isn't async.
         # See the Job class comment for the full rationale.
-        method_name =
-          "__scheduled_#{cron_str.object_id}_#{scheduled_jobs.length}".to_sym
+        method_name = "__scheduled_#{cron_str.object_id}_#{scheduled_jobs.length}".to_sym
         ScheduledContext.send(:define_method, method_name, &block)
         unbound = ScheduledContext.instance_method(method_name)
         ScheduledContext.send(:remove_method, method_name)
 
-        scheduled_jobs << Job.new(
-          cron: cron_str,
-          name: name,
-          block: block,
-          unbound_method: unbound,
-          match_proc: match,
-          file: file,
-          line: line
-        )
+        scheduled_jobs <<
+          Job.new(
+            cron: cron_str,
+            name: name,
+            block: block,
+            unbound_method: unbound,
+            match_proc: match,
+            file: file,
+            line: line
+          )
       end
 
       # Returns all jobs that match the given cron string.
@@ -212,23 +218,28 @@ module Sinatra
             if `(#{promise} != null && typeof #{promise}.then === 'function')`
               promise.__await__
             end
-            results << {
-              "name" => job.name,
-              "cron" => job.cron,
-              "ok" => true,
-              "duration" => Time.now.to_f - start
-            }
+
+            results <<
+              {
+                "name" => job.name,
+                "cron" => job.cron,
+                "ok" => true,
+                "duration" => Time.now.to_f - start
+              }
           rescue ::Exception => e
-            results << {
-              "name" => job.name,
-              "cron" => job.cron,
-              "ok" => false,
-              "error" => "#{e.class}: #{e.message}",
-              "duration" => Time.now.to_f - start
-            }
+            results <<
+              {
+                "name" => job.name,
+                "cron" => job.cron,
+                "ok" => false,
+                "error" => "#{e.class}: #{e.message}",
+                "duration" => Time.now.to_f - start
+              }
           end
+
           i += 1
         end
+
         {
           "fired" => results.size,
           "total" => scheduled_jobs.size,
@@ -247,13 +258,12 @@ module Sinatra
         # Prefer the UnboundMethod path (Opal `# await: true` aware).
         # Fall back to instance_exec only when there is no unbound
         # method — e.g. when a job was constructed manually in tests.
-        result =
-          if job.unbound_method
-            bound = job.unbound_method.bind(ctx)
-            job.block.arity.zero? ? bound.call : bound.call(event)
-          else
-            ctx.instance_exec(event, &job.block)
-          end
+        result = if job.unbound_method
+          bound = job.unbound_method.bind(ctx)
+          job.block.arity.zero? ? bound.call : bound.call(event)
+        else
+          ctx.instance_exec(event, &job.block)
+        end
         # When the block body uses `__await__` internally, Opal compiles
         # the wrapping method as an async JS function, so its return
         # value is a JS Promise. We MUST `await` that promise here for
@@ -312,30 +322,39 @@ module Sinatra
       def d1
         env["cloudflare.DB"]
       end
+
       def db
         d1
       end
+
       def cf_env
         env["cloudflare.env"]
       end
+
       def cf_ctx
         env["cloudflare.ctx"]
       end
+
       def kv
         env["cloudflare.KV"]
       end
+
       def bucket
         env["cloudflare.BUCKET"]
       end
+
       def ai
         Cloudflare::Bindings.ai(env)
       end
+
       def send_email
         env["cloudflare.SEND_EMAIL"]
       end
+
       def jobs_queue
         env["cloudflare.QUEUE_JOBS"]
       end
+
       def durable_object(name, id_or_name = nil)
         Cloudflare::Bindings.durable_object(env, name, id_or_name)
       end

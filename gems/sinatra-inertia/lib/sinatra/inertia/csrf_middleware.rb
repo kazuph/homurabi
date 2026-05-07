@@ -54,11 +54,9 @@ module Sinatra
         unless safe_method?(env)
           header = env[HEADER_KEY].to_s
           if existing.nil? || header.empty? || !secure_compare(header, existing)
-            return(
-              forbidden(
-                "CSRF token mismatch (expected matching X-XSRF-TOKEN header to XSRF-TOKEN cookie)"
-              )
-            )
+            return (forbidden(
+              "CSRF token mismatch (expected matching X-XSRF-TOKEN header to XSRF-TOKEN cookie)"
+            ))
           end
         end
 
@@ -83,6 +81,7 @@ module Sinatra
             next unless name == COOKIE_NAME
             return value
           end
+
         nil
       end
 
@@ -109,15 +108,15 @@ module Sinatra
         # Workers adapter that homura ships with serialises Array-shaped
         # `Set-Cookie` headers as a literal JSON array, which breaks
         # cookie parsing on the client.
-        prev =
-          case existing
-          when nil, ""
-            nil
-          when Array
-            existing.join("\n")
-          else
-            existing.to_s
-          end
+        prev = case existing
+        when nil, ""
+          nil
+        when Array
+          existing.join("\n")
+        else
+          existing.to_s
+        end
+
         headers["Set-Cookie"] = prev ? "#{prev}\n#{attrs}" : attrs
       end
 

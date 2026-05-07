@@ -93,6 +93,7 @@ module HomuraMarkdown
           handle_paragraph
         end
       end
+
       @out.join("\n")
     end
 
@@ -111,17 +112,18 @@ module HomuraMarkdown
           @i += 1
           break
         end
+
         buf << line
         @i += 1
       end
-      lang_attr =
-        (
-          if lang.nil? || lang.empty?
-            ""
-          else
-            " class=\"language-#{Rack::Utils.escape_html(lang)}\""
-          end
-        )
+
+      lang_attr = (
+        if lang.nil? || lang.empty?
+          ""
+        else
+          " class=\"language-#{Rack::Utils.escape_html(lang)}\""
+        end
+      )
       escaped = Rack::Utils.escape_html(buf.join("\n"))
       @out << "<pre><code#{lang_attr}>#{escaped}</code></pre>"
     end
@@ -133,7 +135,10 @@ module HomuraMarkdown
         items << m[1]
         @i += 1
       end
-      @out << "<ul>" + items.map { |txt| "<li>#{inline(txt)}</li>" }.join +
+
+      @out <<
+        "<ul>" +
+        items.map { |txt| "<li>#{inline(txt)}</li>" }.join +
         "</ul>"
     end
 
@@ -144,7 +149,10 @@ module HomuraMarkdown
         items << m[1]
         @i += 1
       end
-      @out << "<ol>" + items.map { |txt| "<li>#{inline(txt)}</li>" }.join +
+
+      @out <<
+        "<ol>" +
+        items.map { |txt| "<li>#{inline(txt)}</li>" }.join +
         "</ol>"
     end
 
@@ -178,53 +186,49 @@ module HomuraMarkdown
       codes = []
 
       # 1. Inline code `...` → opaque tokens (so other rules skip).
-      t =
-        t.gsub(/`([^`]+?)`/) do
-          codes << Regexp.last_match(1)
-          "\x00CODE#{codes.length - 1}\x00"
-        end
+      t = t.gsub(/`([^`]+?)`/) do
+        codes << Regexp.last_match(1)
+        "\x00CODE#{codes.length - 1}\x00"
+      end
 
       # 2. Links [text](url). URL is checked against the allowlist;
       #    rejected urls fall back to "[text](url)" literal.
-      t =
-        t.gsub(/\[([^\]]+)\]\(([^)\s]+)\)/) do
-          label = Regexp.last_match(1)
-          url_raw = Regexp.last_match(2)
-          # Escape already applied — `url_raw` is safe to put inside an
-          # attribute value. Validate scheme via the ORIGINAL (pre-escape)
-          # would be prettier but since HTML entities are a subset that
-          # can't form a scheme, the regex still matches
-          # "http://..." / "mailto:..." / "/..." correctly.
-          if url_raw =~ URL_ALLOW
-            "<a href=\"#{url_raw}\" target=\"_blank\" rel=\"noopener\">#{label}</a>"
-          else
-            "[#{label}](#{url_raw})"
-          end
+      t = t.gsub(/\[([^\]]+)\]\(([^)\s]+)\)/) do
+        label = Regexp.last_match(1)
+        url_raw = Regexp.last_match(2)
+        # Escape already applied — `url_raw` is safe to put inside an
+        # attribute value. Validate scheme via the ORIGINAL (pre-escape)
+        # would be prettier but since HTML entities are a subset that
+        # can't form a scheme, the regex still matches
+        # "http://..." / "mailto:..." / "/..." correctly.
+        if url_raw =~ URL_ALLOW
+          "<a href=\"#{url_raw}\" target=\"_blank\" rel=\"noopener\">#{label}</a>"
+        else
+          "[#{label}](#{url_raw})"
         end
+      end
 
       # 3. Bold — order matters: **strong** BEFORE *em* so a single
       #    pair of asterisks inside `**x**` doesn't greedily eat
       #    just one asterisk.
-      t =
-        t.gsub(/\*\*([^*\n]+?)\*\*/) do
-          "<strong>#{Regexp.last_match(1)}</strong>"
-        end
-      t =
-        t.gsub(/__([^_\n]+?)__/) { "<strong>#{Regexp.last_match(1)}</strong>" }
+      t = t.gsub(/\*\*([^*\n]+?)\*\*/) do
+        "<strong>#{Regexp.last_match(1)}</strong>"
+      end
+
+      t = t.gsub(/__([^_\n]+?)__/) { "<strong>#{Regexp.last_match(1)}</strong>" }
 
       # 4. Italic — single `*...*` or `_..._`. Careful not to match
       #    inside already-emitted tags: the escape above turned `<`
       #    into `&lt;`, so `<strong>`/`</strong>` literal characters
       #    appear only after our own substitution and use `<` `>`
       #    (unescaped), which the italic regex never touches.
-      t =
-        t.gsub(/(?<![\w*])\*([^*\n]+?)\*(?![\w*])/) do
-          "<em>#{Regexp.last_match(1)}</em>"
-        end
-      t =
-        t.gsub(/(?<![\w_])_([^_\n]+?)_(?![\w_])/) do
-          "<em>#{Regexp.last_match(1)}</em>"
-        end
+      t = t.gsub(/(?<![\w*])\*([^*\n]+?)\*(?![\w*])/) do
+        "<em>#{Regexp.last_match(1)}</em>"
+      end
+
+      t = t.gsub(/(?<![\w_])_([^_\n]+?)_(?![\w_])/) do
+        "<em>#{Regexp.last_match(1)}</em>"
+      end
 
       # 5. Restore code spans.
       codes.each_with_index do |c, i|

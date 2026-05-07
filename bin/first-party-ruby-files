@@ -12,17 +12,16 @@ if ARGV.any? { |arg| arg.start_with?("-") }
   abort("usage: ruby bin/first-party-ruby-files [--print0] [PATH ...]")
 end
 
-paths =
-  if ARGV.empty?
-    stdout, status = Open3.capture2("git", "ls-files", "-z")
-    unless status.success?
-      abort("bin/first-party-ruby-files: git ls-files failed")
-    end
-
-    stdout.split("\0")
-  else
-    ARGV
+paths = if ARGV.empty?
+  stdout, status = Open3.capture2("git", "ls-files", "-z")
+  unless status.success?
+    abort("bin/first-party-ruby-files: git ls-files failed")
   end
+
+  stdout.split("\0")
+else
+  ARGV
+end
 
 def ruby_shebang?(path)
   return false unless File.file?(path)
@@ -33,22 +32,22 @@ rescue Errno::ENOENT, Errno::EISDIR
   false
 end
 
-files =
-  paths
-    .filter_map do |path|
-      next if path.empty?
-      next if EXCLUDED_PREFIXES.any? { |prefix| path.start_with?(prefix) }
-      next if path.match?(%r{\Agems/[^/]+/vendor/})
+files = paths
+  .filter_map do |path|
+    next if path.empty?
+    next if EXCLUDED_PREFIXES.any? { |prefix| path.start_with?(prefix) }
+    next if path.match?(%r{\Agems/[^/]+/vendor/})
 
-      basename = File.basename(path)
-      unless RUBYISH_EXTENSIONS.include?(File.extname(path)) ||
-               RUBYISH_BASENAMES.include?(basename) || ruby_shebang?(path)
-        next
-      end
-
-      path
+    basename = File.basename(path)
+    unless RUBYISH_EXTENSIONS.include?(File.extname(path)) ||
+        RUBYISH_BASENAMES.include?(basename) ||
+        ruby_shebang?(path)
+      next
     end
-    .uniq
+
+    path
+  end
+  .uniq
 
 separator = print0 ? "\0" : "\n"
 STDOUT.write(files.join(separator))

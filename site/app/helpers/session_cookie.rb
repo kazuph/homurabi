@@ -13,6 +13,7 @@ module Homura
         unless App.class_variable_defined?(:@@rsa_key)
           App.class_variable_set(:@@rsa_key, OpenSSL::PKey::RSA.new(2048))
         end
+
         rsa = App.class_variable_get(:@@rsa_key)
         [rsa, rsa.public_key]
       when "ES256"
@@ -22,6 +23,7 @@ module Homura
             OpenSSL::PKey::EC.generate("prime256v1")
           )
         end
+
         ec = App.class_variable_get(:@@ec256_key)
         [ec, ec]
       when "ES384"
@@ -31,6 +33,7 @@ module Homura
             OpenSSL::PKey::EC.generate("secp384r1")
           )
         end
+
         ec = App.class_variable_get(:@@ec384_key)
         [ec, ec]
       when "ES512"
@@ -40,12 +43,14 @@ module Homura
             OpenSSL::PKey::EC.generate("secp521r1")
           )
         end
+
         ec = App.class_variable_get(:@@ec521_key)
         [ec, ec]
       when "EdDSA", "ED25519"
         unless App.class_variable_defined?(:@@ed_key)
           App.class_variable_set(:@@ed_key, OpenSSL::PKey::Ed25519.generate)
         end
+
         ed = App.class_variable_get(:@@ed_key)
         [ed, ed]
       else
@@ -79,12 +84,12 @@ module Homura
       return nil if payload.nil? || sig.nil? || payload.empty? || sig.empty?
       expected = OpenSSL::HMAC.hexdigest("SHA256", settings.jwt_secret, payload)
       return nil unless Rack::Utils.secure_compare(expected, sig)
-      decoded =
-        begin
-          Base64.urlsafe_decode64(payload)
-        rescue StandardError
-          nil
-        end
+      decoded = begin
+        Base64.urlsafe_decode64(payload)
+      rescue StandardError
+        nil
+      end
+
       return nil if decoded.nil?
       username, exp = decoded.split(":", 2)
       return nil if username.nil? || exp.nil?

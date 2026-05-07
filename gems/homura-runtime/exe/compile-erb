@@ -75,22 +75,21 @@ module HomuraERB
   # comments are vanishingly rare in real templates. Anything more
   # ambitious would need a Ruby parser, which is overkill for the
   # `@@ivar` shape we actually have to handle here.
-  CVAR_OP_ASSIGN_RE =
-    %r{(?<![@\w])@@([A-Za-z_]\w*)\s*(\|\||&&|\+|-|\*|/|%|\*\*|<<|>>|\||&|\^)=\s*([^;\n]+)}.freeze
+  CVAR_OP_ASSIGN_RE = %r{(?<![@\w])@@([A-Za-z_]\w*)\s*(\|\||&&|\+|-|\*|/|%|\*\*|<<|>>|\||&|\^)=\s*([^;\n]+)}.freeze
   CVAR_ASSIGN_RE = /(?<![@\w])@@([A-Za-z_]\w*)\s*=(?!=)\s*([^;\n]+)/.freeze
   # Read pattern excludes `@@name` that appears on the left-hand side
   # of an assignment (`@@name =`, `@@name +=`, `@@name ||=`, etc.) so
   # the assignment passes still see the raw token to rewrite. The
   # `=(?!=)` guard keeps `==` (comparison) treated as a read.
-  CVAR_READ_RE =
-    %r{
+  CVAR_READ_RE = %r{
     (?<![@\w])@@([A-Za-z_]\w*)\b
     (?!
       \s*
       (?:\|\||&&|\+|-|\*|/|%|\*\*|<<|>>|\||&|\^)?
       =(?!=)
     )
-  }x.freeze
+  }x
+    .freeze
 
   CVAR_PLACEHOLDER_PREFIX = "\x01HOMURA_CVAR\x01".freeze
   CVAR_PLACEHOLDER_SUFFIX = "\x01".freeze
@@ -99,11 +98,10 @@ module HomuraERB
     return fragment unless fragment.include?("@@")
 
     placeholders = []
-    record =
-      lambda do |replacement|
-        placeholders << replacement
-        "#{CVAR_PLACEHOLDER_PREFIX}#{placeholders.length - 1}#{CVAR_PLACEHOLDER_SUFFIX}"
-      end
+    record = lambda do |replacement|
+      placeholders << replacement
+      "#{CVAR_PLACEHOLDER_PREFIX}#{placeholders.length - 1}#{CVAR_PLACEHOLDER_SUFFIX}"
+    end
 
     # Reads first: rewrite every `@@name` that is *not* the target of
     # an assignment, including occurrences on the right-hand side of
@@ -111,68 +109,70 @@ module HomuraERB
     # later assignment passes see the original `@@name = ...` shape
     # (without their RHS reads being clobbered) and so the final
     # output never re-enters this same rewrite loop.
-    work =
-      fragment.gsub(CVAR_READ_RE) do
-        name = Regexp.last_match(1)
-        record.call("self.class.class_variable_get(:@@#{name})")
+    work = fragment.gsub(CVAR_READ_RE) do
+      name = Regexp.last_match(1)
+      record.call("self.class.class_variable_get(:@@#{name})")
+    end
+
+    work = work.gsub(CVAR_OP_ASSIGN_RE) do
+      name = Regexp.last_match(1)
+      op = Regexp.last_match(2)
+      value = Regexp.last_match(3)
+      replacement = case op
+      when "||"
+        "self.class.class_variable_set(:@@#{name}, (self.class.class_variable_defined?(:@@#{name}) ? self.class.class_variable_get(:@@#{name}) : nil) || (#{value}))"
+      when "&&"
+        "self.class.class_variable_set(:@@#{name}, (self.class.class_variable_defined?(:@@#{name}) ? self.class.class_variable_get(:@@#{name}) : nil) && (#{value}))"
+      else
+        "self.class.class_variable_set(:@@#{name}, self.class.class_variable_get(:@@#{name}) #{op} (#{value}))"
       end
 
-    work =
-      work.gsub(CVAR_OP_ASSIGN_RE) do
-        name = Regexp.last_match(1)
-        op = Regexp.last_match(2)
-        value = Regexp.last_match(3)
-        replacement =
-          case op
-          when "||"
-            "self.class.class_variable_set(:@@#{name}, (self.class.class_variable_defined?(:@@#{name}) ? self.class.class_variable_get(:@@#{name}) : nil) || (#{value}))"
-          when "&&"
-            "self.class.class_variable_set(:@@#{name}, (self.class.class_variable_defined?(:@@#{name}) ? self.class.class_variable_get(:@@#{name}) : nil) && (#{value}))"
-          else
-            "self.class.class_variable_set(:@@#{name}, self.class.class_variable_get(:@@#{name}) #{op} (#{value}))"
-          end
-        record.call(replacement)
-      end
+      record.call(replacement)
+    end
 
-    work =
-      work.gsub(CVAR_ASSIGN_RE) do
-        name = Regexp.last_match(1)
-        value = Regexp.last_match(2)
-        record.call("self.class.class_variable_set(:@@#{name}, (#{value}))")
-      end
+    work = work.gsub(CVAR_ASSIGN_RE) do
+      name = Regexp.last_match(1)
+      value = Regexp.last_match(2)
+      record.call("self.class.class_variable_set(:@@#{name}, (#{value}))")
+    end
 
-    placeholder_re =
-      /#{Regexp.escape(CVAR_PLACEHOLDER_PREFIX)}(\d+)#{Regexp.escape(CVAR_PLACEHOLDER_SUFFIX)}/
+    placeholder_re = /#{Regexp.escape(CVAR_PLACEHOLDER_PREFIX)}(\d+)#{Regexp.escape(CVAR_PLACEHOLDER_SUFFIX)}/
     loop do
-      replaced =
-        work.gsub(placeholder_re) { placeholders[Regexp.last_match(1).to_i] }
+      replaced = work.gsub(placeholder_re) { placeholders[Regexp.last_match(1).to_i] }
       break if replaced == work
       work = replaced
     end
+
     work
   end
 
   def validate_code_fragment!(fragment)
     stripped = fragment.strip
     unless supported_yield_fragment?(stripped) ||
-             yield_with_args_fragment?(stripped)
+        yield_with_args_fragment?(stripped)
       return
     end
 
-    raise <<~MSG.strip
-      Unsupported ERB yield form `<% #{stripped} %>`.
-      Use `<%= yield %>` or `<%== yield %>` in layout templates.
-    MSG
+    raise(
+      <<~MSG
+        Unsupported ERB yield form `<% #{stripped} %>`.
+        Use `<%= yield %>` or `<%== yield %>` in layout templates.
+      MSG
+        .strip
+    )
   end
 
   def validate_expression_fragment!(fragment)
     stripped = fragment.strip
     return unless yield_with_args_fragment?(stripped)
 
-    raise <<~MSG.strip
-      Unsupported ERB yield form `<%= #{stripped} %>`.
-      `yield(arg)` is not supported; use `<%= yield %>` or `<%== yield %>`, or pass data via ivars/locals instead.
-    MSG
+    raise(
+      <<~MSG
+        Unsupported ERB yield form `<%= #{stripped} %>`.
+        `yield(arg)` is not supported; use `<%= yield %>` or `<%== yield %>`, or pass data via ivars/locals instead.
+      MSG
+        .strip
+    )
   end
 
   # Compile an ERB source string to a Ruby method body that assembles
@@ -231,6 +231,7 @@ module HomuraERB
 
       cursor = close_idx + 2
     end
+
     ruby << "_out\n"
     ruby
   end
@@ -265,69 +266,72 @@ def template_name_for(path, root)
     root_with_sep = root.end_with?("/") ? root : "#{root}/"
     rel = rel[root_with_sep.length..] if rel.start_with?(root_with_sep)
   end
+
   rel = File.basename(rel) unless rel.include?("/")
   rel.delete_suffix(".erb").to_sym
 end
 
 def emit_header(io, namespace)
-  io.puts <<~RUBY
-    # frozen_string_literal: true
-    #
-    # Auto-generated by bin/compile-erb — DO NOT EDIT BY HAND.
-    #
-    # Run `bin/compile-erb` after modifying anything under views/ to
-    # regenerate. The Opal build command picks this file up via
-    # `-I build -r homura_templates` (or your chosen `--output` basename).
-    #
-    # Each registered template is a Proc that returns an HTML String.
-    # The Proc is `instance_exec`'d on the current Sinatra instance so
-    # `@ivars`, `params`, `request`, and any Sinatra helper remain
-    # accessible exactly as they would in a stock Sinatra route.
-    #
-    # Rendering is wired to `Sinatra::Templates#erb` further down so
-    # `erb :index` in user code dispatches here transparently. No
-    # runtime eval, no `new Function`, no Workers sandbox complaints.
+  io.puts(
+    <<~RUBY
+      # frozen_string_literal: true
+      #
+      # Auto-generated by bin/compile-erb — DO NOT EDIT BY HAND.
+      #
+      # Run `bin/compile-erb` after modifying anything under views/ to
+      # regenerate. The Opal build command picks this file up via
+      # `-I build -r homura_templates` (or your chosen `--output` basename).
+      #
+      # Each registered template is a Proc that returns an HTML String.
+      # The Proc is `instance_exec`'d on the current Sinatra instance so
+      # `@ivars`, `params`, `request`, and any Sinatra helper remain
+      # accessible exactly as they would in a stock Sinatra route.
+      #
+      # Rendering is wired to `Sinatra::Templates#erb` further down so
+      # `erb :index` in user code dispatches here transparently. No
+      # runtime eval, no `new Function`, no Workers sandbox complaints.
 
-    module #{namespace}
-      @templates = {}
+      module #{namespace}
+        @templates = {}
 
-      class << self
-        def register(name, &body)
-          @templates[name.to_sym] = body
-        end
+        class << self
+          def register(name, &body)
+            @templates[name.to_sym] = body
+          end
 
-        def render(name, instance, locals = {}, &block)
-          body = @templates[name.to_sym]
-          raise "#{namespace}: no template registered for \#{name.inspect}" unless body
-          previous_block = instance.instance_variable_get(:@__homura_template_block__)
-          previous_locals = instance.instance_variable_get(:@__homura_template_locals__)
-          begin
-            instance.instance_variable_set(:@__homura_template_block__, block)
-            # Stack locals so nested `erb :_partial, locals: {...}` calls
-            # restore the outer scope on the way out — Sinatra's standard
-            # `locals[:t]` -> bare `t` lookup is implemented via
-            # method_missing on the Sinatra instance (see Sinatra::Base
-            # patch installed by emit_sinatra_patch).
-            stack = previous_locals.is_a?(::Array) ? previous_locals.dup : []
-            stack.push(locals || {})
-            instance.instance_variable_set(:@__homura_template_locals__, stack)
-            instance.instance_exec(locals, &body)
-          ensure
-            instance.instance_variable_set(:@__homura_template_block__, previous_block)
-            instance.instance_variable_set(:@__homura_template_locals__, previous_locals)
+          def render(name, instance, locals = {}, &block)
+            body = @templates[name.to_sym]
+            raise "#{namespace}: no template registered for \#{name.inspect}" unless body
+            previous_block = instance.instance_variable_get(:@__homura_template_block__)
+            previous_locals = instance.instance_variable_get(:@__homura_template_locals__)
+            begin
+              instance.instance_variable_set(:@__homura_template_block__, block)
+              # Stack locals so nested `erb :_partial, locals: {...}` calls
+              # restore the outer scope on the way out — Sinatra's standard
+              # `locals[:t]` -> bare `t` lookup is implemented via
+              # method_missing on the Sinatra instance (see Sinatra::Base
+              # patch installed by emit_sinatra_patch).
+              stack = previous_locals.is_a?(::Array) ? previous_locals.dup : []
+              stack.push(locals || {})
+              instance.instance_variable_set(:@__homura_template_locals__, stack)
+              instance.instance_exec(locals, &body)
+            ensure
+              instance.instance_variable_set(:@__homura_template_block__, previous_block)
+              instance.instance_variable_set(:@__homura_template_locals__, previous_locals)
+            end
+          end
+
+          def registered?(name)
+            @templates.key?(name.to_sym)
+          end
+
+          def names
+            @templates.keys
           end
         end
-
-        def registered?(name)
-          @templates.key?(name.to_sym)
-        end
-
-        def names
-          @templates.keys
-        end
       end
-    end
-  RUBY
+    RUBY
+  )
 end
 
 def emit_templates(io, inputs, namespace, root)
@@ -336,156 +340,158 @@ def emit_templates(io, inputs, namespace, root)
     source = File.read(path)
     compiled = HomuraERB.compile(source)
     io.puts
-    io.puts "# ---- #{path} -> :#{name.inspect} --------------------------------------"
-    io.puts HomuraERB.wrap(name, compiled, namespace)
+    io.puts("# ---- #{path} -> :#{name.inspect} --------------------------------------")
+    io.puts(HomuraERB.wrap(name, compiled, namespace))
   end
 end
 
 def emit_sinatra_patch(io, namespace)
-  io.puts <<~RUBY
+  io.puts(
+    <<~RUBY
 
-    # ---------------------------------------------------------------------
-    # Sinatra hook: `erb :name` dispatches to #{namespace}.render.
-    # ---------------------------------------------------------------------
-    #
-    # This file is loaded by Opal via `-r homura_templates` before
-    # `app/hello.rb`, so Sinatra is not yet loaded at require time.
-    # Pull it in explicitly and reopen `Sinatra::Templates` to install
-    # our ERB dispatcher. User code's own `require 'sinatra/base'`
-    # later becomes a no-op (already cached).
-    require 'sinatra/base'
+      # ---------------------------------------------------------------------
+      # Sinatra hook: `erb :name` dispatches to #{namespace}.render.
+      # ---------------------------------------------------------------------
+      #
+      # This file is loaded by Opal via `-r homura_templates` before
+      # `app/hello.rb`, so Sinatra is not yet loaded at require time.
+      # Pull it in explicitly and reopen `Sinatra::Templates` to install
+      # our ERB dispatcher. User code's own `require 'sinatra/base'`
+      # later becomes a no-op (already cached).
+      require 'sinatra/base'
 
-    module ::Sinatra
-      module Templates
-        def __homura_template_yield__
-          block = @__homura_template_block__
-          raise LocalJumpError, 'no block given' unless block
+      module ::Sinatra
+        module Templates
+          def __homura_template_yield__
+            block = @__homura_template_block__
+            raise LocalJumpError, 'no block given' unless block
 
-          block.call
-        end
+            block.call
+          end
 
-        # Resolve a Sinatra-style local variable reference.
-        # `erb :_partial, locals: { t: row }` causes the precompiled body
-        # to reference a bare `t`. Stock Sinatra uses Ruby's `binding`
-        # eval to install locals into the template's scope; we don't have
-        # `binding` under Opal/Workers, so we hand-roll the lookup
-        # through method_missing against the locals stack maintained by
-        # the renderer.
-        def __homura_template_local__(name)
-          stack = @__homura_template_locals__
-          return nil unless stack.is_a?(::Array)
-          key = name.to_sym
-          stack.reverse_each do |frame|
-            next unless frame.is_a?(::Hash)
-            return frame[key] if frame.key?(key)
+          # Resolve a Sinatra-style local variable reference.
+          # `erb :_partial, locals: { t: row }` causes the precompiled body
+          # to reference a bare `t`. Stock Sinatra uses Ruby's `binding`
+          # eval to install locals into the template's scope; we don't have
+          # `binding` under Opal/Workers, so we hand-roll the lookup
+          # through method_missing against the locals stack maintained by
+          # the renderer.
+          def __homura_template_local__(name)
+            stack = @__homura_template_locals__
+            return nil unless stack.is_a?(::Array)
+            key = name.to_sym
+            stack.reverse_each do |frame|
+              next unless frame.is_a?(::Hash)
+              return frame[key] if frame.key?(key)
+              sk = name.to_s
+              return frame[sk] if frame.key?(sk)
+            end
+            nil
+          end
+
+          def __homura_template_local_defined?(name)
+            stack = @__homura_template_locals__
+            return false unless stack.is_a?(::Array)
+            key = name.to_sym
             sk = name.to_s
-            return frame[sk] if frame.key?(sk)
-          end
-          nil
-        end
-
-        def __homura_template_local_defined?(name)
-          stack = @__homura_template_locals__
-          return false unless stack.is_a?(::Array)
-          key = name.to_sym
-          sk = name.to_s
-          stack.reverse_each do |frame|
-            next unless frame.is_a?(::Hash)
-            return true if frame.key?(key) || frame.key?(sk)
-          end
-          false
-        end
-      end
-    end
-
-    # Method-missing fallback that surfaces template locals as bare names.
-    # Installed on Sinatra::Base so `<%= t['title'] %>` inside a
-    # precompiled partial Just Works without the user having to write
-    # `<%= locals[:t]['title'] %>`.
-    class ::Sinatra::Base
-      def method_missing(name, *args, &block)
-        if args.empty? && block.nil? && __homura_template_local_defined?(name)
-          return __homura_template_local__(name)
-        end
-        super
-      end
-
-      def respond_to_missing?(name, include_private = false)
-        return true if __homura_template_local_defined?(name)
-        super
-      end
-    end
-
-    module ::Sinatra
-      module Templates
-
-        def __homura_default_template_block_for__(template)
-          case template.to_sym
-          when :layout
-            proc { @content } if defined?(@content)
-          when :layout_docs
-            proc { @docs_inner } if defined?(@docs_inner)
-          end
-        end
-
-        # A template is "layout-like" if its name is `:layout` or starts
-        # with `layout_` (e.g. `:layout_docs`). The auto-layout pass in
-        # `erb` skips wrapping such templates in `:layout` so that
-        # rendering `:layout_docs` doesn't end up nested inside `:layout`,
-        # which would otherwise produce a duplicate header / nav.
-        def __homura_layout_template?(template)
-          name = template.to_sym
-          name == :layout || name.to_s.start_with?('layout_')
-        end
-
-        # Rails-/Sinatra-flavoured partial convention: a template name
-        # starting with `_` is treated as a partial (e.g. `_docs_nav`),
-        # so the auto-layout pass leaves it alone. Without this, calling
-        # `<%= erb :_docs_nav %>` from inside a layout template would
-        # rewrap the partial in `:layout`, doubling header/nav output.
-        def __homura_partial_template?(template)
-          template.to_s.start_with?('_')
-        end
-
-        # homura patch: dispatch to precompiled templates when we
-        # have one. Unknown symbols raise a clear message instead of
-        # wandering into upstream Tilt, which would blow up on
-        # Workers with "Code generation from strings disallowed".
-        #
-        # Sinatra's idiom `erb :foo, locals: { x: 1 }` passes locals via
-        # `options[:locals]` rather than the third positional argument;
-        # merge them so both forms work.
-        def erb(template, options = {}, locals = {}, &block)
-          template = template.to_sym if template.is_a?(::String)
-          if template.is_a?(::Symbol) && ::#{namespace}.registered?(template)
-            locals = (options[:locals] || {}).merge(locals || {})
-            block ||= __homura_default_template_block_for__(template)
-            output = ::#{namespace}.render(template, self, locals, &block)
-
-            layout = options[:layout]
-            layout = false if layout.nil? && options.include?(:layout)
-            if layout.nil? &&
-               !__homura_layout_template?(template) &&
-               !__homura_partial_template?(template) &&
-               ::#{namespace}.registered?(:layout)
-              layout = :layout
+            stack.reverse_each do |frame|
+              next unless frame.is_a?(::Hash)
+              return true if frame.key?(key) || frame.key?(sk)
             end
-            if layout
-              layout = :layout if layout == true
-              layout = layout.to_sym
-              raise "homura: layout \#{layout.inspect} not precompiled; run bin/compile-erb" unless ::#{namespace}.registered?(layout)
-
-              return ::#{namespace}.render(layout, self, locals) { output }
-            end
-
-            output
-          else
-            raise "homura: erb \#{template.inspect} not precompiled; run bin/compile-erb"
+            false
           end
         end
       end
-    end
-  RUBY
+
+      # Method-missing fallback that surfaces template locals as bare names.
+      # Installed on Sinatra::Base so `<%= t['title'] %>` inside a
+      # precompiled partial Just Works without the user having to write
+      # `<%= locals[:t]['title'] %>`.
+      class ::Sinatra::Base
+        def method_missing(name, *args, &block)
+          if args.empty? && block.nil? && __homura_template_local_defined?(name)
+            return __homura_template_local__(name)
+          end
+          super
+        end
+
+        def respond_to_missing?(name, include_private = false)
+          return true if __homura_template_local_defined?(name)
+          super
+        end
+      end
+
+      module ::Sinatra
+        module Templates
+
+          def __homura_default_template_block_for__(template)
+            case template.to_sym
+            when :layout
+              proc { @content } if defined?(@content)
+            when :layout_docs
+              proc { @docs_inner } if defined?(@docs_inner)
+            end
+          end
+
+          # A template is "layout-like" if its name is `:layout` or starts
+          # with `layout_` (e.g. `:layout_docs`). The auto-layout pass in
+          # `erb` skips wrapping such templates in `:layout` so that
+          # rendering `:layout_docs` doesn't end up nested inside `:layout`,
+          # which would otherwise produce a duplicate header / nav.
+          def __homura_layout_template?(template)
+            name = template.to_sym
+            name == :layout || name.to_s.start_with?('layout_')
+          end
+
+          # Rails-/Sinatra-flavoured partial convention: a template name
+          # starting with `_` is treated as a partial (e.g. `_docs_nav`),
+          # so the auto-layout pass leaves it alone. Without this, calling
+          # `<%= erb :_docs_nav %>` from inside a layout template would
+          # rewrap the partial in `:layout`, doubling header/nav output.
+          def __homura_partial_template?(template)
+            template.to_s.start_with?('_')
+          end
+
+          # homura patch: dispatch to precompiled templates when we
+          # have one. Unknown symbols raise a clear message instead of
+          # wandering into upstream Tilt, which would blow up on
+          # Workers with "Code generation from strings disallowed".
+          #
+          # Sinatra's idiom `erb :foo, locals: { x: 1 }` passes locals via
+          # `options[:locals]` rather than the third positional argument;
+          # merge them so both forms work.
+          def erb(template, options = {}, locals = {}, &block)
+            template = template.to_sym if template.is_a?(::String)
+            if template.is_a?(::Symbol) && ::#{namespace}.registered?(template)
+              locals = (options[:locals] || {}).merge(locals || {})
+              block ||= __homura_default_template_block_for__(template)
+              output = ::#{namespace}.render(template, self, locals, &block)
+
+              layout = options[:layout]
+              layout = false if layout.nil? && options.include?(:layout)
+              if layout.nil? &&
+                 !__homura_layout_template?(template) &&
+                 !__homura_partial_template?(template) &&
+                 ::#{namespace}.registered?(:layout)
+                layout = :layout
+              end
+              if layout
+                layout = :layout if layout == true
+                layout = layout.to_sym
+                raise "homura: layout \#{layout.inspect} not precompiled; run bin/compile-erb" unless ::#{namespace}.registered?(layout)
+
+                return ::#{namespace}.render(layout, self, locals) { output }
+              end
+
+              output
+            else
+              raise "homura: erb \#{template.inspect} not precompiled; run bin/compile-erb"
+            end
+          end
+        end
+      end
+    RUBY
+  )
 end
 
 # ---------------------------------------------------------------------------
@@ -493,8 +499,8 @@ end
 # ---------------------------------------------------------------------------
 
 if ARGV.include?("-h") || ARGV.include?("--help")
-  puts HELP
-  exit 0
+  puts(HELP)
+  exit(0)
 end
 
 options = {
@@ -504,38 +510,39 @@ options = {
   stdout: false
 }
 
-parser =
-  OptionParser.new do |op|
-    op.banner = "Usage: bin/compile-erb [options] [--] [files...]"
-    op.on("--input DIR", "Directory containing *.erb templates") do |d|
-      options[:input_dir] = d
-    end
-    op.on("--output PATH", "Write generated Ruby to PATH") do |p|
-      options[:output] = p
-    end
-    op.on("--namespace NAME", "Ruby module name for the registry") do |n|
-      options[:namespace] = n
-    end
-    op.on("--stdout", "Write generated Ruby to stdout") do
-      options[:stdout] = true
-    end
+parser = OptionParser.new do |op|
+  op.banner = "Usage: bin/compile-erb [options] [--] [files...]"
+  op.on("--input DIR", "Directory containing *.erb templates") do |d|
+    options[:input_dir] = d
   end
+
+  op.on("--output PATH", "Write generated Ruby to PATH") do |p|
+    options[:output] = p
+  end
+
+  op.on("--namespace NAME", "Ruby module name for the registry") do |n|
+    options[:namespace] = n
+  end
+
+  op.on("--stdout", "Write generated Ruby to stdout") do
+    options[:stdout] = true
+  end
+end
+
 parser.parse!
 
 positional = ARGV.dup
 namespace = options[:namespace]
 
-inputs =
-  if positional.any?
-    positional.flat_map do |a|
-      File.directory?(a) ? Dir.glob(File.join(a, "**", "*.erb")).sort : [a]
-    end
-  else
-    default_inputs_for(options[:input_dir])
+inputs = if positional.any?
+  positional.flat_map do |a|
+    File.directory?(a) ? Dir.glob(File.join(a, "**", "*.erb")).sort : [a]
   end
+else
+  default_inputs_for(options[:input_dir])
+end
 
-template_root =
-  positional.find { |a| File.directory?(a) } || options[:input_dir]
+template_root = positional.find { |a| File.directory?(a) } || options[:input_dir]
 
 write_file = !options[:stdout] && (positional.empty? || options[:output])
 out_path = options[:output]
@@ -544,7 +551,7 @@ out_path = options[:output]
 # that do not ship sinatra-homura at all. Emit the empty registry, but
 # skip the Sinatra hook so `homura-runtime` remains Sinatra-free.
 if inputs.empty?
-  warn "compile-erb: no .erb files under #{options[:input_dir]}/ — writing empty registry"
+  warn("compile-erb: no .erb files under #{options[:input_dir]}/ — writing empty registry")
 end
 
 if write_file
@@ -554,7 +561,8 @@ if write_file
     emit_templates(io, inputs, namespace, template_root)
     emit_sinatra_patch(io, namespace) unless inputs.empty?
   end
-  warn "compile-erb: wrote #{out_path} (#{inputs.size} templates)"
+
+  warn("compile-erb: wrote #{out_path} (#{inputs.size} templates)")
 else
   emit_header($stdout, namespace)
   emit_templates($stdout, inputs, namespace, template_root)

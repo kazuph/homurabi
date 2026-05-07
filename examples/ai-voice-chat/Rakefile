@@ -1,19 +1,19 @@
 # frozen_string_literal: true
 
-task default: :build
+task(default: :build)
 
 def run!(*argv)
   ok = system(*argv)
-  exit 1 unless ok
+  exit(1) unless ok
 end
 
-desc "Build the Worker bundle"
-task :build do
+desc("Build the Worker bundle")
+task(:build) do
   run!("bundle", "exec", "homura", "build", "--standalone")
 end
 
-desc "Start a local dev server through portless"
-task dev: :build do
+desc("Start a local dev server through portless")
+task(dev: :build) do
   app_name = File.basename(__dir__)
   exec(
     "portless",
@@ -24,7 +24,7 @@ task dev: :build do
   )
 end
 
-desc "Deploy to Cloudflare"
-task deploy: :build do
+desc("Deploy to Cloudflare")
+task(deploy: :build) do
   run!("npx", "wrangler", "deploy")
 end

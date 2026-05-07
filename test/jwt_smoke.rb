@@ -37,26 +37,28 @@ module SmokeTest
     result = block.call
     if result
       @passed += 1
-      $stdout.puts "  PASS  #{label}"
+      $stdout.puts("  PASS  #{label}")
     else
       @failed += 1
       @errors << label
-      $stdout.puts "  FAIL  #{label}"
+      $stdout.puts("  FAIL  #{label}")
     end
+
   rescue Exception => e
     @failed += 1
     @errors << "#{label} (#{e.class}: #{e.message})"
-    $stdout.puts "  CRASH #{label} — #{e.class}: #{e.message}"
+    $stdout.puts("  CRASH #{label} — #{e.class}: #{e.message}")
   end
 
   def self.report
     total = @passed + @failed
-    $stdout.puts ""
-    $stdout.puts "#{total} tests, #{@passed} passed, #{@failed} failed"
+    $stdout.puts("")
+    $stdout.puts("#{total} tests, #{@passed} passed, #{@failed} failed")
     if @errors.any?
-      $stdout.puts "Failures:"
-      @errors.each { |e| $stdout.puts "  - #{e}" }
+      $stdout.puts("Failures:")
+      @errors.each { |e| $stdout.puts("  - #{e}") }
     end
+
     @failed == 0
   end
 end
@@ -72,15 +74,15 @@ def tamper(token)
   parts.join(".")
 end
 
-PAYLOAD = { "sub" => "alice", "iat" => 1_000_000_000, "role" => "admin" }.freeze
+PAYLOAD = {"sub" => "alice", "iat" => 1_000_000_000, "role" => "admin"}.freeze
 
-$stdout.puts "=== homura Phase 8 — JWT smoke ==="
-$stdout.puts ""
+$stdout.puts("=== homura Phase 8 — JWT smoke ===")
+$stdout.puts("")
 
 # ---------------------------------------------------------------------
 # HMAC — HS256 / HS384 / HS512
 # ---------------------------------------------------------------------
-$stdout.puts "--- HS256/384/512 (HMAC) ---"
+$stdout.puts("--- HS256/384/512 (HMAC) ---")
 
 %w[HS256 HS384 HS512].each do |alg|
   secret = "super-secret-key-" + alg.downcase
@@ -89,6 +91,7 @@ $stdout.puts "--- HS256/384/512 (HMAC) ---"
     decoded, header = JWT.decode(token, secret, true, algorithm: alg).__await__
     decoded == PAYLOAD && header["alg"] == alg
   end
+
   SmokeTest.assert("#{alg} rejects tampered signature") do
     token = JWT.encode(PAYLOAD, secret, alg).__await__
     bad = tamper(token)
@@ -98,8 +101,10 @@ $stdout.puts "--- HS256/384/512 (HMAC) ---"
     rescue JWT::VerificationError
       raised = true
     end
+
     raised
   end
+
   SmokeTest.assert("#{alg} rejects wrong secret") do
     token = JWT.encode(PAYLOAD, secret, alg).__await__
     raised = false
@@ -108,6 +113,7 @@ $stdout.puts "--- HS256/384/512 (HMAC) ---"
     rescue JWT::VerificationError
       raised = true
     end
+
     raised
   end
 end
@@ -115,31 +121,34 @@ end
 # ---------------------------------------------------------------------
 # RSA — RS256 / RS384 / RS512
 # ---------------------------------------------------------------------
-$stdout.puts ""
-$stdout.puts "--- RS256/384/512 (RSASSA-PKCS1-v1_5) ---"
+$stdout.puts("")
+$stdout.puts("--- RS256/384/512 (RSASSA-PKCS1-v1_5) ---")
 
 RSA_KEY = OpenSSL::PKey::RSA.new(2048)
 
 %w[RS256 RS384 RS512].each do |alg|
   SmokeTest.assert("#{alg} encode/decode round-trip") do
     token = JWT.encode(PAYLOAD, RSA_KEY, alg).__await__
-    decoded, header =
-      JWT.decode(token, RSA_KEY.public_key, true, algorithm: alg).__await__
+    decoded, header = JWT.decode(token, RSA_KEY.public_key, true, algorithm: alg).__await__
     decoded == PAYLOAD && header["alg"] == alg
   end
+
   SmokeTest.assert("#{alg} rejects tampered signature") do
     token = JWT.encode(PAYLOAD, RSA_KEY, alg).__await__
     raised = false
     begin
-      JWT.decode(
-        tamper(token),
-        RSA_KEY.public_key,
-        true,
-        algorithm: alg
-      ).__await__
+      JWT
+        .decode(
+          tamper(token),
+          RSA_KEY.public_key,
+          true,
+          algorithm: alg
+        )
+        .__await__
     rescue JWT::VerificationError
       raised = true
     end
+
     raised
   end
 end
@@ -153,29 +162,32 @@ end
 # ---------------------------------------------------------------------
 # RSA-PSS — PS256 / PS384 / PS512
 # ---------------------------------------------------------------------
-$stdout.puts ""
-$stdout.puts "--- PS256/384/512 (RSASSA-PSS) ---"
+$stdout.puts("")
+$stdout.puts("--- PS256/384/512 (RSASSA-PSS) ---")
 
 %w[PS256 PS384 PS512].each do |alg|
   SmokeTest.assert("#{alg} encode/decode round-trip") do
     token = JWT.encode(PAYLOAD, RSA_KEY, alg).__await__
-    decoded, header =
-      JWT.decode(token, RSA_KEY.public_key, true, algorithm: alg).__await__
+    decoded, header = JWT.decode(token, RSA_KEY.public_key, true, algorithm: alg).__await__
     decoded == PAYLOAD && header["alg"] == alg
   end
+
   SmokeTest.assert("#{alg} rejects tampered signature") do
     token = JWT.encode(PAYLOAD, RSA_KEY, alg).__await__
     raised = false
     begin
-      JWT.decode(
-        tamper(token),
-        RSA_KEY.public_key,
-        true,
-        algorithm: alg
-      ).__await__
+      JWT
+        .decode(
+          tamper(token),
+          RSA_KEY.public_key,
+          true,
+          algorithm: alg
+        )
+        .__await__
     rescue JWT::VerificationError
       raised = true
     end
+
     raised
   end
 end
@@ -183,8 +195,8 @@ end
 # ---------------------------------------------------------------------
 # ECDSA — ES256 / ES384 / ES512
 # ---------------------------------------------------------------------
-$stdout.puts ""
-$stdout.puts "--- ES256/384/512 (ECDSA, raw R||S) ---"
+$stdout.puts("")
+$stdout.puts("--- ES256/384/512 (ECDSA, raw R||S) ---")
 
 EC_BY_ALG = {
   "ES256" => OpenSSL::PKey::EC.generate("prime256v1"),
@@ -199,6 +211,7 @@ EC_BY_ALG = {
     decoded, header = JWT.decode(token, key, true, algorithm: alg).__await__
     decoded == PAYLOAD && header["alg"] == alg
   end
+
   SmokeTest.assert("#{alg} rejects tampered signature") do
     token = JWT.encode(PAYLOAD, key, alg).__await__
     raised = false
@@ -209,6 +222,7 @@ EC_BY_ALG = {
       # either outcome counts as rejection. We rescue broadly.
       raised = true
     end
+
     raised
   end
 end
@@ -221,23 +235,24 @@ SmokeTest.assert("ES256 rejects ES384 key (curve/alg mismatch)") do
   rescue ::Exception
     raised = true
   end
+
   raised
 end
 
 # ---------------------------------------------------------------------
 # EdDSA — Ed25519
 # ---------------------------------------------------------------------
-$stdout.puts ""
-$stdout.puts "--- EdDSA (Ed25519) ---"
+$stdout.puts("")
+$stdout.puts("--- EdDSA (Ed25519) ---")
 
 ED_KEY = OpenSSL::PKey::Ed25519.generate
 
 SmokeTest.assert("EdDSA encode/decode round-trip") do
   token = JWT.encode(PAYLOAD, ED_KEY, "EdDSA").__await__
-  decoded, header =
-    JWT.decode(token, ED_KEY, true, algorithm: "EdDSA").__await__
+  decoded, header = JWT.decode(token, ED_KEY, true, algorithm: "EdDSA").__await__
   decoded == PAYLOAD && header["alg"] == "EdDSA"
 end
+
 SmokeTest.assert("EdDSA rejects tampered signature") do
   token = JWT.encode(PAYLOAD, ED_KEY, "EdDSA").__await__
   raised = false
@@ -246,25 +261,26 @@ SmokeTest.assert("EdDSA rejects tampered signature") do
   rescue JWT::VerificationError
     raised = true
   end
+
   raised
 end
+
 SmokeTest.assert("ED25519 alias for EdDSA works") do
   token = JWT.encode(PAYLOAD, ED_KEY, "ED25519").__await__
-  decoded, header =
-    JWT.decode(token, ED_KEY, true, algorithm: "ED25519").__await__
+  decoded, header = JWT.decode(token, ED_KEY, true, algorithm: "ED25519").__await__
   decoded == PAYLOAD && header["alg"] == "ED25519"
 end
 
 # ---------------------------------------------------------------------
 # Algorithm confusion / header tampering
 # ---------------------------------------------------------------------
-$stdout.puts ""
-$stdout.puts "--- algo-confusion + header edge cases ---"
+$stdout.puts("")
+$stdout.puts("--- algo-confusion + header edge cases ---")
 
 SmokeTest.assert("decode rejects alg:none when not allowed") do
-  header = { "alg" => "none", "typ" => "JWT" }
+  header = {"alg" => "none", "typ" => "JWT"}
   payload = PAYLOAD
-  enc = ->(obj) { Base64.urlsafe_encode64(obj.to_json).delete("=") }
+  enc = -> (obj) { Base64.urlsafe_encode64(obj.to_json).delete("=") }
   token = enc.call(header) + "." + enc.call(payload) + "."
   raised = false
   begin
@@ -272,6 +288,7 @@ SmokeTest.assert("decode rejects alg:none when not allowed") do
   rescue JWT::IncorrectAlgorithm, JWT::DecodeError
     raised = true
   end
+
   raised
 end
 
@@ -285,11 +302,12 @@ SmokeTest.assert(
   rescue JWT::IncorrectAlgorithm
     raised = true
   end
+
   raised
 end
 
 SmokeTest.assert("header_fields extra keys propagate to decoded header") do
-  token = JWT.encode(PAYLOAD, "secret", "HS256", { "kid" => "k-1" }).__await__
+  token = JWT.encode(PAYLOAD, "secret", "HS256", {"kid" => "k-1"}).__await__
   _, header = JWT.decode(token, "secret", true, algorithm: "HS256").__await__
   header["kid"] == "k-1" && header["alg"] == "HS256"
 end
@@ -309,29 +327,31 @@ SmokeTest.assert(
   rescue JWT::DecodeError
     raised = true
   end
+
   raised
 end
 
 SmokeTest.assert("decode with allowed algorithms array") do
   token = JWT.encode(PAYLOAD, "secret", "HS512").__await__
-  decoded, header =
-    JWT.decode(
+  decoded, header = JWT
+    .decode(
       token,
       "secret",
       true,
       algorithms: %w[HS256 HS384 HS512]
-    ).__await__
+    )
+    .__await__
   decoded == PAYLOAD && header["alg"] == "HS512"
 end
 
 # ---------------------------------------------------------------------
 # Claims — exp / iat / iss / aud / sub
 # ---------------------------------------------------------------------
-$stdout.puts ""
-$stdout.puts "--- claim verification ---"
+$stdout.puts("")
+$stdout.puts("--- claim verification ---")
 
 SmokeTest.assert("expired token is rejected") do
-  payload = { "sub" => "alice", "exp" => Time.now.to_i - 60 }
+  payload = {"sub" => "alice", "exp" => Time.now.to_i - 60}
   token = JWT.encode(payload, "secret", "HS256").__await__
   raised = false
   begin
@@ -339,18 +359,19 @@ SmokeTest.assert("expired token is rejected") do
   rescue JWT::ExpiredSignature
     raised = true
   end
+
   raised
 end
 
 SmokeTest.assert("future-exp token is accepted") do
-  payload = { "sub" => "alice", "exp" => Time.now.to_i + 60 }
+  payload = {"sub" => "alice", "exp" => Time.now.to_i + 60}
   token = JWT.encode(payload, "secret", "HS256").__await__
   decoded, = JWT.decode(token, "secret", true, algorithm: "HS256").__await__
   decoded["sub"] == "alice"
 end
 
 SmokeTest.assert("nbf in the future is rejected") do
-  payload = { "sub" => "alice", "nbf" => Time.now.to_i + 60 }
+  payload = {"sub" => "alice", "nbf" => Time.now.to_i + 60}
   token = JWT.encode(payload, "secret", "HS256").__await__
   raised = false
   begin
@@ -358,40 +379,45 @@ SmokeTest.assert("nbf in the future is rejected") do
   rescue JWT::ImmatureSignature
     raised = true
   end
+
   raised
 end
 
 SmokeTest.assert("issuer verification succeeds when matching") do
-  payload = { "sub" => "alice", "iss" => "homura" }
+  payload = {"sub" => "alice", "iss" => "homura"}
   token = JWT.encode(payload, "secret", "HS256").__await__
-  decoded, =
-    JWT.decode(
+  decoded, = JWT
+    .decode(
       token,
       "secret",
       true,
       algorithm: "HS256",
       iss: "homura",
       verify_iss: true
-    ).__await__
+    )
+    .__await__
   decoded["iss"] == "homura"
 end
 
 SmokeTest.assert("issuer verification fails on mismatch") do
-  payload = { "sub" => "alice", "iss" => "other" }
+  payload = {"sub" => "alice", "iss" => "other"}
   token = JWT.encode(payload, "secret", "HS256").__await__
   raised = false
   begin
-    JWT.decode(
-      token,
-      "secret",
-      true,
-      algorithm: "HS256",
-      iss: "homura",
-      verify_iss: true
-    ).__await__
+    JWT
+      .decode(
+        token,
+        "secret",
+        true,
+        algorithm: "HS256",
+        iss: "homura",
+        verify_iss: true
+      )
+      .__await__
   rescue JWT::InvalidIssuerError
     raised = true
   end
+
   raised
 end
 

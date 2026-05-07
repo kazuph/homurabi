@@ -39,11 +39,12 @@ jobs:
         run: npm test
 
   # ---------------------------------------------------------------------------
-  # Ruby formatting gate — keeps first-party Ruby on a single mechanical style
-  # and explicitly excludes vendored / generated trees from the formatter scope.
+  # Ruby formatting gate — keeps first-party Ruby on the same rubyfmt lineage
+  # used in Stripe's rollout story, while explicitly excluding vendored /
+  # generated trees from the formatter scope.
   # ---------------------------------------------------------------------------
   ruby-format:
-    name: syntax_tree check (first-party Ruby)
+    name: rubyfmt check (first-party Ruby)
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -52,6 +53,8 @@ jobs:
         with:
           ruby-version: '3.4'
           bundler-cache: true
+      - name: Install rubyfmt
+        run: ruby bin/install-rubyfmt
       - name: Check Ruby formatting
         run: ruby bin/format-ruby --check
 

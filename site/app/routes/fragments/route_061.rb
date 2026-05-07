@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 # Route fragment 61 — demo /docs/sinatra
-get "/docs/sinatra" do
+get("/docs/sinatra") do
   @title = "sinatra-homura — homura Docs"
   @docs_page = "sinatra"
   @docs_section = :reference
@@ -18,6 +18,6 @@ get "/docs/sinatra" do
     %w[queue Queues],
     %w[matrix できること / できないこと]
   ]
-  @docs_inner = erb :docs_sinatra
-  erb :layout_docs
+  @docs_inner = erb(:docs_sinatra)
+  erb(:layout_docs)
 end

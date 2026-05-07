@@ -56,6 +56,7 @@ module Cloudflare
     def size
       @bytes_binstr.length
     end
+
     alias_method :bytesize, :size
 
     # Convenience accessor matching the CRuby Rack shape.
@@ -106,6 +107,7 @@ module Cloudflare
         tempfile: self
       }
     end
+
     alias_method :to_hash, :to_h
 
     # `#[]` so `file[:filename]` works on the UploadedFile itself
@@ -133,9 +135,11 @@ module Cloudflare
       if (m = ct.match(/boundary="([^"]+)"/i))
         return m[1]
       end
+
       if (m = ct.match(/boundary=([^;,\s]+)/i))
         return m[1]
       end
+
       nil
     end
 
@@ -154,7 +158,8 @@ module Cloudflare
       sep = "--" + boundary
       term = "--" + boundary + "--"
       sep_line = sep + CRLF
-      sep_last = sep + CRLF # the very first boundary may skip the leading CRLF
+      # the very first boundary may skip the leading CRLF
+      sep_last = sep + CRLF
       body = body_binstr.to_s
 
       # Skip any preamble before the first boundary.
@@ -251,13 +256,14 @@ module Cloudflare
       # Quoted `key="value"`
       q_re = /(?:^|[;\s])#{k}\s*=\s*"((?:\\"|[^"])*)"/i
       if (m = disposition.match(q_re))
-        return m[1].gsub('\\"', '"')
+        return m[1].gsub("\\\"", "\"")
       end
       # Bare `key=value`
       b_re = /(?:^|[;\s])#{k}\s*=\s*([^;]+)/i
       if (m = disposition.match(b_re))
         return m[1].strip
       end
+
       nil
     end
 
@@ -276,10 +282,10 @@ module Cloudflare
       return cached if cached
 
       ct = env["CONTENT_TYPE"]
-      return({}) unless ct && ct.to_s.downcase.include?("multipart/")
+      return ({}) unless ct && ct.to_s.downcase.include?("multipart/")
 
       io = env["rack.input"]
-      return({}) if io.nil?
+      return ({}) if io.nil?
 
       # `rack.input` is normally a StringIO wrapping the body_binstr
       # we staged in src/worker.mjs. Read the full body; it's already
@@ -292,6 +298,7 @@ module Cloudflare
           # some stubs don't support rewind — ignore
         end
       end
+
       body = io.respond_to?(:read) ? io.read.to_s : ""
 
       parsed = parse(body, ct)

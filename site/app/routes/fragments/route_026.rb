@@ -1,15 +1,12 @@
 # frozen_string_literal: true
 # Route fragment 26 — demo /demo/crypto
-get "/demo/crypto" do
-  content_type "application/json"
+get("/demo/crypto") do
+  content_type("application/json")
   unless crypto_demos_enabled?
-    status 404
-    next(
-      {
-        "error" =>
-          "crypto demos disabled (set HOMURA_ENABLE_CRYPTO_DEMOS=1 in wrangler vars)"
-      }.to_json
-    )
+    status(404)
+    next ({
+      "error" => "crypto demos disabled (set HOMURA_ENABLE_CRYPTO_DEMOS=1 in wrangler vars)"
+    }.to_json)
   end
 
   # 1) Digest one-shots
@@ -43,18 +40,17 @@ get "/demo/crypto" do
   rsa_ok = rsa.public_key.verify(OpenSSL::Digest::SHA256.new, sig, msg)
 
   # 5) PBKDF2 derived key
-  derived =
-    OpenSSL::KDF.pbkdf2_hmac(
-      "p@ssw0rd",
-      salt: "phase7-salt",
-      iterations: 4096,
-      length: 32,
-      hash: "SHA256"
-    )
+  derived = OpenSSL::KDF.pbkdf2_hmac(
+    "p@ssw0rd",
+    salt: "phase7-salt",
+    iterations: 4096,
+    length: 32,
+    hash: "SHA256"
+  )
 
   # 6) Hand-rolled HS256 JWT (proof Phase 8 jwt gem will work)
-  header = { "alg" => "HS256", "typ" => "JWT" }
-  payload = { "sub" => "demo", "iat" => Time.now.to_i }
+  header = {"alg" => "HS256", "typ" => "JWT"}
+  payload = {"sub" => "demo", "iat" => Time.now.to_i}
   enc_b64 = lambda { |obj| Base64.urlsafe_encode64(obj.to_json).delete("=") }
   signing_input = enc_b64.call(header) + "." + enc_b64.call(payload)
   sig_bin = OpenSSL::HMAC.digest("SHA256", "jwt-secret", signing_input)

@@ -38,26 +38,28 @@ module SmokeTest
     result = block.call
     if result
       @passed += 1
-      $stdout.puts "  PASS  #{label}"
+      $stdout.puts("  PASS  #{label}")
     else
       @failed += 1
       @errors << label
-      $stdout.puts "  FAIL  #{label}"
+      $stdout.puts("  FAIL  #{label}")
     end
+
   rescue Exception => e
     @failed += 1
     @errors << "#{label} (#{e.class}: #{e.message})"
-    $stdout.puts "  CRASH #{label} — #{e.class}: #{e.message}"
+    $stdout.puts("  CRASH #{label} — #{e.class}: #{e.message}")
   end
 
   def self.report
     total = @passed + @failed
-    $stdout.puts ""
-    $stdout.puts "#{total} tests, #{@passed} passed, #{@failed} failed"
+    $stdout.puts("")
+    $stdout.puts("#{total} tests, #{@passed} passed, #{@failed} failed")
     if @errors.any?
-      $stdout.puts "Failures:"
-      @errors.each { |e| $stdout.puts "  - #{e}" }
+      $stdout.puts("Failures:")
+      @errors.each { |e| $stdout.puts("  - #{e}") }
     end
+
     @failed == 0
   end
 end
@@ -81,13 +83,13 @@ def fake_storage
   `globalThis.__homura_do_fake_storage()`
 end
 
-$stdout.puts "=== homura Phase 11B — DurableObject smoke ==="
-$stdout.puts ""
+$stdout.puts("=== homura Phase 11B — DurableObject smoke ===")
+$stdout.puts("")
 
 # ---------------------------------------------------------------------
 # 1. DurableObjectNamespace
 # ---------------------------------------------------------------------
-$stdout.puts "--- DurableObjectNamespace ---"
+$stdout.puts("--- DurableObjectNamespace ---")
 
 SmokeTest.assert(
   "id_from_name forwards to js.idFromName and returns a DurableObjectId"
@@ -95,7 +97,8 @@ SmokeTest.assert(
   js_ns = fake_namespace
   ns = Cloudflare::DurableObjectNamespace.new(js_ns)
   id = ns.id_from_name("global")
-  id.is_a?(Cloudflare::DurableObjectId) && id.to_s == "id::global" &&
+  id.is_a?(Cloudflare::DurableObjectId) &&
+    id.to_s == "id::global" &&
     `#{js_ns}._calls.idFromName[0]` == "global"
 end
 
@@ -107,7 +110,8 @@ SmokeTest.assert(
   a = ns.new_unique_id
   b = ns.new_unique_id
   a.is_a?(Cloudflare::DurableObjectId) &&
-    b.is_a?(Cloudflare::DurableObjectId) && a.to_s != b.to_s &&
+    b.is_a?(Cloudflare::DurableObjectId) &&
+    a.to_s != b.to_s &&
     `#{js_ns}._calls.newUniqueId` == 2
 end
 
@@ -136,8 +140,8 @@ end
 # ---------------------------------------------------------------------
 # 2. DurableObjectStub#fetch
 # ---------------------------------------------------------------------
-$stdout.puts ""
-$stdout.puts "--- DurableObjectStub#fetch ---"
+$stdout.puts("")
+$stdout.puts("--- DurableObjectStub#fetch ---")
 
 SmokeTest.assert(
   "fetch returns Cloudflare::HTTPResponse with status + headers"
@@ -146,8 +150,10 @@ SmokeTest.assert(
   ns = Cloudflare::DurableObjectNamespace.new(js_ns)
   stub = ns.get_by_name("a")
   res = stub.fetch("/peek").__await__
-  res.is_a?(Cloudflare::HTTPResponse) && res.status == 200 &&
-    res["x-homura-test"] == "yes" && res["content-type"] == "application/json"
+  res.is_a?(Cloudflare::HTTPResponse) &&
+    res.status == 200 &&
+    res["x-homura-test"] == "yes" &&
+    res["content-type"] == "application/json"
 end
 
 SmokeTest.assert("fetch with method: POST includes POST in the init object") do
@@ -163,9 +169,10 @@ SmokeTest.assert("request serializes Ruby Hash bodies as JSON") do
   js_ns = fake_namespace
   ns = Cloudflare::DurableObjectNamespace.new(js_ns)
   stub = ns.get_by_name("a")
-  res = stub.request("/inc", method: "POST", body: { "amount" => 2 }).__await__
+  res = stub.request("/inc", method: "POST", body: {"amount" => 2}).__await__
   body = JSON.parse(res.body)
-  body["method"] == "POST" && body["body"].include?('"amount":2') &&
+  body["method"] == "POST" &&
+    body["body"].include?("\"amount\":2") &&
     body["content_type"] == "application/json"
 end
 
@@ -174,7 +181,7 @@ SmokeTest.assert("get/post convenience methods call request") do
   ns = Cloudflare::DurableObjectNamespace.new(js_ns)
   stub = ns.get_by_name("a")
   get_res = stub.get("/state").__await__
-  post_res = stub.post("/inc", { "amount" => 1 }).__await__
+  post_res = stub.post("/inc", {"amount" => 1}).__await__
   JSON.parse(get_res.body)["method"] == "GET" &&
     JSON.parse(post_res.body)["method"] == "POST"
 end
@@ -186,14 +193,14 @@ SmokeTest.assert("BindingHelpers#durable_object returns a named stub") do
   helper.define_singleton_method(:env) do
     Cloudflare::Bindings.build_env(`({ COUNTER: #{js_ns} })`)
   end
+
   stub = helper.durable_object(:counter, "global")
   stub.is_a?(Cloudflare::DurableObjectStub) &&
     `#{js_ns}._calls.idFromName[0]` == "global"
 end
 
 SmokeTest.assert("fetch raises DurableObjectError when the JS stub rejects") do
-  bad_stub =
-    `({ fetch: function() { return Promise.reject(new Error('do-kaboom')); } })`
+  bad_stub = `({ fetch: function() { return Promise.reject(new Error('do-kaboom')); } })`
   stub = Cloudflare::DurableObjectStub.new(bad_stub)
   raised = false
   begin
@@ -201,18 +208,19 @@ SmokeTest.assert("fetch raises DurableObjectError when the JS stub rejects") do
   rescue Cloudflare::DurableObjectError => e
     raised = e.message.include?("do-kaboom")
   end
+
   raised
 end
 
 # ---------------------------------------------------------------------
 # 3. DurableObjectStorage — JSON round-trip
 # ---------------------------------------------------------------------
-$stdout.puts ""
-$stdout.puts "--- DurableObjectStorage ---"
+$stdout.puts("")
+$stdout.puts("--- DurableObjectStorage ---")
 
 SmokeTest.assert("put + get round-trips a Ruby Hash through JSON") do
   storage = Cloudflare::DurableObjectStorage.new(fake_storage)
-  storage.put("config", { "a" => 1, "b" => "two" }).__await__
+  storage.put("config", {"a" => 1, "b" => "two"}).__await__
   got = storage.get("config").__await__
   got.is_a?(Hash) && got["a"] == 1 && got["b"] == "two"
 end
@@ -246,26 +254,28 @@ end
 
 SmokeTest.assert("list returns a Ruby Hash of parsed values") do
   storage = Cloudflare::DurableObjectStorage.new(fake_storage)
-  storage.put("u:1", { "name" => "alice" }).__await__
-  storage.put("u:2", { "name" => "bob" }).__await__
+  storage.put("u:1", {"name" => "alice"}).__await__
+  storage.put("u:2", {"name" => "bob"}).__await__
   result = storage.list.__await__
   # Copilot review PR #9: list now returns a Ruby Hash directly,
   # not a JS Map — callers no longer need backticks to iterate.
-  result.is_a?(Hash) && result["u:1"]["name"] == "alice" &&
+  result.is_a?(Hash) &&
+    result["u:1"]["name"] == "alice" &&
     result["u:2"]["name"] == "bob"
 end
 
 # ---------------------------------------------------------------------
 # 4. Cloudflare::DurableObject.define + dispatcher
 # ---------------------------------------------------------------------
-$stdout.puts ""
-$stdout.puts "--- DurableObject.define + dispatcher ---"
+$stdout.puts("")
+$stdout.puts("--- DurableObject.define + dispatcher ---")
 
 SmokeTest.assert("define registers a handler retrievable via handler_for") do
   Cloudflare::DurableObject.handlers.delete("SmokeClass")
   Cloudflare::DurableObject.define("SmokeClass") do |_state, _req|
     [200, {}, "hello"]
   end
+
   !Cloudflare::DurableObject.handler_for("SmokeClass").nil?
 end
 
@@ -276,21 +286,22 @@ SmokeTest.assert(
   Cloudflare::DurableObject.define("DispatchClass") do |_state, req|
     [
       200,
-      { "content-type" => "application/json" },
-      { "path" => req.path }.to_json
+      {"content-type" => "application/json"},
+      {"path" => req.path}.to_json
     ]
   end
-  js_state =
-    `({ id: { toString: function() { return 'abc' } }, storage: #{fake_storage} })`
+
+  js_state = `({ id: { toString: function() { return 'abc' } }, storage: #{fake_storage} })`
   js_req = `new Request('https://do/foo/bar', { method: 'GET' })`
-  js_resp =
-    Cloudflare::DurableObject.dispatch_js(
+  js_resp = Cloudflare::DurableObject
+    .dispatch_js(
       "DispatchClass",
       js_state,
       `({})`,
       js_req,
       ""
-    ).__await__
+    )
+    .__await__
   status = `#{js_resp}.status`
   text = `#{js_resp}.text()`.__await__
   body = JSON.parse(text)
@@ -300,17 +311,17 @@ end
 SmokeTest.assert(
   "dispatcher returns 500 JSON Response when no handler is registered"
 ) do
-  js_state =
-    `({ id: { toString: function() { return '' } }, storage: #{fake_storage} })`
+  js_state = `({ id: { toString: function() { return '' } }, storage: #{fake_storage} })`
   js_req = `new Request('https://do/whatever')`
-  js_resp =
-    Cloudflare::DurableObject.dispatch_js(
+  js_resp = Cloudflare::DurableObject
+    .dispatch_js(
       "UnknownClass",
       js_state,
       `({})`,
       js_req,
       ""
-    ).__await__
+    )
+    .__await__
   status = `#{js_resp}.status`
   text = `#{js_resp}.text()`.__await__
   body = JSON.parse(text)
@@ -322,17 +333,18 @@ SmokeTest.assert("handler sees request.body when body_text is passed in") do
   Cloudflare::DurableObject.define("BodyClass") do |_state, req|
     [200, {}, req.body]
   end
-  js_state =
-    `({ id: { toString: function() { return '' } }, storage: #{fake_storage} })`
+
+  js_state = `({ id: { toString: function() { return '' } }, storage: #{fake_storage} })`
   js_req = `new Request('https://do/post', { method: 'POST' })`
-  js_resp =
-    Cloudflare::DurableObject.dispatch_js(
+  js_resp = Cloudflare::DurableObject
+    .dispatch_js(
       "BodyClass",
       js_state,
       `({})`,
       js_req,
       "payload-123"
-    ).__await__
+    )
+    .__await__
   text = `#{js_resp}.text()`.__await__
   text == "payload-123"
 end
@@ -344,17 +356,18 @@ SmokeTest.assert(
   Cloudflare::DurableObject.define("StringClass") do |_state, _req|
     "just a string"
   end
-  js_state =
-    `({ id: { toString: function() { return '' } }, storage: #{fake_storage} })`
+
+  js_state = `({ id: { toString: function() { return '' } }, storage: #{fake_storage} })`
   js_req = `new Request('https://do/s')`
-  js_resp =
-    Cloudflare::DurableObject.dispatch_js(
+  js_resp = Cloudflare::DurableObject
+    .dispatch_js(
       "StringClass",
       js_state,
       `({})`,
       js_req,
       ""
-    ).__await__
+    )
+    .__await__
   status = `#{js_resp}.status`
   ct = `#{js_resp}.headers.get('content-type')`
   text = `#{js_resp}.text()`.__await__
@@ -364,8 +377,8 @@ end
 # ---------------------------------------------------------------------
 # 5. Integration — storage round-trip through a registered handler
 # ---------------------------------------------------------------------
-$stdout.puts ""
-$stdout.puts "--- Integration: storage through a handler ---"
+$stdout.puts("")
+$stdout.puts("--- Integration: storage through a handler ---")
 
 SmokeTest.assert(
   "counter DO handler increments across two calls on the same storage"
@@ -376,31 +389,33 @@ SmokeTest.assert(
     state.storage.put("count", prev + 1).__await__
     [
       200,
-      { "content-type" => "application/json" },
-      { "count" => prev + 1 }.to_json
+      {"content-type" => "application/json"},
+      {"count" => prev + 1}.to_json
     ]
   end
+
   shared_storage = fake_storage
-  js_state =
-    `({ id: { toString: function() { return 'shared' } }, storage: #{shared_storage} })`
+  js_state = `({ id: { toString: function() { return 'shared' } }, storage: #{shared_storage} })`
   js_req = `new Request('https://do/inc', { method: 'POST' })`
 
-  js_resp1 =
-    Cloudflare::DurableObject.dispatch_js(
+  js_resp1 = Cloudflare::DurableObject
+    .dispatch_js(
       "SmokeCounter",
       js_state,
       `({})`,
       js_req,
       ""
-    ).__await__
-  js_resp2 =
-    Cloudflare::DurableObject.dispatch_js(
+    )
+    .__await__
+  js_resp2 = Cloudflare::DurableObject
+    .dispatch_js(
       "SmokeCounter",
       js_state,
       `({})`,
       js_req,
       ""
-    ).__await__
+    )
+    .__await__
   body1 = JSON.parse(`#{js_resp1}.text()`.__await__)
   body2 = JSON.parse(`#{js_resp2}.text()`.__await__)
   body1["count"] == 1 && body2["count"] == 2
@@ -409,8 +424,8 @@ end
 # ---------------------------------------------------------------------
 # 5b. DurableObjectState — blockConcurrencyWhile
 # ---------------------------------------------------------------------
-$stdout.puts ""
-$stdout.puts "--- DurableObjectState#block_concurrency_while ---"
+$stdout.puts("")
+$stdout.puts("--- DurableObjectState#block_concurrency_while ---")
 
 SmokeTest.assert(
   "block_concurrency_while forwards to state.blockConcurrencyWhile and resolves"
@@ -420,8 +435,7 @@ SmokeTest.assert(
   `globalThis.__homura_do_fake_state_with_bcw = function() { var calls = 0; return { id: { toString: function() { return 'xyz'; } }, blockConcurrencyWhile: function(fn) { calls += 1; return fn(); }, storage: {}, __calls: function() { return calls; } }; };`
   js_state = `globalThis.__homura_do_fake_state_with_bcw()`
   state = Cloudflare::DurableObjectState.new(js_state)
-  resolved =
-    state.block_concurrency_while(`Promise.resolve('locked-value')`).__await__
+  resolved = state.block_concurrency_while(`Promise.resolve('locked-value')`).__await__
   resolved == "locked-value" && `#{js_state}.__calls()` == 1
 end
 
@@ -452,9 +466,8 @@ SmokeTest.assert(
   js_state = `globalThis.__homura_do_fake_bcw_serialising()`
   state = Cloudflare::DurableObjectState.new(js_state)
   # Schedule two concurrent increments, both protected by BCW.
-  p1 =
-    state.block_concurrency_while(
-      `
+  p1 = state.block_concurrency_while(
+    `
     (async function(storage) {
       var prev = await storage.get('c');
       await new Promise(function(r) { setTimeout(r, 5); });   // widen the window
@@ -462,10 +475,9 @@ SmokeTest.assert(
       return prev + 1;
     })(#{`#{js_state}.storage`})
   `
-    )
-  p2 =
-    state.block_concurrency_while(
-      `
+  )
+  p2 = state.block_concurrency_while(
+    `
     (async function(storage) {
       var prev = await storage.get('c');
       await new Promise(function(r) { setTimeout(r, 5); });
@@ -473,7 +485,7 @@ SmokeTest.assert(
       return prev + 1;
     })(#{`#{js_state}.storage`})
   `
-    )
+  )
   final = p1.__await__
   final2 = p2.__await__
   final == 1 && final2 == 2
@@ -482,8 +494,8 @@ end
 # ---------------------------------------------------------------------
 # 6. JS dispatcher hook
 # ---------------------------------------------------------------------
-$stdout.puts ""
-$stdout.puts "--- JS dispatcher hook ---"
+$stdout.puts("")
+$stdout.puts("--- JS dispatcher hook ---")
 
 SmokeTest.assert("globalThis.__HOMURA_DO_DISPATCH__ is installed") do
   `typeof globalThis.__HOMURA_DO_DISPATCH__ === 'function'`
@@ -502,11 +514,12 @@ SmokeTest.assert(
 ) do
   Cloudflare::DurableObject.define_web_socket_handlers(
     "WsSmoke",
-    on_message: ->(_ws, _msg, _state) { :msg },
-    on_close: ->(_ws, _c, _r, _clean, _state) { :close }
+    on_message: -> (_ws, _msg, _state) { :msg },
+    on_close: -> (_ws, _c, _r, _clean, _state) { :close }
   )
   h = Cloudflare::DurableObject.web_socket_handlers_for("WsSmoke")
-  h[:on_message].respond_to?(:call) && h[:on_close].respond_to?(:call) &&
+  h[:on_message].respond_to?(:call) &&
+    h[:on_close].respond_to?(:call) &&
     h[:on_error].nil?
 end
 
@@ -516,15 +529,14 @@ SmokeTest.assert(
   received = {}
   Cloudflare::DurableObject.define_web_socket_handlers(
     "WsMsgSmoke",
-    on_message: ->(ws, msg, state) do
+    on_message: -> (ws, msg, state) do
       received[:ws] = ws
       received[:msg] = msg
       received[:state] = state
     end
   )
   js_ws = `({ send: function(){} })`
-  js_state =
-    `({ id: { toString: function() { return 'ws-id' } }, storage: #{fake_storage} })`
+  js_state = `({ id: { toString: function() { return 'ws-id' } }, storage: #{fake_storage} })`
   Cloudflare::DurableObject.dispatch_ws_message(
     "WsMsgSmoke",
     js_ws,
@@ -543,13 +555,12 @@ SmokeTest.assert(
   captured = nil
   Cloudflare::DurableObject.define_web_socket_handlers(
     "WsCloseSmoke",
-    on_close: ->(_ws, code, reason, clean, _state) do
-      captured = { code: code, reason: reason, clean: clean }
+    on_close: -> (_ws, code, reason, clean, _state) do
+      captured = {code: code, reason: reason, clean: clean}
     end
   )
   js_ws = `({})`
-  js_state =
-    `({ id: { toString: function() { return 'x' } }, storage: #{fake_storage} })`
+  js_state = `({ id: { toString: function() { return 'x' } }, storage: #{fake_storage} })`
   Cloudflare::DurableObject.dispatch_ws_close(
     "WsCloseSmoke",
     js_ws,
@@ -559,7 +570,8 @@ SmokeTest.assert(
     js_state,
     `({})`
   )
-  captured[:code] == 1001 && captured[:reason] == "going away" &&
+  captured[:code] == 1001 &&
+    captured[:reason] == "going away" &&
     captured[:clean] == true
 end
 
@@ -569,16 +581,14 @@ SmokeTest.assert(
   # No call to define_web_socket_handlers('WsMissing', …) — the
   # dispatcher must silently return nil rather than raise.
   js_ws = `({})`
-  js_state =
-    `({ id: { toString: function() { return 'x' } }, storage: #{fake_storage} })`
-  result =
-    Cloudflare::DurableObject.dispatch_ws_message(
-      "WsMissing",
-      js_ws,
-      "anything",
-      js_state,
-      `({})`
-    )
+  js_state = `({ id: { toString: function() { return 'x' } }, storage: #{fake_storage} })`
+  result = Cloudflare::DurableObject.dispatch_ws_message(
+    "WsMissing",
+    js_ws,
+    "anything",
+    js_state,
+    `({})`
+  )
   result.nil?
 end
 
@@ -587,11 +597,10 @@ SmokeTest.assert("JS hook forwards through to the Ruby dispatcher") do
   Cloudflare::DurableObject.define("JSHook") do |_state, req|
     [201, {}, req.method]
   end
-  js_state =
-    `({ id: { toString: function() { return 'x' } }, storage: #{fake_storage} })`
+
+  js_state = `({ id: { toString: function() { return 'x' } }, storage: #{fake_storage} })`
   js_req = `new Request('https://do/h', { method: 'PUT' })`
-  promise =
-    `globalThis.__HOMURA_DO_DISPATCH__('JSHook', #{js_state}, ({}), #{js_req}, '')`
+  promise = `globalThis.__HOMURA_DO_DISPATCH__('JSHook', #{js_state}, ({}), #{js_req}, '')`
   js_resp = promise.__await__
   status = `#{js_resp}.status`
   text = `#{js_resp}.text()`.__await__

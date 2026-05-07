@@ -58,14 +58,16 @@ end
 # Opal 1.8.3.rc1 does ship a minimal Thread class; only patch if
 # missing to avoid fighting Opal.
 # -----------------------------------------------------------------
-unless defined?(::Thread) && ::Thread.respond_to?(:current) &&
-         (
-           begin
-             ::Thread.current.respond_to?(:status)
-           rescue StandardError
-             false
-           end
-         )
+unless defined?(::Thread) &&
+    ::Thread.respond_to?(:current) &&
+    (
+      begin
+        ::Thread.current.respond_to?(:status)
+      rescue StandardError
+        false
+      end
+    )
+
   module ::HomuraThreadStub
     class FauxThread
       def status
@@ -155,6 +157,7 @@ unless defined?(::BigDecimal)
     def BigDecimal(v, _precision = nil)
       ::BigDecimal.new_from(v)
     end
+
     module_function :BigDecimal
   end
 end
@@ -215,16 +218,19 @@ class ::HomuraSqlBuffer
     @chunks << other.to_s
     self
   end
+
   alias_method :concat, :<<
 
   def to_s
     @chunks.join
   end
+
   alias_method :to_str, :to_s
 
   def length
     to_s.length
   end
+
   alias_method :size, :length
 
   def empty?
@@ -319,8 +325,10 @@ class ::HomuraSqlBuffer
 
   def ensure_not_frozen!
     if @frozen
-      raise ::FrozenError,
-            "can't modify frozen HomuraSqlBuffer: #{to_s.inspect}"
+      raise(
+        ::FrozenError,
+        "can't modify frozen HomuraSqlBuffer: #{to_s.inspect}"
+      )
     end
   end
 
@@ -360,6 +368,7 @@ module ::Kernel
     def gem(*_args)
       nil
     end
+
     module_function :gem
     private :gem
   end

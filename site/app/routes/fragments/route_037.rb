@@ -1,21 +1,21 @@
 # frozen_string_literal: true
 # Route fragment 37 — test /test/ai/debug
-get "/test/ai/debug" do
-  content_type "application/json"
+get("/test/ai/debug") do
+  content_type("application/json")
   unless ai_demos_enabled? && ai_binding?
-    status 404
-    next({ "error" => "disabled" }.to_json)
+    status(404)
+    next ({"error" => "disabled"}.to_json)
   end
+
   model = params["model"] || App::CHAT_MODELS[:primary]
-  out =
-    ai.run(
-      model,
-      messages: [
-        { role: "system", content: "reply with a short Japanese greeting" },
-        { role: "user", content: "こんにちは" }
-      ],
-      max_tokens: 64
-    )
+  out = ai.run(
+    model,
+    messages: [
+      {role: "system", content: "reply with a short Japanese greeting"},
+      {role: "user", content: "こんにちは"}
+    ],
+    max_tokens: 64
+  )
   {
     "model" => model,
     "class" => out.class.to_s,

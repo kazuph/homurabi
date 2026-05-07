@@ -16,4 +16,3 @@ gem "opal-homura", path: "vendor/opal-gem", require: "opal"
 gem "homura-runtime", path: "gems/homura-runtime"
 gem "sinatra-homura", path: "gems/sinatra-homura"
 gem "sequel-d1", path: "gems/sequel-d1"
-gem "syntax_tree", require: false

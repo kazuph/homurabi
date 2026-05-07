@@ -88,11 +88,10 @@ class App < Sinatra::Base
     # without env config still works in dev).
     def mail_allowed?(email)
       return true if dev_host?
-      list =
-        cf_env_var("HOMURA_MAIL_ALLOWLIST")
-          .split(",")
-          .map { |s| s.strip.downcase }
-          .reject(&:empty?)
+      list = cf_env_var("HOMURA_MAIL_ALLOWLIST")
+        .split(",")
+        .map { |s| s.strip.downcase }
+        .reject(&:empty?)
       return true if list.empty?
       list.include?(email.to_s.strip.downcase)
     end
@@ -117,21 +116,19 @@ class App < Sinatra::Base
           "Email" => "no-reply@auth-otp.localhost",
           "Name" => "auth-otp demo"
         },
-        "To" => [{ "Email" => email }],
+        "To" => [{"Email" => email}],
         "Subject" => "Your one-time code",
-        "Text" =>
-          "Your code: #{code} (valid 5min)\n\nIf you did not request this, ignore this email.\n"
+        "Text" => "Your code: #{code} (valid 5min)\n\nIf you did not request this, ignore this email.\n"
       }.to_json
 
-      resp =
-        Cloudflare::HTTP.fetch(
-          MAILPIT_SEND_URL,
-          method: "POST",
-          headers: {
-            "content-type" => "application/json"
-          },
-          body: payload
-        )
+      resp = Cloudflare::HTTP.fetch(
+        MAILPIT_SEND_URL,
+        method: "POST",
+        headers: {
+          "content-type" => "application/json"
+        },
+        body: payload
+      )
       return true, nil if resp.ok?
       [false, "mailpit #{resp.status}: #{resp.body[0, 200]}"]
     rescue => e
@@ -152,8 +149,7 @@ class App < Sinatra::Base
         to: email,
         from: from,
         subject: "Your one-time code",
-        text:
-          "Your code: #{code} (valid 5min)\n\nIf you did not request this, ignore this email.\n"
+        text: "Your code: #{code} (valid 5min)\n\nIf you did not request this, ignore this email.\n"
       )
       [true, nil]
     rescue Cloudflare::Email::Error => e
@@ -180,8 +176,7 @@ class App < Sinatra::Base
       hex8: SecureRandom.hex(8),
       random_float: SecureRandom.random_float,
       random_number_1m: SecureRandom.random_number(1_000_000),
-      sample_otps:
-        5.times.map { format("%06d", SecureRandom.random_number(1_000_000)) }
+      sample_otps: 5.times.map { format("%06d", SecureRandom.random_number(1_000_000)) }
     }.to_json
   end
 
@@ -224,12 +219,11 @@ class App < Sinatra::Base
     if mail_allowed?(email)
       ok, err = send_otp_email(email, code)
       if ok
-        @mail_notice =
-          if dev_host?
-            "メールを確認してください (#{email})。届かない場合は mailpit Web UI で確認: http://127.0.0.1:8025/"
-          else
-            "メールを確認してください (#{email})。"
-          end
+        @mail_notice = if dev_host?
+          "メールを確認してください (#{email})。届かない場合は mailpit Web UI で確認: http://127.0.0.1:8025/"
+        else
+          "メールを確認してください (#{email})。"
+        end
       elsif dev_host?
         # Dev-only fallback: show the OTP on screen so the demo keeps working
         # even if mailpit is offline. NEVER do this in production — it leaks
@@ -270,11 +264,10 @@ class App < Sinatra::Base
     end
 
     now = Time.now.to_i
-    row =
-      conn.get_first_row(
-        "SELECT id, code, expires_at FROM otps WHERE email = ? AND expires_at >= ? ORDER BY id DESC LIMIT 1",
-        [email, now]
-      )
+    row = conn.get_first_row(
+      "SELECT id, code, expires_at FROM otps WHERE email = ? AND expires_at >= ? ORDER BY id DESC LIMIT 1",
+      [email, now]
+    )
 
     if row.nil? || !Rack::Utils.secure_compare(row["code"].to_s, code)
       @title = "Verify OTP — auth-otp demo"

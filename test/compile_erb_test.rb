@@ -7,14 +7,14 @@ require "tmpdir"
 passed = 0
 failed = 0
 repo_root = File.expand_path("..", __dir__)
-bundle_env = { "BUNDLE_GEMFILE" => File.join(repo_root, "Gemfile") }
+bundle_env = {"BUNDLE_GEMFILE" => File.join(repo_root, "Gemfile")}
 
 def assert(label)
   yield
-  puts "PASS #{label}"
+  puts("PASS #{label}")
   true
 rescue => e
-  warn "FAIL #{label}: #{e.class}: #{e.message}"
+  warn("FAIL #{label}: #{e.class}: #{e.message}")
   false
 end
 
@@ -55,61 +55,62 @@ Dir.mktmpdir do |dir|
       "compiled_templates.rb",
       "--namespace",
       "CompileErbTest"
-    ) or abort("compile-erb failed")
+    ) or
+      abort("compile-erb failed")
   end
 
   $LOAD_PATH.unshift(load_path_dir)
-  load out_path
+  load(out_path)
 
-  app_class = Class.new { include Sinatra::Templates }
+  app_class = Class.new { include(Sinatra::Templates) }
 
-  ok =
-    assert("erb supports explicit Sinatra-style layout option") do
-      app = app_class.new
-      app.instance_variable_set(:@name, "homura")
-      html = app.erb(:index, layout: :layout)
-      raise html unless html == "<main><p>Hello homura</p></main>"
-    end
+  ok = assert("erb supports explicit Sinatra-style layout option") do
+    app = app_class.new
+    app.instance_variable_set(:@name, "homura")
+    html = app.erb(:index, layout: :layout)
+    raise html unless html == "<main><p>Hello homura</p></main>"
+  end
+
   passed += 1 if ok
   failed += 1 unless ok
 
-  ok =
-    assert("erb applies layout.erb by default like Sinatra") do
-      app = app_class.new
-      app.instance_variable_set(:@name, "homura")
-      html = app.erb(:index)
-      raise html unless html == "<main><p>Hello homura</p></main>"
-    end
+  ok = assert("erb applies layout.erb by default like Sinatra") do
+    app = app_class.new
+    app.instance_variable_set(:@name, "homura")
+    html = app.erb(:index)
+    raise html unless html == "<main><p>Hello homura</p></main>"
+  end
+
   passed += 1 if ok
   failed += 1 unless ok
 
-  ok =
-    assert("erb still supports layout: false opt-out") do
-      app = app_class.new
-      app.instance_variable_set(:@name, "homura")
-      html = app.erb(:index, layout: false)
-      raise html unless html == "<p>Hello homura</p>"
-    end
+  ok = assert("erb still supports layout: false opt-out") do
+    app = app_class.new
+    app.instance_variable_set(:@name, "homura")
+    html = app.erb(:index, layout: false)
+    raise html unless html == "<p>Hello homura</p>"
+  end
+
   passed += 1 if ok
   failed += 1 unless ok
 
-  ok =
-    assert("legacy @content layout fallback still works") do
-      app = app_class.new
-      app.instance_variable_set(:@content, "<p>legacy</p>")
-      html = app.erb(:layout)
-      raise html unless html == "<main><p>legacy</p></main>"
-    end
+  ok = assert("legacy @content layout fallback still works") do
+    app = app_class.new
+    app.instance_variable_set(:@content, "<p>legacy</p>")
+    html = app.erb(:layout)
+    raise html unless html == "<main><p>legacy</p></main>"
+  end
+
   passed += 1 if ok
   failed += 1 unless ok
 
-  ok =
-    assert("legacy @docs_inner layout fallback still works") do
-      app = app_class.new
-      app.instance_variable_set(:@docs_inner, "<section>docs</section>")
-      html = app.erb(:layout_docs, layout: false)
-      raise html unless html == "<article><section>docs</section></article>"
-    end
+  ok = assert("legacy @docs_inner layout fallback still works") do
+    app = app_class.new
+    app.instance_variable_set(:@docs_inner, "<section>docs</section>")
+    html = app.erb(:layout_docs, layout: false)
+    raise html unless html == "<article><section>docs</section></article>"
+  end
+
   passed += 1 if ok
   failed += 1 unless ok
 
@@ -118,28 +119,27 @@ Dir.mktmpdir do |dir|
   # pass rewrites `@@foo` reads/writes into explicit
   # `class_variable_get` / `class_variable_set` calls on the instance's
   # class, which works the same under CRuby and Opal.
-  ok =
-    assert("templates can read class variables via @@cvar") do
-      cvar_class = Class.new { include Sinatra::Templates }
-      cvar_class.class_variable_set(:@@todos, %w[a b c])
-      html = cvar_class.new.erb(:cvars, layout: false)
-      expected =
-        "<ul>\n\n  <li>a</li>\n\n  <li>b</li>\n\n  <li>c</li>\n\n</ul>\n<p>3</p>"
-      raise html unless html == expected
-    end
+  ok = assert("templates can read class variables via @@cvar") do
+    cvar_class = Class.new { include(Sinatra::Templates) }
+    cvar_class.class_variable_set(:@@todos, %w[a b c])
+    html = cvar_class.new.erb(:cvars, layout: false)
+    expected = "<ul>\n\n  <li>a</li>\n\n  <li>b</li>\n\n  <li>c</li>\n\n</ul>\n<p>3</p>"
+    raise html unless html == expected
+  end
+
   passed += 1 if ok
   failed += 1 unless ok
 
-  ok =
-    assert("templates can assign and re-read class variables via @@cvar") do
-      cvar_class = Class.new { include Sinatra::Templates }
-      cvar_class.class_variable_set(:@@count, 0)
-      inst = cvar_class.new
-      first = inst.erb(:cvars_assign, layout: false)
-      raise first unless first == "<span>1</span>"
-      second = inst.erb(:cvars_assign, layout: false)
-      raise second unless second == "<span>2</span>"
-    end
+  ok = assert("templates can assign and re-read class variables via @@cvar") do
+    cvar_class = Class.new { include(Sinatra::Templates) }
+    cvar_class.class_variable_set(:@@count, 0)
+    inst = cvar_class.new
+    first = inst.erb(:cvars_assign, layout: false)
+    raise first unless first == "<span>1</span>"
+    second = inst.erb(:cvars_assign, layout: false)
+    raise second unless second == "<span>2</span>"
+  end
+
   passed += 1 if ok
   failed += 1 unless ok
 
@@ -179,31 +179,32 @@ Dir.mktmpdir do |dir|
       body: "<%= yield(:body) %>"
     }
   }.each do |label, spec|
-    ok =
-      assert(label) do
-        invalid_path = File.join(views_dir, "invalid.erb")
-        File.write(invalid_path, spec[:body])
-        output, status =
-          Dir.chdir(dir) do
-            if spec[:argv].first == "bundle"
-              Open3.capture2e(bundle_env, *spec[:argv], invalid_path)
-            else
-              Open3.capture2e(*spec[:argv], invalid_path)
-            end
-          end
-        raise "unexpected success" if status.success?
-        raise output unless output.include?("Unsupported ERB yield form")
-        unless output.include?("<%= yield %>") &&
-                 output.include?("<%== yield %>")
-          raise output
+    ok = assert(label) do
+      invalid_path = File.join(views_dir, "invalid.erb")
+      File.write(invalid_path, spec[:body])
+      output, status = Dir.chdir(dir) do
+        if spec[:argv].first == "bundle"
+          Open3.capture2e(bundle_env, *spec[:argv], invalid_path)
+        else
+          Open3.capture2e(*spec[:argv], invalid_path)
         end
-      ensure
-        FileUtils.rm_f(invalid_path)
       end
+
+      raise "unexpected success" if status.success?
+      raise output unless output.include?("Unsupported ERB yield form")
+      unless output.include?("<%= yield %>") &&
+          output.include?("<%== yield %>")
+        raise output
+      end
+
+    ensure
+      FileUtils.rm_f(invalid_path)
+    end
+
     passed += 1 if ok
     failed += 1 unless ok
   end
 end
 
-puts "\n#{passed} passed, #{failed} failed"
+puts("\n#{passed} passed, #{failed} failed")
 exit(failed.zero? ? 0 : 1)

@@ -317,10 +317,13 @@ skills/               # インストール可能なエージェント skill
 
 ## リポジトリ保守
 
-tracked な first-party Ruby は Syntax Tree で機械整形する。vendor や生成物は
-その対象外に保つ。
+tracked な first-party Ruby は
+[`fables-tales/rubyfmt`](https://github.com/fables-tales/rubyfmt) で機械整形する。
+Stripe の rubyfmt rollout 記事で前提になっている formatter と同じ系統のものを
+この repo でも正として採用する。vendor や生成物はその対象外に保つ。
 
 ```bash
+npm run format:ruby:install
 npm run format:ruby
 npm run format:ruby:check
 ruby bin/install-git-hooks
@@ -328,6 +331,10 @@ ruby bin/install-git-hooks
 
 formatter と `ruby -c` CI が見る範囲は
 [`bin/first-party-ruby-files`](bin/first-party-ruby-files) に一元化している。
+
+`ruby bin/install-rubyfmt` は、CI と同じ固定版 rubyfmt を `build/tools/` に
+ダウンロードする。すでにグローバルに rubyfmt を管理している場合
+（たとえば `brew install rubyfmt`）も `bin/format-ruby` はそれを使える。
 
 `ruby bin/install-git-hooks` を実行すると、この clone だけ
 `core.hooksPath=.githooks` を設定する。pre-commit hook は **staged 済み** の

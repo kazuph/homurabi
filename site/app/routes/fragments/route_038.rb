@@ -1,20 +1,17 @@
 # frozen_string_literal: true
 # Route fragment 38 — test /test/ai
-get "/test/ai" do
-  content_type "application/json"
+get("/test/ai") do
+  content_type("application/json")
   unless ai_demos_enabled?
-    status 404
-    next(
-      { "error" => "AI demos disabled (set HOMURA_ENABLE_AI_DEMOS=1)" }.to_json
-    )
+    status(404)
+    next ({"error" => "AI demos disabled (set HOMURA_ENABLE_AI_DEMOS=1)"}.to_json)
   end
+
   unless ai_binding?
-    status 503
-    next(
-      {
-        "error" => "AI binding not bound (wrangler.toml [ai] block missing)"
-      }.to_json
-    )
+    status(503)
+    next ({
+      "error" => "AI binding not bound (wrangler.toml [ai] block missing)"
+    }.to_json)
   end
 
   cases = []
@@ -28,30 +25,29 @@ get "/test/ai" do
   # `{cases: []}` before the AI call even finished. Inline a manual
   # loop where each step is followed by an explicit `__await__`.
 
-  test_one =
-    lambda do |model, label|
-      result =
-        begin
-          out =
-            ai.run(
-              model,
-              messages: [
-                { role: "system", content: "reply with the single word READY" },
-                { role: "user", content: "ping" }
-              ],
-              max_tokens: 64
-            )
-          txt = App.extract_ai_text(out).strip
-          if txt.empty?
-            { "pass" => false, "note" => "empty response from model" }
-          else
-            { "pass" => true, "note" => txt[0, 200] }
-          end
-        rescue ::Exception => e
-          { "pass" => false, "note" => "#{e.class}: #{e.message[0, 200]}" }
-        end
-      result.merge("case" => label)
+  test_one = lambda do |model, label|
+    result = begin
+      out = ai.run(
+        model,
+        messages: [
+          {role: "system", content: "reply with the single word READY"},
+          {role: "user", content: "ping"}
+        ],
+        max_tokens: 64
+      )
+      txt = App.extract_ai_text(out).strip
+      if txt.empty?
+        {"pass" => false, "note" => "empty response from model"}
+      else
+        {"pass" => true, "note" => txt[0, 200]}
+      end
+
+    rescue ::Exception => e
+      {"pass" => false, "note" => "#{e.class}: #{e.message[0, 200]}"}
     end
+
+    result.merge("case" => label)
+  end
 
   cases << test_one.call(primary, "primary model #{primary} responds")
   cases << test_one.call(fallback, "fallback model #{fallback} responds")

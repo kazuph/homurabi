@@ -39,14 +39,13 @@ Gem::Specification.new do |spec|
   # resolve transparently. No-op when consumed by plain MRI Sinatra apps.
   spec.metadata["homura.auto_await"] = "true"
 
-  spec.files =
-    Dir.chdir(__dir__) do
-      Dir["lib/**/*", "README.md", "CHANGELOG.md", "LICENSE"].select do |f|
-        File.file?(f)
-      end
+  spec.files = Dir.chdir(__dir__) do
+    Dir["lib/**/*", "README.md", "CHANGELOG.md", "LICENSE"].select do |f|
+      File.file?(f)
     end
+  end
   spec.require_paths = ["lib"]
 
-  spec.add_runtime_dependency "sinatra", ">= 3.0", "< 5.0"
-  spec.add_runtime_dependency "rack", ">= 2.0", "< 4.0"
+  spec.add_runtime_dependency("sinatra", ">= 3.0", "< 5.0")
+  spec.add_runtime_dependency("rack", ">= 2.0", "< 4.0")
 end

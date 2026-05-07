@@ -35,10 +35,12 @@
 
 begin
   require "homura/runtime"
+
 rescue LoadError
   # Workers / Opal builds compile this file with `-r homura/runtime`
   # already applied; standalone specs may omit the runtime gem.
 end
+
 require "sequel/adapters/shared/sqlite"
 
 module Sequel
@@ -113,16 +115,19 @@ module Sequel
       # `d1://` URL for migrator-side CLI usage (no D1 binding
       # available there; raises at connect time if actually used).
       def self.options_from_uri(uri)
-        { binding_name: uri.host.to_s }
+        {binding_name: uri.host.to_s}
       end
 
       def connect(_server)
         d1_binding = @opts[:d1] || @opts[:database]
         unless d1_binding
-          raise Error,
-                "Sequel D1 adapter requires a :d1 option (object responding to #prepare). " \
-                  "Example: Sequel.connect(adapter: :d1, d1: d1)"
+          raise(
+            Error,
+            "Sequel D1 adapter requires a :d1 option (object responding to #prepare). " \
+              "Example: Sequel.connect(adapter: :d1, d1: d1)"
+          )
         end
+
         Connection.new(d1_binding)
       end
 
@@ -139,10 +144,10 @@ module Sequel
         # bubbled via Opal) are caught and re-raised as Sequel::D1::Error
         # with the offending SQL attached so Sequel's error handling
         # path classifies them via database_error_classes.
-        rows =
-          synchronize(opts[:server]) do |conn|
-            conn.query(sql, Array(opts[:arguments])).__await__
-          end.__await__
+        rows = synchronize(opts[:server]) do |conn|
+          conn.query(sql, Array(opts[:arguments])).__await__
+        end
+          .__await__
         rows.each(&block) if block
         rows
       rescue Error
@@ -155,7 +160,8 @@ module Sequel
         synchronize(opts[:server]) do |conn|
           raw = conn.run(sql, Array(opts[:arguments])).__await__
           d1_meta_value(raw, "last_row_id")
-        end.__await__
+        end
+          .__await__
       rescue Error
         raise
       rescue ::Exception => e
@@ -166,7 +172,8 @@ module Sequel
         synchronize(opts[:server]) do |conn|
           raw = conn.run(sql, Array(opts[:arguments])).__await__
           d1_meta_value(raw, "changes")
-        end.__await__
+        end
+          .__await__
       rescue Error
         raise
       rescue ::Exception => e
@@ -184,17 +191,23 @@ module Sequel
       # that's a contract violation worth surfacing).
       def d1_meta_value(raw, key)
         unless raw.is_a?(::Hash)
-          raise MissingMetaError,
-                "D1 run() returned non-Hash #{raw.class}: #{raw.inspect[0, 120]}"
+          raise(
+            MissingMetaError,
+            "D1 run() returned non-Hash #{raw.class}: #{raw.inspect[0, 120]}"
+          )
         end
+
         meta = raw["meta"].is_a?(::Hash) ? raw["meta"] : raw
         value = meta[key] || meta[key.to_sym]
         if value.nil?
-          raise MissingMetaError.new(
-                  "D1 run() meta missing '#{key}'. Available keys: #{meta.keys.inspect}",
-                  meta: meta
-                )
+          raise(
+            MissingMetaError.new(
+              "D1 run() meta missing '#{key}'. Available keys: #{meta.keys.inspect}",
+              meta: meta
+            )
+          )
         end
+
         value
       end
 
@@ -250,7 +263,7 @@ module Sequel
       end
 
       def connection_pool_default_options
-        { pool_class: :single }
+        {pool_class: :single}
       end
 
       def dataset_class_default
@@ -289,15 +302,16 @@ module Sequel
 
       def homura_boolean_columns
         from = opts[:from]
-        if !from || from.length != 1 || opts.include?(:join) ||
-             opts.include?(:sql)
+        if !from ||
+            from.length != 1 ||
+            opts.include?(:join) ||
+            opts.include?(:sql)
           return nil
         end
 
         table = first_source_table
         quoted_table = table.to_s.gsub("'", "''")
-        pragma_rows =
-          db.execute("PRAGMA table_xinfo('#{quoted_table}')").__await__
+        pragma_rows = db.execute("PRAGMA table_xinfo('#{quoted_table}')").__await__
         columns = {}
         pragma_rows.each do |row|
           name = row["name"] || row[:name]
@@ -308,6 +322,7 @@ module Sequel
           columns[name] = true
           columns[name.to_sym] = true
         end
+
         columns.empty? ? nil : columns
       rescue ::Exception
         nil

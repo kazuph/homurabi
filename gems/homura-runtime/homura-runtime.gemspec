@@ -6,8 +6,7 @@ Gem::Specification.new do |spec|
   spec.name = "homura-runtime"
   spec.version = HomuraRuntime::VERSION
   spec.authors = ["Kazuhiro Homma"]
-  spec.summary =
-    "Cloudflare Workers + Opal runtime core (Rack dispatch, bindings, patches)"
+  spec.summary = "Cloudflare Workers + Opal runtime core (Rack dispatch, bindings, patches)"
   spec.description = <<~DESC
     Sinatra-free core for running Opal-compiled Ruby on Cloudflare Workers:
     Rack handler, D1/KV/R2/AI/Queue/Durable Object adapters, multipart/streaming,
@@ -34,27 +33,27 @@ Gem::Specification.new do |spec|
 
   # Consumer-facing snippets (e.g. templates/wrangler.toml.example) ship with the gem —
   # `templates/**/*` must remain in this glob so rubygems packaging does not omit them.
-  spec.files =
-    Dir.chdir(__dir__) do
-      Dir[
-        "lib/**/*",
-        "vendor/**/*",
-        "runtime/**/*",
-        "exe/**/*",
-        "bin/*",
-        "docs/**/*",
-        "templates/**/*",
-        "README.md",
-        "CHANGELOG.md"
-      ].select { |f| File.file?(f) }
-    end
+  spec.files = Dir.chdir(__dir__) do
+    Dir[
+      "lib/**/*",
+      "vendor/**/*",
+      "runtime/**/*",
+      "exe/**/*",
+      "bin/*",
+      "docs/**/*",
+      "templates/**/*",
+      "README.md",
+      "CHANGELOG.md"
+    ]
+      .select { |f| File.file?(f) }
+  end
   spec.require_paths = ["lib"]
   spec.bindir = "bin"
   spec.executables = []
 
   # Exact pin: homura verifies against the vendored Opal fork 1.8.3.rc1.5 for Ruby 3.4 compatibility.
-  spec.add_runtime_dependency "opal-homura", "= 1.8.3.rc1.5"
+  spec.add_runtime_dependency("opal-homura", "= 1.8.3.rc1.5")
 
   # parser is required by the build pipeline (auto-await analyzer).
-  spec.add_runtime_dependency "parser", "~> 3.3"
+  spec.add_runtime_dependency("parser", "~> 3.3")
 end

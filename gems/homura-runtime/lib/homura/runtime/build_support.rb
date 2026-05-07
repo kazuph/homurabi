@@ -66,7 +66,8 @@ module HomuraRuntime
         runtime_root(
           current_file: current_file,
           loaded_specs: loaded_specs
-        ).join("runtime", *names)
+        )
+          .join("runtime", *names)
       end
 
       def ensure_standalone_runtime(
@@ -137,8 +138,7 @@ module HomuraRuntime
         # app code.
         opal_gem_paths(root, loaded_specs: loaded_specs).each do |gem_path|
           basename = gem_path.basename.to_s
-          rewritten_lib =
-            root.join("build", "auto_await", "gem_#{basename}", "lib")
+          rewritten_lib = root.join("build", "auto_await", "gem_#{basename}", "lib")
           load_paths << rewritten_lib.to_s if rewritten_lib.directory?
           %w[lib vendor].each do |sub|
             dir = gem_path.join(sub)
@@ -165,12 +165,9 @@ module HomuraRuntime
         return unless gf.file?
 
         txt = gf.read
-        unless (
-                 m =
-                   txt.match(
-                     /#{Regexp.escape(RUNTIME_GEM_NAME)}['"]\s*,\s*path:\s*['"]([^'"]+)['"]/
-                   )
-               )
+        unless (m = txt.match(
+            /#{Regexp.escape(RUNTIME_GEM_NAME)}['"]\s*,\s*path:\s*['"]([^'"]+)['"]/
+          ))
           return
         end
 
@@ -235,11 +232,11 @@ module HomuraRuntime
           next if stripped.empty? || stripped.start_with?("#")
 
           if (m = stripped.match(/\Agroup\s+(.+?)\s+do\b/))
-            groups =
-              m[1].scan(/[:'"]([A-Za-z0-9_]+)['"]?/).flatten.map(&:to_sym)
+            groups = m[1].scan(/[:'"]([A-Za-z0-9_]+)['"]?/).flatten.map(&:to_sym)
             group_stack.push(groups)
             next
           end
+
           if stripped == "end"
             group_stack.pop unless group_stack.empty?
             next
@@ -256,6 +253,7 @@ module HomuraRuntime
           gem_path = Pathname.new(rel).expand_path(project_root)
           out << gem_path if gem_path.directory?
         end
+
         out.uniq
       end
     end

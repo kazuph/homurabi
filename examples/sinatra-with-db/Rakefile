@@ -1,19 +1,19 @@
 # frozen_string_literal: true
 
-task default: :build
+task(default: :build)
 
 def run!(*argv)
   ok = system(*argv)
-  exit 1 unless ok
+  exit(1) unless ok
 end
 
-desc "Build the Worker bundle (with D1 / Sequel support)"
-task :build do
+desc("Build the Worker bundle (with D1 / Sequel support)")
+task(:build) do
   run!("bundle", "exec", "homura", "build", "--standalone", "--with-db")
 end
 
-desc "Start a local dev server through portless"
-task dev: :build do
+desc("Start a local dev server through portless")
+task(dev: :build) do
   app_name = File.basename(__dir__)
   exec(
     "portless",
@@ -24,19 +24,19 @@ task dev: :build do
   )
 end
 
-desc "Deploy to Cloudflare"
-task deploy: :build do
+desc("Deploy to Cloudflare")
+task(deploy: :build) do
   run!("npx", "wrangler", "deploy")
 end
 
-namespace :db do
-  namespace :migrate do
+namespace(:db) do
+  namespace(:migrate) do
     def d1_database_name
       ENV["CLOUDFLARE_D1_DATABASE"] || "sinatra-with-db"
     end
 
-    desc "Compile Sequel migrations to Wrangler SQL in db/migrations/"
-    task :compile do
+    desc("Compile Sequel migrations to Wrangler SQL in db/migrations/")
+    task(:compile) do
       run!(
         "bundle",
         "exec",
@@ -48,8 +48,8 @@ namespace :db do
       )
     end
 
-    desc "Apply compiled D1 migrations locally"
-    task local: :compile do
+    desc("Apply compiled D1 migrations locally")
+    task(local: :compile) do
       run!(
         "bundle",
         "exec",
@@ -60,8 +60,8 @@ namespace :db do
       )
     end
 
-    desc "Apply compiled D1 migrations remotely"
-    task remote: :compile do
+    desc("Apply compiled D1 migrations remotely")
+    task(remote: :compile) do
       run!(
         "bundle",
         "exec",

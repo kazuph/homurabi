@@ -10,11 +10,11 @@ class App < Sinatra::Base
     end
 
     def render_todo_li(t)
-      erb :_todo, layout: false, locals: { t: t }
+      erb(:_todo, layout: false, locals: {t: t})
     end
 
     def render_form
-      erb :_form, layout: false
+      erb(:_form, layout: false)
     end
 
     # Build a turbo-stream body composed of the requested actions.
@@ -28,15 +28,15 @@ class App < Sinatra::Base
       case action
       when :append
         li_html = render_todo_li(@t)
-        %(<turbo-stream action="append" target="todos-list"><template>#{li_html}</template></turbo-stream>)
+        "<turbo-stream action=\"append\" target=\"todos-list\"><template>#{li_html}</template></turbo-stream>"
       when :replace_form
         form_html = render_form
-        %(<turbo-stream action="replace" target="todo-form"><template>#{form_html}</template></turbo-stream>)
+        "<turbo-stream action=\"replace\" target=\"todo-form\"><template>#{form_html}</template></turbo-stream>"
       when :replace
         li_html = render_todo_li(@t)
-        %(<turbo-stream action="replace" target="todo-#{@t["id"]}"><template>#{li_html}</template></turbo-stream>)
+        "<turbo-stream action=\"replace\" target=\"todo-#{@t["id"]}\"><template>#{li_html}</template></turbo-stream>"
       when :remove
-        %(<turbo-stream action="remove" target="todo-#{@id}"></turbo-stream>)
+        "<turbo-stream action=\"remove\" target=\"todo-#{@id}\"></turbo-stream>"
       else
         raise ArgumentError, "unknown turbo-stream action: #{action.inspect}"
       end
@@ -44,8 +44,7 @@ class App < Sinatra::Base
   end
 
   get "/" do
-    @todos =
-      db.execute("SELECT id, title, done, created_at FROM todos ORDER BY id")
+    @todos = db.execute("SELECT id, title, done, created_at FROM todos ORDER BY id")
     content_type "text/html; charset=utf-8"
     erb :index, layout: :layout
   end
@@ -54,15 +53,14 @@ class App < Sinatra::Base
     title = (params["title"] || "").to_s.strip
     return redirect "/" if title.empty?
 
-    meta =
-      db.execute_insert(
-        "INSERT INTO todos (title, done, created_at) VALUES (?, ?, ?)",
-        [title, 0, Time.now.to_i]
-      )
+    meta = db.execute_insert(
+      "INSERT INTO todos (title, done, created_at) VALUES (?, ?, ?)",
+      [title, 0, Time.now.to_i]
+    )
     new_id = meta["last_row_id"]
 
     if turbo_stream_request?
-      @t = { "id" => new_id, "title" => title, "done" => 0 }
+      @t = {"id" => new_id, "title" => title, "done" => 0}
       content_type "text/vnd.turbo-stream.html; charset=utf-8"
       render_turbo_streams(:append, :replace_form)
     else
@@ -79,11 +77,10 @@ class App < Sinatra::Base
     # the build-time auto-await pass currently leaves a bare `db.get_first_row`
     # un-awaited when it follows another `db.execute(...)` in the same block,
     # and the calling code then trips over a raw JS Promise.
-    rows =
-      db.execute(
-        "SELECT id, title, done, created_at FROM todos WHERE id = ?",
-        [id]
-      )
+    rows = db.execute(
+      "SELECT id, title, done, created_at FROM todos WHERE id = ?",
+      [id]
+    )
     row = rows && rows.first
 
     if turbo_stream_request?

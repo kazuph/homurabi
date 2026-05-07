@@ -56,26 +56,28 @@ module SmokeTest
     result = block.call
     if result
       @passed += 1
-      $stdout.puts "  PASS  #{label}"
+      $stdout.puts("  PASS  #{label}")
     else
       @failed += 1
       @errors << label
-      $stdout.puts "  FAIL  #{label}"
+      $stdout.puts("  FAIL  #{label}")
     end
+
   rescue Exception => e
     @failed += 1
     @errors << "#{label} (#{e.class}: #{e.message})"
-    $stdout.puts "  CRASH #{label} — #{e.class}: #{e.message}"
+    $stdout.puts("  CRASH #{label} — #{e.class}: #{e.message}")
   end
 
   def self.report
     total = @passed + @failed
-    $stdout.puts ""
-    $stdout.puts "#{total} tests, #{@passed} passed, #{@failed} failed"
+    $stdout.puts("")
+    $stdout.puts("#{total} tests, #{@passed} passed, #{@failed} failed")
     if @errors.any?
-      $stdout.puts "Failures:"
-      @errors.each { |e| $stdout.puts "  - #{e}" }
+      $stdout.puts("Failures:")
+      @errors.each { |e| $stdout.puts("  - #{e}") }
     end
+
     @failed == 0
   end
 end
@@ -155,13 +157,13 @@ class TestApp < Sinatra::Base
 
   get "/async/tuple-redirect" do
     await_tick
-    [302, { "location" => "/dest" }, []]
+    [302, {"location" => "/dest"}, []]
   end
 
   get "/async/json" do
     await_tick
     content_type "application/json"
-    { ok: true, kind: "async-json" }.to_json
+    {ok: true, kind: "async-json"}.to_json
   end
 
   get "/async/erb" do
@@ -188,7 +190,7 @@ class TestApp < Sinatra::Base
 
   get "/async/sequel-json" do
     content_type "application/json"
-    { todos: seq_db[:todos].order(:id).all.__await__ }.to_json
+    {todos: seq_db[:todos].order(:id).all.__await__}.to_json
   end
 
   get "/async/sequel-erb" do
@@ -207,7 +209,7 @@ class TestApp < Sinatra::Base
 
   get "/content_type_test" do
     content_type "application/json"
-    '{"ok":true}'
+    "{\"ok\":true}"
   end
 
   post "/echo" do
@@ -241,14 +243,14 @@ class TestApp < Sinatra::Base
     session[:counter] ||= 0
     session[:counter] += 1
     content_type "application/json"
-    { counter: session[:counter] }.to_json
+    {counter: session[:counter]}.to_json
   end
 end
 
 class AsyncDispatchApp < Sinatra::Base
   def dispatch!
-    content_type "text/plain"
-    body "async-dispatch-ok"
+    content_type("text/plain")
+    body("async-dispatch-ok")
     PromiseV2.value(nil)
   end
 end
@@ -256,7 +258,7 @@ end
 class PromiseRackApp
   def self.call(_env)
     PromiseV2.value(
-      [200, { "content-type" => "text/plain" }, ["promise-rack-ok"]]
+      [200, {"content-type" => "text/plain"}, ["promise-rack-ok"]]
     )
   end
 end
@@ -285,8 +287,7 @@ def env_for(method, path, body: "", headers: {})
 end
 
 def call_app(method, path, body: "", headers: {})
-  status, hdrs, body_parts =
-    TestApp.call(env_for(method, path, body: body, headers: headers))
+  status, hdrs, body_parts = TestApp.call(env_for(method, path, body: body, headers: headers))
   body_str = ""
   body_parts.each { |c| body_str = body_str + c.to_s }
   [status, hdrs, body_str]
@@ -296,16 +297,16 @@ def call_worker_app(method, path, body: "")
   Rack::Handler::Homura.run(TestApp)
   url = "https://example.test#{path}"
   js_req = `new Request(#{url}, { method: #{method}, body: #{body} })`
-  js_resp =
-    Rack::Handler::Homura.call(
+  js_resp = Rack::Handler::Homura
+    .call(
       js_req,
       `({})`,
       `({ waitUntil: function() {} })`,
       body
-    ).__await__
+    )
+    .__await__
   status = `#{js_resp}.status`
-  location =
-    `#{js_resp}.headers.get('location') || #{js_resp}.headers.get('Location')`
+  location = `#{js_resp}.headers.get('location') || #{js_resp}.headers.get('Location')`
   text = `#{js_resp}.text()`.__await__
   [status, location, text]
 end
@@ -314,16 +315,16 @@ def call_worker_app_with_env(method, path, js_env, body: "")
   Rack::Handler::Homura.run(TestApp)
   url = "https://example.test#{path}"
   js_req = `new Request(#{url}, { method: #{method}, body: #{body} })`
-  js_resp =
-    Rack::Handler::Homura.call(
+  js_resp = Rack::Handler::Homura
+    .call(
       js_req,
       js_env,
       `({ waitUntil: function() {} })`,
       body
-    ).__await__
+    )
+    .__await__
   status = `#{js_resp}.status`
-  location =
-    `#{js_resp}.headers.get('location') || #{js_resp}.headers.get('Location')`
+  location = `#{js_resp}.headers.get('location') || #{js_resp}.headers.get('Location')`
   text = `#{js_resp}.text()`.__await__
   [status, location, text]
 end
@@ -332,13 +333,14 @@ def call_worker_app_for(app, method, path, body: "")
   Rack::Handler::Homura.run(app)
   url = "https://example.test#{path}"
   js_req = `new Request(#{url}, { method: #{method}, body: #{body} })`
-  js_resp =
-    Rack::Handler::Homura.call(
+  js_resp = Rack::Handler::Homura
+    .call(
       js_req,
       `({})`,
       `({ waitUntil: function() {} })`,
       body
-    ).__await__
+    )
+    .__await__
   status = `#{js_resp}.status`
   text = `#{js_resp}.text()`.__await__
   [status, text]
@@ -348,94 +350,115 @@ end
 # Tests
 # =====================================================================
 
-$stdout.puts "=== homura smoke tests ==="
-$stdout.puts ""
+$stdout.puts("=== homura smoke tests ===")
+$stdout.puts("")
 
-$stdout.puts "--- Route matching ---"
+$stdout.puts("--- Route matching ---")
 SmokeTest.assert("GET / returns 200") { call_app("GET", "/")[0] == 200 }
 SmokeTest.assert("GET / body includes app_name") do
   call_app("GET", "/")[2].include?("SmokeTestApp")
 end
+
 SmokeTest.assert("GET /hello/kazu matches :name") do
   call_app("GET", "/hello/kazu")[2] == "hello:kazu"
 end
+
 SmokeTest.assert("GET /items/42 exposes params['id']") do
   call_app("GET", "/items/42")[2] == "item:42"
 end
+
 SmokeTest.assert("dispatch survives undefined values in request params") do
-  call_app("GET", "/", headers: { "X-HOMURA-UNDEFINED-PARAM" => "1" })[0] == 200
+  call_app("GET", "/", headers: {"X-HOMURA-UNDEFINED-PARAM" => "1"})[0] == 200
 end
+
 SmokeTest.assert("GET /nonexistent returns 404") do
   call_app("GET", "/nonexistent")[0] == 404
 end
 
-$stdout.puts ""
-$stdout.puts "--- Sinatra features ---"
+$stdout.puts("")
+$stdout.puts("--- Sinatra features ---")
 SmokeTest.assert("before filter sets @req_id") do
   call_app("GET", "/")[2].include?("true")
 end
+
 SmokeTest.assert("helpers work") { call_app("GET", "/helper")[2] == "hi world" }
 SmokeTest.assert("redirect returns 302") do
   call_app("GET", "/redirect")[0] == 302
 end
+
 SmokeTest.assert("redirect sets Location") do
   call_app("GET", "/redirect")[1]["location"].to_s.include?("/dest")
 end
+
 SmokeTest.assert("halt returns 403") { call_app("GET", "/halt")[0] == 403 }
 SmokeTest.assert("halt body is 'forbidden'") do
   call_app("GET", "/halt")[2] == "forbidden"
 end
+
 SmokeTest.assert("async params['id'] survives await boundary") do
   call_worker_app("GET", "/async/items/42").__await__[2] == "async-item:42"
 end
+
 SmokeTest.assert("async redirect returns 302") do
   call_worker_app("GET", "/async/redirect").__await__[0] == 302
 end
+
 SmokeTest.assert("async redirect sets Location") do
   call_worker_app("GET", "/async/redirect").__await__[1].to_s.include?("/dest")
 end
+
 SmokeTest.assert("async halt returns 418") do
   call_worker_app("GET", "/async/halt").__await__[0] == 418
 end
+
 SmokeTest.assert("async halt body is teapot") do
   call_worker_app("GET", "/async/halt").__await__[2] == "teapot"
 end
+
 SmokeTest.assert("async tuple redirect returns 302") do
   call_worker_app("GET", "/async/tuple-redirect").__await__[0] == 302
 end
+
 SmokeTest.assert("async tuple redirect sets Location") do
   call_worker_app("GET", "/async/tuple-redirect").__await__[1].to_s.include?(
     "/dest"
   )
 end
+
 SmokeTest.assert("async tuple redirect keeps empty body") do
   call_worker_app("GET", "/async/tuple-redirect").__await__[2] == ""
 end
+
 SmokeTest.assert("async json route returns JSON body after await") do
   status, _, text = call_worker_app("GET", "/async/json").__await__
-  status == 200 && text.include?('"kind":"async-json"')
+  status == 200 && text.include?("\"kind\":\"async-json\"")
 end
+
 SmokeTest.assert("async erb route renders template after await") do
   status, _, text = call_worker_app("GET", "/async/erb").__await__
   status == 200 && text.include?("greeting=hello-async-erb")
 end
+
 SmokeTest.assert("async layout route renders nested erb after await") do
   status, _, text = call_worker_app("GET", "/async/layout").__await__
-  status == 200 && text.include?("hello-async-layout") &&
+  status == 200 &&
+    text.include?("hello-async-layout") &&
     text.include?("<!DOCTYPE html>")
 end
+
 SmokeTest.assert("async route returning raw Promise resolves into body") do
   status, _, text = call_worker_app("GET", "/async/raw-promise").__await__
   status == 200 && text == "raw-promise-ok"
 end
+
 SmokeTest.assert(
   "async route returning native JS Promise resolves into body"
 ) do
   status, _, text = call_worker_app("GET", "/async/native-promise").__await__
   status == 200 && text == "native-promise-ok"
 end
-fake_d1_env =
-  `({
+
+fake_d1_env = `({
   DB: {
     prepare: function(sql) {
       return {
@@ -448,85 +471,89 @@ fake_d1_env =
   }
 })`
 SmokeTest.assert("Sequel JSON route returns DB rows through worker path") do
-  status, _, text =
-    call_worker_app_with_env("GET", "/async/sequel-json", fake_d1_env).__await__
-  status == 200 && text.include?('"todos"') && text.include?('"text":"a"')
+  status, _, text = call_worker_app_with_env("GET", "/async/sequel-json", fake_d1_env).__await__
+  status == 200 && text.include?("\"todos\"") && text.include?("\"text\":\"a\"")
 end
+
 SmokeTest.assert(
   "Sequel ERB route renders after DB await through worker path"
 ) do
-  status, _, text =
-    call_worker_app_with_env("GET", "/async/sequel-erb", fake_d1_env).__await__
+  status, _, text = call_worker_app_with_env("GET", "/async/sequel-erb", fake_d1_env).__await__
   status == 200 && text.include?("greeting=hello-sequel-erb")
 end
+
 SmokeTest.assert(
   "promise-returning dispatch! preserves body instead of emptying response"
 ) do
   status, text = call_worker_app_for(AsyncDispatchApp, "GET", "/").__await__
   status == 200 && text == "async-dispatch-ok"
 end
+
 SmokeTest.assert(
   "promise-returning rack app is awaited before response build"
 ) do
   status, text = call_worker_app_for(PromiseRackApp, "GET", "/").__await__
   status == 200 && text == "promise-rack-ok"
 end
+
 SmokeTest.assert("pass falls through") do
   call_app("GET", "/pass1")[2] == "second-route"
 end
+
 SmokeTest.assert("content_type sets header") do
   call_app("GET", "/content_type_test")[1]["content-type"].to_s.include?(
     "application/json"
   )
 end
 
-$stdout.puts ""
-$stdout.puts "--- Error handlers ---"
+$stdout.puts("")
+$stdout.puts("--- Error handlers ---")
 SmokeTest.assert("not_found custom body") do
   call_app("GET", "/nonexistent")[2] == "custom-404"
 end
+
 SmokeTest.assert("error handler catches RuntimeError") do
   call_app("GET", "/boom")[2].include?("custom-error:deliberate")
 end
 
-$stdout.puts ""
-$stdout.puts "--- POST body ---"
+$stdout.puts("")
+$stdout.puts("--- POST body ---")
 SmokeTest.assert("POST /echo echoes body") do
   call_app("POST", "/echo", body: "test-body")[2].include?("test-body")
 end
 
-$stdout.puts ""
-$stdout.puts "--- ERB precompiled ---"
+$stdout.puts("")
+$stdout.puts("--- ERB precompiled ---")
 SmokeTest.assert("erb :test_template renders") do
   s, _, b = call_app("GET", "/erb_test")
   s == 200 && b.include?("hello-erb")
 end
 
-$stdout.puts ""
-$stdout.puts "--- Session ---"
+$stdout.puts("")
+$stdout.puts("--- Session ---")
 SmokeTest.assert("session counter increments") do
   s1, h1, b1 = call_app("GET", "/session")
   cookie = (h1["set-cookie"] || h1["Set-Cookie"]).to_s.split(";").first
-  s2, _, b2 =
-    TestApp.call(env_for("GET", "/session").merge("HTTP_COOKIE" => cookie))
+  s2, _, b2 = TestApp.call(env_for("GET", "/session").merge("HTTP_COOKIE" => cookie))
   body2 = ""
   s2
   b2.each { |c| body2 = body2 + c.to_s }
-  b1.include?('"counter":1') && body2.include?('"counter":2')
+  b1.include?("\"counter\":1") && body2.include?("\"counter\":2")
 end
 
-$stdout.puts ""
-$stdout.puts "--- BinaryBody ---"
+$stdout.puts("")
+$stdout.puts("--- BinaryBody ---")
 SmokeTest.assert("BinaryBody responds to each/close") do
-  bb =
-    Cloudflare::BinaryBody.new(
-      "fake-stream",
-      "image/png",
-      "public, max-age=86400"
-    )
-  bb.respond_to?(:each) && bb.respond_to?(:close) &&
+  bb = Cloudflare::BinaryBody.new(
+    "fake-stream",
+    "image/png",
+    "public, max-age=86400"
+  )
+  bb.respond_to?(:each) &&
+    bb.respond_to?(:close) &&
     bb.content_type == "image/png"
 end
+
 SmokeTest.assert("BinaryBody.each yields nothing (no byte mangling)") do
   bb = Cloudflare::BinaryBody.new("s", "image/png")
   parts = []
@@ -534,11 +561,12 @@ SmokeTest.assert("BinaryBody.each yields nothing (no byte mangling)") do
   parts.empty?
 end
 
-$stdout.puts ""
-$stdout.puts "--- Error classes ---"
+$stdout.puts("")
+$stdout.puts("--- Error classes ---")
 SmokeTest.assert("Cloudflare::D1Error exists and is StandardError") do
   Cloudflare::D1Error.ancestors.include?(StandardError)
 end
+
 SmokeTest.assert("Cloudflare::BindingError carries binding_type") do
   e = Cloudflare::BindingError.new("test", binding_type: "D1", operation: "all")
   e.binding_type == "D1" && e.operation == "all" && e.message.include?("D1")
@@ -550,8 +578,7 @@ end
 # This test fakes a JS binding whose .all() returns a rejected Promise
 # and asserts that Ruby code can rescue Cloudflare::D1Error normally.
 SmokeTest.assert("D1 catch handler raises Cloudflare::D1Error (regression)") do
-  fake_db =
-    `({
+  fake_db = `({
     prepare: function(sql) {
       return { all: function() { return Promise.reject(new Error('no such table: users')); } };
     }
@@ -563,13 +590,14 @@ SmokeTest.assert("D1 catch handler raises Cloudflare::D1Error (regression)") do
   rescue Cloudflare::D1Error => e
     raised = e
   end
-  raised && raised.message.include?("no such table") &&
+
+  raised &&
+    raised.message.include?("no such table") &&
     raised.binding_type == "D1"
 end
 
 SmokeTest.assert("KV catch handler raises Cloudflare::KVError (regression)") do
-  fake_kv =
-    `({
+  fake_kv = `({
     get: function(k, opts) { return Promise.reject(new Error('kv unavailable')); }
   })`
   kv = Cloudflare::KVNamespace.new(fake_kv)
@@ -579,34 +607,39 @@ SmokeTest.assert("KV catch handler raises Cloudflare::KVError (regression)") do
   rescue Cloudflare::KVError => e
     raised = e
   end
-  raised && raised.message.include?("kv unavailable") &&
+
+  raised &&
+    raised.message.include?("kv unavailable") &&
     raised.binding_type == "KV"
 end
 
-$stdout.puts ""
-$stdout.puts "--- Helpers ---"
+$stdout.puts("")
+$stdout.puts("--- Helpers ---")
 SmokeTest.assert("db/kv/bucket helpers are defined on App") do
-  TestApp.instance_methods.include?(:greet) # our test helper
+  # our test helper
+  TestApp.instance_methods.include?(:greet)
 end
 
-$stdout.puts ""
-$stdout.puts "--- Opal patches ---"
+$stdout.puts("")
+$stdout.puts("--- Opal patches ---")
 SmokeTest.assert("Regexp anchor normalization (dstr)") do
   inner = %r{/}
   combo = /\A#{inner}\Z/
   combo.match("/") != nil
 end
+
 SmokeTest.assert("throw/catch not swallowed by rescue StandardError") do
-  r =
-    catch(:outer) do
-      begin
-        catch(:inner) { throw :outer, "ok" }
-      rescue StandardError
-        "swallowed"
-      end
+  r = catch(:outer) do
+    begin
+      catch(:inner) { throw(:outer, "ok") }
+    rescue StandardError
+      "swallowed"
     end
+  end
+
   r == "ok"
 end
+
 SmokeTest.assert("next <expr> in while updates variable") do
   x = 0
   i = 0
@@ -615,6 +648,7 @@ SmokeTest.assert("next <expr> in while updates variable") do
     next x = x + 1 if i < 100
     break
   end
+
   x == 3
 end
 

@@ -64,6 +64,7 @@ while i < lines.size && !route_starts?(lines[i])
   hdr << lines[i]
   i += 1
 end
+
 inner = lines[i..]
 
 route_chunks = []
@@ -74,6 +75,7 @@ while j < inner.size
     j += 1
     next
   end
+
   start = j
   j += 1
   while j < inner.size
@@ -81,18 +83,20 @@ while j < inner.size
     break if structural_stop?(inner[j])
     j += 1
   end
+
   route_chunks << trim_route_chunk(inner[start...j])
 end
 
 FileUtils.mkdir_p(FRAG)
 
-meta = [] # [{ idx:, cat:, path: }]
+# [{ idx:, cat:, path: }]
+meta = []
 
 route_chunks.each_with_index do |chunk, idx|
   first = chunk.find { |l| l =~ ROUTE_HEAD }
   path = first && (first =~ ROUTE_HEAD && Regexp.last_match(3))
   cat = classify_path(path)
-  meta << { idx: idx + 1, cat: cat, path: path }
+  meta << {idx: idx + 1, cat: cat, path: path}
   fname = format("route_%03d.rb", idx + 1)
   body = +"# frozen_string_literal: true\n"
   body << "# Route fragment #{idx + 1} — #{cat} #{path}\n"
@@ -106,6 +110,7 @@ bootstrap << "# Route bodies use Sinatra DSL; they are NOT `require`d — see `i
 (1..meta.size).each do |n|
   bootstrap << "# fragments/route_#{format("%03d", n)}\n"
 end
+
 File.write(File.join(ROOT, "app/routes/bootstrap.rb"), bootstrap)
 
 %i[demo posts login api test].each do |sym|
@@ -118,4 +123,4 @@ File.write(File.join(ROOT, "app/routes/bootstrap.rb"), bootstrap)
   File.write(File.join(ROOT, "app/routes", "#{sym}.rb"), buf)
 end
 
-puts "Wrote #{meta.size} fragments + bootstrap + domain loaders"
+puts("Wrote #{meta.size} fragments + bootstrap + domain loaders")

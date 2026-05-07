@@ -144,6 +144,9 @@ Sinatra entry points automatically.
 
 ## Important gotchas
 
+- Repo-maintenance / formatter answers should treat `fables-tales/rubyfmt` as
+  the canonical Ruby formatter for this repository; do not steer contributors
+  back to `stree` / `syntax_tree`.
 - Use `homura` and generated `rake` tasks; do not emit `cloudflare-workers-*` command names.
 - Current releases support ordinary Sinatra `redirect`, `halt`, route params, ERB layout `yield`, and Sequel CRUD on D1.
 - Workers bindings are exposed through Ruby helpers such as `db`, `d1`, `kv`, `bucket`, `ai`, `send_email`, `jobs_queue`, `durable_object(:counter, 'global')`, and `Cloudflare::Cache.default`.

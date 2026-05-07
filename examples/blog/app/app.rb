@@ -48,10 +48,9 @@ class App < Sinatra::Base
 
   get "/" do
     ensure_seed!
-    @posts =
-      db.execute(
-        "SELECT id, title, body, created_at FROM posts ORDER BY id DESC"
-      )
+    @posts = db.execute(
+      "SELECT id, title, body, created_at FROM posts ORDER BY id DESC"
+    )
     erb :posts_index
   end
 
@@ -61,11 +60,10 @@ class App < Sinatra::Base
 
   get "/posts/:id" do
     id = params[:id].to_i
-    rows =
-      db.execute(
-        "SELECT id, title, body, created_at FROM posts WHERE id = ? LIMIT 1",
-        [id]
-      )
+    rows = db.execute(
+      "SELECT id, title, body, created_at FROM posts WHERE id = ? LIMIT 1",
+      [id]
+    )
     @post = rows && rows.first
     if @post
       erb :posts_show
@@ -79,11 +77,10 @@ class App < Sinatra::Base
     title = params[:title].to_s.strip
     body = params[:body].to_s
     title = "(no title)" if title.empty?
-    meta =
-      db.execute_insert(
-        "INSERT INTO posts (title, body, created_at) VALUES (?, ?, ?)",
-        [title, body, Time.now.to_i]
-      )
+    meta = db.execute_insert(
+      "INSERT INTO posts (title, body, created_at) VALUES (?, ?, ?)",
+      [title, body, Time.now.to_i]
+    )
     redirect "/posts/#{meta["last_row_id"]}"
   end
 

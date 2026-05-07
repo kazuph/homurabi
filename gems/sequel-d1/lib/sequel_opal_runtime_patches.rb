@@ -68,13 +68,15 @@ class Sequel::Dataset
   end
 
   def homura_sql_value(value)
-    if value.is_a?(::String) && !value.is_a?(::Sequel::LiteralString) &&
-         !value.is_a?(::Sequel::SQL::Blob)
+    if value.is_a?(::String) &&
+        !value.is_a?(::Sequel::LiteralString) &&
+        !value.is_a?(::Sequel::SQL::Blob)
       ::HomuraSqlStringLiteral.new(value)
     else
       value
     end
   end
+
   private :homura_sql_value
 
   # upstream literal_append Symbol branch:
@@ -116,6 +118,7 @@ class Sequel::Dataset
           literal_symbol_append(l, v)
           db.literal_symbol_set(v, l.to_s)
         end
+
         sql << l
       end
     else
@@ -125,8 +128,7 @@ class Sequel::Dataset
 
   alias_method :__homura_orig_update_sql_values_hash, :update_sql_values_hash
   def update_sql_values_hash(sql, values)
-    values =
-      values.each_with_object({}) { |(k, v), acc| acc[k] = homura_sql_value(v) }
+    values = values.each_with_object({}) { |(k, v), acc| acc[k] = homura_sql_value(v) }
     __homura_orig_update_sql_values_hash(sql, values)
   end
 
@@ -142,10 +144,12 @@ class Sequel::SQL::BooleanExpression
     alias_method :__homura_orig_from_value_pair, :from_value_pair
 
     def from_value_pair(l, r)
-      if r.is_a?(::String) && !r.is_a?(::Sequel::LiteralString) &&
-           !r.is_a?(::Sequel::SQL::Blob)
+      if r.is_a?(::String) &&
+          !r.is_a?(::Sequel::LiteralString) &&
+          !r.is_a?(::Sequel::SQL::Blob)
         r = ::HomuraSqlStringLiteral.new(r)
       end
+
       __homura_orig_from_value_pair(l, r)
     end
   end

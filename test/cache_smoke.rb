@@ -28,26 +28,28 @@ module SmokeTest
     result = block.call
     if result
       @passed += 1
-      $stdout.puts "  PASS  #{label}"
+      $stdout.puts("  PASS  #{label}")
     else
       @failed += 1
       @errors << label
-      $stdout.puts "  FAIL  #{label}"
+      $stdout.puts("  FAIL  #{label}")
     end
+
   rescue Exception => e
     @failed += 1
     @errors << "#{label} (#{e.class}: #{e.message})"
-    $stdout.puts "  CRASH #{label} — #{e.class}: #{e.message}"
+    $stdout.puts("  CRASH #{label} — #{e.class}: #{e.message}")
   end
 
   def self.report
     total = @passed + @failed
-    $stdout.puts ""
-    $stdout.puts "#{total} tests, #{@passed} passed, #{@failed} failed"
+    $stdout.puts("")
+    $stdout.puts("#{total} tests, #{@passed} passed, #{@failed} failed")
     if @errors.any?
-      $stdout.puts "Failures:"
-      @errors.each { |e| $stdout.puts "  - #{e}" }
+      $stdout.puts("Failures:")
+      @errors.each { |e| $stdout.puts("  - #{e}") }
     end
+
     @failed == 0
   end
 end
@@ -94,13 +96,13 @@ end
   globalThis.__HOMURA_CACHE_FAKE_STORE__ = store;
 })()`
 
-$stdout.puts "=== homura Phase 11B — Cache API smoke ==="
-$stdout.puts ""
+$stdout.puts("=== homura Phase 11B — Cache API smoke ===")
+$stdout.puts("")
 
 # ---------------------------------------------------------------------
 # 1. Cache.default / available?
 # ---------------------------------------------------------------------
-$stdout.puts "--- Cache.default ---"
+$stdout.puts("--- Cache.default ---")
 
 SmokeTest.assert(
   "Cache.default returns a Cloudflare::Cache wrapping caches.default"
@@ -110,7 +112,7 @@ SmokeTest.assert(
 end
 
 SmokeTest.assert(
-  'Cache.open("named") resolves to a wrapped Cloudflare::Cache'
+  "Cache.open(\"named\") resolves to a wrapped Cloudflare::Cache"
 ) do
   # Cache.open is async (it awaits caches.open internally); callers in
   # `# await: true` files must `__await__` the return value before
@@ -127,8 +129,8 @@ end
 # ---------------------------------------------------------------------
 # 2. match / put round-trip
 # ---------------------------------------------------------------------
-$stdout.puts ""
-$stdout.puts "--- put + match ---"
+$stdout.puts("")
+$stdout.puts("--- put + match ---")
 
 SmokeTest.assert("match returns nil for a never-stored URL") do
   c = Cloudflare::Cache.default
@@ -138,36 +140,44 @@ end
 SmokeTest.assert("put + match round-trips body, status, and content-type") do
   c = Cloudflare::Cache.default
   url = "https://example.com/round-trip"
-  c.put(
-    url,
-    '{"hi":1}',
-    status: 200,
-    headers: {
-      "content-type" => "application/json",
-      "cache-control" => "public, max-age=30"
-    }
-  ).__await__
+  c
+    .put(
+      url,
+      "{\"hi\":1}",
+      status: 200,
+      headers: {
+        "content-type" => "application/json",
+        "cache-control" => "public, max-age=30"
+      }
+    )
+    .__await__
   got = c.match(url).__await__
-  got.is_a?(Cloudflare::HTTPResponse) && got.status == 200 &&
-    got.body == '{"hi":1}' && got["content-type"] == "application/json"
+  got.is_a?(Cloudflare::HTTPResponse) &&
+    got.status == 200 &&
+    got.body == "{\"hi\":1}" &&
+    got["content-type"] == "application/json"
 end
 
 SmokeTest.assert("different URLs produce independent cache entries") do
   c = Cloudflare::Cache.default
-  c.put(
-    "https://example.com/a",
-    "AAA",
-    headers: {
-      "content-type" => "text/plain"
-    }
-  ).__await__
-  c.put(
-    "https://example.com/b",
-    "BBB",
-    headers: {
-      "content-type" => "text/plain"
-    }
-  ).__await__
+  c
+    .put(
+      "https://example.com/a",
+      "AAA",
+      headers: {
+        "content-type" => "text/plain"
+      }
+    )
+    .__await__
+  c
+    .put(
+      "https://example.com/b",
+      "BBB",
+      headers: {
+        "content-type" => "text/plain"
+      }
+    )
+    .__await__
   c.match("https://example.com/a").__await__.body == "AAA" &&
     c.match("https://example.com/b").__await__.body == "BBB"
 end
@@ -177,7 +187,7 @@ SmokeTest.assert(
 ) do
   c = Cloudflare::Cache.default
   url = "https://example.com/idempotent"
-  c.put(url, "once", headers: { "content-type" => "text/plain" }).__await__
+  c.put(url, "once", headers: {"content-type" => "text/plain"}).__await__
   a = c.match(url).__await__.body
   b = c.match(url).__await__.body
   a == "once" && b == "once"
@@ -186,13 +196,13 @@ end
 # ---------------------------------------------------------------------
 # 3. delete
 # ---------------------------------------------------------------------
-$stdout.puts ""
-$stdout.puts "--- delete ---"
+$stdout.puts("")
+$stdout.puts("--- delete ---")
 
 SmokeTest.assert("delete removes a stored entry and returns true") do
   c = Cloudflare::Cache.default
   url = "https://example.com/to-delete"
-  c.put(url, "x", headers: { "content-type" => "text/plain" }).__await__
+  c.put(url, "x", headers: {"content-type" => "text/plain"}).__await__
   deleted = c.delete(url).__await__
   absent = c.match(url).__await__
   deleted == true && absent.nil?
@@ -206,23 +216,26 @@ end
 # ---------------------------------------------------------------------
 # 4. no-caches safety — put on a nil-js Cache is a noop
 # ---------------------------------------------------------------------
-$stdout.puts ""
-$stdout.puts "--- no-caches safety ---"
+$stdout.puts("")
+$stdout.puts("--- no-caches safety ---")
 
 SmokeTest.assert("put on a Cache with nil js does not raise and returns nil") do
   c = Cloudflare::Cache.new(nil, "nil-test")
   raised = false
   begin
-    c.put(
-      "https://example.com/nil",
-      "x",
-      headers: {
-        "content-type" => "text/plain"
-      }
-    ).__await__
+    c
+      .put(
+        "https://example.com/nil",
+        "x",
+        headers: {
+          "content-type" => "text/plain"
+        }
+      )
+      .__await__
   rescue ::Exception
     raised = true
   end
+
   !raised
 end
 
@@ -235,6 +248,7 @@ SmokeTest.assert("match on a Cache with nil js returns nil without raising") do
   rescue ::Exception
     raised = true
   end
+
   !raised && v.nil?
 end
 
@@ -246,14 +260,13 @@ end
 # ---------------------------------------------------------------------
 # 5. Error propagation
 # ---------------------------------------------------------------------
-$stdout.puts ""
-$stdout.puts "--- error propagation ---"
+$stdout.puts("")
+$stdout.puts("--- error propagation ---")
 
 SmokeTest.assert(
   "put error from the underlying cache is raised as CacheError"
 ) do
-  bad_cache =
-    `({
+  bad_cache = `({
     put: function() { return Promise.reject(new Error('cache-kaboom')); },
     match: function() { return Promise.resolve(undefined); },
     delete: function() { return Promise.resolve(false); }
@@ -261,24 +274,26 @@ SmokeTest.assert(
   c = Cloudflare::Cache.new(bad_cache, "bad")
   raised = false
   begin
-    c.put(
-      "https://example.com/bad",
-      "x",
-      headers: {
-        "content-type" => "text/plain"
-      }
-    ).__await__
+    c
+      .put(
+        "https://example.com/bad",
+        "x",
+        headers: {
+          "content-type" => "text/plain"
+        }
+      )
+      .__await__
   rescue Cloudflare::CacheError => e
     raised = e.message.include?("cache-kaboom")
   end
+
   raised
 end
 
 SmokeTest.assert(
   "match error from the underlying cache is raised as CacheError"
 ) do
-  bad_cache =
-    `({
+  bad_cache = `({
     match: function() { return Promise.reject(new Error('match-kaboom')); },
     put: function() { return Promise.resolve(); },
     delete: function() { return Promise.resolve(false); }
@@ -290,6 +305,7 @@ SmokeTest.assert(
   rescue Cloudflare::CacheError => e
     raised = e.message.include?("match-kaboom")
   end
+
   raised
 end
 
@@ -297,30 +313,31 @@ end
 # 6. request_to_js input accepts the documented shapes
 #    (Copilot review PR #9, second pass)
 # ---------------------------------------------------------------------
-$stdout.puts ""
-$stdout.puts "--- request key normalisation ---"
+$stdout.puts("")
+$stdout.puts("--- request key normalisation ---")
 
 SmokeTest.assert("put accepts a Cloudflare::HTTPResponse as the cache key") do
   c = Cloudflare::Cache.default
   url = "https://example.com/from-httpresponse"
-  src =
-    Cloudflare::HTTPResponse.new(
-      status: 200,
-      headers: {
-        "x-src" => "upstream"
-      },
-      body: "forget-me",
-      url: url
-    )
+  src = Cloudflare::HTTPResponse.new(
+    status: 200,
+    headers: {
+      "x-src" => "upstream"
+    },
+    body: "forget-me",
+    url: url
+  )
   # Use the HTTPResponse as the key — the wrapper should extract its
   # `.url` and build the corresponding Request under the hood.
-  c.put(
-    src,
-    "stored-through-httpresponse",
-    headers: {
-      "content-type" => "text/plain"
-    }
-  ).__await__
+  c
+    .put(
+      src,
+      "stored-through-httpresponse",
+      headers: {
+        "content-type" => "text/plain"
+      }
+    )
+    .__await__
   got = c.match(url).__await__
   got && got.body == "stored-through-httpresponse"
 end
@@ -368,20 +385,24 @@ SmokeTest.assert(
   begin
     a = Cloudflare::Cache.open("partition-a").__await__
     b = Cloudflare::Cache.open("partition-b").__await__
-    a.put(
-      "https://same-key.example/logical",
-      "from-A",
-      headers: {
-        "content-type" => "text/plain"
-      }
-    ).__await__
-    b.put(
-      "https://same-key.example/logical",
-      "from-B",
-      headers: {
-        "content-type" => "text/plain"
-      }
-    ).__await__
+    a
+      .put(
+        "https://same-key.example/logical",
+        "from-A",
+        headers: {
+          "content-type" => "text/plain"
+        }
+      )
+      .__await__
+    b
+      .put(
+        "https://same-key.example/logical",
+        "from-B",
+        headers: {
+          "content-type" => "text/plain"
+        }
+      )
+      .__await__
     got_a = a.match("https://same-key.example/logical").__await__
     got_b = b.match("https://same-key.example/logical").__await__
     got_a.body == "from-A" && got_b.body == "from-B"
@@ -436,14 +457,17 @@ SmokeTest.assert(
   begin
     c = Cloudflare::Cache.default
     url = "https://ttl-example.com/r"
-    c.put(
-      url,
-      "fresh-body",
-      headers: {
-        "content-type" => "text/plain",
-        "cache-control" => "public, max-age=5" # 5 seconds
-      }
-    ).__await__
+    c
+      .put(
+        url,
+        "fresh-body",
+        headers: {
+          "content-type" => "text/plain",
+          # 5 seconds
+          "cache-control" => "public, max-age=5"
+        }
+      )
+      .__await__
     # Before expiry — returns body.
     got_before = c.match(url).__await__
     # Advance fake clock 6 seconds past max-age.
@@ -461,10 +485,11 @@ SmokeTest.assert("put rejects an unsupported input type with ArgumentError") do
   c = Cloudflare::Cache.default
   raised = false
   begin
-    c.put(12_345, "x", headers: { "content-type" => "text/plain" }).__await__
+    c.put(12_345, "x", headers: {"content-type" => "text/plain"}).__await__
   rescue ArgumentError => e
     raised = e.message.include?("String URL")
   end
+
   raised
 end
 

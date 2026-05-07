@@ -32,26 +32,28 @@ module SmokeTest
     result = block.call
     if result
       @passed += 1
-      $stdout.puts "  PASS  #{label}"
+      $stdout.puts("  PASS  #{label}")
     else
       @failed += 1
       @errors << label
-      $stdout.puts "  FAIL  #{label}"
+      $stdout.puts("  FAIL  #{label}")
     end
+
   rescue Exception => e
     @failed += 1
     @errors << "#{label} (#{e.class}: #{e.message})"
-    $stdout.puts "  CRASH #{label} — #{e.class}: #{e.message}"
+    $stdout.puts("  CRASH #{label} — #{e.class}: #{e.message}")
   end
 
   def self.report
     total = @passed + @failed
-    $stdout.puts ""
-    $stdout.puts "#{total} tests, #{@passed} passed, #{@failed} failed"
+    $stdout.puts("")
+    $stdout.puts("#{total} tests, #{@passed} passed, #{@failed} failed")
     if @errors.any?
-      $stdout.puts "Failures:"
-      @errors.each { |e| $stdout.puts "  - #{e}" }
+      $stdout.puts("Failures:")
+      @errors.each { |e| $stdout.puts("  - #{e}") }
     end
+
     @failed == 0
   end
 end
@@ -77,18 +79,18 @@ def fake_batch(queue_name, bodies)
   `globalThis.__homura_queue_fake_batch(#{qname}, #{js_bodies})`
 end
 
-$stdout.puts "=== homura Phase 11B — Queue smoke ==="
-$stdout.puts ""
+$stdout.puts("=== homura Phase 11B — Queue smoke ===")
+$stdout.puts("")
 
 # ---------------------------------------------------------------------
 # 1. Queue#send
 # ---------------------------------------------------------------------
-$stdout.puts "--- Queue#send ---"
+$stdout.puts("--- Queue#send ---")
 
 SmokeTest.assert("send forwards a Hash body as a JS object") do
   js_p = fake_queue_producer
   q = Cloudflare::Queue.new(js_p, "jobs")
-  q.send({ "name" => "alice", "n" => 3 }).__await__
+  q.send({"name" => "alice", "n" => 3}).__await__
   entry = `#{js_p}._sends[0]`
   name = `#{entry}.body.name`
   n = `#{entry}.body.n`
@@ -105,7 +107,7 @@ end
 SmokeTest.assert("send with delay_seconds forwards opts.delaySeconds") do
   js_p = fake_queue_producer
   q = Cloudflare::Queue.new(js_p, "jobs")
-  q.send({ "n" => 1 }, delay_seconds: 30).__await__
+  q.send({"n" => 1}, delay_seconds: 30).__await__
   `#{js_p}._sends[0].opts.delaySeconds` == 30
 end
 
@@ -124,27 +126,28 @@ SmokeTest.assert("send on a nil binding raises QueueError") do
   rescue Cloudflare::QueueError => e
     raised = e.message.include?("not bound")
   end
+
   raised
 end
 
 SmokeTest.assert("send propagates JS rejection as QueueError") do
-  bad =
-    `({ send: function() { return Promise.reject(new Error('producer-kaboom')); } })`
+  bad = `({ send: function() { return Promise.reject(new Error('producer-kaboom')); } })`
   q = Cloudflare::Queue.new(bad, "jobs")
   raised = false
   begin
-    q.send({ "x" => 1 }).__await__
+    q.send({"x" => 1}).__await__
   rescue Cloudflare::QueueError => e
     raised = e.message.include?("producer-kaboom")
   end
+
   raised
 end
 
 # ---------------------------------------------------------------------
 # 2. Queue#send_batch
 # ---------------------------------------------------------------------
-$stdout.puts ""
-$stdout.puts "--- Queue#send_batch ---"
+$stdout.puts("")
+$stdout.puts("--- Queue#send_batch ---")
 
 SmokeTest.assert("send_batch accepts a list of plain bodies") do
   js_p = fake_queue_producer
@@ -157,7 +160,7 @@ end
 SmokeTest.assert("send_batch preserves order + count across 100 messages") do
   js_p = fake_queue_producer
   q = Cloudflare::Queue.new(js_p, "jobs")
-  msgs = (1..100).map { |i| { "seq" => i, "tag" => "t-#{i}" } }
+  msgs = (1..100).map { |i| {"seq" => i, "tag" => "t-#{i}"} }
   q.send_batch(msgs).__await__
   arr = `#{js_p}._batches[0].msgs`
   ok = `#{arr}.length` == 100
@@ -168,6 +171,7 @@ SmokeTest.assert("send_batch preserves order + count across 100 messages") do
     ok &&= `#{arr}[42].body.seq` == 43 && `#{arr}[42].body.tag` == "t-43"
     ok &&= `#{arr}[99].body.seq` == 100 && `#{arr}[99].body.tag` == "t-100"
   end
+
   ok
 end
 
@@ -183,28 +187,31 @@ end
 SmokeTest.assert("send_batch accepts Hash messages with body + options") do
   js_p = fake_queue_producer
   q = Cloudflare::Queue.new(js_p, "jobs")
-  q.send_batch(
-    [
-      { "body" => { "x" => 1 }, "content_type" => "json" },
-      { "body" => "plain", "delay_seconds" => 10 }
-    ]
-  ).__await__
+  q
+    .send_batch(
+      [
+        {"body" => {"x" => 1}, "content_type" => "json"},
+        {"body" => "plain", "delay_seconds" => 10}
+      ]
+    )
+    .__await__
   msgs = `#{js_p}._batches[0].msgs`
-  `#{msgs}[0].body.x` == 1 && `#{msgs}[0].contentType` == "json" &&
-    `#{msgs}[1].body` == "plain" && `#{msgs}[1].delaySeconds` == 10
+  `#{msgs}[0].body.x` == 1 &&
+    `#{msgs}[0].contentType` == "json" &&
+    `#{msgs}[1].body` == "plain" &&
+    `#{msgs}[1].delaySeconds` == 10
 end
 
 # ---------------------------------------------------------------------
 # 3. QueueMessage
 # ---------------------------------------------------------------------
-$stdout.puts ""
-$stdout.puts "--- QueueMessage ---"
+$stdout.puts("")
+$stdout.puts("--- QueueMessage ---")
 
 SmokeTest.assert(
   "QueueMessage#body returns a Ruby Hash when the JS message body is an object"
 ) do
-  js_msg =
-    `({ id: 'm1', timestamp: new Date(1700000000000), body: { title: 'first', n: 7 }, ack: function(){}, retry: function(){} })`
+  js_msg = `({ id: 'm1', timestamp: new Date(1700000000000), body: { title: 'first', n: 7 }, ack: function(){}, retry: function(){} })`
   msg = Cloudflare::QueueMessage.new(js_msg)
   msg.body.is_a?(Hash) && msg.body["title"] == "first" && msg.body["n"] == 7
 end
@@ -212,10 +219,10 @@ end
 SmokeTest.assert(
   "QueueMessage#id and #timestamp surface the JS fields as Ruby types"
 ) do
-  js_msg =
-    `({ id: 'mid-42', timestamp: new Date(1700000000000), body: 'x', ack: function(){}, retry: function(){} })`
+  js_msg = `({ id: 'mid-42', timestamp: new Date(1700000000000), body: 'x', ack: function(){}, retry: function(){} })`
   msg = Cloudflare::QueueMessage.new(js_msg)
-  msg.id == "mid-42" && msg.timestamp.is_a?(Time) &&
+  msg.id == "mid-42" &&
+    msg.timestamp.is_a?(Time) &&
     msg.timestamp.to_i == 1_700_000_000
 end
 
@@ -239,8 +246,8 @@ end
 # ---------------------------------------------------------------------
 # 4. QueueBatch
 # ---------------------------------------------------------------------
-$stdout.puts ""
-$stdout.puts "--- QueueBatch ---"
+$stdout.puts("")
+$stdout.puts("--- QueueBatch ---")
 
 SmokeTest.assert("QueueBatch#queue and #size reflect the JS batch") do
   batch = fake_batch("the-queue", [`({ a: 1 })`, `({ b: 2 })`, `({ c: 3 })`])
@@ -266,17 +273,17 @@ end
 # ---------------------------------------------------------------------
 # 5. consume_queue DSL + dispatcher
 # ---------------------------------------------------------------------
-$stdout.puts ""
-$stdout.puts "--- consume_queue DSL + dispatcher ---"
+$stdout.puts("")
+$stdout.puts("--- consume_queue DSL + dispatcher ---")
 
 SmokeTest.assert(
   "consume_queue registers a handler retrievable via QueueConsumer.handler_for"
 ) do
-  app =
-    Class.new(Sinatra::Base) do
-      register Sinatra::Queue
-      consume_queue("unit-test-queue") { |batch| batch.size }
-    end
+  app = Class.new(Sinatra::Base) do
+    register(Sinatra::Queue)
+    consume_queue("unit-test-queue") { |batch| batch.size }
+  end
+
   _ = app
   !Cloudflare::QueueConsumer.handler_for("unit-test-queue").nil?
 end
@@ -284,9 +291,9 @@ end
 SmokeTest.assert(
   "dispatcher invokes the registered consume_queue handler with the QueueBatch"
 ) do
-  counter = { "count" => 0, "queue" => nil, "ids" => [] }
+  counter = {"count" => 0, "queue" => nil, "ids" => []}
   Class.new(Sinatra::Base) do
-    register Sinatra::Queue
+    register(Sinatra::Queue)
     consume_queue("smoke-queue") do |batch|
       counter["queue"] = batch.queue
       batch.messages.each do |m|
@@ -296,11 +303,13 @@ SmokeTest.assert(
       end
     end
   end
+
   batch = fake_batch("smoke-queue", [`({ n: 1 })`, `({ n: 2 })`])
-  summary =
-    Cloudflare::QueueConsumer.dispatch_js(batch, `({})`, `({})`).__await__
-  counter["count"] == 2 && counter["queue"] == "smoke-queue" &&
-    counter["ids"] == %w[mid-0 mid-1] && summary["queue"] == "smoke-queue" &&
+  summary = Cloudflare::QueueConsumer.dispatch_js(batch, `({})`, `({})`).__await__
+  counter["count"] == 2 &&
+    counter["queue"] == "smoke-queue" &&
+    counter["ids"] == %w[mid-0 mid-1] &&
+    summary["queue"] == "smoke-queue" &&
     summary["handled"] == true
 end
 
@@ -308,27 +317,27 @@ SmokeTest.assert(
   "dispatcher for an unregistered queue name returns handled=false"
 ) do
   batch = fake_batch("never-registered", [`({ n: 1 })`])
-  summary =
-    Cloudflare::QueueConsumer.dispatch_js(batch, `({})`, `({})`).__await__
+  summary = Cloudflare::QueueConsumer.dispatch_js(batch, `({})`, `({})`).__await__
   summary["handled"] == false && summary["reason"] == "no_handler"
 end
 
 # ---------------------------------------------------------------------
 # 6. JS dispatcher hook
 # ---------------------------------------------------------------------
-$stdout.puts ""
-$stdout.puts "--- JS dispatcher hook ---"
+$stdout.puts("")
+$stdout.puts("--- JS dispatcher hook ---")
 
 SmokeTest.assert("globalThis.__HOMURA_QUEUE_DISPATCH__ is installed") do
   `typeof globalThis.__HOMURA_QUEUE_DISPATCH__ === 'function'`
 end
 
 SmokeTest.assert("JS hook forwards through to the Ruby handler") do
-  bucket = { "fired" => 0 }
+  bucket = {"fired" => 0}
   Class.new(Sinatra::Base) do
-    register Sinatra::Queue
+    register(Sinatra::Queue)
     consume_queue("via-js-hook") { |batch| bucket["fired"] += batch.size }
   end
+
   batch = fake_batch("via-js-hook", [`({})`, `({})`, `({})`])
   promise = `globalThis.__HOMURA_QUEUE_DISPATCH__(#{batch}, ({}), ({}))`
   summary = promise.__await__

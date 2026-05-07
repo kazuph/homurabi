@@ -43,26 +43,28 @@ module SmokeTest
     result = block.call
     if result
       @passed += 1
-      $stdout.puts "  PASS  #{label}"
+      $stdout.puts("  PASS  #{label}")
     else
       @failed += 1
       @errors << label
-      $stdout.puts "  FAIL  #{label}"
+      $stdout.puts("  FAIL  #{label}")
     end
+
   rescue Exception => e
     @failed += 1
     @errors << "#{label} (#{e.class}: #{e.message})"
-    $stdout.puts "  CRASH #{label} — #{e.class}: #{e.message}"
+    $stdout.puts("  CRASH #{label} — #{e.class}: #{e.message}")
   end
 
   def self.report
     total = @passed + @failed
-    $stdout.puts ""
-    $stdout.puts "#{total} tests, #{@passed} passed, #{@failed} failed"
+    $stdout.puts("")
+    $stdout.puts("#{total} tests, #{@passed} passed, #{@failed} failed")
     if @errors.any?
-      $stdout.puts "Failures:"
-      @errors.each { |e| $stdout.puts "  - #{e}" }
+      $stdout.puts("Failures:")
+      @errors.each { |e| $stdout.puts("  - #{e}") }
     end
+
     @failed == 0
   end
 end
@@ -76,65 +78,62 @@ end
 
 SHA1_HELLO = "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
 SHA1_EMPTY = "da39a3ee5e6b4b0d3255bfef95601890afd80709"
-SHA256_HELLO =
-  "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
-SHA256_EMPTY =
-  "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-SHA256_HOMURA =
-  "cedb08873dca79fda7f7a7d0d1c50a85450b3ca50d5361629d5687477eb73db4"
-SHA384_HELLO =
-  "59e1748777448c69de6b800d7a33bbfb9ff1b463e44354c3553bcdb9c666fa90125a3c79f90397bdf5f6a13de828684f"
-SHA512_HELLO =
-  "9b71d224bd62f3785d96d46ad3ea3d73319bfbc2890caadae2dff72519673ca72323c3d99ba5c11d7c7acc6e14b8c5da0c4663475c2e5c3adef46f73bcdec043"
+SHA256_HELLO = "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+SHA256_EMPTY = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+SHA256_HOMURA = "cedb08873dca79fda7f7a7d0d1c50a85450b3ca50d5361629d5687477eb73db4"
+SHA384_HELLO = "59e1748777448c69de6b800d7a33bbfb9ff1b463e44354c3553bcdb9c666fa90125a3c79f90397bdf5f6a13de828684f"
+SHA512_HELLO = "9b71d224bd62f3785d96d46ad3ea3d73319bfbc2890caadae2dff72519673ca72323c3d99ba5c11d7c7acc6e14b8c5da0c4663475c2e5c3adef46f73bcdec043"
 MD5_HELLO = "5d41402abc4b2a76b9719d911017c592"
 
 HMAC_SHA1_K_M = "102900b72b7bf1031eec76b4804b66052376896b"
-HMAC_SHA256_K_M =
-  "2d93cbc1be167bcb1637a4a23cbff01a7878f0c50ee833954ea5221bb1b8c628"
-HMAC_SHA384_K_M =
-  "3bba95ff38376a129225ec5430dd3aff6ac7b7acdb829a4af35f33f8c6ddbbf9d85fb31f8b20316db93aedd08a816cfa"
-HMAC_SHA512_K_M =
-  "1e4b55b925ccc28ed90d9d18fc2393fcbe164c0d84e67e173cc5aa486b7afc106633c66bdc309076f5f8d9fdbbb62456f894f2c23377fbcc12f4ab2940eb6d70"
-HMAC_SHA256_SECRET_HELLO =
-  "88aab3ede8d3adf94d26ab90d3bafd4a2083070c3bcce9c014ee04a443847c0b"
+HMAC_SHA256_K_M = "2d93cbc1be167bcb1637a4a23cbff01a7878f0c50ee833954ea5221bb1b8c628"
+HMAC_SHA384_K_M = "3bba95ff38376a129225ec5430dd3aff6ac7b7acdb829a4af35f33f8c6ddbbf9d85fb31f8b20316db93aedd08a816cfa"
+HMAC_SHA512_K_M = "1e4b55b925ccc28ed90d9d18fc2393fcbe164c0d84e67e173cc5aa486b7afc106633c66bdc309076f5f8d9fdbbb62456f894f2c23377fbcc12f4ab2940eb6d70"
+HMAC_SHA256_SECRET_HELLO = "88aab3ede8d3adf94d26ab90d3bafd4a2083070c3bcce9c014ee04a443847c0b"
 
-PBKDF2_SHA256 =
-  "2038580f917370fe42b04462a7c26ed17a2e769b44eb6181134243a9dabf0136"
+PBKDF2_SHA256 = "2038580f917370fe42b04462a7c26ed17a2e769b44eb6181134243a9dabf0136"
 HKDF_SHA256 = "fe8f9615d2374c0d17f77d1aeaf408c2e75fe0466073d0def23c733e2f862dfd"
 
 # =====================================================================
 # Tests
 # =====================================================================
 
-$stdout.puts "=== homura Phase 7 — crypto smoke ==="
-$stdout.puts ""
+$stdout.puts("=== homura Phase 7 — crypto smoke ===")
+$stdout.puts("")
 
 # ---------------------------------------------------------------------
 # Digest — one-shot
 # ---------------------------------------------------------------------
-$stdout.puts "--- Digest (one-shot hexdigest) ---"
+$stdout.puts("--- Digest (one-shot hexdigest) ---")
 
 SmokeTest.assert("Digest::SHA1.hexdigest('hello')") do
   Digest::SHA1.hexdigest("hello") == SHA1_HELLO
 end
+
 SmokeTest.assert("Digest::SHA1.hexdigest('')") do
   Digest::SHA1.hexdigest("") == SHA1_EMPTY
 end
+
 SmokeTest.assert("Digest::SHA256.hexdigest('hello')") do
   Digest::SHA256.hexdigest("hello") == SHA256_HELLO
 end
+
 SmokeTest.assert("Digest::SHA256.hexdigest('')") do
   Digest::SHA256.hexdigest("") == SHA256_EMPTY
 end
+
 SmokeTest.assert("Digest::SHA256.hexdigest('homura')") do
   Digest::SHA256.hexdigest("homura") == SHA256_HOMURA
 end
+
 SmokeTest.assert("Digest::SHA384.hexdigest('hello')") do
   Digest::SHA384.hexdigest("hello") == SHA384_HELLO
 end
+
 SmokeTest.assert("Digest::SHA512.hexdigest('hello')") do
   Digest::SHA512.hexdigest("hello") == SHA512_HELLO
 end
+
 SmokeTest.assert("Digest::MD5.hexdigest('hello')") do
   Digest::MD5.hexdigest("hello") == MD5_HELLO
 end
@@ -142,8 +141,8 @@ end
 # ---------------------------------------------------------------------
 # Digest — streaming (instance.update.hexdigest)
 # ---------------------------------------------------------------------
-$stdout.puts ""
-$stdout.puts "--- Digest (streaming) ---"
+$stdout.puts("")
+$stdout.puts("--- Digest (streaming) ---")
 
 SmokeTest.assert("SHA256 .new.update.hexdigest matches one-shot") do
   d = Digest::SHA256.new
@@ -151,12 +150,14 @@ SmokeTest.assert("SHA256 .new.update.hexdigest matches one-shot") do
   d.update("lo")
   d.hexdigest == SHA256_HELLO
 end
+
 SmokeTest.assert("SHA256 << operator matches update") do
   d = Digest::SHA256.new
   d << "hel"
   d << "lo"
   d.hexdigest == SHA256_HELLO
 end
+
 SmokeTest.assert("SHA256 .digest returns binary 32 bytes") do
   bin = Digest::SHA256.digest("hello")
   bin.is_a?(String) && bin.length == 32 && bin.unpack1("H*") == SHA256_HELLO
@@ -165,29 +166,33 @@ end
 # ---------------------------------------------------------------------
 # OpenSSL::HMAC
 # ---------------------------------------------------------------------
-$stdout.puts ""
-$stdout.puts "--- OpenSSL::HMAC ---"
+$stdout.puts("")
+$stdout.puts("--- OpenSSL::HMAC ---")
 
 SmokeTest.assert("HMAC SHA1 ('key','msg')") do
   OpenSSL::HMAC.hexdigest("SHA1", "key", "msg") == HMAC_SHA1_K_M
 end
+
 SmokeTest.assert("HMAC SHA256 ('key','msg')") do
   OpenSSL::HMAC.hexdigest("SHA256", "key", "msg") == HMAC_SHA256_K_M
 end
+
 SmokeTest.assert("HMAC SHA384 ('key','msg')") do
   OpenSSL::HMAC.hexdigest("SHA384", "key", "msg") == HMAC_SHA384_K_M
 end
+
 SmokeTest.assert("HMAC SHA512 ('key','msg')") do
   OpenSSL::HMAC.hexdigest("SHA512", "key", "msg") == HMAC_SHA512_K_M
 end
+
 SmokeTest.assert("HMAC SHA256 ('secret','hello')") do
-  OpenSSL::HMAC.hexdigest("SHA256", "secret", "hello") ==
-    HMAC_SHA256_SECRET_HELLO
+  OpenSSL::HMAC.hexdigest("SHA256", "secret", "hello") == HMAC_SHA256_SECRET_HELLO
 end
+
 SmokeTest.assert("HMAC accepts OpenSSL::Digest::SHA256 instance") do
-  OpenSSL::HMAC.hexdigest(OpenSSL::Digest::SHA256.new, "key", "msg") ==
-    HMAC_SHA256_K_M
+  OpenSSL::HMAC.hexdigest(OpenSSL::Digest::SHA256.new, "key", "msg") == HMAC_SHA256_K_M
 end
+
 SmokeTest.assert("HMAC.digest returns binary, hexdigest matches") do
   bin = OpenSSL::HMAC.digest("SHA256", "key", "msg")
   bin.length == 32 && bin.unpack1("H*") == HMAC_SHA256_K_M
@@ -196,37 +201,36 @@ end
 # ---------------------------------------------------------------------
 # OpenSSL::KDF
 # ---------------------------------------------------------------------
-$stdout.puts ""
-$stdout.puts "--- OpenSSL::KDF ---"
+$stdout.puts("")
+$stdout.puts("--- OpenSSL::KDF ---")
 
 SmokeTest.assert("PBKDF2 SHA256 (4096 iter, 32 bytes)") do
-  out =
-    OpenSSL::KDF.pbkdf2_hmac(
-      "password",
-      salt: "salt-1234",
-      iterations: 4096,
-      length: 32,
-      hash: "SHA256"
-    )
+  out = OpenSSL::KDF.pbkdf2_hmac(
+    "password",
+    salt: "salt-1234",
+    iterations: 4096,
+    length: 32,
+    hash: "SHA256"
+  )
   out.unpack1("H*") == PBKDF2_SHA256
 end
+
 SmokeTest.assert("HKDF SHA256 (ikm/salt/info, 32 bytes)") do
-  out =
-    OpenSSL::KDF.hkdf(
-      "ikm",
-      salt: "salt",
-      info: "info",
-      length: 32,
-      hash: "SHA256"
-    )
+  out = OpenSSL::KDF.hkdf(
+    "ikm",
+    salt: "salt",
+    info: "info",
+    length: 32,
+    hash: "SHA256"
+  )
   out.unpack1("H*") == HKDF_SHA256
 end
 
 # ---------------------------------------------------------------------
 # OpenSSL::Cipher — AES round-trips
 # ---------------------------------------------------------------------
-$stdout.puts ""
-$stdout.puts "--- OpenSSL::Cipher AES round-trips ---"
+$stdout.puts("")
+$stdout.puts("--- OpenSSL::Cipher AES round-trips ---")
 
 # Cipher methods are async (Web Crypto subtle backend) — caller awaits.
 SmokeTest.assert("AES-256-GCM encrypt → decrypt round-trip") do
@@ -273,6 +277,7 @@ SmokeTest.assert("AES-256-GCM tampering detection (auth_tag mismatch)") do
   rescue OpenSSL::Cipher::CipherError
     raised = true
   end
+
   raised
 end
 
@@ -298,6 +303,7 @@ SmokeTest.assert("AES-256-GCM AAD mismatch fails decryption") do
   rescue OpenSSL::Cipher::CipherError
     raised = true
   end
+
   raised
 end
 
@@ -306,7 +312,8 @@ SmokeTest.assert(
 ) do
   key = SecureRandom.random_bytes(32)
   iv = SecureRandom.random_bytes(12)
-  plain = (0..255).map(&:chr).join # every byte 0x00..0xff
+  # every byte 0x00..0xff
+  plain = (0..255).map(&:chr).join
   enc = OpenSSL::Cipher.new("AES-256-GCM").encrypt
   enc.key = key
   enc.iv = iv
@@ -340,7 +347,8 @@ end
 SmokeTest.assert("AES-256-CTR streaming via multiple update() calls") do
   key = SecureRandom.random_bytes(32)
   iv = SecureRandom.random_bytes(16)
-  plain = "streaming CTR test " * 20 # ~ 400 bytes, > 16 * many
+  # ~ 400 bytes, > 16 * many
+  plain = "streaming CTR test " * 20
   enc = OpenSSL::Cipher.new("AES-256-CTR").encrypt
   enc.key = key
   enc.iv = iv
@@ -352,6 +360,7 @@ SmokeTest.assert("AES-256-CTR streaming via multiple update() calls") do
     ct = ct + enc.update(chunk).__await__
     i += 17
   end
+
   ct = ct + enc.final.__await__
   # Decrypt in different chunk size
   dec = OpenSSL::Cipher.new("AES-256-CTR").decrypt
@@ -364,6 +373,7 @@ SmokeTest.assert("AES-256-CTR streaming via multiple update() calls") do
     recovered = recovered + dec.update(chunk).__await__
     j += 23
   end
+
   recovered = recovered + dec.final.__await__
   recovered == plain
 end
@@ -390,8 +400,8 @@ end
 # ---------------------------------------------------------------------
 # OpenSSL::PKey::RSA
 # ---------------------------------------------------------------------
-$stdout.puts ""
-$stdout.puts "--- OpenSSL::PKey::RSA ---"
+$stdout.puts("")
+$stdout.puts("--- OpenSSL::PKey::RSA ---")
 
 # Generate a small key once and reuse across tests for speed.
 RSA_KEY = OpenSSL::PKey::RSA.new(2048)
@@ -399,21 +409,25 @@ RSA_KEY = OpenSSL::PKey::RSA.new(2048)
 SmokeTest.assert("RSA generate yields 2048-bit private key") do
   RSA_KEY.private? && RSA_KEY.n.num_bits == 2048
 end
+
 SmokeTest.assert("RSA private PEM export → import round-trip") do
   pem = RSA_KEY.to_pem
   reloaded = OpenSSL::PKey::RSA.new(pem)
   reloaded.n.to_s == RSA_KEY.n.to_s
 end
+
 SmokeTest.assert("RSA public PEM export → import round-trip") do
   pub_pem = RSA_KEY.public_key.to_pem
   reloaded = OpenSSL::PKey::RSA.new(pub_pem)
   !reloaded.private? && reloaded.n.to_s == RSA_KEY.n.to_s
 end
+
 SmokeTest.assert("RSA sign(SHA256, msg) → verify(SHA256, sig, msg)") do
   msg = "Phase 7 RSA signature payload"
   sig = RSA_KEY.sign(OpenSSL::Digest::SHA256.new, msg).__await__
   RSA_KEY.public_key.verify(OpenSSL::Digest::SHA256.new, sig, msg).__await__
 end
+
 SmokeTest.assert("RSA verify rejects tampered message") do
   msg = "original"
   sig = RSA_KEY.sign(OpenSSL::Digest::SHA256.new, msg).__await__
@@ -426,24 +440,27 @@ end
 # ---------------------------------------------------------------------
 # OpenSSL::PKey::EC (P-256 / ES256)
 # ---------------------------------------------------------------------
-$stdout.puts ""
-$stdout.puts "--- OpenSSL::PKey::EC ---"
+$stdout.puts("")
+$stdout.puts("--- OpenSSL::PKey::EC ---")
 
 EC_KEY = OpenSSL::PKey::EC.generate("prime256v1")
 
 SmokeTest.assert("EC generate (prime256v1)") do
   EC_KEY.private_key? && EC_KEY.group.curve_name == "prime256v1"
 end
+
 SmokeTest.assert("EC sign / verify round-trip (SHA256)") do
   msg = "Phase 7 ECDSA payload"
   sig = EC_KEY.sign(OpenSSL::Digest::SHA256.new, msg).__await__
   EC_KEY.verify(OpenSSL::Digest::SHA256.new, sig, msg).__await__
 end
+
 SmokeTest.assert("EC verify rejects tampered message") do
   msg = "original"
   sig = EC_KEY.sign(OpenSSL::Digest::SHA256.new, msg).__await__
   EC_KEY.verify(OpenSSL::Digest::SHA256.new, sig, "tampered").__await__ == false
 end
+
 SmokeTest.assert("EC PEM export → import round-trip preserves curve") do
   pem = EC_KEY.to_pem
   reloaded = OpenSSL::PKey::EC.new(pem)
@@ -453,19 +470,20 @@ end
 # ---------------------------------------------------------------------
 # RSA-PSS (PS256/384/512)
 # ---------------------------------------------------------------------
-$stdout.puts ""
-$stdout.puts "--- OpenSSL::PKey::RSA — PSS (PS256/384/512) ---"
+$stdout.puts("")
+$stdout.puts("--- OpenSSL::PKey::RSA — PSS (PS256/384/512) ---")
 
 %w[SHA256 SHA384 SHA512].each do |hash|
   SmokeTest.assert("RSA-PSS sign/verify round-trip (#{hash}, salt :digest)") do
     msg = "phase 7 PSS payload #{hash}"
-    sig =
-      RSA_KEY.sign_pss(
+    sig = RSA_KEY
+      .sign_pss(
         hash,
         msg,
         salt_length: :digest,
         mgf1_hash: hash
-      ).__await__
+      )
+      .__await__
     RSA_KEY
       .public_key
       .verify_pss(hash, sig, msg, salt_length: :digest, mgf1_hash: hash)
@@ -473,13 +491,14 @@ $stdout.puts "--- OpenSSL::PKey::RSA — PSS (PS256/384/512) ---"
   end
 
   SmokeTest.assert("RSA-PSS rejects tampered (#{hash})") do
-    sig =
-      RSA_KEY.sign_pss(
+    sig = RSA_KEY
+      .sign_pss(
         hash,
         "orig",
         salt_length: :digest,
         mgf1_hash: hash
-      ).__await__
+      )
+      .__await__
     RSA_KEY
       .public_key
       .verify_pss(hash, sig, "tampered", salt_length: :digest, mgf1_hash: hash)
@@ -496,8 +515,8 @@ end
 # ---------------------------------------------------------------------
 # RSA-OAEP encrypt/decrypt
 # ---------------------------------------------------------------------
-$stdout.puts ""
-$stdout.puts "--- OpenSSL::PKey::RSA — OAEP encrypt/decrypt ---"
+$stdout.puts("")
+$stdout.puts("--- OpenSSL::PKey::RSA — OAEP encrypt/decrypt ---")
 
 SmokeTest.assert("RSA-OAEP encrypt → decrypt round-trip (default SHA-256)") do
   plain = "phase 7 OAEP payload"
@@ -517,7 +536,8 @@ SmokeTest.assert("RSA-OAEP rejects tampered ciphertext") do
   plain = "orig"
   ct = RSA_KEY.public_key.public_encrypt(plain).__await__
   bytes = ct.bytes
-  bytes[10] ^= 0xff # flip a bit somewhere in the middle
+  # flip a bit somewhere in the middle
+  bytes[10] ^= 0xff
   bad = bytes.pack("C*")
   raised = false
   begin
@@ -525,14 +545,15 @@ SmokeTest.assert("RSA-OAEP rejects tampered ciphertext") do
   rescue OpenSSL::PKey::PKeyError, ::Exception
     raised = true
   end
+
   raised
 end
 
 # ---------------------------------------------------------------------
 # ECDSA — DER signature (CRuby compat) and ES384 / ES512
 # ---------------------------------------------------------------------
-$stdout.puts ""
-$stdout.puts "--- OpenSSL::PKey::EC — DER + ES384 / ES512 ---"
+$stdout.puts("")
+$stdout.puts("--- OpenSSL::PKey::EC — DER + ES384 / ES512 ---")
 
 SmokeTest.assert("EC sign returns DER (starts 0x30) and verify accepts it") do
   msg = "der format check"
@@ -590,14 +611,15 @@ SmokeTest.assert(
   rescue ::Exception
     raised = true
   end
+
   raised
 end
 
 # ---------------------------------------------------------------------
 # ECDH key agreement
 # ---------------------------------------------------------------------
-$stdout.puts ""
-$stdout.puts "--- OpenSSL::PKey::EC — ECDH ---"
+$stdout.puts("")
+$stdout.puts("--- OpenSSL::PKey::EC — ECDH ---")
 
 SmokeTest.assert("ECDH P-256: alice & bob derive identical 32-byte secret") do
   alice = OpenSSL::PKey::EC.generate("prime256v1")
@@ -624,8 +646,8 @@ end
 # ---------------------------------------------------------------------
 # Ed25519 (JWT EdDSA) and X25519 (key agreement)
 # ---------------------------------------------------------------------
-$stdout.puts ""
-$stdout.puts "--- OpenSSL::PKey::Ed25519 (EdDSA) ---"
+$stdout.puts("")
+$stdout.puts("--- OpenSSL::PKey::Ed25519 (EdDSA) ---")
 
 ED_KEY = OpenSSL::PKey::Ed25519.generate
 
@@ -635,10 +657,12 @@ SmokeTest.assert("Ed25519 sign / verify round-trip") do
   sig = ED_KEY.sign(nil, msg).__await__
   ED_KEY.verify(nil, sig, msg).__await__
 end
+
 SmokeTest.assert("Ed25519 verify rejects tampered message") do
   sig = ED_KEY.sign(nil, "orig").__await__
   ED_KEY.verify(nil, sig, "tampered").__await__ == false
 end
+
 SmokeTest.assert("Ed25519 PEM round-trip preserves public/private") do
   pem = ED_KEY.to_pem
   reloaded = OpenSSL::PKey::Ed25519.new(pem)
@@ -647,8 +671,8 @@ SmokeTest.assert("Ed25519 PEM round-trip preserves public/private") do
   ED_KEY.verify(nil, sig, msg).__await__
 end
 
-$stdout.puts ""
-$stdout.puts "--- OpenSSL::PKey::X25519 (key agreement) ---"
+$stdout.puts("")
+$stdout.puts("--- OpenSSL::PKey::X25519 (key agreement) ---")
 
 SmokeTest.assert("X25519 alice & bob derive same 32-byte secret") do
   alice = OpenSSL::PKey::X25519.generate
@@ -661,67 +685,80 @@ end
 # ---------------------------------------------------------------------
 # OpenSSL::BN — BigInt-backed arbitrary-precision integer arithmetic
 # ---------------------------------------------------------------------
-$stdout.puts ""
-$stdout.puts "--- OpenSSL::BN ---"
+$stdout.puts("")
+$stdout.puts("--- OpenSSL::BN ---")
 
 SmokeTest.assert("BN from Integer and to_s round-trip") do
   OpenSSL::BN.new(65_537).to_s == "65537"
 end
+
 SmokeTest.assert("BN from decimal String") do
   OpenSSL::BN.new("12345").to_s == "12345"
 end
+
 SmokeTest.assert("BN from hex String with 0x prefix") do
   OpenSSL::BN.new("0xFF").to_s(16) == "ff"
 end
+
 SmokeTest.assert("BN num_bits(256) == 9") { OpenSSL::BN.new(256).num_bits == 9 }
 SmokeTest.assert("BN num_bits(0) == 0") { OpenSSL::BN.new(0).num_bits == 0 }
 SmokeTest.assert("BN +") do
   (OpenSSL::BN.new(2) + OpenSSL::BN.new(3)).to_s == "5"
 end
+
 SmokeTest.assert("BN * (huge)") do
-  (OpenSSL::BN.new("1000000000") * OpenSSL::BN.new("1000000000")).to_s ==
-    "1000000000000000000"
+  (OpenSSL::BN.new("1000000000") * OpenSSL::BN.new("1000000000")).to_s == "1000000000000000000"
 end
+
 SmokeTest.assert("BN %") do
   (OpenSSL::BN.new(10) % OpenSSL::BN.new(3)).to_s == "1"
 end
+
 SmokeTest.assert("BN comparison") { OpenSSL::BN.new(5) < OpenSSL::BN.new(10) }
 SmokeTest.assert("BN gcd(12, 18) == 6") do
   OpenSSL::BN.new(12).gcd(18).to_s == "6"
 end
+
 SmokeTest.assert("BN mod_exp (3^5 mod 13 == 9)") do
   OpenSSL::BN.new(3).mod_exp(5, 13).to_s == "9"
 end
+
 SmokeTest.assert("BN odd? / even?") do
   OpenSSL::BN.new(3).odd? && OpenSSL::BN.new(4).even?
 end
+
 SmokeTest.assert("RSA key n is a large BN (~2048 bits)") do
   n = RSA_KEY.n
   n.num_bits >= 2040 && n.num_bits <= 2048 && n.to_s.length > 600
 end
+
 SmokeTest.assert("RSA key e equals 65537") { RSA_KEY.e.to_s == "65537" }
 
 # ---------------------------------------------------------------------
 # SecureRandom (already partially implemented; sanity check)
 # ---------------------------------------------------------------------
-$stdout.puts ""
-$stdout.puts "--- SecureRandom ---"
+$stdout.puts("")
+$stdout.puts("--- SecureRandom ---")
 
 SmokeTest.assert("SecureRandom.hex(16) returns 32-char hex") do
   s = SecureRandom.hex(16)
   s.length == 32 && (s =~ /\A[0-9a-f]+\z/)
 end
+
 SmokeTest.assert("SecureRandom.random_bytes(32) returns 32 bytes") do
   SecureRandom.random_bytes(32).bytesize == 32
 end
+
 SmokeTest.assert("SecureRandom.uuid matches v4 format") do
   uuid = SecureRandom.uuid
   uuid =~ /\A[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[0-9a-f]{4}-[0-9a-f]{12}\z/
 end
+
 SmokeTest.assert("SecureRandom.urlsafe_base64 has no +/=") do
   s = SecureRandom.urlsafe_base64(32)
   !s.include?("+") && !s.include?("/") && !s.include?("=")
 end
+
 SmokeTest.assert("SecureRandom.hex calls produce different values (entropy)") do
   SecureRandom.hex(16) != SecureRandom.hex(16)
 end
@@ -729,15 +766,17 @@ end
 # ---------------------------------------------------------------------
 # OpenSSL::Digest aliases (jwt gem compatibility)
 # ---------------------------------------------------------------------
-$stdout.puts ""
-$stdout.puts "--- OpenSSL::Digest aliases ---"
+$stdout.puts("")
+$stdout.puts("--- OpenSSL::Digest aliases ---")
 
 SmokeTest.assert("OpenSSL::Digest::SHA256.hexdigest matches Digest::SHA256") do
   OpenSSL::Digest::SHA256.hexdigest("hello") == SHA256_HELLO
 end
+
 SmokeTest.assert("OpenSSL::Digest::SHA384.hexdigest matches Digest::SHA384") do
   OpenSSL::Digest::SHA384.hexdigest("hello") == SHA384_HELLO
 end
+
 SmokeTest.assert("OpenSSL::Digest.new('SHA256') gives a Digest object") do
   d = OpenSSL::Digest.new("SHA256")
   d.update("hello").hexdigest == SHA256_HELLO
@@ -746,27 +785,26 @@ end
 # ---------------------------------------------------------------------
 # JWT HS256 round-trip (proof that Phase 8 jwt gem will work)
 # ---------------------------------------------------------------------
-$stdout.puts ""
-$stdout.puts "--- JWT HS256 sanity (Phase 8 readiness) ---"
+$stdout.puts("")
+$stdout.puts("--- JWT HS256 sanity (Phase 8 readiness) ---")
 
 SmokeTest.assert("HS256 sign/verify round-trip with Base64URL") do
-  header = { "alg" => "HS256", "typ" => "JWT" }
-  payload = { "sub" => "alice", "iat" => 1_000_000_000 }
+  header = {"alg" => "HS256", "typ" => "JWT"}
+  payload = {"sub" => "alice", "iat" => 1_000_000_000}
   secret = "super-secret"
 
-  enc =
-    lambda do |obj|
-      json = obj.to_json
-      Base64.urlsafe_encode64(json).delete("=")
-    end
+  enc = lambda do |obj|
+    json = obj.to_json
+    Base64.urlsafe_encode64(json).delete("=")
+  end
+
   signing_input = enc.call(header) + "." + enc.call(payload)
   sig = OpenSSL::HMAC.digest("SHA256", secret, signing_input)
   sig_b64 = Base64.urlsafe_encode64(sig).delete("=")
   token = signing_input + "." + sig_b64
 
   parts = token.split(".")
-  expected_sig =
-    OpenSSL::HMAC.digest("SHA256", secret, parts[0] + "." + parts[1])
+  expected_sig = OpenSSL::HMAC.digest("SHA256", secret, parts[0] + "." + parts[1])
   expected_b64 = Base64.urlsafe_encode64(expected_sig).delete("=")
   parts[2] == expected_b64
 end

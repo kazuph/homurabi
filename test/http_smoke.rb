@@ -79,26 +79,28 @@ module SmokeTest
     result = block.call
     if result
       @passed += 1
-      $stdout.puts "  PASS  #{label}"
+      $stdout.puts("  PASS  #{label}")
     else
       @failed += 1
       @errors << label
-      $stdout.puts "  FAIL  #{label}"
+      $stdout.puts("  FAIL  #{label}")
     end
+
   rescue Exception => e
     @failed += 1
     @errors << "#{label} (#{e.class}: #{e.message})"
-    $stdout.puts "  CRASH #{label} — #{e.class}: #{e.message}"
+    $stdout.puts("  CRASH #{label} — #{e.class}: #{e.message}")
   end
 
   def self.report
     total = @passed + @failed
-    $stdout.puts ""
-    $stdout.puts "#{total} tests, #{@passed} passed, #{@failed} failed"
+    $stdout.puts("")
+    $stdout.puts("#{total} tests, #{@passed} passed, #{@failed} failed")
     if @errors.any?
-      $stdout.puts "Failures:"
-      @errors.each { |e| $stdout.puts "  - #{e}" }
+      $stdout.puts("Failures:")
+      @errors.each { |e| $stdout.puts("  - #{e}") }
     end
+
     @failed == 0
   end
 end
@@ -107,10 +109,10 @@ end
 # Tests
 # =====================================================================
 
-$stdout.puts "=== homura Phase 6 — HTTP smoke ==="
-$stdout.puts ""
+$stdout.puts("=== homura Phase 6 — HTTP smoke ===")
+$stdout.puts("")
 
-$stdout.puts "--- Cloudflare::HTTP.fetch ---"
+$stdout.puts("--- Cloudflare::HTTP.fetch ---")
 
 SmokeTest.assert("GET returns Cloudflare::HTTPResponse with status 200") do
   res = Cloudflare::HTTP.fetch("https://example.test/").__await__
@@ -146,29 +148,31 @@ SmokeTest.assert("ok? is true for 2xx, false otherwise") do
 end
 
 SmokeTest.assert("POST with body sends the body to the server") do
-  res =
-    Cloudflare::HTTP.fetch(
+  res = Cloudflare::HTTP
+    .fetch(
       "https://example.test/echo",
       method: "POST",
       body: "hi-there"
-    ).__await__
+    )
+    .__await__
   res.body == "POST:hi-there"
 end
 
 SmokeTest.assert("POST forwards custom headers") do
-  res =
-    Cloudflare::HTTP.fetch(
+  res = Cloudflare::HTTP
+    .fetch(
       "https://example.test/headers",
       method: "POST",
       headers: {
         "x-marker" => "m1"
       }
-    ).__await__
+    )
+    .__await__
   res.headers["x-custom"].to_s.include?("received:m1")
 end
 
-$stdout.puts ""
-$stdout.puts "--- Net::HTTP shim ---"
+$stdout.puts("")
+$stdout.puts("--- Net::HTTP shim ---")
 
 # Note on # await: true semantics — Opal compiles every method body in
 # this file as async, so any helper that itself awaits a Promise still
@@ -188,8 +192,9 @@ SmokeTest.assert(
   "Net::HTTP.get_response returns Net::HTTPResponse with code/body"
 ) do
   res = Net::HTTP.get_response(URI("https://example.test/json")).__await__
-  res.is_a?(Net::HTTPResponse) && res.code == "200" &&
-    res.body.include?('"ok":true')
+  res.is_a?(Net::HTTPResponse) &&
+    res.code == "200" &&
+    res.body.include?("\"ok\":true")
 end
 
 SmokeTest.assert("Net::HTTPResponse#[] reads a header (case insensitive)") do
@@ -199,26 +204,30 @@ SmokeTest.assert("Net::HTTPResponse#[] reads a header (case insensitive)") do
 end
 
 SmokeTest.assert("Net::HTTP.post_form sends urlencoded body") do
-  res =
-    Net::HTTP.post_form(
+  res = Net::HTTP
+    .post_form(
       URI("https://example.test/form"),
       "name" => "kazu",
       "lang" => "ja"
-    ).__await__
+    )
+    .__await__
   # body comes back as 'form:<urlencoded>'; both keys must appear
   b = res.body
   b.start_with?("form:") && b.include?("name=kazu") && b.include?("lang=ja")
 end
 
-$stdout.puts ""
-$stdout.puts "--- URI sanity (Phase 6 prerequisites) ---"
+$stdout.puts("")
+$stdout.puts("--- URI sanity (Phase 6 prerequisites) ---")
 
 SmokeTest.assert(
   "URI.parse('https://x.test/p?q=1#f') exposes scheme/host/path/query/fragment"
 ) do
   u = URI.parse("https://x.test/p?q=1#f")
-  u.scheme == "https" && u.host == "x.test" && u.path == "/p" &&
-    u.query == "q=1" && u.fragment == "f"
+  u.scheme == "https" &&
+    u.host == "x.test" &&
+    u.path == "/p" &&
+    u.query == "q=1" &&
+    u.fragment == "f"
 end
 
 # =====================================================================

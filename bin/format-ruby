@@ -2,8 +2,26 @@
 # frozen_string_literal: true
 
 require "open3"
+require "tempfile"
 
 files_script = File.expand_path("first-party-ruby-files", __dir__)
+repo_root = File.expand_path("..", __dir__)
+rubyfmt_install = File.expand_path("install-rubyfmt", __dir__)
+rubyfmt_candidates = []
+
+if (env_bin = ENV["RUBYFMT_BIN"]).to_s != ""
+  rubyfmt_candidates << env_bin
+end
+
+repo_rubyfmt = Dir[
+  File.join(repo_root, "build", "tools", "rubyfmt", "v*", "*", "rubyfmt")
+].sort.last
+rubyfmt_candidates << repo_rubyfmt if repo_rubyfmt
+
+homebrew_rubyfmt = "/opt/homebrew/opt/rubyfmt/bin/rubyfmt"
+rubyfmt_candidates << homebrew_rubyfmt if File.exist?(homebrew_rubyfmt)
+
+rubyfmt_candidates << "rubyfmt"
 
 staged = ARGV.delete("--staged")
 mode = ARGV.delete("--check") ? "check" : "write"
@@ -12,37 +30,62 @@ if ARGV.any? { |arg| arg.start_with?("-") }
   abort("usage: ruby bin/format-ruby [--check] [--staged] [PATH ...]")
 end
 
-candidate_paths =
-  if staged
-    stdout, status =
-      Open3.capture2(
-        "git",
-        "diff",
-        "--cached",
-        "--name-only",
-        "--diff-filter=ACMR",
-        "-z"
-      )
-    abort("bin/format-ruby: git diff --cached failed") unless status.success?
+candidate_paths = if staged
+  stdout, status = Open3.capture2(
+    "git",
+    "diff",
+    "--cached",
+    "--name-only",
+    "--diff-filter=ACMR",
+    "-z"
+  )
+  abort("bin/format-ruby: git diff --cached failed") unless status.success?
 
-    stdout.split("\0").reject(&:empty?)
-  else
-    ARGV
-  end
+  stdout.split("\0").reject(&:empty?)
+else
+  ARGV
+end
 
 command = [files_script, "--print0", *candidate_paths]
 files = IO.popen(command, &:read).split("\0").reject(&:empty?)
 
 if files.empty?
-  exit 0 if staged
+  exit(0) if staged
 
   abort("bin/format-ruby: no first-party Ruby files found")
 end
 
-success = system("bundle", "exec", "stree", mode, *files)
-exit 1 unless success
+rubyfmt = rubyfmt_candidates.find do |candidate|
+  next false if candidate.nil? || candidate.empty?
+
+  _out, status = Open3.capture2e(candidate, "--version")
+  status.success?
+rescue Errno::ENOENT
+  false
+end
+
+unless rubyfmt
+  abort(
+    "bin/format-ruby: rubyfmt not found. Run `ruby bin/install-rubyfmt` " \
+      "or install it globally (e.g. `brew install rubyfmt`)."
+  )
+end
+
+Tempfile.create("rubyfmt-files") do |filelist|
+  filelist.write(files.join("\n"))
+  filelist.flush
+
+  formatter_args = [rubyfmt]
+  formatter_args << "--check" if mode == "check"
+  formatter_args << "--in-place" if mode == "write"
+  formatter_args << "--fail-fast"
+  formatter_args << "@#{filelist.path}"
+
+  success = system(*formatter_args)
+  exit(1) unless success
+end
 
 if staged && mode == "write"
   success = system("git", "add", "--", *files)
-  exit 1 unless success
+  exit(1) unless success
 end

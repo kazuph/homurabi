@@ -7,10 +7,13 @@ module Zlib
   class GzipFile
     class Error < Zlib::Error
     end
+
     class CRCError < Error
     end
+
     class LengthError < Error
     end
+
     class NoFooter < Error
     end
   end

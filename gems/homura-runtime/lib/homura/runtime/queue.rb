@@ -82,11 +82,13 @@ module Cloudflare
       qname = @name
       err_klass = Cloudflare::QueueError
       unless available?
-        raise QueueError.new(
-                "queue binding not bound",
-                operation: "send",
-                queue: qname
-              )
+        raise(
+          QueueError.new(
+            "queue binding not bound",
+            operation: "send",
+            queue: qname
+          )
+        )
       end
 
       js_body = ruby_to_js(body)
@@ -108,11 +110,13 @@ module Cloudflare
       qname = @name
       err_klass = Cloudflare::QueueError
       unless available?
-        raise QueueError.new(
-                "queue binding not bound",
-                operation: "send_batch",
-                queue: qname
-              )
+        raise(
+          QueueError.new(
+            "queue binding not bound",
+            operation: "send_batch",
+            queue: qname
+          )
+        )
       end
 
       js_msgs = `([])`
@@ -131,6 +135,7 @@ module Cloudflare
           `#{js_msgs}.push({ body: #{js_body} })`
         end
       end
+
       js_opts = `({})`
       `#{js_opts}.delaySeconds = #{delay_seconds.to_i}` if delay_seconds
 
@@ -143,10 +148,14 @@ module Cloudflare
     # Same Ruby→JS conversion that Cloudflare::AI.ruby_to_js uses, but
     # local to avoid cross-wrapper coupling.
     def ruby_to_js(val)
-      if val.is_a?(String) || val.is_a?(Numeric) || val == true ||
-           val == false || val.nil?
+      if val.is_a?(String) ||
+          val.is_a?(Numeric) ||
+          val == true ||
+          val == false ||
+          val.nil?
         return val
       end
+
       return val.to_s if val.is_a?(Symbol)
       if val.is_a?(Hash)
         obj = `({})`
@@ -155,16 +164,20 @@ module Cloudflare
           jv = ruby_to_js(v)
           `#{obj}[#{ks}] = #{jv}`
         end
+
         return obj
       end
+
       if val.is_a?(Array)
         arr = `([])`
         val.each do |v|
           jv = ruby_to_js(v)
           `#{arr}.push(#{jv})`
         end
+
         return arr
       end
+
       val
     end
   end
@@ -185,8 +198,7 @@ module Cloudflare
 
     def timestamp
       js = @js
-      ms =
-        `(#{js} && #{js}.timestamp && typeof #{js}.timestamp.getTime === 'function' ? #{js}.timestamp.getTime() : null)`
+      ms = `(#{js} && #{js}.timestamp && typeof #{js}.timestamp.getTime === 'function' ? #{js}.timestamp.getTime() : null)`
       return nil if `#{ms} == null`
       Time.at(ms.to_f / 1000.0)
     end
@@ -234,6 +246,7 @@ module Cloudflare
       else
         `(#{js} && typeof #{js}.retry === 'function' ? #{js}.retry() : null)`
       end
+
       nil
     end
 
@@ -244,6 +257,7 @@ module Cloudflare
       if `typeof #{v} === 'string' || typeof #{v} === 'number' || typeof #{v} === 'boolean'`
         return v
       end
+
       if `Array.isArray(#{v})`
         out = []
         len = `#{v}.length`
@@ -252,8 +266,10 @@ module Cloudflare
           out << js_to_ruby(`#{v}[#{i}]`)
           i += 1
         end
+
         return out
       end
+
       if `typeof #{v} === 'object'`
         h = {}
         keys = `Object.keys(#{v})`
@@ -264,8 +280,10 @@ module Cloudflare
           h[k] = js_to_ruby(`#{v}[#{k}]`)
           i += 1
         end
+
         return h
       end
+
       v
     end
   end
@@ -296,6 +314,7 @@ module Cloudflare
         out << QueueMessage.new(`#{arr}[#{i}]`)
         i += 1
       end
+
       @messages = out
     end
 
@@ -317,6 +336,7 @@ module Cloudflare
       else
         `(#{js} && typeof #{js}.retryAll === 'function' ? #{js}.retryAll() : null)`
       end
+
       nil
     end
   end
@@ -353,15 +373,15 @@ module Cloudflare
       queue_name = batch.queue
       handler = handler_for(queue_name)
       if handler.nil?
-        warn "[Cloudflare::QueueConsumer] no handler registered for queue #{queue_name.inspect}; messages will time out and retry"
-        return(
-          {
-            "queue" => queue_name,
-            "handled" => false,
-            "size" => batch.size,
-            "reason" => "no_handler"
-          }
+        warn(
+          "[Cloudflare::QueueConsumer] no handler registered for queue #{queue_name.inspect}; messages will time out and retry"
         )
+        return ({
+          "queue" => queue_name,
+          "handled" => false,
+          "size" => batch.size,
+          "reason" => "no_handler"
+        })
       end
 
       ctx = QueueContext.new(batch, js_env, js_ctx)
@@ -369,6 +389,7 @@ module Cloudflare
       if `(#{result} != null && typeof #{result}.then === 'function')`
         result = result.__await__
       end
+
       {
         "queue" => queue_name,
         "handled" => true,
@@ -403,30 +424,39 @@ module Cloudflare
     def d1
       env["cloudflare.DB"]
     end
+
     def db
       d1
     end
+
     def cf_env
       env["cloudflare.env"]
     end
+
     def cf_ctx
       env["cloudflare.ctx"]
     end
+
     def kv
       env["cloudflare.KV"]
     end
+
     def bucket
       env["cloudflare.BUCKET"]
     end
+
     def ai
       Cloudflare::Bindings.ai(env)
     end
+
     def send_email
       env["cloudflare.SEND_EMAIL"]
     end
+
     def jobs_queue
       env["cloudflare.QUEUE_JOBS"]
     end
+
     def durable_object(name, id_or_name = nil)
       Cloudflare::Bindings.durable_object(env, name, id_or_name)
     end
@@ -446,7 +476,7 @@ module Cloudflare
       Cloudflare::Bindings.build_env(
         js_env,
         @js_ctx,
-        { "cloudflare.queue" => true }
+        {"cloudflare.queue" => true}
       )
     end
   end

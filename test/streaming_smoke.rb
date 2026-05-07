@@ -15,23 +15,24 @@ module StreamingSmoke
     r = block.call
     if r
       @passed += 1
-      $stdout.puts "  PASS  #{label}"
+      $stdout.puts("  PASS  #{label}")
     else
       @failed += 1
       @errors << label
-      $stdout.puts "  FAIL  #{label}"
+      $stdout.puts("  FAIL  #{label}")
     end
+
   rescue Exception => e
     @failed += 1
     @errors << "#{label} (#{e.class}: #{e.message})"
-    $stdout.puts "  CRASH #{label} — #{e.class}: #{e.message}"
+    $stdout.puts("  CRASH #{label} — #{e.class}: #{e.message}")
   end
 
   def self.report
     total = @passed + @failed
-    $stdout.puts ""
-    $stdout.puts "#{total} tests, #{@passed} passed, #{@failed} failed"
-    @errors.each { |e| $stdout.puts "  - #{e}" } if @errors.any?
+    $stdout.puts("")
+    $stdout.puts("#{total} tests, #{@passed} passed, #{@failed} failed")
+    @errors.each { |e| $stdout.puts("  - #{e}") } if @errors.any?
     @failed == 0
   end
 end
@@ -42,10 +43,11 @@ end
 # allocates a Promise per iteration and does NOT break cleanly under
 # the async transformation, which blew up the Node heap the first time.
 def drain_readable(js_stream)
-  `(async function(stream) { var reader = stream.getReader(); var decoder = new TextDecoder(); var out = ''; while (true) { var r = await reader.read(); if (r.done) return out; out += decoder.decode(r.value); } })(#{js_stream})`.__await__
+  `(async function(stream) { var reader = stream.getReader(); var decoder = new TextDecoder(); var out = ''; while (true) { var r = await reader.read(); if (r.done) return out; out += decoder.decode(r.value); } })(#{js_stream})`
+    .__await__
 end
 
-$stdout.puts "=== Streaming smoke tests ==="
+$stdout.puts("=== Streaming smoke tests ===")
 
 # 1. Static framing: write `data: x\n\n` via <<
 StreamingSmoke.assert("SSEOut << writes raw chunk to the stream") do
@@ -66,12 +68,14 @@ StreamingSmoke.assert("SSEOut#event emits event: / id: / data: frame") do
   out.event("hello", event: "greet", id: "42")
   out.close
   decoded = drain_readable(`#{ts}.readable`).__await__
-  decoded.include?("event: greet") && decoded.include?("id: 42") &&
-    decoded.include?("data: hello") && decoded.end_with?("\n\n")
+  decoded.include?("event: greet") &&
+    decoded.include?("id: 42") &&
+    decoded.include?("data: hello") &&
+    decoded.end_with?("\n\n")
 end
 
 # 3. Multi-line data split across multiple `data:` lines
-StreamingSmoke.assert('SSEOut#event splits multi-line data on \n') do
+StreamingSmoke.assert("SSEOut#event splits multi-line data on \\n") do
   ts = `new TransformStream()`
   writer = `#{ts}.writable.getWriter()`
   out = Cloudflare::SSEOut.new(writer)
@@ -115,6 +119,7 @@ StreamingSmoke.assert("SSEStream.new { |out| … } must receive a block") do
   rescue ArgumentError => e
     raised = e
   end
+
   !raised.nil?
 end
 
@@ -122,10 +127,10 @@ end
 StreamingSmoke.assert(
   "SSEStream end-to-end: block emits 3 events, then closes"
 ) do
-  s =
-    Cloudflare::SSEStream.new do |out|
-      3.times { |i| out.event("tick-#{i}", event: "heartbeat", id: i.to_s) }
-    end
+  s = Cloudflare::SSEStream.new do |out|
+    3.times { |i| out.event("tick-#{i}", event: "heartbeat", id: i.to_s) }
+  end
+
   readable = s.js_stream
   decoded = drain_readable(readable).__await__
   %w[tick-0 tick-1 tick-2].all? { |v| decoded.include?("data: #{v}") } &&
@@ -134,11 +139,11 @@ end
 
 # 8. SSEStream handles exceptions inside the block (stream still closes)
 StreamingSmoke.assert("exception in block closes the stream cleanly") do
-  s =
-    Cloudflare::SSEStream.new do |out|
-      out << "partial\n"
-      raise "deliberate"
-    end
+  s = Cloudflare::SSEStream.new do |out|
+    out << "partial\n"
+    raise "deliberate"
+  end
+
   readable = s.js_stream
   # drain_readable hits 'done' because stream closes in ensure.
   decoded = drain_readable(readable).__await__
@@ -161,10 +166,9 @@ end
 
 # 11. Custom headers merge over defaults
 StreamingSmoke.assert("SSEStream extra headers merge over defaults") do
-  h =
-    Cloudflare::SSEStream
-      .new(headers: { "x-phase" => "11a" }) { |_o| }
-      .response_headers
+  h = Cloudflare::SSEStream
+    .new(headers: {"x-phase" => "11a"}) { |_o| }
+    .response_headers
   h["x-phase"] == "11a" && h["content-type"].include?("text/event-stream")
 end
 
@@ -173,20 +177,19 @@ StreamingSmoke.assert(
   "Sinatra::Streaming#stream type: :plain emits text/plain body"
 ) do
   # Minimal stub Sinatra context
-  ctx_stub =
-    Class
-      .new do
-        include Sinatra::Streaming
-        def env
-          {}
-        end
+  ctx_stub = Class
+    .new do
+      include(Sinatra::Streaming)
+      def env
+        {}
       end
-      .new
-  s =
-    ctx_stub.stream(type: :plain) do |o|
-      o << "hi"
-      o.close
     end
+    .new
+  s = ctx_stub.stream(type: :plain) do |o|
+    o << "hi"
+    o.close
+  end
+
   s.is_a?(Cloudflare::SSEStream) &&
     s.response_headers["content-type"].include?("text/plain")
 end
@@ -195,30 +198,29 @@ end
 StreamingSmoke.assert(
   "Sinatra::Streaming#stream type: :sse emits event-stream headers"
 ) do
-  ctx_stub =
-    Class
-      .new do
-        include Sinatra::Streaming
-        def env
-          {}
-        end
+  ctx_stub = Class
+    .new do
+      include(Sinatra::Streaming)
+      def env
+        {}
       end
-      .new
+    end
+    .new
   s = ctx_stub.stream(type: :sse) { |o| o.close }
   s.response_headers["content-type"].include?("text/event-stream")
 end
 
 # 14. Sinatra::Base#stream (upstream-compat override) builds an SSEStream
 require "sinatra/base"
+
 StreamingSmoke.assert(
   "Sinatra::Base#stream override returns Cloudflare::SSEStream"
 ) do
-  app =
-    Class.new(Sinatra::Base) do
-      get "/test-stream" do
-        stream { |out| out << "hello" }
-      end
+  app = Class.new(Sinatra::Base) do
+    get("/test-stream") do
+      stream { |out| out << "hello" }
     end
+  end
   # We don't actually dispatch — just verify the override is installed.
   inst = app.new!
   inst.instance_variable_set(:@env, {})

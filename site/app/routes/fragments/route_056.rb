@@ -1,16 +1,14 @@
 # frozen_string_literal: true
 # Route fragment 56 — demo /demo/sse
-get "/demo/sse" do
+get("/demo/sse") do
   unless foundations_demos_enabled?
-    content_type "application/json"
-    status 404
-    next(
-      {
-        "error" =>
-          "foundations demos disabled (set HOMURA_ENABLE_FOUNDATIONS_DEMOS=1)"
-      }.to_json
-    )
+    content_type("application/json")
+    status(404)
+    next ({
+      "error" => "foundations demos disabled (set HOMURA_ENABLE_FOUNDATIONS_DEMOS=1)"
+    }.to_json)
   end
+
   sse do |out|
     # Manual `while` instead of `Integer#times` because Opal compiles
     # `.each` / `.times` iterators as synchronous JS `for` loops —
@@ -33,6 +31,7 @@ get "/demo/sse" do
       out.sleep(1)
       i += 1
     end
+
     out.event("done", event: "close")
   end
 end

@@ -1,0 +1,72 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "fileutils"
+require "open3"
+require "tmpdir"
+
+RUBYFMT_VERSION = "v0.13.0"
+
+def platform_slug
+  host_os = RbConfig::CONFIG["host_os"]
+  host_cpu = RbConfig::CONFIG["host_cpu"]
+
+  os = case host_os
+  when /darwin/i
+    "Darwin"
+  when /linux/i
+    "Linux"
+  else
+    abort("bin/install-rubyfmt: unsupported OS #{host_os.inspect}")
+  end
+
+  arch = case host_cpu
+  when "arm64", "aarch64"
+    os == "Darwin" ? "arm64" : "aarch64"
+  when "x86_64", "amd64"
+    "x86_64"
+  else
+    abort("bin/install-rubyfmt: unsupported CPU #{host_cpu.inspect}")
+  end
+
+  "#{os}-#{arch}"
+end
+
+repo_root = File.expand_path("..", __dir__)
+install_dir = File.join(repo_root, "build", "tools", "rubyfmt", RUBYFMT_VERSION, platform_slug)
+binary_path = File.join(install_dir, "rubyfmt")
+asset_name = "rubyfmt-#{RUBYFMT_VERSION}-#{platform_slug}.tar.gz"
+asset_url = "https://github.com/fables-tales/rubyfmt/releases/download/#{RUBYFMT_VERSION}/#{asset_name}"
+
+print_only = ARGV.delete("--print-path")
+force = ARGV.delete("--force")
+
+if ARGV.any? { |arg| arg.start_with?("-") }
+  abort("usage: ruby bin/install-rubyfmt [--print-path] [--force]")
+end
+
+unless force || File.exist?(binary_path)
+  Dir.mktmpdir("rubyfmt-install") do |tmpdir|
+    archive_path = File.join(tmpdir, asset_name)
+    extract_dir = File.join(tmpdir, "extract")
+
+    success = system("curl", "-L", "--fail", "--silent", "--show-error", "-o", archive_path, asset_url)
+    abort("bin/install-rubyfmt: failed to download #{asset_url}") unless success
+
+    FileUtils.mkdir_p(extract_dir)
+    success = system("tar", "-xzf", archive_path, "-C", extract_dir)
+    abort("bin/install-rubyfmt: failed to extract #{archive_path}") unless success
+
+    extracted_binary = Dir[File.join(extract_dir, "**", "rubyfmt")].first
+    abort("bin/install-rubyfmt: rubyfmt binary missing in archive") unless extracted_binary
+
+    FileUtils.mkdir_p(install_dir)
+    FileUtils.cp(extracted_binary, binary_path)
+    FileUtils.chmod(0o755, binary_path)
+  end
+end
+
+stdout, status = Open3.capture2e(binary_path, "--version")
+abort("bin/install-rubyfmt: installed binary failed validation\n#{stdout}") unless status.success?
+
+puts(binary_path) if print_only || !print_only

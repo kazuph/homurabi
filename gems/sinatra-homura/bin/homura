@@ -57,16 +57,16 @@ module HomuraCLI
     abort("homura #{command}: requires gem `#{entry[:gem]}`") unless spec
 
     ARGV.replace(entry[:argv_prefix] + ARGV)
-    load File.join(spec.full_gem_path, entry[:script])
+    load(File.join(spec.full_gem_path, entry[:script]))
   end
 end
 
 command = ARGV.shift
 
 unless command && HomuraCLI::COMMANDS.key?(command)
-  warn "Unknown command: #{command}" if command
-  warn HomuraCLI.usage
-  exit 1
+  warn("Unknown command: #{command}") if command
+  warn(HomuraCLI.usage)
+  exit(1)
 end
 
 HomuraCLI.dispatch(command)

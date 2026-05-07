@@ -8,8 +8,7 @@ require "json"
 module Homura
   module DebugMailController
     class << self
-      SUBJECT_HAS_FULL_VERSION =
-        /homura Phase 17 test.{0,3}Version\s+[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z/i
+      SUBJECT_HAS_FULL_VERSION = /homura Phase 17 test.{0,3}Version\s+[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z/i
 
       # Default `to` recipient for /debug/mail comes from a Wrangler secret
       # (HOMURA_MAIL_DEFAULT_TO). Never hard-coded — the route helper passes
@@ -27,44 +26,37 @@ module Homura
 
       # バリデーション済みコンテキスト。`:error_result` があれば送信しない。
       def prepare_send(params, env, route, mail)
-        default_to =
-          (
-            if route.respond_to?(:homura_mail_default_to)
-              route.homura_mail_default_to
-            else
-              ""
-            end
-          )
+        default_to = (
+          if route.respond_to?(:homura_mail_default_to)
+            route.homura_mail_default_to
+          else
+            ""
+          end
+        )
         form = parse_form_params(params, default_to: default_to)
         mail_from = route.homura_mail_from
         final_to = form[:to].empty? ? default_to.to_s : form[:to]
 
         if mail_from.empty?
-          return(
-            {
-              error_result:
-                error_result(
-                  form,
-                  mail_from,
-                  nil,
-                  "HOMURA_MAIL_FROM が未設定です。ドメイン onboarding 後に wrangler [vars] で verified の送信元アドレスを設定してください。"
-                )
-            }
-          )
+          return ({
+            error_result: error_result(
+              form,
+              mail_from,
+              nil,
+              "HOMURA_MAIL_FROM が未設定です。ドメイン onboarding 後に wrangler [vars] で verified の送信元アドレスを設定してください。"
+            )
+          })
         end
 
         if mail.nil? || !mail.available?
-          return(
-            {
-              error_result:
-                error_result(
-                  form,
-                  mail_from,
-                  nil,
-                  "SEND_EMAIL バインディングが利用できません（wrangler.toml の [[send_email]] を確認）。"
-                )
-            }
-          )
+          return ({
+            error_result: error_result(
+              form,
+              mail_from,
+              nil,
+              "SEND_EMAIL バインディングが利用できません（wrangler.toml の [[send_email]] を確認）。"
+            )
+          })
         end
 
         vid = vid_from_env(env)
@@ -88,14 +80,12 @@ module Homura
         subject_line = ctx[:subject_line]
 
         if `(#{raw} == null || #{raw} === undefined || #{raw} === Opal.nil)`
-          return(
-            error_result(
-              form,
-              mail_from,
-              subject_line,
-              "SEND_EMAIL.send の戻りが null です。メールは送信されていません。"
-            )
-          )
+          return (error_result(
+            form,
+            mail_from,
+            subject_line,
+            "SEND_EMAIL.send の戻りが null です。メールは送信されていません。"
+          ))
         end
 
         message_id = extract_message_id(raw)
@@ -142,12 +132,12 @@ module Homura
 
       def resolve_bodies(form_text, form_html)
         html = form_html.strip.empty? ? nil : form_html
-        text =
-          if form_text.strip.empty?
-            html ? nil : "This is a test mail from homura"
-          else
-            form_text
-          end
+        text = if form_text.strip.empty?
+          html ? nil : "This is a test mail from homura"
+        else
+          form_text
+        end
+
         [text, html]
       end
 
@@ -172,12 +162,11 @@ module Homura
         cf_raw
       )
         accepted = !message_id.strip.empty?
-        warning =
-          if accepted
-            nil
-          else
-            "message_id が空です。cf_send_result_json を確認してください。送信はキューに載っていない可能性があります。"
-          end
+        warning = if accepted
+          nil
+        else
+          "message_id が空です。cf_send_result_json を確認してください。送信はキューに載っていない可能性があります。"
+        end
 
         payload = {
           "ok" => accepted,
@@ -210,7 +199,7 @@ module Homura
           form: form,
           mail_from: mail_from
         }
-        h[:meta] = { subject_line: subject_line } if subject_line
+        h[:meta] = {subject_line: subject_line} if subject_line
         h
       end
     end

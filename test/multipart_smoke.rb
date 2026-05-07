@@ -15,23 +15,24 @@ module MultipartSmoke
     result = block.call
     if result
       @passed += 1
-      $stdout.puts "  PASS  #{label}"
+      $stdout.puts("  PASS  #{label}")
     else
       @failed += 1
       @errors << label
-      $stdout.puts "  FAIL  #{label}"
+      $stdout.puts("  FAIL  #{label}")
     end
+
   rescue Exception => e
     @failed += 1
     @errors << "#{label} (#{e.class}: #{e.message})"
-    $stdout.puts "  CRASH #{label} — #{e.class}: #{e.message}"
+    $stdout.puts("  CRASH #{label} — #{e.class}: #{e.message}")
   end
 
   def self.report
     total = @passed + @failed
-    $stdout.puts ""
-    $stdout.puts "#{total} tests, #{@passed} passed, #{@failed} failed"
-    @errors.each { |e| $stdout.puts "  - #{e}" } if @errors.any?
+    $stdout.puts("")
+    $stdout.puts("#{total} tests, #{@passed} passed, #{@failed} failed")
+    @errors.each { |e| $stdout.puts("  - #{e}") } if @errors.any?
     @failed == 0
   end
 end
@@ -43,88 +44,87 @@ def build_multipart(boundary, parts)
   parts.each do |part|
     body += "--#{boundary}\r\n"
     if part[:filename]
-      body +=
-        "Content-Disposition: form-data; name=\"#{part[:name]}\"; filename=\"#{part[:filename]}\"\r\n"
-      body +=
-        "Content-Type: #{part[:content_type] || "application/octet-stream"}\r\n"
+      body += "Content-Disposition: form-data; name=\"#{part[:name]}\"; filename=\"#{part[:filename]}\"\r\n"
+      body += "Content-Type: #{part[:content_type] || "application/octet-stream"}\r\n"
     else
       body += "Content-Disposition: form-data; name=\"#{part[:name]}\"\r\n"
     end
+
     body += "\r\n"
     body += part[:data]
     body += "\r\n"
   end
+
   body += "--#{boundary}--\r\n"
   body
 end
 
-$stdout.puts "=== Multipart smoke tests ==="
+$stdout.puts("=== Multipart smoke tests ===")
 
 # 1. Boundary extraction
 MultipartSmoke.assert("parse_boundary recognises quoted and unquoted forms") do
-  Cloudflare::Multipart.parse_boundary("multipart/form-data; boundary=foo") ==
-    "foo" &&
+  Cloudflare::Multipart.parse_boundary("multipart/form-data; boundary=foo") == "foo" &&
     Cloudflare::Multipart.parse_boundary(
-      'multipart/form-data; boundary="foo bar"'
-    ) == "foo bar" &&
+    "multipart/form-data; boundary=\"foo bar\""
+  ) == "foo bar" &&
     Cloudflare::Multipart.parse_boundary("application/json").nil?
 end
 
 # 2. Simple text-field parse
 MultipartSmoke.assert("parses a single text field") do
   b = "B1"
-  body = build_multipart(b, [{ name: "greeting", data: "hello" }])
-  parts =
-    Cloudflare::Multipart.parse(body, "multipart/form-data; boundary=#{b}")
+  body = build_multipart(b, [{name: "greeting", data: "hello"}])
+  parts = Cloudflare::Multipart.parse(body, "multipart/form-data; boundary=#{b}")
   parts["greeting"] == "hello"
 end
 
 # 3. Mixed text + file
 MultipartSmoke.assert("parses text + file parts in one payload") do
   b = "B2"
-  body =
-    build_multipart(
-      b,
-      [
-        { name: "note", data: "hi" },
-        {
-          name: "file",
-          filename: "a.bin",
-          content_type: "application/octet-stream",
-          data: "ABCDEF"
-        }
-      ]
-    )
-  parts =
-    Cloudflare::Multipart.parse(body, "multipart/form-data; boundary=#{b}")
-  parts["note"] == "hi" && parts["file"].is_a?(Cloudflare::UploadedFile) &&
+  body = build_multipart(
+    b,
+    [
+      {name: "note", data: "hi"},
+      {
+        name: "file",
+        filename: "a.bin",
+        content_type: "application/octet-stream",
+        data: "ABCDEF"
+      }
+    ]
+  )
+  parts = Cloudflare::Multipart.parse(body, "multipart/form-data; boundary=#{b}")
+  parts["note"] == "hi" &&
+    parts["file"].is_a?(Cloudflare::UploadedFile) &&
     parts["file"].filename == "a.bin" &&
     parts["file"].content_type == "application/octet-stream" &&
-    parts["file"].read == "ABCDEF" && parts["file"].size == 6
+    parts["file"].read == "ABCDEF" &&
+    parts["file"].size == 6
 end
 
 # 4. Binary bytes survive the parser (no UTF-8 mangling)
-MultipartSmoke.assert('preserves binary bytes (\x00..\xFF) through parsing') do
+MultipartSmoke.assert("preserves binary bytes (\\x00..\\xFF) through parsing") do
   b = "B3"
   # 256-byte content covering every byte value.
   bytes = (0..255).map { |c| c.chr }.join
-  body =
-    build_multipart(
-      b,
-      [
-        {
-          name: "file",
-          filename: "bin",
-          content_type: "application/octet-stream",
-          data: bytes
-        }
-      ]
-    )
-  parts =
-    Cloudflare::Multipart.parse(body, "multipart/form-data; boundary=#{b}")
+  body = build_multipart(
+    b,
+    [
+      {
+        name: "file",
+        filename: "bin",
+        content_type: "application/octet-stream",
+        data: bytes
+      }
+    ]
+  )
+  parts = Cloudflare::Multipart.parse(body, "multipart/form-data; boundary=#{b}")
   f = parts["file"]
-  f && f.size == 256 && f.bytes_binstr.length == 256 &&
-    f.bytes_binstr[0].ord == 0x00 && f.bytes_binstr[255].ord == 0xFF
+  f &&
+    f.size == 256 &&
+    f.bytes_binstr.length == 256 &&
+    f.bytes_binstr[0].ord == 0x00 &&
+    f.bytes_binstr[255].ord == 0xFF
 end
 
 # 5. UploadedFile#to_uint8_array returns a real Uint8Array
@@ -135,13 +135,12 @@ MultipartSmoke.assert("UploadedFile#to_uint8_array yields correct bytes") do
   # collapse to the Unicode replacement character before any test
   # assertion runs.
   binstr = 0x00.chr + 0x7F.chr + 0x80.chr + 0xFF.chr
-  u =
-    Cloudflare::UploadedFile.new(
-      name: "file",
-      filename: "x.bin",
-      content_type: "application/octet-stream",
-      bytes_binstr: binstr
-    )
+  u = Cloudflare::UploadedFile.new(
+    name: "file",
+    filename: "x.bin",
+    content_type: "application/octet-stream",
+    bytes_binstr: binstr
+  )
   arr = u.to_uint8_array
   `#{arr} instanceof Uint8Array && #{arr}.length === 4 && #{arr}[0] === 0 && #{arr}[1] === 0x7F && #{arr}[2] === 0x80 && #{arr}[3] === 0xFF`
 end
@@ -150,13 +149,11 @@ end
 MultipartSmoke.assert("filename with quoted semicolons survives parsing") do
   b = "B4"
   body = "--#{b}\r\n"
-  body +=
-    "Content-Disposition: form-data; name=\"file\"; filename=\"weird; name.txt\"\r\n"
+  body += "Content-Disposition: form-data; name=\"file\"; filename=\"weird; name.txt\"\r\n"
   body += "Content-Type: text/plain\r\n\r\n"
   body += "x"
   body += "\r\n--#{b}--\r\n"
-  parts =
-    Cloudflare::Multipart.parse(body, "multipart/form-data; boundary=#{b}")
+  parts = Cloudflare::Multipart.parse(body, "multipart/form-data; boundary=#{b}")
   parts["file"].filename == "weird; name.txt"
 end
 
@@ -169,8 +166,7 @@ MultipartSmoke.assert("empty filename is treated as an empty text value") do
   body += "Content-Type: application/octet-stream\r\n\r\n"
   body += ""
   body += "\r\n--#{b}--\r\n"
-  parts =
-    Cloudflare::Multipart.parse(body, "multipart/form-data; boundary=#{b}")
+  parts = Cloudflare::Multipart.parse(body, "multipart/form-data; boundary=#{b}")
   # We still wrap it as an UploadedFile; the point is that the parser
   # doesn't blow up and the form field name is present.
   parts.key?("attach")
@@ -183,36 +179,36 @@ end
 
 # 9. UploadedFile Hash-style access (rack-compat shim)
 MultipartSmoke.assert("UploadedFile[:filename] returns the filename") do
-  u =
-    Cloudflare::UploadedFile.new(
-      name: "f",
-      filename: "pic.png",
-      content_type: "image/png",
-      bytes_binstr: "xxx"
-    )
-  u[:filename] == "pic.png" && u[:type] == "image/png" &&
+  u = Cloudflare::UploadedFile.new(
+    name: "f",
+    filename: "pic.png",
+    content_type: "image/png",
+    bytes_binstr: "xxx"
+  )
+  u[:filename] == "pic.png" &&
+    u[:type] == "image/png" &&
     u[:tempfile].read == "xxx"
 end
 
 # 10. Rack::Request#POST delegates to Cloudflare::Multipart
 require "rack/request"
+
 MultipartSmoke.assert(
   "Rack::Request#POST parses multipart body via our parser"
 ) do
   b = "B10"
-  body =
-    build_multipart(
-      b,
-      [
-        { name: "greeting", data: "yo" },
-        {
-          name: "doc",
-          filename: "d.txt",
-          content_type: "text/plain",
-          data: "line1"
-        }
-      ]
-    )
+  body = build_multipart(
+    b,
+    [
+      {name: "greeting", data: "yo"},
+      {
+        name: "doc",
+        filename: "d.txt",
+        content_type: "text/plain",
+        data: "line1"
+      }
+    ]
+  )
   env = {
     "REQUEST_METHOD" => "POST",
     "PATH_INFO" => "/api/upload",
@@ -225,52 +221,50 @@ MultipartSmoke.assert(
     "HTTP_HOST" => "localhost"
   }
   req = Rack::Request.new(env)
-  posted = req.POST
-  posted.is_a?(Hash) && posted["greeting"] == "yo" &&
+  posted = req.POST()
+  posted.is_a?(Hash) &&
+    posted["greeting"] == "yo" &&
     posted["doc"].is_a?(Cloudflare::UploadedFile)
 end
 
 # 11. Multiple file parts in a single request
 MultipartSmoke.assert("parses multiple file parts by field name") do
   b = "B11"
-  body =
-    build_multipart(
-      b,
-      [
-        {
-          name: "avatar",
-          filename: "a.png",
-          content_type: "image/png",
-          data: "AA"
-        },
-        {
-          name: "banner",
-          filename: "b.jpg",
-          content_type: "image/jpeg",
-          data: "BB"
-        }
-      ]
-    )
-  parts =
-    Cloudflare::Multipart.parse(body, "multipart/form-data; boundary=#{b}")
+  body = build_multipart(
+    b,
+    [
+      {
+        name: "avatar",
+        filename: "a.png",
+        content_type: "image/png",
+        data: "AA"
+      },
+      {
+        name: "banner",
+        filename: "b.jpg",
+        content_type: "image/jpeg",
+        data: "BB"
+      }
+    ]
+  )
+  parts = Cloudflare::Multipart.parse(body, "multipart/form-data; boundary=#{b}")
   parts["avatar"].is_a?(Cloudflare::UploadedFile) &&
     parts["banner"].is_a?(Cloudflare::UploadedFile) &&
-    parts["avatar"].filename == "a.png" && parts["banner"].filename == "b.jpg"
+    parts["avatar"].filename == "a.png" &&
+    parts["banner"].filename == "b.jpg"
 end
 
 # 12. RFC 5987 — filename*=UTF-8''<percent-encoded> is URL-decoded
-MultipartSmoke.assert('RFC 5987 filename*=UTF-8\'\'... is URL-decoded') do
+MultipartSmoke.assert("RFC 5987 filename*=UTF-8''... is URL-decoded") do
   b = "B12"
   # "ファイル.txt" percent-encoded in UTF-8
   encoded = "%E3%83%95%E3%82%A1%E3%82%A4%E3%83%AB.txt"
   body = "--#{b}\r\n"
-  body +=
-    "Content-Disposition: form-data; name=\"doc\"; filename*=UTF-8''#{encoded}\r\n"
+  body += "Content-Disposition: form-data; name=\"doc\"; filename*=UTF-8''#{encoded}\r\n"
   body += "Content-Type: text/plain\r\n\r\n"
   body += "contents"
   body += "\r\n--#{b}--\r\n"
-  parts =
-    Cloudflare::Multipart.parse(body, "multipart/form-data; boundary=#{b}")
+  parts = Cloudflare::Multipart.parse(body, "multipart/form-data; boundary=#{b}")
   parts["doc"].filename == "ファイル.txt"
 end
 
@@ -284,22 +278,23 @@ MultipartSmoke.assert("64 KiB binary body survives parsing intact") do
     payload += (i % 256).chr
     i += 1
   end
-  body =
-    build_multipart(
-      b,
-      [
-        {
-          name: "big",
-          filename: "big.bin",
-          content_type: "application/octet-stream",
-          data: payload
-        }
-      ]
-    )
-  parts =
-    Cloudflare::Multipart.parse(body, "multipart/form-data; boundary=#{b}")
+
+  body = build_multipart(
+    b,
+    [
+      {
+        name: "big",
+        filename: "big.bin",
+        content_type: "application/octet-stream",
+        data: payload
+      }
+    ]
+  )
+  parts = Cloudflare::Multipart.parse(body, "multipart/form-data; boundary=#{b}")
   f = parts["big"]
-  f && f.size == 65_536 && f.bytes_binstr[12_345].ord == (12_345 % 256) &&
+  f &&
+    f.size == 65_536 &&
+    f.bytes_binstr[12_345].ord == (12_345 % 256) &&
     f.bytes_binstr[65_535].ord == (65_535 % 256)
 end
 
@@ -307,26 +302,22 @@ end
 MultipartSmoke.assert("quoted UTF-8 filename (Japanese) survives") do
   b = "B14"
   body = "--#{b}\r\n"
-  body +=
-    "Content-Disposition: form-data; name=\"doc\"; filename=\"レポート.pdf\"\r\n"
+  body += "Content-Disposition: form-data; name=\"doc\"; filename=\"レポート.pdf\"\r\n"
   body += "Content-Type: application/pdf\r\n\r\n"
   body += "pdf-bytes"
   body += "\r\n--#{b}--\r\n"
-  parts =
-    Cloudflare::Multipart.parse(body, "multipart/form-data; boundary=#{b}")
+  parts = Cloudflare::Multipart.parse(body, "multipart/form-data; boundary=#{b}")
   parts["doc"].filename == "レポート.pdf"
 end
 
 # 15. Text field with multi-line content (CR/LF preserved)
 MultipartSmoke.assert("text field preserves embedded newlines") do
   b = "B15"
-  body =
-    build_multipart(
-      b,
-      [{ name: "note", data: "line one\r\nline two\r\nline three" }]
-    )
-  parts =
-    Cloudflare::Multipart.parse(body, "multipart/form-data; boundary=#{b}")
+  body = build_multipart(
+    b,
+    [{name: "note", data: "line one\r\nline two\r\nline three"}]
+  )
+  parts = Cloudflare::Multipart.parse(body, "multipart/form-data; boundary=#{b}")
   parts["note"] == "line one\r\nline two\r\nline three"
 end
 

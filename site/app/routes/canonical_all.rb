@@ -1,124 +1,135 @@
 # frozen_string_literal: true
 # Route table — loaded inside `class App < Sinatra::Base` (order = original hello.rb)
-get "/" do
+get("/") do
   @title = "Hello from Sinatra"
   @users = db ? db.execute("SELECT id, name FROM users ORDER BY id") : []
-  erb :index
+  erb(:index)
 end
-get "/hello/:name" do
+
+get("/hello/:name") do
   @title = "Hello #{params["name"]}"
   @name = params["name"]
-  erb :hello
+  erb(:hello)
 end
-get "/about" do
+
+get("/about") do
   @title = "About homura"
-  erb :about
+  erb(:about)
 end
-post "/api/echo" do
-  content_type "application/json"
+
+post("/api/echo") do
+  content_type("application/json")
   request.body.rewind
   body = request.body.read
   "{\"echo\": \"#{body}\"}"
 end
-get "/d1/users" do
-  content_type "application/json"
+
+get("/d1/users") do
+  content_type("application/json")
   db.execute("SELECT id, name FROM users ORDER BY id").to_json
 end
-get "/d1/users/:id" do
-  content_type "application/json"
+
+get("/d1/users/:id") do
+  content_type("application/json")
   id = params["id"].to_i
   row = db.get_first_row("SELECT id, name FROM users WHERE id = ?", [id])
   if row.nil?
-    status 404
-    { "error" => "not found", "id" => id }.to_json
+    status(404)
+    {"error" => "not found", "id" => id}.to_json
   else
     row.to_json
   end
 end
-post "/d1/users" do
-  content_type "application/json"
+
+post("/d1/users") do
+  content_type("application/json")
   begin
     payload = JSON.parse(request.body.read)
   rescue JSON::ParserError, StandardError => e
-    status 400
-    return { "error" => "invalid JSON body", "detail" => e.message }.to_json
+    status(400)
+    return {"error" => "invalid JSON body", "detail" => e.message}.to_json
   end
+
   name = payload["name"].to_s
   if name.empty?
-    status 400
-    { "error" => "name required" }.to_json
+    status(400)
+    {"error" => "name required"}.to_json
   else
-    row =
-      db.get_first_row(
-        "INSERT INTO users (name) VALUES (?) RETURNING id, name",
-        [name]
-      )
-    status 201
+    row = db.get_first_row(
+      "INSERT INTO users (name) VALUES (?) RETURNING id, name",
+      [name]
+    )
+    status(201)
     row.to_json
   end
 end
-get "/demo/sequel" do
-  content_type "application/json"
+
+get("/demo/sequel") do
+  content_type("application/json")
   seq_db = Sequel.connect(adapter: :d1, d1: db)
   rows = seq_db[:users].order(:id).limit(10).all
-  { "rows" => rows, "adapter" => "sequel-d1", "dialect" => "sqlite" }.to_json
+  {"rows" => rows, "adapter" => "sequel-d1", "dialect" => "sqlite"}.to_json
 end
-get "/demo/sequel/sql" do
-  content_type "application/json"
+
+get("/demo/sequel/sql") do
+  content_type("application/json")
   seq_db = Sequel.connect(adapter: :d1, d1: db)
   ds = seq_db[:users].where(active: true).order(:name).limit(10)
-  { "sql" => ds.sql.to_s, "adapter" => "sequel-d1" }.to_json
+  {"sql" => ds.sql.to_s, "adapter" => "sequel-d1"}.to_json
 end
-get "/posts" do
-  content_type "application/json"
+
+get("/posts") do
+  content_type("application/json")
   seq_db = Sequel.connect(adapter: :d1, d1: db)
   rows = seq_db[:posts].order(Sequel.desc(:id)).limit(20).all
-  { "count" => rows.size, "posts" => rows }.to_json
+  {"count" => rows.size, "posts" => rows}.to_json
 end
-post "/posts" do
-  content_type "application/json"
+
+post("/posts") do
+  content_type("application/json")
   begin
     payload = JSON.parse(request.body.read)
   rescue JSON::ParserError, StandardError => e
-    status 400
-    next({ "error" => "invalid JSON: #{e.message}" }.to_json)
+    status(400)
+    next ({"error" => "invalid JSON: #{e.message}"}.to_json)
   end
+
   title = payload["title"].to_s.strip
   body_text = payload["body"].to_s.strip
   if title.empty?
-    status 400
-    next({ "error" => "title is required" }.to_json)
+    status(400)
+    next ({"error" => "title is required"}.to_json)
   end
   # Use Cloudflare::D1Database directly for the insert + readback.
   # D1's execute() accepts `?` placeholders and binds as an Array,
   # matching sqlite3-ruby's idiom (same shape `/d1/users POST`
   # route already relies on).
-  row =
-    db.get_first_row(
-      "INSERT INTO posts (title, body) VALUES (?, ?) RETURNING id, title, body, created_at",
-      [title, body_text]
-    )
-  status 201
-  { "ok" => true, "post" => row }.to_json
+  row = db.get_first_row(
+    "INSERT INTO posts (title, body) VALUES (?, ?) RETURNING id, title, body, created_at",
+    [title, body_text]
+  )
+  status(201)
+  {"ok" => true, "post" => row}.to_json
 end
-get "/test/sequel" do
-  content_type "application/json"
+
+get("/test/sequel") do
+  content_type("application/json")
   cases = []
-  run =
-    lambda do |label, &blk|
-      result =
-        begin
-          v = blk.call
-          if v == false
-            { "pass" => false, "note" => "returned false" }
-          else
-            { "pass" => true }
-          end
-        rescue ::Exception => e
-          { "pass" => false, "note" => "#{e.class}: #{e.message[0, 200]}" }
-        end
-      cases << result.merge("case" => label)
+  run = lambda do |label, &blk|
+    result = begin
+      v = blk.call
+      if v == false
+        {"pass" => false, "note" => "returned false"}
+      else
+        {"pass" => true}
+      end
+
+    rescue ::Exception => e
+      {"pass" => false, "note" => "#{e.class}: #{e.message[0, 200]}"}
     end
+
+    cases << result.merge("case" => label)
+  end
 
   seq_db = Sequel.connect(adapter: :d1, d1: db)
 
@@ -127,21 +138,25 @@ get "/test/sequel" do
   run.call("SingleConnectionPool in use") do
     seq_db.pool.class.name == "Sequel::SingleConnectionPool"
   end
+
   run.call("DB[:users].sql emits SELECT * FROM users") do
     seq_db[:users].sql.to_s == "SELECT * FROM `users`"
   end
+
   run.call("DB[:users].where(id: 1).sql emits id = 1") do
-    seq_db[:users].where(id: 1).sql.to_s ==
-      "SELECT * FROM `users` WHERE (`id` = 1)"
+    seq_db[:users].where(id: 1).sql.to_s == "SELECT * FROM `users` WHERE (`id` = 1)"
   end
+
   run.call("DB[:users].order(:id).limit(5) emits ORDER BY + LIMIT") do
     sql = seq_db[:users].order(:id).limit(5).sql.to_s
     sql.include?("ORDER BY `id`") && sql.include?("LIMIT 5")
   end
+
   run.call("DB[:users].all hits D1 and returns rows") do
     rows = seq_db[:users].all
     rows.is_a?(Array) && rows.all? { |r| r.is_a?(Hash) && r["id"] && r["name"] }
   end
+
   run.call("DB[:users].where(id: 1).first returns single row") do
     row = seq_db[:users].where(id: 1).first
     row.is_a?(Hash) && row["id"].to_i == 1
@@ -156,48 +171,54 @@ get "/test/sequel" do
     "cases" => cases
   }.to_json
 end
-get "/kv/:key" do
-  content_type "application/json"
+
+get("/kv/:key") do
+  content_type("application/json")
   key = params["key"]
   value = kv.get(key)
   if value.nil?
-    status 404
-    { "error" => "not found", "key" => key }.to_json
+    status(404)
+    {"error" => "not found", "key" => key}.to_json
   else
-    { "key" => key, "value" => value }.to_json
+    {"key" => key, "value" => value}.to_json
   end
 end
-put "/kv/:key" do
-  content_type "application/json"
+
+put("/kv/:key") do
+  content_type("application/json")
   key = params["key"]
   body = request.body.read
   kv.put(key, body)
-  status 201
-  { "key" => key, "value" => body, "stored" => true }.to_json
+  status(201)
+  {"key" => key, "value" => body, "stored" => true}.to_json
 end
-delete "/kv/:key" do
-  content_type "application/json"
+
+delete("/kv/:key") do
+  content_type("application/json")
   key = params["key"]
   kv.delete(key)
-  { "key" => key, "deleted" => true }.to_json
+  {"key" => key, "deleted" => true}.to_json
 end
-get "/images/:key" do
+
+get("/images/:key") do
   key = params["key"]
   obj = bucket.get_binary(key)
   if obj.nil?
-    status 404
+    status(404)
     "not found"
   else
-    obj # BinaryBody — build_js_response detects and streams directly
+    # BinaryBody — build_js_response detects and streams directly
+    obj
   end
 end
-get "/r2/:key" do
-  content_type "application/json"
+
+get("/r2/:key") do
+  content_type("application/json")
   key = params["key"]
   obj = bucket.get(key)
   if obj.nil?
-    status 404
-    { "error" => "not found", "key" => key }.to_json
+    status(404)
+    {"error" => "not found", "key" => key}.to_json
   else
     {
       "key" => obj["key"],
@@ -207,28 +228,31 @@ get "/r2/:key" do
     }.to_json
   end
 end
-put "/r2/:key" do
-  content_type "application/json"
+
+put("/r2/:key") do
+  content_type("application/json")
   key = params["key"]
-  body =
-    begin
-      request.body.read
-    rescue StandardError
-      ""
-    end
+  body = begin
+    request.body.read
+  rescue StandardError
+    ""
+  end
+
   content_type_in = request.env["CONTENT_TYPE"] || "application/octet-stream"
   bucket.put(key, body, content_type_in)
-  status 201
-  { "key" => key, "size" => body.bytesize, "stored" => true }.to_json
+  status(201)
+  {"key" => key, "size" => body.bytesize, "stored" => true}.to_json
 end
-delete "/r2/:key" do
-  content_type "application/json"
+
+delete("/r2/:key") do
+  content_type("application/json")
   key = params["key"]
   bucket.delete(key)
-  { "key" => key, "deleted" => true }.to_json
+  {"key" => key, "deleted" => true}.to_json
 end
-get "/demo/http" do
-  content_type "application/json"
+
+get("/demo/http") do
+  content_type("application/json")
   res = Net::HTTP.get_response(URI("https://api.ipify.org/?format=json"))
   {
     "demo" => "Net::HTTP through Cloudflare fetch",
@@ -238,8 +262,9 @@ get "/demo/http" do
     "body" => JSON.parse(res.body)
   }.to_json
 end
-get "/demo/http/raw" do
-  content_type "application/json"
+
+get("/demo/http/raw") do
+  content_type("application/json")
   res = Cloudflare::HTTP.fetch("https://api.ipify.org/?format=json")
   {
     "demo" => "Cloudflare::HTTP.fetch (raw)",
@@ -251,22 +276,24 @@ get "/demo/http/raw" do
     "json" => res.json
   }.to_json
 end
-post "/api/login" do
-  content_type "application/json"
+
+post("/api/login") do
+  content_type("application/json")
   alg = params["alg"] || "HS256"
   begin
     body = JSON.parse(request.body.read)
   rescue JSON::ParserError, StandardError
     body = {}
   end
+
   username = body["username"].to_s
   username = "demo" if username.empty?
 
   begin
     sign_key, _ = jwt_keys_for(alg)
   rescue ArgumentError => e
-    status 400
-    return { "error" => e.message }.to_json
+    status(400)
+    return {"error" => e.message}.to_json
   end
 
   payload = {
@@ -294,7 +321,7 @@ post "/api/login" do
     kv.put("refresh:#{refresh}", entry.to_json)
   end
 
-  status 201
+  status(201)
   resp = {
     "access_token" => access_token,
     "token_type" => "Bearer",
@@ -304,45 +331,46 @@ post "/api/login" do
   resp["refresh_token"] = refresh if refresh
   resp.to_json
 end
-get "/api/me" do
-  content_type "application/json"
+
+get("/api/me") do
+  content_type("application/json")
   auth_header = request.env["HTTP_AUTHORIZATION"].to_s
   parts = auth_header.split(" ", 2)
   if parts.length != 2 || parts[0].downcase != "bearer"
-    status 401
-    next { "error" => "missing Authorization: Bearer header" }.to_json
+    status(401)
+    next {"error" => "missing Authorization: Bearer header"}.to_json
   end
 
   token = parts[1].strip
   if token.empty?
-    status 401
-    next { "error" => "missing Authorization: Bearer header" }.to_json
+    status(401)
+    next {"error" => "missing Authorization: Bearer header"}.to_json
   end
 
   alg = alg_from_token(token)
   if alg.nil? || alg == "none"
-    status 401
-    next { "error" => "unknown or unsafe algorithm" }.to_json
+    status(401)
+    next {"error" => "unknown or unsafe algorithm"}.to_json
   end
 
   begin
     _, verify_key = jwt_keys_for(alg)
   rescue ArgumentError => e
-    status 401
-    next { "error" => e.message }.to_json
+    status(401)
+    next {"error" => e.message}.to_json
   end
 
   begin
     payload, header = JWT.decode(token, verify_key, true, algorithm: alg)
   rescue JWT::ExpiredSignature
-    status 401
-    next { "error" => "token expired" }.to_json
+    status(401)
+    next {"error" => "token expired"}.to_json
   rescue JWT::VerificationError
-    status 401
-    next { "error" => "signature verification failed" }.to_json
+    status(401)
+    next {"error" => "signature verification failed"}.to_json
   rescue JWT::DecodeError => e
-    status 401
-    next({ "error" => "invalid token: #{e.message}" }.to_json)
+    status(401)
+    next ({"error" => "invalid token: #{e.message}"}.to_json)
   end
 
   {
@@ -352,11 +380,12 @@ get "/api/me" do
     "claims" => payload
   }.to_json
 end
-post "/api/login/refresh" do
-  content_type "application/json"
+
+post("/api/login/refresh") do
+  content_type("application/json")
   if kv.nil?
-    status 500
-    next { "error" => "KV not bound" }.to_json
+    status(500)
+    next {"error" => "KV not bound"}.to_json
   end
 
   begin
@@ -364,29 +393,30 @@ post "/api/login/refresh" do
   rescue JSON::ParserError, StandardError
     body = {}
   end
+
   refresh = body["refresh_token"].to_s
   if refresh.empty?
-    status 400
-    next { "error" => "refresh_token required" }.to_json
+    status(400)
+    next {"error" => "refresh_token required"}.to_json
   end
 
   raw = kv.get("refresh:#{refresh}")
   if raw.nil?
-    status 401
-    next { "error" => "unknown refresh_token" }.to_json
+    status(401)
+    next {"error" => "unknown refresh_token"}.to_json
   end
 
   begin
     entry = JSON.parse(raw)
   rescue JSON::ParserError
-    status 500
-    next { "error" => "corrupt refresh entry" }.to_json
+    status(500)
+    next {"error" => "corrupt refresh entry"}.to_json
   end
 
   if entry["exp"].to_i < Time.now.to_i
     kv.delete("refresh:#{refresh}")
-    status 401
-    next { "error" => "refresh_token expired" }.to_json
+    status(401)
+    next {"error" => "refresh_token expired"}.to_json
   end
 
   alg = entry["alg"] || "HS256"
@@ -407,54 +437,52 @@ post "/api/login/refresh" do
     "alg" => alg
   }.to_json
 end
-get "/test/crypto" do
-  content_type "application/json"
+
+get("/test/crypto") do
+  content_type("application/json")
   unless crypto_demos_enabled?
-    status 404
-    next(
-      {
-        "error" =>
-          "crypto demos disabled (set HOMURA_ENABLE_CRYPTO_DEMOS=1 in wrangler vars)"
-      }.to_json
-    )
+    status(404)
+    next ({
+      "error" => "crypto demos disabled (set HOMURA_ENABLE_CRYPTO_DEMOS=1 in wrangler vars)"
+    }.to_json)
   end
+
   cases = []
-  run =
-    lambda do |label, &blk|
-      result =
-        begin
-          v = blk.call
-          if v == false
-            { "pass" => false, "note" => "returned false" }
-          else
-            { "pass" => true }
-          end
-        rescue ::Exception => e
-          { "pass" => false, "note" => "#{e.class}: #{e.message[0, 200]}" }
-        end
-      cases << result.merge("case" => label)
+  run = lambda do |label, &blk|
+    result = begin
+      v = blk.call
+      if v == false
+        {"pass" => false, "note" => "returned false"}
+      else
+        {"pass" => true}
+      end
+
+    rescue ::Exception => e
+      {"pass" => false, "note" => "#{e.class}: #{e.message[0, 200]}"}
     end
 
+    cases << result.merge("case" => label)
+  end
+
   run.call("Digest::SHA256.hexdigest matches CRuby vector") do
-    Digest::SHA256.hexdigest("hello") ==
-      "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+    Digest::SHA256.hexdigest("hello") == "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
   end
+
   run.call("OpenSSL::HMAC SHA256") do
-    OpenSSL::HMAC.hexdigest("SHA256", "secret", "hello") ==
-      "88aab3ede8d3adf94d26ab90d3bafd4a2083070c3bcce9c014ee04a443847c0b"
+    OpenSSL::HMAC.hexdigest("SHA256", "secret", "hello") == "88aab3ede8d3adf94d26ab90d3bafd4a2083070c3bcce9c014ee04a443847c0b"
   end
+
   run.call("OpenSSL::KDF.pbkdf2_hmac") do
-    d =
-      OpenSSL::KDF.pbkdf2_hmac(
-        "password",
-        salt: "salt-1234",
-        iterations: 4096,
-        length: 32,
-        hash: "SHA256"
-      )
-    d.unpack1("H*") ==
-      "2038580f917370fe42b04462a7c26ed17a2e769b44eb6181134243a9dabf0136"
+    d = OpenSSL::KDF.pbkdf2_hmac(
+      "password",
+      salt: "salt-1234",
+      iterations: 4096,
+      length: 32,
+      hash: "SHA256"
+    )
+    d.unpack1("H*") == "2038580f917370fe42b04462a7c26ed17a2e769b44eb6181134243a9dabf0136"
   end
+
   run.call("AES-256-GCM round-trip") do
     key = SecureRandom.random_bytes(32)
     iv = SecureRandom.random_bytes(12)
@@ -471,6 +499,7 @@ get "/test/crypto" do
     d.update(ct)
     d.final == "payload-gcm"
   end
+
   run.call("AES-256-CTR streaming") do
     key = SecureRandom.random_bytes(32)
     iv = SecureRandom.random_bytes(16)
@@ -484,12 +513,14 @@ get "/test/crypto" do
       ct = ct + e.update(plain[i, 13])
       i += 13
     end
+
     ct = ct + e.final
     d = OpenSSL::Cipher.new("AES-256-CTR").decrypt
     d.key = key
     d.iv = iv
     d.update(ct) + d.final == plain
   end
+
   run.call("AES-128-CBC round-trip") do
     key = SecureRandom.random_bytes(16)
     iv = SecureRandom.random_bytes(16)
@@ -504,15 +535,16 @@ get "/test/crypto" do
     d.update(ct)
     d.final == "cbc-test"
   end
+
   run.call("RSA RS256 sign/verify") do
     r = OpenSSL::PKey::RSA.new(2048)
     sig = r.sign(OpenSSL::Digest::SHA256.new, "rs256")
     r.public_key.verify(OpenSSL::Digest::SHA256.new, sig, "rs256")
   end
+
   run.call("RSA PS256 sign/verify") do
     r = OpenSSL::PKey::RSA.new(2048)
-    sig =
-      r.sign_pss("SHA256", "ps256", salt_length: :digest, mgf1_hash: "SHA256")
+    sig = r.sign_pss("SHA256", "ps256", salt_length: :digest, mgf1_hash: "SHA256")
     r.public_key.verify_pss(
       "SHA256",
       sig,
@@ -521,45 +553,54 @@ get "/test/crypto" do
       mgf1_hash: "SHA256"
     )
   end
+
   run.call("RSA OAEP encrypt/decrypt") do
     r = OpenSSL::PKey::RSA.new(2048)
     ct = r.public_key.public_encrypt("oaep-payload")
     r.private_decrypt(ct) == "oaep-payload"
   end
+
   run.call("ECDSA ES256 (DER) sign/verify") do
     ec = OpenSSL::PKey::EC.generate("prime256v1")
     sig = ec.sign(OpenSSL::Digest::SHA256.new, "es256")
     sig.bytes[0] == 0x30 && ec.verify(OpenSSL::Digest::SHA256.new, sig, "es256")
   end
+
   run.call("ECDSA ES384 sign/verify") do
     ec = OpenSSL::PKey::EC.generate("secp384r1")
     sig = ec.sign(OpenSSL::Digest::SHA384.new, "es384")
     ec.verify(OpenSSL::Digest::SHA384.new, sig, "es384")
   end
+
   run.call("ECDSA ES512 sign/verify") do
     ec = OpenSSL::PKey::EC.generate("secp521r1")
     sig = ec.sign(OpenSSL::Digest::SHA512.new, "es512")
     ec.verify(OpenSSL::Digest::SHA512.new, sig, "es512")
   end
+
   run.call("ECDH P-256 agreement") do
     a = OpenSSL::PKey::EC.generate("prime256v1")
     b = OpenSSL::PKey::EC.generate("prime256v1")
     a.dh_compute_key(b) == b.dh_compute_key(a)
   end
+
   run.call("Ed25519 sign/verify (EdDSA)") do
     ed = OpenSSL::PKey::Ed25519.generate
     sig = ed.sign(nil, "eddsa")
     ed.verify(nil, sig, "eddsa")
   end
+
   run.call("X25519 key agreement") do
     a = OpenSSL::PKey::X25519.generate
     b = OpenSSL::PKey::X25519.generate
     a.dh_compute_key(b) == b.dh_compute_key(a)
   end
+
   run.call("OpenSSL::BN arithmetic") do
     (OpenSSL::BN.new(123) + OpenSSL::BN.new(456)).to_s == "579" &&
       OpenSSL::BN.new(3).mod_exp(5, 13).to_s == "9"
   end
+
   run.call("SecureRandom.hex(16) returns 32 hex chars") do
     SecureRandom.hex(16).length == 32
   end
@@ -568,7 +609,7 @@ get "/test/crypto" do
   # every algorithm against the live Workers runtime so we can prove
   # RS/PS/ES/EdDSA signatures actually verify on the edge, not just
   # in the Node test harness.
-  jwt_payload = { "sub" => "self-test", "iat" => Time.now.to_i }
+  jwt_payload = {"sub" => "self-test", "iat" => Time.now.to_i}
   jwt_secret = "phase8-self-test-secret"
 
   run.call("JWT HS256 encode/decode round-trip") do
@@ -576,11 +617,13 @@ get "/test/crypto" do
     dec, = JWT.decode(tok, jwt_secret, true, algorithm: "HS256")
     dec["sub"] == "self-test"
   end
+
   run.call("JWT HS256 tampered signature rejected") do
     tok = JWT.encode(jwt_payload, jwt_secret, "HS256")
     parts = tok.split(".")
     mid = parts[2].length / 2
-    parts[2] = parts[2][0, mid] + (parts[2][mid] == "A" ? "B" : "A") +
+    parts[2] = parts[2][0, mid] +
+      (parts[2][mid] == "A" ? "B" : "A") +
       parts[2][mid + 1, parts[2].length - mid - 1]
     raised = false
     begin
@@ -588,6 +631,7 @@ get "/test/crypto" do
     rescue JWT::VerificationError
       raised = true
     end
+
     raised
   end
 
@@ -597,16 +641,19 @@ get "/test/crypto" do
     dec, = JWT.decode(tok, rsa.public_key, true, algorithm: "RS256")
     dec["sub"] == "self-test"
   end
+
   run.call("JWT PS256 encode/decode round-trip") do
     tok = JWT.encode(jwt_payload, rsa, "PS256")
     dec, = JWT.decode(tok, rsa.public_key, true, algorithm: "PS256")
     dec["sub"] == "self-test"
   end
+
   run.call("JWT RS256 tampered signature rejected") do
     tok = JWT.encode(jwt_payload, rsa, "RS256")
     parts = tok.split(".")
     mid = parts[2].length / 2
-    parts[2] = parts[2][0, mid] + (parts[2][mid] == "A" ? "B" : "A") +
+    parts[2] = parts[2][0, mid] +
+      (parts[2][mid] == "A" ? "B" : "A") +
       parts[2][mid + 1, parts[2].length - mid - 1]
     raised = false
     begin
@@ -614,6 +661,7 @@ get "/test/crypto" do
     rescue JWT::VerificationError
       raised = true
     end
+
     raised
   end
 
@@ -623,6 +671,7 @@ get "/test/crypto" do
     dec, = JWT.decode(tok, ec256, true, algorithm: "ES256")
     dec["sub"] == "self-test"
   end
+
   ec384 = OpenSSL::PKey::EC.generate("secp384r1")
   run.call("JWT ES384 encode/decode round-trip") do
     tok = JWT.encode(jwt_payload, ec384, "ES384")
@@ -636,11 +685,13 @@ get "/test/crypto" do
     dec, = JWT.decode(tok, ed, true, algorithm: "EdDSA")
     dec["sub"] == "self-test"
   end
+
   run.call("JWT EdDSA tampered signature rejected") do
     tok = JWT.encode(jwt_payload, ed, "EdDSA")
     parts = tok.split(".")
     mid = parts[2].length / 2
-    parts[2] = parts[2][0, mid] + (parts[2][mid] == "A" ? "B" : "A") +
+    parts[2] = parts[2][0, mid] +
+      (parts[2][mid] == "A" ? "B" : "A") +
       parts[2][mid + 1, parts[2].length - mid - 1]
     raised = false
     begin
@@ -648,6 +699,7 @@ get "/test/crypto" do
     rescue JWT::VerificationError
       raised = true
     end
+
     raised
   end
 
@@ -660,16 +712,14 @@ get "/test/crypto" do
     "cases" => cases
   }.to_json
 end
-get "/demo/crypto" do
-  content_type "application/json"
+
+get("/demo/crypto") do
+  content_type("application/json")
   unless crypto_demos_enabled?
-    status 404
-    next(
-      {
-        "error" =>
-          "crypto demos disabled (set HOMURA_ENABLE_CRYPTO_DEMOS=1 in wrangler vars)"
-      }.to_json
-    )
+    status(404)
+    next ({
+      "error" => "crypto demos disabled (set HOMURA_ENABLE_CRYPTO_DEMOS=1 in wrangler vars)"
+    }.to_json)
   end
 
   # 1) Digest one-shots
@@ -703,18 +753,17 @@ get "/demo/crypto" do
   rsa_ok = rsa.public_key.verify(OpenSSL::Digest::SHA256.new, sig, msg)
 
   # 5) PBKDF2 derived key
-  derived =
-    OpenSSL::KDF.pbkdf2_hmac(
-      "p@ssw0rd",
-      salt: "phase7-salt",
-      iterations: 4096,
-      length: 32,
-      hash: "SHA256"
-    )
+  derived = OpenSSL::KDF.pbkdf2_hmac(
+    "p@ssw0rd",
+    salt: "phase7-salt",
+    iterations: 4096,
+    length: 32,
+    hash: "SHA256"
+  )
 
   # 6) Hand-rolled HS256 JWT (proof Phase 8 jwt gem will work)
-  header = { "alg" => "HS256", "typ" => "JWT" }
-  payload = { "sub" => "demo", "iat" => Time.now.to_i }
+  header = {"alg" => "HS256", "typ" => "JWT"}
+  payload = {"sub" => "demo", "iat" => Time.now.to_i}
   enc_b64 = lambda { |obj| Base64.urlsafe_encode64(obj.to_json).delete("=") }
   signing_input = enc_b64.call(header) + "." + enc_b64.call(payload)
   sig_bin = OpenSSL::HMAC.digest("SHA256", "jwt-secret", signing_input)
@@ -744,48 +793,43 @@ get "/demo/crypto" do
     }
   }.to_json
 end
-get "/test/scheduled" do
-  content_type "application/json"
+
+get("/test/scheduled") do
+  content_type("application/json")
   unless scheduled_demos_enabled?
-    status 404
-    next(
-      {
-        "error" =>
-          "scheduled demos disabled (set HOMURA_ENABLE_SCHEDULED_DEMOS=1 in wrangler vars)"
-      }.to_json
-    )
+    status(404)
+    next ({
+      "error" => "scheduled demos disabled (set HOMURA_ENABLE_SCHEDULED_DEMOS=1 in wrangler vars)"
+    }.to_json)
   end
+
   {
-    "jobs" =>
-      App.scheduled_jobs.map do |job|
-        {
-          "name" => job.name,
-          "cron" => job.cron,
-          "file" => job.file,
-          "line" => job.line
-        }
-      end
+    "jobs" => App.scheduled_jobs.map do |job|
+      {
+        "name" => job.name,
+        "cron" => job.cron,
+        "file" => job.file,
+        "line" => job.line
+      }
+    end
   }.to_json
 end
-post "/test/scheduled/run" do
-  content_type "application/json"
+
+post("/test/scheduled/run") do
+  content_type("application/json")
   unless scheduled_demos_enabled?
-    status 404
-    next(
-      {
-        "error" =>
-          "scheduled demos disabled (set HOMURA_ENABLE_SCHEDULED_DEMOS=1 in wrangler vars)"
-      }.to_json
-    )
+    status(404)
+    next ({
+      "error" => "scheduled demos disabled (set HOMURA_ENABLE_SCHEDULED_DEMOS=1 in wrangler vars)"
+    }.to_json)
   end
+
   cron = params["cron"].to_s
   if cron.empty?
-    status 400
-    next(
-      {
-        "error" => "missing cron query param (e.g. ?cron=*/5%20*%20*%20*%20*)"
-      }.to_json
-    )
+    status(400)
+    next ({
+      "error" => "missing cron query param (e.g. ?cron=*/5%20*%20*%20*%20*)"
+    }.to_json)
   end
   # Use the same dispatcher the Workers runtime invokes. Pass the
   # JS env / ctx so D1 / KV writes hit the live bindings. The
@@ -796,17 +840,21 @@ post "/test/scheduled/run" do
   # what Opal scans for to emit a JS `await`.
   event = Cloudflare::ScheduledEvent.new(cron: cron, scheduled_time: Time.now)
   result = App.dispatch_scheduled(event, cf_env, cf_ctx)
-  result.merge(
-    "cron" => cron,
-    "registered_crons" => App.scheduled_jobs.map(&:cron)
-  ).to_json
+  result
+    .merge(
+      "cron" => cron,
+      "registered_crons" => App.scheduled_jobs.map(&:cron)
+    )
+    .to_json
 end
-get "/login" do
+
+get("/login") do
   @title = "Login — homura"
   @login_error = nil
-  erb :login
+  erb(:login)
 end
-post "/login" do
+
+post("/login") do
   username = params["username"].to_s.strip
   return_to = params["return_to"].to_s
   # Reject protocol-relative (`//evil.example`) and anything with
@@ -822,7 +870,7 @@ post "/login" do
   if username.empty? || username.length > 64 || username.include?(":")
     @title = "Login — homura"
     @login_error = "username is required (1-64 chars, no colon)"
-    next erb :login
+    next erb(:login)
   end
 
   # mint_session_cookie is sync (HMAC-SHA256 via node:crypto).
@@ -841,13 +889,15 @@ post "/login" do
   )
   # 303 See Other — explicitly tells the client to follow up with
   # GET, avoiding any ambiguous POST-replay semantics around 302.
-  redirect return_to, 303
+  redirect(return_to, 303)
 end
-get "/logout" do
+
+get("/logout") do
   response.delete_cookie(App::SESSION_COOKIE_NAME, path: "/")
-  redirect "/"
+  redirect("/")
 end
-get "/chat" do
+
+get("/chat") do
   # /chat's body is async (load_chat_history is auto-awaited), so
   # `redirect` (which throws :halt) would surface as
   # `UncaughtThrowError: uncaught throw "halt"` past the async
@@ -866,10 +916,11 @@ get "/chat" do
   @ai_demos_enabled = ai_demos_enabled?
   @session_id = normalize_session_id(params["session"])
   @history = @ai_demos_enabled ? load_chat_history(@session_id) : []
-  erb :chat
+  erb(:chat)
 end
-get "/api/chat/health" do
-  content_type "application/json"
+
+get("/api/chat/health") do
+  content_type("application/json")
   {
     "ok" => true,
     "demos_enabled" => ai_demos_enabled?,
@@ -879,8 +930,9 @@ get "/api/chat/health" do
     "fallback_model" => App::CHAT_MODELS[:fallback]
   }.to_json
 end
-post "/api/chat/messages" do
-  content_type "application/json"
+
+post("/api/chat/messages") do
+  content_type("application/json")
   gate = ai_demos_block_or_nil
   next gate if gate
   # Inline JWT verification with dynamic algorithm detection.
@@ -891,17 +943,14 @@ post "/api/chat/messages" do
   auth_header = request.env["HTTP_AUTHORIZATION"].to_s
   parts = auth_header.split(" ", 2)
   if parts.length != 2 || parts[0].downcase != "bearer"
-    status 401
-    next(
-      { "error" => "unauthorized", "reason" => "missing bearer token" }.to_json
-    )
+    status(401)
+    next ({"error" => "unauthorized", "reason" => "missing bearer token"}.to_json)
   end
+
   auth_token = parts[1].strip
   if auth_token.empty?
-    status 401
-    next(
-      { "error" => "unauthorized", "reason" => "missing bearer token" }.to_json
-    )
+    status(401)
+    next ({"error" => "unauthorized", "reason" => "missing bearer token"}.to_json)
   end
   # JWT verify may resolve asynchronously. If verification fails after
   # the await, return `[status, body]` directly so build_js_response
@@ -915,16 +964,16 @@ post "/api/chat/messages" do
       algorithm: settings.jwt_algorithm
     )
   rescue JWT::ExpiredSignature
-    next 401, { "error" => "unauthorized", "reason" => "token expired" }.to_json
+    next 401, {"error" => "unauthorized", "reason" => "token expired"}.to_json
   rescue JWT::ImmatureSignature
     next [
       401,
-      { "error" => "unauthorized", "reason" => "token not yet valid" }.to_json
+      {"error" => "unauthorized", "reason" => "token not yet valid"}.to_json
     ]
   rescue JWT::IncorrectAlgorithm
     next [
       401,
-      { "error" => "unauthorized", "reason" => "algorithm mismatch" }.to_json
+      {"error" => "unauthorized", "reason" => "algorithm mismatch"}.to_json
     ]
   rescue JWT::VerificationError
     next [
@@ -943,6 +992,7 @@ post "/api/chat/messages" do
       }.to_json
     ]
   end
+
   bgate = ai_binding_block_or_nil
   next bgate if bgate
 
@@ -950,8 +1000,8 @@ post "/api/chat/messages" do
   session_id = normalize_session_id(body["session"])
   user_text = body["content"].to_s
   if user_text.strip.empty?
-    status 400
-    next({ "error" => "content required" }.to_json)
+    status(400)
+    next ({"error" => "content required"}.to_json)
   end
 
   requested_model = body["model"].to_s
@@ -959,12 +1009,11 @@ post "/api/chat/messages" do
   fallback = App::CHAT_MODELS[:fallback]
   # Allow either of the two configured models. Anything else is
   # rejected so a client can't run up neuron costs on arbitrary models.
-  model =
-    if requested_model == primary || requested_model == fallback
-      requested_model
-    else
-      primary
-    end
+  model = if requested_model == primary || requested_model == fallback
+    requested_model
+  else
+    primary
+  end
 
   # Auto-await knows this helper and the standard Cloudflare binding
   # wrappers, so the source stays sync-shaped here even though the
@@ -979,21 +1028,21 @@ post "/api/chat/messages" do
   ai_error = nil
 
   begin
-    result =
-      ai.run(
-        model,
-        # max_tokens raised to 1024 because OpenAI-style models (Gemma 4,
-        # gpt-oss-*) report `finish_reason: "length"` and surface the
-        # visible answer in `message.reasoning` instead of `content` when
-        # truncated. 1024 is generous enough for most chat replies and
-        # still well under Workers' 30s wall-time budget.
-        messages: messages,
-        max_tokens: 1024
-      )
+    result = ai.run(
+      model,
+      # max_tokens raised to 1024 because OpenAI-style models (Gemma 4,
+      # gpt-oss-*) report `finish_reason: "length"` and surface the
+      # visible answer in `message.reasoning` instead of `content` when
+      # truncated. 1024 is generous enough for most chat replies and
+      # still well under Workers' 30s wall-time budget.
+      messages: messages,
+      max_tokens: 1024
+    )
     reply_text = App.extract_ai_text(result).strip
     if reply_text.empty?
       raise Cloudflare::AIError.new("empty response", model: model)
     end
+
   rescue Cloudflare::AIError => e
     ai_error = e
   end
@@ -1007,33 +1056,28 @@ post "/api/chat/messages" do
       result = ai.run(used_model, messages: messages, max_tokens: 1024)
       reply_text = App.extract_ai_text(result).strip
     rescue Cloudflare::AIError => e
-      status 502
-      next(
-        {
-          "error" => "workers AI call failed",
-          "detail" => e.message,
-          "fallback_error" => true
-        }.to_json
-      )
+      status(502)
+      next ({
+        "error" => "workers AI call failed",
+        "detail" => e.message,
+        "fallback_error" => true
+      }.to_json)
     end
+
     if reply_text.nil? || reply_text.empty?
-      status 502
-      next(
-        {
-          "error" =>
-            "workers AI returned empty response on both primary and fallback"
-        }.to_json
-      )
+      status(502)
+      next ({
+        "error" => "workers AI returned empty response on both primary and fallback"
+      }.to_json)
     end
   end
 
   elapsed_ms = ((Time.now.to_f - started_at) * 1000).to_i
-  new_history =
-    history +
-      [
-        { "role" => "user", "content" => user_text },
-        { "role" => "assistant", "content" => reply_text }
-      ]
+  new_history = history +
+    [
+      {"role" => "user", "content" => user_text},
+      {"role" => "assistant", "content" => reply_text}
+    ]
   save_chat_history(session_id, new_history)
 
   {
@@ -1052,8 +1096,9 @@ post "/api/chat/messages" do
     "history_len" => new_history.size
   }.to_json
 end
-get "/api/chat/messages" do
-  content_type "application/json"
+
+get("/api/chat/messages") do
+  content_type("application/json")
   gate = ai_demos_block_or_nil
   next gate if gate
   auth_status, auth_result = authenticate_or_401
@@ -1062,44 +1107,46 @@ get "/api/chat/messages" do
   history = load_chat_history(session_id)
   # Include a pre-rendered HTML for each message so the client can
   # show Markdown-formatted history without re-running a JS parser.
-  history_enriched =
-    history.map do |m|
-      role = m["role"].to_s
-      content = m["content"].to_s
-      item = { "role" => role, "content" => content }
-      # Only assistant replies are converted — user messages are
-      # authored text and stay as-is to preserve the exact payload.
-      item["content_html"] = markdown_html(content) if role == "assistant"
-      item
-    end
-  { "session" => session_id, "history" => history_enriched }.to_json
+  history_enriched = history.map do |m|
+    role = m["role"].to_s
+    content = m["content"].to_s
+    item = {"role" => role, "content" => content}
+    # Only assistant replies are converted — user messages are
+    # authored text and stay as-is to preserve the exact payload.
+    item["content_html"] = markdown_html(content) if role == "assistant"
+    item
+  end
+
+  {"session" => session_id, "history" => history_enriched}.to_json
 end
-delete "/api/chat/messages" do
-  content_type "application/json"
+
+delete("/api/chat/messages") do
+  content_type("application/json")
   gate = ai_demos_block_or_nil
   next gate if gate
   auth_status, auth_result = authenticate_or_401
   next auth_status, auth_result if auth_status
   session_id = normalize_session_id(params["session"])
   clear_chat_history(session_id)
-  { "ok" => true, "session" => session_id, "cleared" => true }.to_json
+  {"ok" => true, "session" => session_id, "cleared" => true}.to_json
 end
-get "/test/ai/debug" do
-  content_type "application/json"
+
+get("/test/ai/debug") do
+  content_type("application/json")
   unless ai_demos_enabled? && ai_binding?
-    status 404
-    next({ "error" => "disabled" }.to_json)
+    status(404)
+    next ({"error" => "disabled"}.to_json)
   end
+
   model = params["model"] || App::CHAT_MODELS[:primary]
-  out =
-    ai.run(
-      model,
-      messages: [
-        { role: "system", content: "reply with a short Japanese greeting" },
-        { role: "user", content: "こんにちは" }
-      ],
-      max_tokens: 64
-    )
+  out = ai.run(
+    model,
+    messages: [
+      {role: "system", content: "reply with a short Japanese greeting"},
+      {role: "user", content: "こんにちは"}
+    ],
+    max_tokens: 64
+  )
   {
     "model" => model,
     "class" => out.class.to_s,
@@ -1109,21 +1156,19 @@ get "/test/ai/debug" do
     "raw" => out
   }.to_json
 end
-get "/test/ai" do
-  content_type "application/json"
+
+get("/test/ai") do
+  content_type("application/json")
   unless ai_demos_enabled?
-    status 404
-    next(
-      { "error" => "AI demos disabled (set HOMURA_ENABLE_AI_DEMOS=1)" }.to_json
-    )
+    status(404)
+    next ({"error" => "AI demos disabled (set HOMURA_ENABLE_AI_DEMOS=1)"}.to_json)
   end
+
   unless ai_binding?
-    status 503
-    next(
-      {
-        "error" => "AI binding not bound (wrangler.toml [ai] block missing)"
-      }.to_json
-    )
+    status(503)
+    next ({
+      "error" => "AI binding not bound (wrangler.toml [ai] block missing)"
+    }.to_json)
   end
 
   cases = []
@@ -1137,30 +1182,29 @@ get "/test/ai" do
   # `{cases: []}` before the AI call even finished. Inline a manual
   # loop where each step is followed by an explicit `__await__`.
 
-  test_one =
-    lambda do |model, label|
-      result =
-        begin
-          out =
-            ai.run(
-              model,
-              messages: [
-                { role: "system", content: "reply with the single word READY" },
-                { role: "user", content: "ping" }
-              ],
-              max_tokens: 64
-            )
-          txt = App.extract_ai_text(out).strip
-          if txt.empty?
-            { "pass" => false, "note" => "empty response from model" }
-          else
-            { "pass" => true, "note" => txt[0, 200] }
-          end
-        rescue ::Exception => e
-          { "pass" => false, "note" => "#{e.class}: #{e.message[0, 200]}" }
-        end
-      result.merge("case" => label)
+  test_one = lambda do |model, label|
+    result = begin
+      out = ai.run(
+        model,
+        messages: [
+          {role: "system", content: "reply with the single word READY"},
+          {role: "user", content: "ping"}
+        ],
+        max_tokens: 64
+      )
+      txt = App.extract_ai_text(out).strip
+      if txt.empty?
+        {"pass" => false, "note" => "empty response from model"}
+      else
+        {"pass" => true, "note" => txt[0, 200]}
+      end
+
+    rescue ::Exception => e
+      {"pass" => false, "note" => "#{e.class}: #{e.message[0, 200]}"}
     end
+
+    result.merge("case" => label)
+  end
 
   cases << test_one.call(primary, "primary model #{primary} responds")
   cases << test_one.call(fallback, "fallback model #{fallback} responds")
@@ -1174,11 +1218,12 @@ get "/test/ai" do
     "cases" => cases
   }.to_json
 end
-get "/demo/do/ws" do
+
+get("/demo/do/ws") do
   unless binding_demos_enabled?
-    status 404
-    content_type "application/json"
-    next({ "error" => "binding demos disabled" }.to_json)
+    status(404)
+    content_type("application/json")
+    next ({"error" => "binding demos disabled"}.to_json)
   end
   # Copilot review PR #9 (third pass): Workers only accepts a
   # `Response` with a `.webSocket` property from a handler that
@@ -1190,22 +1235,21 @@ get "/demo/do/ws" do
   # get an intentional, documented response.
   upgrade = (request.env["HTTP_UPGRADE"] || "").to_s.downcase
   unless upgrade == "websocket"
-    status 426
-    content_type "application/json"
-    next(
-      {
-        "error" => "Upgrade Required",
-        "detail" =>
-          "GET /demo/do/ws must be called with `Upgrade: websocket`; use a WebSocket client."
-      }.to_json
-    )
+    status(426)
+    content_type("application/json")
+    next ({
+      "error" => "Upgrade Required",
+      "detail" => "GET /demo/do/ws must be called with `Upgrade: websocket`; use a WebSocket client."
+    }.to_json)
   end
+
   ns = do_counter
   if ns.nil?
-    status 503
-    content_type "application/json"
-    next({ "error" => "COUNTER binding not bound" }.to_json)
+    status(503)
+    content_type("application/json")
+    next ({"error" => "COUNTER binding not bound"}.to_json)
   end
+
   name = (params["name"] || "ws-demo").to_s
   stub = ns.get_by_name(name)
   # Forward a WebSocket-upgrade request to the DO stub. The stub's
@@ -1213,36 +1257,33 @@ get "/demo/do/ws" do
   # Cloudflare::RawResponse signals to build_js_response that the
   # JS Response must be passed through untouched (normal bodies
   # lose the WebSocket property when reconstructed).
-  js_resp =
-    stub.fetch_raw(
-      "https://homura-do.internal/ws/#{name}",
-      method: "GET",
-      headers: {
-        "upgrade" => "websocket"
-      }
-    )
+  js_resp = stub.fetch_raw(
+    "https://homura-do.internal/ws/#{name}",
+    method: "GET",
+    headers: {
+      "upgrade" => "websocket"
+    }
+  )
   Cloudflare::RawResponse.new(js_resp)
 end
-get "/demo/do" do
-  content_type "application/json"
+
+get("/demo/do") do
+  content_type("application/json")
   unless binding_demos_enabled?
-    status 404
-    next(
-      {
-        "error" => "binding demos disabled (set HOMURA_ENABLE_BINDING_DEMOS=1)"
-      }.to_json
-    )
+    status(404)
+    next ({
+      "error" => "binding demos disabled (set HOMURA_ENABLE_BINDING_DEMOS=1)"
+    }.to_json)
   end
+
   ns = do_counter
   if ns.nil?
-    status 503
-    next(
-      {
-        "error" =>
-          "DurableObject binding COUNTER not bound (wrangler.toml missing [[durable_objects.bindings]])"
-      }.to_json
-    )
+    status(503)
+    next ({
+      "error" => "DurableObject binding COUNTER not bound (wrangler.toml missing [[durable_objects.bindings]])"
+    }.to_json)
   end
+
   name = (params["name"] || "global").to_s
   action = (params["action"] || "inc").to_s
   stub = ns.get_by_name(name)
@@ -1261,83 +1302,81 @@ get "/demo/do" do
     "body" => res.body.empty? ? nil : JSON.parse(res.body)
   }.to_json
 end
-get "/demo/cache/heavy" do
-  content_type "application/json"
+
+get("/demo/cache/heavy") do
+  content_type("application/json")
   unless binding_demos_enabled?
-    status 404
-    next(
-      {
-        "error" => "binding demos disabled (set HOMURA_ENABLE_BINDING_DEMOS=1)"
-      }.to_json
-    )
+    status(404)
+    next ({
+      "error" => "binding demos disabled (set HOMURA_ENABLE_BINDING_DEMOS=1)"
+    }.to_json)
   end
   # Cache by request URL so different query strings produce different
   # cache entries (cache-busting with ?v=N works).
   cache_key = request.url
   ttl = (params["ttl"] || "60").to_i
   started = Time.now.to_f
-  compute_body =
-    proc do
-      # Expensive work: derive a PBKDF2 key + hash many times so the
-      # first-request latency is non-trivial. The exact ~1000 iterations
-      # is a compromise between "clearly slower than a cache hit" and
-      # "finishes inside wrangler dev's request budget on an M1".
-      salt = SecureRandom.random_bytes(16)
-      derived =
-        OpenSSL::KDF.pbkdf2_hmac(
-          "homura-phase11b",
-          salt: salt,
-          iterations: 50_000,
-          length: 32,
-          hash: "SHA256"
-        )
-      {
-        "computed" => "expensive PBKDF2 derivation",
-        "iterations" => 50_000,
-        "derived_hex" => derived.unpack1("H*"),
-        "salt_hex" => salt.unpack1("H*"),
-        "computed_at" => Time.now.to_i
-      }.to_json
-    end
+  compute_body = proc do
+    # Expensive work: derive a PBKDF2 key + hash many times so the
+    # first-request latency is non-trivial. The exact ~1000 iterations
+    # is a compromise between "clearly slower than a cache hit" and
+    # "finishes inside wrangler dev's request budget on an M1".
+    salt = SecureRandom.random_bytes(16)
+    derived = OpenSSL::KDF.pbkdf2_hmac(
+      "homura-phase11b",
+      salt: salt,
+      iterations: 50_000,
+      length: 32,
+      hash: "SHA256"
+    )
+    {
+      "computed" => "expensive PBKDF2 derivation",
+      "iterations" => 50_000,
+      "derived_hex" => derived.unpack1("H*"),
+      "salt_hex" => salt.unpack1("H*"),
+      "computed_at" => Time.now.to_i
+    }.to_json
+  end
+
   body = cache_get(cache_key, ttl: ttl, &compute_body)
   elapsed_ms = ((Time.now.to_f - started) * 1000).round
   # The helper set response.headers['x-homura-cache'] to HIT / MISS.
   cache_state = response["X-Homura-Cache"] || "UNKNOWN"
   # Re-serialise with extra diagnostic fields so the route caller can
   # see which path ran without cracking open headers from a browser.
-  orig =
-    begin
-      JSON.parse(body)
-    rescue JSON::ParserError
-      { "raw" => body }
-    end
-  orig.merge(
-    "cache" => cache_state,
-    "elapsed_ms" => elapsed_ms,
-    "cache_key" => cache_key,
-    "ttl" => ttl
-  ).to_json
-end
-post "/api/enqueue" do
-  content_type "application/json"
-  unless binding_demos_enabled?
-    status 404
-    next(
-      {
-        "error" => "binding demos disabled (set HOMURA_ENABLE_BINDING_DEMOS=1)"
-      }.to_json
-    )
+  orig = begin
+    JSON.parse(body)
+  rescue JSON::ParserError
+    {"raw" => body}
   end
+
+  orig
+    .merge(
+      "cache" => cache_state,
+      "elapsed_ms" => elapsed_ms,
+      "cache_key" => cache_key,
+      "ttl" => ttl
+    )
+    .to_json
+end
+
+post("/api/enqueue") do
+  content_type("application/json")
+  unless binding_demos_enabled?
+    status(404)
+    next ({
+      "error" => "binding demos disabled (set HOMURA_ENABLE_BINDING_DEMOS=1)"
+    }.to_json)
+  end
+
   q = jobs_queue
   if q.nil?
-    status 503
-    next(
-      {
-        "error" =>
-          "Queue binding JOBS_QUEUE not bound (wrangler.toml missing [[queues.producers]])"
-      }.to_json
-    )
+    status(503)
+    next ({
+      "error" => "Queue binding JOBS_QUEUE not bound (wrangler.toml missing [[queues.producers]])"
+    }.to_json)
   end
+
   begin
     body = JSON.parse(request.body.read)
   rescue JSON::ParserError, StandardError
@@ -1346,24 +1385,26 @@ post "/api/enqueue" do
       "ts" => Time.now.to_i
     }
   end
+
   q.send(body)
-  status 202
-  { "enqueued" => true, "queue" => "homura-jobs", "payload" => body }.to_json
+  status(202)
+  {"enqueued" => true, "queue" => "homura-jobs", "payload" => body}.to_json
 end
-get "/demo/queue/status" do
-  content_type "application/json"
+
+get("/demo/queue/status") do
+  content_type("application/json")
   unless binding_demos_enabled?
-    status 404
-    next(
-      {
-        "error" => "binding demos disabled (set HOMURA_ENABLE_BINDING_DEMOS=1)"
-      }.to_json
-    )
+    status(404)
+    next ({
+      "error" => "binding demos disabled (set HOMURA_ENABLE_BINDING_DEMOS=1)"
+    }.to_json)
   end
+
   if kv.nil?
-    status 503
-    next({ "error" => "KV not bound — cannot read consumer state" }.to_json)
+    status(503)
+    next ({"error" => "KV not bound — cannot read consumer state"}.to_json)
   end
+
   limit = (params["limit"] || "10").to_i
   recent = []
   i = 0
@@ -1373,46 +1414,48 @@ get "/demo/queue/status" do
     begin
       recent << JSON.parse(raw)
     rescue JSON::ParserError
-      recent << { "raw" => raw }
+      recent << {"raw" => raw}
     end
+
     i += 1
   end
+
   {
     "queue" => "homura-jobs",
     "count" => recent.size,
     "recent" => recent
   }.to_json
 end
-get "/demo/cache/named" do
-  content_type "application/json"
+
+get("/demo/cache/named") do
+  content_type("application/json")
   unless binding_demos_enabled?
-    status 404
-    next({ "error" => "binding demos disabled" }.to_json)
+    status(404)
+    next ({"error" => "binding demos disabled"}.to_json)
   end
+
   namespace = (params["namespace"] || "frag-default").to_s
   # Copilot review PR #9 (third pass): return a stable 400 JSON
   # response on client input validation failures instead of
   # raising — the app has no Sinatra error handler for
   # ArgumentError, which would otherwise surface as 500.
   unless namespace =~ /\A[A-Za-z0-9_-]{1,32}\z/
-    status 400
-    next(
-      {
-        "error" => 'namespace must match /\\A[A-Za-z0-9_-]{1,32}\\z/',
-        "got" => namespace
-      }.to_json
-    )
+    status(400)
+    next ({
+      "error" => "namespace must match /\\A[A-Za-z0-9_-]{1,32}\\z/",
+      "got" => namespace
+    }.to_json)
   end
+
   key = (params["key"] || "demo").to_s
   unless key =~ /\A[A-Za-z0-9._\-\/]{1,128}\z/
-    status 400
-    next(
-      {
-        "error" => 'key must match /\\A[A-Za-z0-9._\\-\\/]{1,128}\\z/',
-        "got" => key
-      }.to_json
-    )
+    status(400)
+    next ({
+      "error" => "key must match /\\A[A-Za-z0-9._\\-\\/]{1,128}\\z/",
+      "got" => key
+    }.to_json)
   end
+
   cache_key = "https://homura-named-cache.internal/#{namespace}/#{key}"
   started = Time.now.to_f
   # Open the named partition fresh per request — the JS handle is
@@ -1422,18 +1465,20 @@ get "/demo/cache/named" do
   if cached
     state = "HIT"
     # Tiny pass-through of the cached body.
-    payload =
-      begin
-        JSON.parse(cached.body)
-      rescue StandardError
-        { "raw" => cached.body }
-      end
-    payload.merge(
-      "cache" => state,
-      "namespace" => namespace,
-      "key" => key,
-      "elapsed_ms" => ((Time.now.to_f - started) * 1000).round
-    ).to_json
+    payload = begin
+      JSON.parse(cached.body)
+    rescue StandardError
+      {"raw" => cached.body}
+    end
+
+    payload
+      .merge(
+        "cache" => state,
+        "namespace" => namespace,
+        "key" => key,
+        "elapsed_ms" => ((Time.now.to_f - started) * 1000).round
+      )
+      .to_json
   else
     state = "MISS"
     # Compute something uniquely attributable to this namespace/key
@@ -1455,33 +1500,36 @@ get "/demo/cache/named" do
         "date" => Time.now.httpdate
       }
     )
-    payload.merge(
-      "cache" => state,
-      "elapsed_ms" => ((Time.now.to_f - started) * 1000).round
-    ).to_json
+    payload
+      .merge(
+        "cache" => state,
+        "elapsed_ms" => ((Time.now.to_f - started) * 1000).round
+      )
+      .to_json
   end
 end
-post "/test/queue/fire" do
-  content_type "application/json"
+
+post("/test/queue/fire") do
+  content_type("application/json")
   unless binding_demos_enabled?
-    status 404
-    next({ "error" => "binding demos disabled" }.to_json)
+    status(404)
+    next ({"error" => "binding demos disabled"}.to_json)
   end
-  body =
-    begin
-      JSON.parse(request.body.read)
-    rescue StandardError
-      {}
-    end
+
+  body = begin
+    JSON.parse(request.body.read)
+  rescue StandardError
+    {}
+  end
+
   qname = (body["queue"] || "homura-jobs").to_s
-  messages =
-    (
-      if body["messages"].is_a?(Array)
-        body["messages"]
-      else
-        [{ "fire" => true, "ts" => Time.now.to_i }]
-      end
-    )
+  messages = (
+    if body["messages"].is_a?(Array)
+      body["messages"]
+    else
+      [{"fire" => true, "ts" => Time.now.to_i}]
+    end
+  )
 
   js_msgs = `([])`
   idx = 0
@@ -1492,21 +1540,24 @@ post "/test/queue/fire" do
     `#{js_msgs}.push({ id: #{i_str}, timestamp: new Date(#{now_ms}), body: #{js_body}, ack: function() {}, retry: function() {} })`
     idx += 1
   end
-  js_batch =
-    `({ queue: #{qname}, messages: #{js_msgs}, ackAll: function() {}, retryAll: function() {} })`
+
+  js_batch = `({ queue: #{qname}, messages: #{js_msgs}, ackAll: function() {}, retryAll: function() {} })`
   summary = Cloudflare::QueueConsumer.dispatch_js(js_batch, cf_env, cf_ctx)
   summary.merge("injected" => messages.size).to_json
 end
-get "/demo/queue/dlq-status" do
-  content_type "application/json"
+
+get("/demo/queue/dlq-status") do
+  content_type("application/json")
   unless binding_demos_enabled?
-    status 404
-    next({ "error" => "binding demos disabled" }.to_json)
+    status(404)
+    next ({"error" => "binding demos disabled"}.to_json)
   end
+
   if kv.nil?
-    status 503
-    next({ "error" => "KV not bound — cannot read DLQ state" }.to_json)
+    status(503)
+    next ({"error" => "KV not bound — cannot read DLQ state"}.to_json)
   end
+
   limit = (params["limit"] || "10").to_i
   recent = []
   i = 0
@@ -1516,56 +1567,60 @@ get "/demo/queue/dlq-status" do
     begin
       recent << JSON.parse(raw)
     rescue JSON::ParserError
-      recent << { "raw" => raw }
+      recent << {"raw" => raw}
     end
+
     i += 1
   end
+
   {
     "queue" => "homura-jobs-dlq",
     "count" => recent.size,
     "recent" => recent
   }.to_json
 end
-post "/demo/queue/force-dlq" do
-  content_type "application/json"
+
+post("/demo/queue/force-dlq") do
+  content_type("application/json")
   unless binding_demos_enabled?
-    status 404
-    next({ "error" => "binding demos disabled" }.to_json)
+    status(404)
+    next ({"error" => "binding demos disabled"}.to_json)
   end
+
   q = jobs_queue
   if q.nil?
-    status 503
-    next({ "error" => "Queue binding JOBS_QUEUE not bound" }.to_json)
+    status(503)
+    next ({"error" => "Queue binding JOBS_QUEUE not bound"}.to_json)
   end
+
   payload = {
     "fail" => true,
     "reason" => "force-dlq demo",
     "ts" => Time.now.to_i
   }
   q.send(payload)
-  status 202
+  status(202)
   {
     "enqueued" => true,
     "payload" => payload,
-    "note" =>
-      "main consumer will retry up to max_retries; then the runtime forwards the message to homura-jobs-dlq"
+    "note" => "main consumer will retry up to max_retries; then the runtime forwards the message to homura-jobs-dlq"
   }.to_json
 end
-get "/test/bindings" do
-  content_type "application/json"
+
+get("/test/bindings") do
+  content_type("application/json")
   unless binding_demos_enabled?
-    status 404
-    next(
-      {
-        "error" => "binding demos disabled (set HOMURA_ENABLE_BINDING_DEMOS=1)"
-      }.to_json
-    )
+    status(404)
+    next ({
+      "error" => "binding demos disabled (set HOMURA_ENABLE_BINDING_DEMOS=1)"
+    }.to_json)
   end
+
   cases = []
   started = Time.now.to_f
 
   # 1. DurableObject round-trip
-  do_case = { "case" => "DurableObject counter inc/peek/reset round-trip" }
+  do_case = {"case" => "DurableObject counter inc/peek/reset round-trip"}
   begin
     ns = do_counter
     if ns.nil?
@@ -1579,23 +1634,26 @@ get "/test/bindings" do
       r1 = JSON.parse(stub.fetch("#{base}/inc", method: "POST").body)
       r2 = JSON.parse(stub.fetch("#{base}/inc", method: "POST").body)
       peek = JSON.parse(stub.fetch("#{base}/peek").body)
-      do_case["pass"] = r1["count"] == 1 && r2["count"] == 2 &&
+      do_case["pass"] = r1["count"] == 1 &&
+        r2["count"] == 2 &&
         peek["count"] == 2
-      do_case["detail"] = { "r1" => r1, "r2" => r2, "peek" => peek }
+      do_case["detail"] = {"r1" => r1, "r2" => r2, "peek" => peek}
       stub.fetch("#{base}/reset", method: "POST")
     end
+
   rescue ::Exception => e
     do_case["pass"] = false
     do_case["note"] = "#{e.class}: #{e.message[0, 200]}"
   end
+
   cases << do_case
 
   # 2. Cache API put/match round-trip
-  cache_case = { "case" => "Cache API match after put returns same body" }
+  cache_case = {"case" => "Cache API match after put returns same body"}
   begin
     c = cache
     key = "https://cache-selftest.example/phase11b-#{SecureRandom.hex(4)}"
-    payload = { "self_test" => true, "ts" => Time.now.to_i }.to_json
+    payload = {"self_test" => true, "ts" => Time.now.to_i}.to_json
     c.put(
       key,
       payload,
@@ -1619,10 +1677,12 @@ get "/test/bindings" do
         "content_type" => got["content-type"]
       }
     end
+
   rescue ::Exception => e
     cache_case["pass"] = false
     cache_case["note"] = "#{e.class}: #{e.message[0, 200]}"
   end
+
   cases << cache_case
 
   # 3. Queue producer .send succeeds (does not crash). We can't
@@ -1630,7 +1690,7 @@ get "/test/bindings" do
   # separate invocation; instead we check that the producer returned
   # without error and, when KV is available, that at least one
   # message had been delivered previously (warmup from /api/enqueue).
-  queue_case = { "case" => "Queue producer send() returns without error" }
+  queue_case = {"case" => "Queue producer send() returns without error"}
   begin
     q = jobs_queue
     if q.nil?
@@ -1647,10 +1707,12 @@ get "/test/bindings" do
       queue_case["pass"] = true
       queue_case["note"] = "producer.send completed"
     end
+
   rescue ::Exception => e
     queue_case["pass"] = false
     queue_case["note"] = "#{e.class}: #{e.message[0, 200]}"
   end
+
   cases << queue_case
 
   passed = cases.count { |c| c["pass"] }
@@ -1663,51 +1725,49 @@ get "/test/bindings" do
     "cases" => cases
   }.to_json
 end
-get "/demo/faraday" do
-  content_type "application/json"
+
+get("/demo/faraday") do
+  content_type("application/json")
   unless foundations_demos_enabled?
-    status 404
-    next(
-      {
-        "error" =>
-          "foundations demos disabled (set HOMURA_ENABLE_FOUNDATIONS_DEMOS=1)"
-      }.to_json
-    )
+    status(404)
+    next ({
+      "error" => "foundations demos disabled (set HOMURA_ENABLE_FOUNDATIONS_DEMOS=1)"
+    }.to_json)
   end
-  client =
-    Faraday.new(url: "https://api.ipify.org") do |c|
-      c.request :json
-      c.response :json
-      c.headers["user-agent"] = "homura-phase11a/1.0"
-    end
-  res = client.get("/", { "format" => "json" })
+
+  client = Faraday.new(url: "https://api.ipify.org") do |c|
+    c.request(:json)
+    c.response(:json)
+    c.headers["user-agent"] = "homura-phase11a/1.0"
+  end
+
+  res = client.get("/", {"format" => "json"})
   {
     "demo" => "Faraday.new(url:) { request :json; response :json }",
     "status" => res.status,
     "success" => res.success?,
     "reason" => res.reason_phrase,
-    "body" => res.body, # parsed Hash thanks to :json middleware
+    # parsed Hash thanks to :json middleware
+    "body" => res.body,
     "headers_ct" => res.headers["content-type"]
   }.to_json
 end
-post "/api/upload" do
-  content_type "application/json"
+
+post("/api/upload") do
+  content_type("application/json")
   unless foundations_demos_enabled?
-    status 404
-    next(
-      {
-        "error" =>
-          "foundations demos disabled (set HOMURA_ENABLE_FOUNDATIONS_DEMOS=1)"
-      }.to_json
-    )
+    status(404)
+    next ({
+      "error" => "foundations demos disabled (set HOMURA_ENABLE_FOUNDATIONS_DEMOS=1)"
+    }.to_json)
   end
   # pull params BEFORE the first await — Sinatra clears @params when
   # it starts a Promise-returning route (same ceremony as /d1/users).
   file_param = params["file"]
   note_param = params["note"].to_s
   unless file_param.is_a?(::Cloudflare::UploadedFile)
-    status 400
-    next({ "error" => 'missing "file" multipart part' }.to_json)
+    status(400)
+    next ({"error" => "missing \"file\" multipart part"}.to_json)
   end
 
   # Only accept images — this is the /phase11a/upload demo's purpose.
@@ -1716,19 +1776,18 @@ post "/api/upload" do
   # `.bin` payloads came in before this check existed).
   ct = file_param.content_type.to_s
   unless ct.start_with?("image/")
-    status 415 # Unsupported Media Type
-    next(
-      {
-        "error" => "only image/* content types are accepted",
-        "received_type" => ct.empty? ? "(missing)" : ct,
-        "filename" => file_param.filename
-      }.to_json
-    )
+    # Unsupported Media Type
+    status(415)
+    next ({
+      "error" => "only image/* content types are accepted",
+      "received_type" => ct.empty? ? "(missing)" : ct,
+      "filename" => file_param.filename
+    }.to_json)
   end
 
   if bucket.nil?
-    status 503
-    next({ "error" => "R2 binding not configured" }.to_json)
+    status(503)
+    next ({"error" => "R2 binding not configured"}.to_json)
   end
 
   # Pick a random key under a phase11a/ prefix so we don't collide
@@ -1737,7 +1796,7 @@ post "/api/upload" do
   u8 = file_param.to_uint8_array
   bucket.put(key, u8, file_param.content_type)
 
-  status 201
+  status(201)
   {
     "stored" => true,
     "key" => key,
@@ -1745,17 +1804,19 @@ post "/api/upload" do
     "content_type" => file_param.content_type,
     "size" => file_param.size,
     "note" => note_param,
-    "url" => "/r2/#{key}" # hit via GET /images/:key for binary
+    # hit via GET /images/:key for binary
+    "url" => "/r2/#{key}"
   }.to_json
 end
-get "/phase11a/upload" do
+
+get("/phase11a/upload") do
   @title = "Phase 11A — image upload demo"
   unless foundations_demos_enabled?
-    status 404
-    @content =
-      "<p>foundations demos disabled (set HOMURA_ENABLE_FOUNDATIONS_DEMOS=1).</p>"
-    next erb :layout
+    status(404)
+    @content = "<p>foundations demos disabled (set HOMURA_ENABLE_FOUNDATIONS_DEMOS=1).</p>"
+    next erb(:layout)
   end
+
   @images = []
   @non_image_count = 0
   if bucket
@@ -1770,36 +1831,39 @@ get "/phase11a/upload" do
       if ct.start_with?("image/")
         filename = row["key"].to_s.split("/").last.to_s
         display_name = filename.sub(/\A[0-9a-f]+-/, "")
-        @images << {
-          "key" => row["key"],
-          "download_url" => "/phase11a/download/#{row["key"]}",
-          "filename" => display_name,
-          "content_type" => ct,
-          "size" => row["size"],
-          "note" => nil # R2 doesn't preserve our custom note
-        }
+        @images <<
+          {
+            "key" => row["key"],
+            "download_url" => "/phase11a/download/#{row["key"]}",
+            "filename" => display_name,
+            "content_type" => ct,
+            "size" => row["size"],
+            # R2 doesn't preserve our custom note
+            "note" => nil
+          }
       else
         @non_image_count += 1
       end
     end
   end
-  erb :phase11a_upload
+
+  erb(:phase11a_upload)
 end
-post "/phase11a/cleanup" do
-  content_type "application/json"
+
+post("/phase11a/cleanup") do
+  content_type("application/json")
   unless foundations_demos_enabled?
-    status 404
-    next(
-      {
-        "error" =>
-          "foundations demos disabled (set HOMURA_ENABLE_FOUNDATIONS_DEMOS=1)"
-      }.to_json
-    )
+    status(404)
+    next ({
+      "error" => "foundations demos disabled (set HOMURA_ENABLE_FOUNDATIONS_DEMOS=1)"
+    }.to_json)
   end
+
   if bucket.nil?
-    status 503
-    next({ "error" => "R2 binding not configured" }.to_json)
+    status(503)
+    next ({"error" => "R2 binding not configured"}.to_json)
   end
+
   rows = bucket.list(prefix: "phase11a/uploads/", limit: 1000)
   deleted_keys = []
   rows.each do |row|
@@ -1811,91 +1875,89 @@ post "/phase11a/cleanup" do
     bucket.delete(k)
     deleted_keys << k
   end
-  { "deleted_count" => deleted_keys.length, "deleted" => deleted_keys }.to_json
+
+  {"deleted_count" => deleted_keys.length, "deleted" => deleted_keys}.to_json
 end
-delete "/phase11a/uploads/*" do
-  content_type "application/json"
+
+delete("/phase11a/uploads/*") do
+  content_type("application/json")
   unless foundations_demos_enabled?
-    status 404
-    next(
-      {
-        "error" =>
-          "foundations demos disabled (set HOMURA_ENABLE_FOUNDATIONS_DEMOS=1)"
-      }.to_json
-    )
+    status(404)
+    next ({
+      "error" => "foundations demos disabled (set HOMURA_ENABLE_FOUNDATIONS_DEMOS=1)"
+    }.to_json)
   end
+
   if bucket.nil?
-    status 503
-    next({ "error" => "R2 binding not configured" }.to_json)
+    status(503)
+    next ({"error" => "R2 binding not configured"}.to_json)
   end
-  key =
-    (
-      if params["splat"].is_a?(Array)
-        params["splat"].join("/")
-      else
-        params["splat"].to_s
-      end
-    )
+
+  key = (
+    if params["splat"].is_a?(Array)
+      params["splat"].join("/")
+    else
+      params["splat"].to_s
+    end
+  )
   full = "phase11a/uploads/#{key}"
   # Safety: only ever delete under our own prefix. The splat route
   # already enforces this prefix structurally, but a belt-and-braces
   # startswith check protects against future routing changes.
   unless full.start_with?("phase11a/uploads/")
-    status 400
-    next(
-      {
-        "error" => "refusing to delete outside phase11a/uploads/",
-        "key" => full
-      }.to_json
-    )
+    status(400)
+    next ({
+      "error" => "refusing to delete outside phase11a/uploads/",
+      "key" => full
+    }.to_json)
   end
+
   bucket.delete(full)
-  { "deleted" => true, "key" => full }.to_json
+  {"deleted" => true, "key" => full}.to_json
 end
-get "/phase11a/download/*" do
+
+get("/phase11a/download/*") do
   unless foundations_demos_enabled?
-    content_type "application/json"
-    status 404
-    next(
-      {
-        "error" =>
-          "foundations demos disabled (set HOMURA_ENABLE_FOUNDATIONS_DEMOS=1)"
-      }.to_json
-    )
+    content_type("application/json")
+    status(404)
+    next ({
+      "error" => "foundations demos disabled (set HOMURA_ENABLE_FOUNDATIONS_DEMOS=1)"
+    }.to_json)
   end
+
   if bucket.nil?
-    content_type "application/json"
-    status 503
-    next({ "error" => "R2 binding not configured" }.to_json)
+    content_type("application/json")
+    status(503)
+    next ({"error" => "R2 binding not configured"}.to_json)
   end
-  key =
-    (
-      if params["splat"].is_a?(Array)
-        params["splat"].join("/")
-      else
-        params["splat"].to_s
-      end
-    )
+
+  key = (
+    if params["splat"].is_a?(Array)
+      params["splat"].join("/")
+    else
+      params["splat"].to_s
+    end
+  )
   obj = bucket.get_binary(key)
   if obj.nil?
-    content_type "application/json"
-    status 404
-    next({ "error" => "not found", "key" => key }.to_json)
+    content_type("application/json")
+    status(404)
+    next ({"error" => "not found", "key" => key}.to_json)
   else
-    obj # BinaryBody — build_js_response streams raw bytes to client
+    # BinaryBody — build_js_response streams raw bytes to client
+    obj
   end
 end
-get "/demo/stream" do
+
+get("/demo/stream") do
   unless foundations_demos_enabled?
-    content_type "application/json"
-    status 404
-    next(
-      {
-        "error" =>
-          "foundations demos disabled (set HOMURA_ENABLE_FOUNDATIONS_DEMOS=1)"
-      }.to_json
-    )
+    content_type("application/json")
+    status(404)
+    next ({
+      "error" => "foundations demos disabled (set HOMURA_ENABLE_FOUNDATIONS_DEMOS=1)"
+    }.to_json)
   end
+
   stream do |out|
     i = 0
     while i < 3
@@ -1903,20 +1965,20 @@ get "/demo/stream" do
       out.sleep(0.5)
       i += 1
     end
+
     out << "done\n"
   end
 end
-get "/demo/sse" do
+
+get("/demo/sse") do
   unless foundations_demos_enabled?
-    content_type "application/json"
-    status 404
-    next(
-      {
-        "error" =>
-          "foundations demos disabled (set HOMURA_ENABLE_FOUNDATIONS_DEMOS=1)"
-      }.to_json
-    )
+    content_type("application/json")
+    status(404)
+    next ({
+      "error" => "foundations demos disabled (set HOMURA_ENABLE_FOUNDATIONS_DEMOS=1)"
+    }.to_json)
   end
+
   sse do |out|
     # Manual `while` instead of `Integer#times` because Opal compiles
     # `.each` / `.times` iterators as synchronous JS `for` loops —
@@ -1939,37 +2001,36 @@ get "/demo/sse" do
       out.sleep(1)
       i += 1
     end
+
     out.event("done", event: "close")
   end
 end
-get "/test/foundations" do
-  content_type "application/json"
+
+get("/test/foundations") do
+  content_type("application/json")
   unless foundations_demos_enabled?
-    status 404
-    next(
-      {
-        "error" =>
-          "foundations demos disabled (set HOMURA_ENABLE_FOUNDATIONS_DEMOS=1)"
-      }.to_json
-    )
+    status(404)
+    next ({
+      "error" => "foundations demos disabled (set HOMURA_ENABLE_FOUNDATIONS_DEMOS=1)"
+    }.to_json)
   end
 
   cases = []
-  run =
-    lambda do |label, &blk|
-      result =
-        begin
-          v = blk.call
-          if v == false
-            { "pass" => false, "note" => "returned false" }
-          else
-            { "pass" => true }
-          end
-        rescue ::Exception => e
-          { "pass" => false, "note" => "#{e.class}: #{e.message[0, 200]}" }
-        end
-      cases << result.merge("case" => label)
+  run = lambda do |label, &blk|
+    result = begin
+      v = blk.call
+      if v == false
+        {"pass" => false, "note" => "returned false"}
+      else
+        {"pass" => true}
+      end
+
+    rescue ::Exception => e
+      {"pass" => false, "note" => "#{e.class}: #{e.message[0, 200]}"}
     end
+
+    cases << result.merge("case" => label)
+  end
 
   # Faraday GET with :json middleware, hitting the only stable public
   # API we're willing to depend on in a self-test (ipify). httpbin.org
@@ -1977,12 +2038,12 @@ get "/test/foundations" do
   # "Reached heap limit" — the body comes back huge and JSON-parsing
   # it inside Opal is not free.
   run.call("Faraday GET with :json middleware round-trips") do
-    c =
-      Faraday.new(url: "https://api.ipify.org") do |conn|
-        conn.request :json
-        conn.response :json
-      end
-    res = c.get("/", { "format" => "json" })
+    c = Faraday.new(url: "https://api.ipify.org") do |conn|
+      conn.request(:json)
+      conn.response(:json)
+    end
+
+    res = c.get("/", {"format" => "json"})
     res.success? && res.body.is_a?(Hash) && res.body["ip"]
   end
 
@@ -1990,16 +2051,17 @@ get "/test/foundations" do
   # We don't hit httpbin (too heavy), so use an obviously-404 path on
   # ipify which always responds 404 with a short body.
   run.call("Faraday raise_error raises ResourceNotFound on 404") do
-    c =
-      Faraday.new(url: "https://api.ipify.org") do |conn|
-        conn.response :raise_error
-      end
+    c = Faraday.new(url: "https://api.ipify.org") do |conn|
+      conn.response(:raise_error)
+    end
+
     raised = nil
     begin
       c.get("/this-path-does-not-exist-11a")
     rescue Faraday::ResourceNotFound => e
       raised = e
     end
+
     raised && raised.response_status == 404
   end
 
@@ -2008,9 +2070,9 @@ get "/test/foundations" do
   # directly instead of a live round-trip.
   run.call("Faraday :json middleware encodes Hash body (offline)") do
     env = Faraday::Env.new(method: :post, url: "https://example.com/x")
-    env.body = { "name" => "homura", "phase" => 11 }
+    env.body = {"name" => "homura", "phase" => 11}
     Faraday::Middleware::JSON.new.on_request(env)
-    env.body == '{"name":"homura","phase":11}' &&
+    env.body == "{\"name\":\"homura\",\"phase\":11}" &&
       env.request_headers["content-type"] == "application/json"
   end
 
@@ -2021,16 +2083,14 @@ get "/test/foundations" do
     body += "Content-Disposition: form-data; name=\"note\"\r\n\r\n"
     body += "hello-11a\r\n"
     body += "--#{boundary}\r\n"
-    body +=
-      "Content-Disposition: form-data; name=\"file\"; filename=\"t.bin\"\r\n"
+    body += "Content-Disposition: form-data; name=\"file\"; filename=\"t.bin\"\r\n"
     body += "Content-Type: application/octet-stream\r\n\r\n"
     body += "\x00\x01\x02payload"
     body += "\r\n--#{boundary}--\r\n"
-    parsed =
-      Cloudflare::Multipart.parse(
-        body,
-        "multipart/form-data; boundary=#{boundary}"
-      )
+    parsed = Cloudflare::Multipart.parse(
+      body,
+      "multipart/form-data; boundary=#{boundary}"
+    )
     parsed["note"] == "hello-11a" &&
       parsed["file"].is_a?(Cloudflare::UploadedFile) &&
       parsed["file"].filename == "t.bin" &&
@@ -2043,13 +2103,12 @@ get "/test/foundations" do
     # time and the high bytes would collapse to U+FFFD before this
     # case ran (same workaround used in test/multipart_smoke.rb).
     bytes = 0xDE.chr + 0xAD.chr + 0xBE.chr + 0xEF.chr
-    u =
-      Cloudflare::UploadedFile.new(
-        name: "f",
-        filename: "a.bin",
-        content_type: "application/octet-stream",
-        bytes_binstr: bytes
-      )
+    u = Cloudflare::UploadedFile.new(
+      name: "f",
+      filename: "a.bin",
+      content_type: "application/octet-stream",
+      bytes_binstr: bytes
+    )
     arr = u.to_uint8_array
     `#{arr}.length === 4 && #{arr}[0] === 0xDE && #{arr}[1] === 0xAD && #{arr}[2] === 0xBE && #{arr}[3] === 0xEF`
   end
@@ -2067,10 +2126,12 @@ get "/test/foundations" do
     # iteration and blows up the workerd isolate under heavy load
     # (observed: V8 OOM after ~60s on /test/foundations).
     readable = `#{ts}.readable`
-    decoded =
-      `(async function(r){ var rd=r.getReader(); var d=new TextDecoder(); var out=''; while(true){ var c=await rd.read(); if(c.done) return out; out += d.decode(c.value); } })(#{readable})`.__await__
-    decoded.include?("event: greet") && decoded.include?("id: 1") &&
-      decoded.include?("data: hello") && decoded.include?("data: raw")
+    decoded = `(async function(r){ var rd=r.getReader(); var d=new TextDecoder(); var out=''; while(true){ var c=await rd.read(); if(c.done) return out; out += d.decode(c.value); } })(#{readable})`
+      .__await__
+    decoded.include?("event: greet") &&
+      decoded.include?("id: 1") &&
+      decoded.include?("data: hello") &&
+      decoded.include?("data: raw")
   end
 
   passed = cases.count { |c| c["pass"] }
@@ -2085,22 +2146,22 @@ end
 # Phase 16 — self-hosted docs (Cloudflare-style /docs/*)
 # Mustermann on Opal rejects `^`/`$` in regex routes. Trailing `/docs/` is normalized
 # to `/docs` in Rack::Handler::Homura.build_rack_env (runtime gem).
-docs_index_route =
-  lambda do
-    @title = "ドキュメント — homura"
-    @docs_page = "index"
-    @docs_section = :getting_started
-    @docs_breadcrumb = [%w[Docs /docs], ["概要", nil]]
-    @docs_toc = [
-      %w[hero このサイトについて],
-      %w[gems 公開 gem の全体像],
-      %w[app-shapes アプリケーションの形],
-      %w[next 次のステップ]
-    ]
-    erb :docs_index, layout: :layout_docs
-  end
-get "/docs", &docs_index_route
-get "/docs/quick-start" do
+docs_index_route = lambda do
+  @title = "ドキュメント — homura"
+  @docs_page = "index"
+  @docs_section = :getting_started
+  @docs_breadcrumb = [%w[Docs /docs], ["概要", nil]]
+  @docs_toc = [
+    %w[hero このサイトについて],
+    %w[gems 公開 gem の全体像],
+    %w[app-shapes アプリケーションの形],
+    %w[next 次のステップ]
+  ]
+  erb(:docs_index, layout: :layout_docs)
+end
+
+get("/docs", &docs_index_route)
+get("/docs/quick-start") do
   @title = "クイックスタート — homura Docs"
   @docs_page = "quick-start"
   @docs_section = :getting_started
@@ -2116,9 +2177,10 @@ get "/docs/quick-start" do
     %w[deploy デプロイ],
     %w[limits 現在の制限]
   ]
-  erb :docs_quick_start, layout: :layout_docs
+  erb(:docs_quick_start, layout: :layout_docs)
 end
-get "/docs/migration" do
+
+get("/docs/migration") do
   @title = "移行ガイド — homura Docs"
   @docs_page = "migration"
   @docs_section = :guides
@@ -2129,9 +2191,10 @@ get "/docs/migration" do
     %w[gotchas よくあるハマり],
     %w[blockers 移行が難しい例]
   ]
-  erb :docs_migration, layout: :layout_docs
+  erb(:docs_migration, layout: :layout_docs)
 end
-get "/docs/sinatra" do
+
+get("/docs/sinatra") do
   @title = "sinatra-homura — homura Docs"
   @docs_page = "sinatra"
   @docs_section = :reference
@@ -2149,9 +2212,10 @@ get "/docs/sinatra" do
     %w[queue Queues],
     %w[matrix できること / できないこと]
   ]
-  erb :docs_sinatra, layout: :layout_docs
+  erb(:docs_sinatra, layout: :layout_docs)
 end
-get "/docs/sequel-d1" do
+
+get("/docs/sequel-d1") do
   @title = "sequel-d1 — homura Docs"
   @docs_page = "sequel-d1"
   @docs_section = :reference
@@ -2166,9 +2230,10 @@ get "/docs/sequel-d1" do
     %w[opal Opal ビルドパス],
     %w[matrix できること / できないこと]
   ]
-  erb :docs_sequel_d1, layout: :layout_docs
+  erb(:docs_sequel_d1, layout: :layout_docs)
 end
-get "/docs/runtime" do
+
+get("/docs/runtime") do
   @title = "homura-runtime — homura Docs"
   @docs_page = "runtime"
   @docs_section = :reference
@@ -2183,9 +2248,10 @@ get "/docs/runtime" do
     %w[entrypoint build/worker.entrypoint.mjs],
     %w[matrix できること / できないこと]
   ]
-  erb :docs_runtime, layout: :layout_docs
+  erb(:docs_runtime, layout: :layout_docs)
 end
-get "/docs/auto-await" do
+
+get("/docs/auto-await") do
   @title = "Auto-Await — homura Docs"
   @docs_page = "auto-await"
   @docs_section = :guides
@@ -2197,9 +2263,10 @@ get "/docs/auto-await" do
     %w[diagnostic 診断モード],
     %w[limits 制限とフォールバック]
   ]
-  erb :docs_auto_await, layout: :layout_docs
+  erb(:docs_auto_await, layout: :layout_docs)
 end
-get "/docs/architecture" do
+
+get("/docs/architecture") do
   @title = "アーキテクチャ — homura Docs"
   @docs_page = "architecture"
   @docs_section = :architecture
@@ -2211,9 +2278,10 @@ get "/docs/architecture" do
     %w[history Phase 15 の整理],
     %w[diagram 依存関係 (Mermaid)]
   ]
-  erb :docs_architecture, layout: :layout_docs
+  erb(:docs_architecture, layout: :layout_docs)
 end
-get "/docs/opal-homura" do
+
+get("/docs/opal-homura") do
   @title = "opal-homura — homura Docs"
   @docs_page = "opal-homura"
   @docs_section = :reference
@@ -2228,9 +2296,10 @@ get "/docs/opal-homura" do
     %w[build-path ビルド内での位置],
     %w[matrix できること / できないこと]
   ]
-  erb :docs_opal_homura, layout: :layout_docs
+  erb(:docs_opal_homura, layout: :layout_docs)
 end
-get "/docs/sinatra-inertia" do
+
+get("/docs/sinatra-inertia") do
   @title = "sinatra-inertia — homura Docs"
   @docs_page = "sinatra-inertia"
   @docs_section = :reference
@@ -2247,9 +2316,10 @@ get "/docs/sinatra-inertia" do
     %w[example example],
     %w[matrix できること / できないこと]
   ]
-  erb :docs_sinatra_inertia, layout: :layout_docs
+  erb(:docs_sinatra_inertia, layout: :layout_docs)
 end
-get "/docs/rack" do
+
+get("/docs/rack") do
   @title = "Rack apps — homura Docs"
   @docs_page = "rack"
   @docs_section = :reference
@@ -2264,9 +2334,10 @@ get "/docs/rack" do
     %w[bindings Rack から binding を読む],
     %w[when いつ Rack だけを選ぶか]
   ]
-  erb :docs_rack, layout: :layout_docs
+  erb(:docs_rack, layout: :layout_docs)
 end
-get "/docs/cloudflare" do
+
+get("/docs/cloudflare") do
   @title = "Cloudflare bindings — homura Docs"
   @docs_page = "cloudflare"
   @docs_section = :reference
@@ -2286,26 +2357,25 @@ get "/docs/cloudflare" do
     %w[cache Cache],
     %w[safety production safety]
   ]
-  erb :docs_cloudflare, layout: :layout_docs
+  erb(:docs_cloudflare, layout: :layout_docs)
 end
 # Phase 17 — Cloudflare Email Service (SEND_EMAIL) manual test
-get "/debug/mail" do
+get("/debug/mail") do
   gate = debug_mail_gate_response
   next gate if gate
 
   @title = "Debug — mail"
   @mail_from = homura_mail_from
-  @form =
-    Homura::DebugMailController.parse_form_params(params, default_to: true)
+  @form = Homura::DebugMailController.parse_form_params(params, default_to: true)
   @result = nil
-  erb :debug_mail
+  erb(:debug_mail)
 end
 
-post "/debug/mail" do
+post("/debug/mail") do
   gate = debug_mail_gate_response
   next gate if gate
 
-  content_type "text/html; charset=utf-8"
+  content_type("text/html; charset=utf-8")
 
   @title = "Debug — mail"
   @mail_from = homura_mail_from
@@ -2316,14 +2386,13 @@ post "/debug/mail" do
     @result = ctx[:error_result]
   else
     begin
-      raw =
-        mail.send(
-          to: ctx[:final_to],
-          from: ctx[:mail_from],
-          subject: ctx[:subject_line],
-          text: ctx[:text_body],
-          html: ctx[:html_body]
-        )
+      raw = mail.send(
+        to: ctx[:final_to],
+        from: ctx[:mail_from],
+        subject: ctx[:subject_line],
+        text: ctx[:text_body],
+        html: ctx[:html_body]
+      )
       @result = Homura::DebugMailController.after_send_success(raw, ctx)
     rescue Cloudflare::Email::Error => e
       @result = Homura::DebugMailController.after_send_failure(e, ctx)
@@ -2331,10 +2400,10 @@ post "/debug/mail" do
   end
 
   @form = @result[:form]
-  erb :debug_mail
+  erb(:debug_mail)
 end
 
-get "/docs/email" do
+get("/docs/email") do
   @title = "Cloudflare Email Service — homura Docs"
   @docs_page = "email"
   @docs_section = :reference
@@ -2351,5 +2420,5 @@ get "/docs/email" do
     %w[debug /debug/mail],
     %w[links 公式リンク]
   ]
-  erb :docs_email, layout: :layout_docs
+  erb(:docs_email, layout: :layout_docs)
 end

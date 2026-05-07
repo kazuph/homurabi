@@ -9,7 +9,7 @@ require "fileutils"
 require "optparse"
 require "pathname"
 
-options = { with_db: false }
+options = {with_db: false}
 
 OptionParser
   .new do |o|
@@ -39,10 +39,10 @@ sequel_spec = options[:with_db] ? required_spec("sequel-d1") : nil
 
 target = Pathname(app_name).expand_path
 app_slug = target.basename.to_s
-abort "homura new: #{target} already exists" if target.exist?
+abort("homura new: #{target} already exists") if target.exist?
 
 tpl_root = sinatra_gem_dir.join("templates/project")
-abort "homura new: templates missing #{tpl_root}" unless tpl_root.directory?
+abort("homura new: templates missing #{tpl_root}") unless tpl_root.directory?
 
 locals = {
   app_name: app_slug,
@@ -84,4 +84,4 @@ Dir
 # project root with two opaque JavaScript files. Run `bundle exec
 # rake build` (or `homura build`) once before the first wrangler dev.
 
-puts "homura new: wrote #{target} (using published gems)"
+puts("homura new: wrote #{target} (using published gems)")

@@ -49,8 +49,7 @@ opal_args = [
 
 stderr_path = File.expand_path("build/opal.stderr.log", Dir.pwd)
 
-success =
-  system({ "OPAL_PREFORK_DISABLE" => "1" }, *opal_args, err: stderr_path)
+success = system({"OPAL_PREFORK_DISABLE" => "1"}, *opal_args, err: stderr_path)
 abort("opal-test-build: opal compile failed") unless success
 
 patch_script = File.expand_path("runtime/patch-opal-evals.mjs", runtime_root)

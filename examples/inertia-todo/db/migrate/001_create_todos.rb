@@ -3,11 +3,11 @@
 Sequel.migration do
   change do
     create_table?(:todos) do
-      primary_key :id
-      String :title, null: false
-      String :description
-      Integer :done, null: false, default: 0
-      Integer :created_at, null: false
+      primary_key(:id)
+      String(:title, null: false)
+      String(:description)
+      Integer(:done, null: false, default: 0)
+      Integer(:created_at, null: false)
     end
   end
 end

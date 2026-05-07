@@ -18,6 +18,20 @@ function withToken(url: string, token?: string) {
   return parsed.toString();
 }
 
+async function submitMicRecording(page: import('@playwright/test').Page) {
+  const recordButton = page.locator('#record-button');
+  await expect(recordButton).toBeVisible();
+  await expect(recordButton.locator('svg')).toBeVisible();
+  await recordButton.click({ force: true });
+  await expect(recordButton).toHaveAttribute('data-state', 'recording');
+  await page.waitForTimeout(1500);
+  await Promise.all([
+    page.waitForURL(/\/chat(?:\?|$)/),
+    recordButton.click({ force: true }),
+  ]);
+  await page.waitForLoadState('networkidle');
+}
+
 test.describe('Workers AI examples', () => {
   test.skip(
     !aiChatUrl || !aiTranscribeChatUrl || !aiVoiceChatUrl || !audioSample,
@@ -44,9 +58,8 @@ test.describe('Workers AI examples', () => {
     await page.goto(aiTranscribeChatUrl!);
     await page.waitForLoadState('networkidle');
 
-    await page.getByLabel('Audio clip').setInputFiles(audioSample!);
     await page.getByLabel('Whisper language hint').selectOption('ja');
-    await page.getByRole('button', { name: /transcribe and reply/i }).click();
+    await submitMicRecording(page);
 
     await expect(page.getByRole('heading', { name: 'Transcript' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Kimi reply' })).toBeVisible();
@@ -67,10 +80,9 @@ test.describe('Workers AI examples', () => {
     await page.goto(withToken(aiVoiceChatUrl!, aiVoiceChatToken));
     await page.waitForLoadState('networkidle');
 
-    await page.getByLabel('Audio clip').setInputFiles(audioSample!);
     await page.getByLabel('Whisper language hint').selectOption('ja');
     await page.getByLabel('Aura speaker').selectOption('luna');
-    await page.getByRole('button', { name: /transcribe, reply, and speak/i }).click();
+    await submitMicRecording(page);
 
     await expect(page.getByRole('heading', { name: 'Transcript' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Kimi reply' })).toBeVisible();

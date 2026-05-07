@@ -167,8 +167,7 @@ module Cloudflare
 
       # Single-line IIFE — see `lib/homura/runtime/cache.rb#put`
       # for why Opal can silently drop a multi-line x-string Promise.
-      js_promise =
-        `(async function(stub, url_str, method_str, js_headers, js_body, Kernel, err_klass, do_class_label) { var init = { method: method_str, headers: js_headers }; if (js_body !== null && js_body !== undefined && js_body !== Opal.nil) { init.body = js_body; } var resp; try { resp = await stub.fetch(url_str, init); } catch (e) { Kernel.$raise(err_klass.$new(e && e.message ? e.message : String(e), Opal.hash({ operation: 'stub.fetch', do_class: do_class_label }))); } var text = ''; try { text = await resp.text(); } catch (_) { text = ''; } var hk = []; var hv = []; if (resp.headers && typeof resp.headers.forEach === 'function') { resp.headers.forEach(function(v, k) { hk.push(String(k).toLowerCase()); hv.push(String(v)); }); } return { status: resp.status|0, text: text, hkeys: hk, hvals: hv }; })(#{js_stub}, #{url_str}, #{method_str}, #{js_headers}, #{js_body}, #{Kernel}, #{err_klass}, #{do_class_label})`
+      js_promise = `(async function(stub, url_str, method_str, js_headers, js_body, Kernel, err_klass, do_class_label) { var init = { method: method_str, headers: js_headers }; if (js_body !== null && js_body !== undefined && js_body !== Opal.nil) { init.body = js_body; } var resp; try { resp = await stub.fetch(url_str, init); } catch (e) { Kernel.$raise(err_klass.$new(e && e.message ? e.message : String(e), Opal.hash({ operation: 'stub.fetch', do_class: do_class_label }))); } var text = ''; try { text = await resp.text(); } catch (_) { text = ''; } var hk = []; var hv = []; if (resp.headers && typeof resp.headers.forEach === 'function') { resp.headers.forEach(function(v, k) { hk.push(String(k).toLowerCase()); hv.push(String(v)); }); } return { status: resp.status|0, text: text, hkeys: hk, hvals: hv }; })(#{js_stub}, #{url_str}, #{method_str}, #{js_headers}, #{js_body}, #{Kernel}, #{err_klass}, #{do_class_label})`
 
       js_result = js_promise.__await__
       hkeys = `#{js_result}.hkeys`
@@ -198,6 +197,7 @@ module Cloudflare
           hdrs["content-type"] = "application/json"
         end
       end
+
       fetch(path, method: method, headers: hdrs, body: request_body)
     end
 
@@ -258,11 +258,11 @@ module Cloudflare
       unless class_name.is_a?(String)
         raise ArgumentError, "class_name must be a String"
       end
+
       @handlers ||= {}
       # Wrap via define_method so Opal's `# await: true` picks it up as
       # async (same trick Sinatra::Scheduled uses for its jobs).
-      method_name =
-        "__do_handler_#{class_name.gsub(/[^A-Za-z0-9_]/, "_")}".to_sym
+      method_name = "__do_handler_#{class_name.gsub(/[^A-Za-z0-9_]/, "_")}".to_sym
       DurableObjectRequestContext.send(:define_method, method_name, &block)
       unbound = DurableObjectRequestContext.instance_method(method_name)
       DurableObjectRequestContext.send(:remove_method, method_name)
@@ -317,9 +317,7 @@ module Cloudflare
         body = {
           "error" => "no Ruby handler for DurableObject class #{class_name}"
         }.to_json
-        return(
-          build_js_response(500, { "content-type" => "application/json" }, body)
-        )
+        return (build_js_response(500, {"content-type" => "application/json"}, body))
       end
 
       state = DurableObjectState.new(js_state)
@@ -354,7 +352,7 @@ module Cloudflare
           (result["body"] || result[:body] || "").to_s
         ]
       else
-        [200, { "content-type" => "text/plain; charset=utf-8" }, result.to_s]
+        [200, {"content-type" => "text/plain; charset=utf-8"}, result.to_s]
       end
     end
 
@@ -365,6 +363,7 @@ module Cloudflare
         vs = v.to_s
         `#{js_headers}[#{ks}] = #{vs}`
       end
+
       status_int = status.to_i
       body_str = body.to_s
       `new Response(#{body_str}, { status: #{status_int}, headers: #{js_headers} })`
@@ -475,10 +474,12 @@ module Cloudflare
           ts = t.to_s
           `#{js_tags}.push(#{ts})`
         end
+
         `#{js_state}.acceptWebSocket(#{js_ws}, #{js_tags})`
       else
         `#{js_state}.acceptWebSocket(#{js_ws})`
       end
+
       nil
     end
 
@@ -487,13 +488,13 @@ module Cloudflare
     # `getWebSockets(tag)`.
     def web_sockets(tag: nil)
       js_state = @js_state
-      js_arr =
-        if tag
-          ts = tag.to_s
-          `(#{js_state}.getWebSockets ? #{js_state}.getWebSockets(#{ts}) : [])`
-        else
-          `(#{js_state}.getWebSockets ? #{js_state}.getWebSockets() : [])`
-        end
+      js_arr = if tag
+        ts = tag.to_s
+        `(#{js_state}.getWebSockets ? #{js_state}.getWebSockets(#{ts}) : [])`
+      else
+        `(#{js_state}.getWebSockets ? #{js_state}.getWebSockets() : [])`
+      end
+
       out = []
       len = `#{js_arr}.length`
       i = 0
@@ -501,6 +502,7 @@ module Cloudflare
         out << `#{js_arr}[#{i}]`
         i += 1
       end
+
       out
     end
   end
@@ -567,8 +569,7 @@ module Cloudflare
       `#{js_opts}.reverse = #{!!reverse}` unless reverse.nil?
       `#{js_opts}.start   = #{start.to_s}` unless start.nil?
       `#{js_opts}.end     = #{end_key.to_s}` unless end_key.nil?
-      js_promise =
-        `#{js}.list(#{js_opts}).catch(function(e) { #{Kernel}.$raise(#{err_klass}.$new(e && e.message ? e.message : String(e), Opal.hash({ operation: 'storage.list' }))); })`
+      js_promise = `#{js}.list(#{js_opts}).catch(function(e) { #{Kernel}.$raise(#{err_klass}.$new(e && e.message ? e.message : String(e), Opal.hash({ operation: 'storage.list' }))); })`
       js_result = js_promise.__await__
       out = {}
       return out if `#{js_result} == null`
@@ -646,9 +647,11 @@ module Cloudflare
     def storage
       @state.storage
     end
+
     def cf_env
       env["cloudflare.env"]
     end
+
     def cf_ctx
       env["cloudflare.ctx"]
     end
@@ -656,24 +659,31 @@ module Cloudflare
     def d1
       env["cloudflare.DB"]
     end
+
     def db
       d1
     end
+
     def kv
       env["cloudflare.KV"]
     end
+
     def bucket
       env["cloudflare.BUCKET"]
     end
+
     def ai
       Cloudflare::Bindings.ai(env)
     end
+
     def send_email
       env["cloudflare.SEND_EMAIL"]
     end
+
     def jobs_queue
       env["cloudflare.QUEUE_JOBS"]
     end
+
     def durable_object(name, id_or_name = nil)
       Cloudflare::Bindings.durable_object(env, name, id_or_name)
     end

@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 # Route fragment 65 — demo /docs/architecture
-get "/docs/architecture" do
+get("/docs/architecture") do
   @title = "アーキテクチャ — homura Docs"
   @docs_page = "architecture"
   @docs_section = :architecture
@@ -12,6 +12,6 @@ get "/docs/architecture" do
     %w[history Phase 15 の整理],
     %w[diagram 依存関係 (Mermaid)]
   ]
-  @docs_inner = erb :docs_architecture
-  erb :layout_docs
+  @docs_inner = erb(:docs_architecture)
+  erb(:layout_docs)
 end

@@ -41,6 +41,7 @@ module Sequel
       else
         fetch_rows(select_sql) { |r| yield r }.__await__
       end
+
       self
     end
 
@@ -68,6 +69,7 @@ module Sequel
       else
         _with_sql_dataset.fetch_rows(sql) { |r| yield r }.__await__
       end
+
       self
     end
 
@@ -90,16 +92,15 @@ module Sequel
       value = nil
       found = false
       # each is async (patched in this file); must await.
-      (
-        single_value_ds.each do |r|
+      (single_value_ds.each do |r|
+        next if found
+        r.each do |_, v|
           next if found
-          r.each do |_, v|
-            next if found
-            value = v
-            found = true
-          end
+          value = v
+          found = true
         end
-      ).__await__
+      end)
+        .__await__
       found ? value : nil
     end
 
@@ -114,6 +115,7 @@ module Sequel
           value = v
           captured = true
         end
+
         value
       end
     end

@@ -44,12 +44,11 @@ end
 
 def todos_html
   return "<p>No todos yet — add one above.</p>" if TODOS.empty?
-  items =
-    TODOS.map do |t|
-      done_class = t[:done] ? ' class="done"' : ""
-      label = t[:done] ? "↩" : "✓"
-      title = Rack::Utils.escape_html(t[:title])
-      <<~LI
+  items = TODOS.map do |t|
+    done_class = t[:done] ? " class=\"done\"" : ""
+    label = t[:done] ? "↩" : "✓"
+    title = Rack::Utils.escape_html(t[:title])
+    <<~LI
       <li#{done_class}>
         <form action="/todos/#{t[:id]}/toggle" method="post" style="display:inline">
           <button type="submit">#{label}</button>
@@ -60,38 +59,42 @@ def todos_html
         </form>
       </li>
     LI
-    end
+  end
+
   "<ul>#{items.join}</ul>"
 end
 
-get "/" do
-  page <<~HTML
-    <h1>todo-simple</h1>
-    <p>One file, classic Sinatra DSL, no ORM, no migrations.</p>
-    <form class="add" action="/todos" method="post">
-      <input type="text" name="title" placeholder="What needs doing?" required autofocus>
-      <button type="submit">Add</button>
-    </form>
-    #{todos_html}
-  HTML
+get("/") do
+  page(
+    <<~HTML
+      <h1>todo-simple</h1>
+      <p>One file, classic Sinatra DSL, no ORM, no migrations.</p>
+      <form class="add" action="/todos" method="post">
+        <input type="text" name="title" placeholder="What needs doing?" required autofocus>
+        <button type="submit">Add</button>
+      </form>
+      #{todos_html}
+    HTML
+  )
 end
 
-post "/todos" do
+post("/todos") do
   title = params[:title].to_s.strip
   unless title.empty?
-    TODOS << { id: NEXT_ID[0], title: title, done: false }
+    TODOS << {id: NEXT_ID[0], title: title, done: false}
     NEXT_ID[0] += 1
   end
-  redirect "/"
+
+  redirect("/")
 end
 
-post "/todos/:id/toggle" do
+post("/todos/:id/toggle") do
   todo = TODOS.find { |t| t[:id] == params[:id].to_i }
   todo[:done] = !todo[:done] if todo
-  redirect "/"
+  redirect("/")
 end
 
-post "/todos/:id/delete" do
+post("/todos/:id/delete") do
   TODOS.reject! { |t| t[:id] == params[:id].to_i }
-  redirect "/"
+  redirect("/")
 end

@@ -27,21 +27,22 @@ module SmokeTest
     result = block.call
     if result
       @passed += 1
-      $stdout.puts "  PASS  #{label}"
+      $stdout.puts("  PASS  #{label}")
     else
       @failed += 1
       @errors << label
-      $stderr.puts "  FAIL  #{label}"
+      $stderr.puts("  FAIL  #{label}")
     end
+
   rescue => e
     @failed += 1
     @errors << "#{label} (#{e.class}: #{e.message})"
-    $stderr.puts "  ERROR #{label} — #{e.class}: #{e.message}"
+    $stderr.puts("  ERROR #{label} — #{e.class}: #{e.message}")
   end
 
   def self.summary
     total = @passed + @failed
-    $stdout.puts "\n#{total} tests, #{@passed} passed, #{@failed} failed"
+    $stdout.puts("\n#{total} tests, #{@passed} passed, #{@failed} failed")
     exit(@failed.positive? ? 1 : 0)
   end
 end
@@ -53,14 +54,14 @@ end
 HomuraRuntime::AsyncRegistry.reset!
 
 HomuraRuntime::AsyncRegistry.register_async_source do
-  async_accessor :env, :"cloudflare.DB", "Cloudflare::D1Database"
-  async_accessor :env, :"cloudflare.KV", "Cloudflare::KVNamespace"
-  helper_factory :db, "Cloudflare::D1Database"
-  helper_factory :kv, "Cloudflare::KVNamespace"
-  async_method "Cloudflare::D1Database", :execute
-  async_method "Cloudflare::KVNamespace", :get
-  async_method "Cloudflare::AI", :run
-  async_helper :load_chat_history, "Homura::ChatHistoryHelpers"
+  async_accessor(:env, :"cloudflare.DB", "Cloudflare::D1Database")
+  async_accessor(:env, :"cloudflare.KV", "Cloudflare::KVNamespace")
+  helper_factory(:db, "Cloudflare::D1Database")
+  helper_factory(:kv, "Cloudflare::KVNamespace")
+  async_method("Cloudflare::D1Database", :execute)
+  async_method("Cloudflare::KVNamespace", :get)
+  async_method("Cloudflare::AI", :run)
+  async_helper(:load_chat_history, "Homura::ChatHistoryHelpers")
 end
 
 # ------------------------------------------------------------------
@@ -79,8 +80,8 @@ end
 # Tests
 # ------------------------------------------------------------------
 
-$stdout.puts "Auto-Await Analyzer Smoke Tests"
-$stdout.puts "=" * 40
+$stdout.puts("Auto-Await Analyzer Smoke Tests")
+$stdout.puts("=" * 40)
 
 # 1. Direct env accessor inference
 SmokeTest.assert("env['cloudflare.DB'].execute is awaited") do

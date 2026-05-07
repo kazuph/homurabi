@@ -1,21 +1,22 @@
 # frozen_string_literal: true
 # Route fragment 22 — api /api/login
-post "/api/login" do
-  content_type "application/json"
+post("/api/login") do
+  content_type("application/json")
   alg = params["alg"] || "HS256"
   begin
     body = JSON.parse(request.body.read)
   rescue JSON::ParserError, StandardError
     body = {}
   end
+
   username = body["username"].to_s
   username = "demo" if username.empty?
 
   begin
     sign_key, _ = jwt_keys_for(alg)
   rescue ArgumentError => e
-    status 400
-    return { "error" => e.message }.to_json
+    status(400)
+    return {"error" => e.message}.to_json
   end
 
   payload = {
@@ -43,7 +44,7 @@ post "/api/login" do
     kv.put("refresh:#{refresh}", entry.to_json)
   end
 
-  status 201
+  status(201)
   resp = {
     "access_token" => access_token,
     "token_type" => "Bearer",

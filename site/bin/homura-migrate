@@ -3,4 +3,4 @@
 
 # Thin wrapper — implementation lives in the `sequel-d1` gem.
 root = File.expand_path("..", __dir__)
-load File.join(root, "gems/sequel-d1/bin/cloudflare-workers-migrate")
+load(File.join(root, "gems/sequel-d1/bin/cloudflare-workers-migrate"))

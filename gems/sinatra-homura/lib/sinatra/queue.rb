@@ -45,8 +45,7 @@ module Sinatra
         qname = queue_name.to_s
         raise ArgumentError, "queue_name must be non-empty" if qname.empty?
 
-        method_name =
-          "__queue_handler_#{qname.gsub(/[^A-Za-z0-9_]/, "_")}".to_sym
+        method_name = "__queue_handler_#{qname.gsub(/[^A-Za-z0-9_]/, "_")}".to_sym
         ::Cloudflare::QueueContext.send(:define_method, method_name, &block)
         unbound = ::Cloudflare::QueueContext.instance_method(method_name)
         ::Cloudflare::QueueContext.send(:remove_method, method_name)

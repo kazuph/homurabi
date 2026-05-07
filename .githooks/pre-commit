@@ -6,6 +6,6 @@ cd "$repo_root"
 
 if ! ruby bin/format-ruby --staged; then
   echo "pre-commit: failed to format staged first-party Ruby files." >&2
-  echo "pre-commit: fix the formatter issue or run 'npm run format:ruby' manually." >&2
+  echo "pre-commit: install rubyfmt with 'ruby bin/install-rubyfmt' or run 'npm run format:ruby' manually." >&2
   exit 1
 fi

@@ -42,21 +42,22 @@ module SmokeTest
     result = block.call
     if result
       @passed += 1
-      $stdout.puts "  PASS  #{label}"
+      $stdout.puts("  PASS  #{label}")
     else
       @failed += 1
       @errors << label
-      $stderr.puts "  FAIL  #{label}"
+      $stderr.puts("  FAIL  #{label}")
     end
+
   rescue => e
     @failed += 1
     @errors << "#{label} (#{e.class}: #{e.message})"
-    $stderr.puts "  ERROR #{label} — #{e.class}: #{e.message}"
+    $stderr.puts("  ERROR #{label} — #{e.class}: #{e.message}")
   end
 
   def self.summary
     total = @passed + @failed
-    $stdout.puts "\n#{total} tests, #{@passed} passed, #{@failed} failed"
+    $stdout.puts("\n#{total} tests, #{@passed} passed, #{@failed} failed")
     exit(@failed.positive? ? 1 : 0)
   end
 end
@@ -102,14 +103,14 @@ class MockHelper
   end
 end
 
-$stdout.puts "Sinatra::JwtAuth Halt-Boundary Smoke Tests"
-$stdout.puts "=" * 40
+$stdout.puts("Sinatra::JwtAuth Halt-Boundary Smoke Tests")
+$stdout.puts("=" * 40)
 
 # 1. authenticate_or_401 returns [nil, payload] for a valid token
 SmokeTest.assert(
   "authenticate_or_401 returns [nil, payload] for valid token"
 ) do
-  token = JWT.encode({ "sub" => "alice" }, "test-secret", "HS256")
+  token = JWT.encode({"sub" => "alice"}, "test-secret", "HS256")
   req = MockRequest.new("HTTP_AUTHORIZATION" => "Bearer #{token}")
   helper = MockHelper.new(req)
   status, payload = helper.authenticate_or_401
@@ -126,12 +127,11 @@ end
 
 # 3. authenticate_or_401 returns [401, json] for expired token
 SmokeTest.assert("authenticate_or_401 returns [401, json] for expired token") do
-  token =
-    JWT.encode(
-      { "sub" => "alice", "exp" => Time.now.to_i - 10 },
-      "test-secret",
-      "HS256"
-    )
+  token = JWT.encode(
+    {"sub" => "alice", "exp" => Time.now.to_i - 10},
+    "test-secret",
+    "HS256"
+  )
   req = MockRequest.new("HTTP_AUTHORIZATION" => "Bearer #{token}")
   helper = MockHelper.new(req)
   status, body = helper.authenticate_or_401
@@ -140,7 +140,7 @@ end
 
 # 4. authenticate_or_401 returns [401, json] for bad signature
 SmokeTest.assert("authenticate_or_401 returns [401, json] for bad signature") do
-  token = JWT.encode({ "sub" => "alice" }, "wrong-secret", "HS256")
+  token = JWT.encode({"sub" => "alice"}, "wrong-secret", "HS256")
   req = MockRequest.new("HTTP_AUTHORIZATION" => "Bearer #{token}")
   helper = MockHelper.new(req)
   status, body = helper.authenticate_or_401
@@ -149,7 +149,7 @@ end
 
 # 5. authenticate_or_401 sets @jwt_payload on success
 SmokeTest.assert("authenticate_or_401 sets @jwt_payload on success") do
-  token = JWT.encode({ "sub" => "alice" }, "test-secret", "HS256")
+  token = JWT.encode({"sub" => "alice"}, "test-secret", "HS256")
   req = MockRequest.new("HTTP_AUTHORIZATION" => "Bearer #{token}")
   helper = MockHelper.new(req)
   helper.authenticate_or_401

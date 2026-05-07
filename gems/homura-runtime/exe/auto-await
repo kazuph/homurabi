@@ -15,17 +15,18 @@
 
 require "fileutils"
 require "pathname"
+
 require_relative "../lib/homura/runtime/build_support"
 
 # homura-runtime lib path resolution (with legacy alias fallback)
 runtime_lib = ENV["CFW_RUNTIME_LIB"]
 unless runtime_lib
-  runtime_lib =
-    HomuraRuntime::BuildSupport
-      .runtime_root(current_file: __FILE__)
-      .join("lib")
-      .to_s
+  runtime_lib = HomuraRuntime::BuildSupport
+    .runtime_root(current_file: __FILE__)
+    .join("lib")
+    .to_s
 end
+
 $LOAD_PATH.unshift(runtime_lib) unless $LOAD_PATH.include?(runtime_lib)
 
 require "homura/runtime/async_registry"
@@ -69,12 +70,11 @@ changed = 0
 skipped = 0
 errors = 0
 
-paths =
-  if File.directory?(input_root)
-    Dir.glob(input_root.join("**", "*.rb")).sort
-  else
-    [input_root.to_s]
-  end
+paths = if File.directory?(input_root)
+  Dir.glob(input_root.join("**", "*.rb")).sort
+else
+  [input_root.to_s]
+end
 
 paths.each do |path|
   rel = Pathname(path).relative_path_from(input_root)
@@ -89,36 +89,36 @@ paths.each do |path|
   has_existing_await = source.include?(".__await__")
 
   begin
-    analyzer =
-      HomuraRuntime::AutoAwait::Analyzer.new(registry, debug: options[:debug])
+    analyzer = HomuraRuntime::AutoAwait::Analyzer.new(registry, debug: options[:debug])
     buffer, nodes = analyzer.process(source, path)
     needs_magic_only_output = has_existing_await && !has_magic
 
     if nodes.empty? && !needs_magic_only_output
-      puts "[auto-await] skip (no changes) #{rel}" if options[:debug]
+      puts("[auto-await] skip (no changes) #{rel}") if options[:debug]
       skipped += 1
       next
     end
 
-    transformed =
-      if nodes.empty?
-        source
-      else
-        HomuraRuntime::AutoAwait::Transformer.transform(source, nodes, buffer)
-      end
+    transformed = if nodes.empty?
+      source
+    else
+      HomuraRuntime::AutoAwait::Transformer.transform(source, nodes, buffer)
+    end
+
     transformed = "# await: true\n" + transformed unless has_magic
     out_path = output_root.join(rel)
     FileUtils.mkdir_p(out_path.dirname)
     File.write(out_path, transformed)
     if options[:debug]
-      puts "[auto-await] write #{rel} (#{nodes.length} await#{"s" if nodes.length > 1})"
+      puts("[auto-await] write #{rel} (#{nodes.length} await#{"s" if nodes.length > 1})")
     end
+
     changed += 1
   rescue => e
-    $stderr.puts "[auto-await] ERROR #{rel}: #{e.message}"
+    $stderr.puts("[auto-await] ERROR #{rel}: #{e.message}")
     errors += 1
   end
 end
 
-puts "[auto-await] done: #{changed} changed, #{skipped} skipped, #{errors} errors"
+puts("[auto-await] done: #{changed} changed, #{skipped} skipped, #{errors} errors")
 exit(1) if errors > 0

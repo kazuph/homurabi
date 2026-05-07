@@ -1,19 +1,19 @@
 # frozen_string_literal: true
 # Route fragment 43 — demo /demo/queue/status
-get "/demo/queue/status" do
-  content_type "application/json"
+get("/demo/queue/status") do
+  content_type("application/json")
   unless binding_demos_enabled?
-    status 404
-    next(
-      {
-        "error" => "binding demos disabled (set HOMURA_ENABLE_BINDING_DEMOS=1)"
-      }.to_json
-    )
+    status(404)
+    next ({
+      "error" => "binding demos disabled (set HOMURA_ENABLE_BINDING_DEMOS=1)"
+    }.to_json)
   end
+
   if kv.nil?
-    status 503
-    next({ "error" => "KV not bound — cannot read consumer state" }.to_json)
+    status(503)
+    next ({"error" => "KV not bound — cannot read consumer state"}.to_json)
   end
+
   limit = (params["limit"] || "10").to_i
   recent = []
   i = 0
@@ -23,10 +23,12 @@ get "/demo/queue/status" do
     begin
       recent << JSON.parse(raw)
     rescue JSON::ParserError
-      recent << { "raw" => raw }
+      recent << {"raw" => raw}
     end
+
     i += 1
   end
+
   {
     "queue" => "homura-jobs",
     "count" => recent.size,

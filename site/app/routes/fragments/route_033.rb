@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 # Route fragment 33 — api /api/chat/health
-get "/api/chat/health" do
-  content_type "application/json"
+get("/api/chat/health") do
+  content_type("application/json")
   {
     "ok" => true,
     "demos_enabled" => ai_demos_enabled?,

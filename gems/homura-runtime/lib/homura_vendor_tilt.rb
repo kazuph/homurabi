@@ -56,9 +56,11 @@ module Tilt
     end
 
     def new(file = nil, line = nil, options = {}, &block)
-      raise NotImplementedError,
-            "Tilt template rendering is not available in homura Phase 2 " \
-              "(stubbed). Return Strings or arrays from your Sinatra handlers."
+      raise(
+        NotImplementedError,
+        "Tilt template rendering is not available in homura Phase 2 " \
+          "(stubbed). Return Strings or arrays from your Sinatra handlers."
+      )
     end
   end
 end

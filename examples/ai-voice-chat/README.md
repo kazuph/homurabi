@@ -1,13 +1,13 @@
 # ai-voice-chat
 
-The third Workers AI example: audio in, transcript out, Kimi K2.6 reply, and
-Aura speech playback. When the reply contains Japanese text, the app rewrites
-it into romaji before sending it to Aura so the spoken output stays usable on
-the current `@cf/deepgram/aura-1` surface.
+The third Workers AI example: browser-recorded audio in, transcript out, Kimi
+K2.6 reply, and Aura speech playback. When the reply contains Japanese text,
+the app rewrites it into romaji before sending it to Aura so the spoken output
+stays usable on the current `@cf/deepgram/aura-1` surface.
 
 ## Routes
 
-- `GET /` — upload + speaker selection UI
+- `GET /` — browser microphone + speaker selection UI
 - `POST /chat` — Whisper transcription + Kimi reply + romaji TTS script +
   inline Aura audio
 
@@ -30,8 +30,9 @@ wrangler secret put VOICE_CHAT_TOKEN
 bundle exec rake deploy
 ```
 
-The page stays JavaScript-free by embedding the Aura MP3 as a data URL in the
-HTML response.
+The page records one browser microphone clip with `getUserMedia` +
+`MediaRecorder`, then still posts that clip as a normal multipart form upload.
+The reply page embeds the Aura MP3 as a data URL in the HTML response.
 
 ## Cost guard
 

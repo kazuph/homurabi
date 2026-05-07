@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 # Route fragment 60 — demo /docs/migration
-get "/docs/migration" do
+get("/docs/migration") do
   @title = "移行ガイド — homura Docs"
   @docs_page = "migration"
   @docs_section = :guides
@@ -11,6 +11,6 @@ get "/docs/migration" do
     %w[gotchas よくあるハマり],
     %w[blockers 移行が難しい例]
   ]
-  @docs_inner = erb :docs_migration
-  erb :layout_docs
+  @docs_inner = erb(:docs_migration)
+  erb(:layout_docs)
 end

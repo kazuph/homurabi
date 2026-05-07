@@ -8,8 +8,10 @@ class Tempfile < StringIO
   end
 
   def self.open(*)
-    raise NotImplementedError,
-          "Tempfile is stubbed in homura (Workers have no writable FS)"
+    raise(
+      NotImplementedError,
+      "Tempfile is stubbed in homura (Workers have no writable FS)"
+    )
   end
 
   def path

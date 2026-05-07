@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 # Route fragment 59 — demo /docs/quick-start
-get "/docs/quick-start" do
+get("/docs/quick-start") do
   @title = "クイックスタート — homura Docs"
   @docs_page = "quick-start"
   @docs_section = :getting_started
@@ -16,6 +16,6 @@ get "/docs/quick-start" do
     %w[deploy デプロイ],
     %w[limits 現在の制限]
   ]
-  @docs_inner = erb :docs_quick_start
-  erb :layout_docs
+  @docs_inner = erb(:docs_quick_start)
+  erb(:layout_docs)
 end

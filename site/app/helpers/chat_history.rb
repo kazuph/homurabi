@@ -46,9 +46,12 @@ module Homura
       raise ArgumentError, "cache_get requires a block" unless block
       cache_ttl = ttl.to_i
       if cache_ttl <= 0
-        raise ArgumentError,
-              "cache_get ttl must be > 0 (got #{ttl.inspect}); Workers refuses to store max-age=0"
+        raise(
+          ArgumentError,
+          "cache_get ttl must be > 0 (got #{ttl.inspect}); Workers refuses to store max-age=0"
+        )
       end
+
       c = cache
       cached = c.match(cache_key)
       if cached
@@ -56,10 +59,11 @@ module Homura
         response.headers["x-homura-cache"] = "HIT"
         return cached.body
       end
+
       body = block.call
-      ct =
-        content_type_override || response["Content-Type"] ||
-          "text/plain; charset=utf-8"
+      ct = content_type_override ||
+        response["Content-Type"] ||
+        "text/plain; charset=utf-8"
       c.put(
         cache_key,
         body,
@@ -137,11 +141,12 @@ module Homura
     end
 
     def build_ai_messages(history, latest_user_text)
-      msgs = [{ "role" => "system", "content" => App::CHAT_SYSTEM_PROMPT }]
+      msgs = [{"role" => "system", "content" => App::CHAT_SYSTEM_PROMPT}]
       history.each do |m|
-        msgs << { "role" => m["role"], "content" => m["content"] }
+        msgs << {"role" => m["role"], "content" => m["content"]}
       end
-      msgs << { "role" => "user", "content" => latest_user_text }
+
+      msgs << {"role" => "user", "content" => latest_user_text}
       msgs
     end
 
@@ -150,8 +155,7 @@ module Homura
       [
         404,
         {
-          "error" =>
-            "AI demos disabled (set HOMURA_ENABLE_AI_DEMOS=1 in wrangler vars)"
+          "error" => "AI demos disabled (set HOMURA_ENABLE_AI_DEMOS=1 in wrangler vars)"
         }.to_json
       ]
     end
@@ -161,8 +165,7 @@ module Homura
       [
         503,
         {
-          "error" =>
-            "AI binding not configured (wrangler.toml [ai] block missing or wrangler version too old)"
+          "error" => "AI binding not configured (wrangler.toml [ai] block missing or wrangler version too old)"
         }.to_json
       ]
     end
@@ -171,67 +174,64 @@ module Homura
       header = request.env["HTTP_AUTHORIZATION"].to_s
       parts = header.split(" ", 2)
       if parts.length != 2 || parts[0].downcase != "bearer"
-        return(
-          {
-            "ok" => false,
-            "status" => 401,
-            "body" => {
-              "error" => "unauthorized",
-              "reason" => "missing bearer token"
-            }.to_json
-          }
-        )
+        return ({
+          "ok" => false,
+          "status" => 401,
+          "body" => {
+            "error" => "unauthorized",
+            "reason" => "missing bearer token"
+          }.to_json
+        })
       end
+
       token = parts[1].strip
       if token.empty?
-        return(
-          {
-            "ok" => false,
-            "status" => 401,
-            "body" => {
-              "error" => "unauthorized",
-              "reason" => "missing bearer token"
-            }.to_json
-          }
-        )
+        return ({
+          "ok" => false,
+          "status" => 401,
+          "body" => {
+            "error" => "unauthorized",
+            "reason" => "missing bearer token"
+          }.to_json
+        })
       end
+
       verify_key = settings.jwt_secret
       algorithm = settings.jwt_algorithm
       reason = nil
-      decoded =
-        begin
-          JWT.decode(token, verify_key, true, algorithm: algorithm)
-        rescue JWT::ExpiredSignature
-          reason = "token expired"
-          nil
-        rescue JWT::VerificationError
-          reason = "signature verification failed"
-          nil
-        rescue JWT::IncorrectAlgorithm
-          reason = "algorithm mismatch"
-          nil
-        rescue JWT::DecodeError => e
-          reason = "invalid token: #{e.message}"
-          nil
-        rescue StandardError => e
-          reason = "auth error: #{e.message}"
-          nil
-        end
-      if decoded.nil?
-        return(
-          {
-            "ok" => false,
-            "status" => 401,
-            "body" => {
-              "error" => "unauthorized",
-              "reason" => reason || "token verification failed"
-            }.to_json
-          }
-        )
+      decoded = begin
+        JWT.decode(token, verify_key, true, algorithm: algorithm)
+      rescue JWT::ExpiredSignature
+        reason = "token expired"
+        nil
+      rescue JWT::VerificationError
+        reason = "signature verification failed"
+        nil
+      rescue JWT::IncorrectAlgorithm
+        reason = "algorithm mismatch"
+        nil
+      rescue JWT::DecodeError => e
+        reason = "invalid token: #{e.message}"
+        nil
+      rescue StandardError => e
+        reason = "auth error: #{e.message}"
+        nil
       end
+
+      if decoded.nil?
+        return ({
+          "ok" => false,
+          "status" => 401,
+          "body" => {
+            "error" => "unauthorized",
+            "reason" => reason || "token verification failed"
+          }.to_json
+        })
+      end
+
       payload, _header = decoded
       @jwt_payload = payload
-      { "ok" => true, "payload" => payload }
+      {"ok" => true, "payload" => payload}
     end
   end
 
@@ -247,10 +247,12 @@ module Homura
           return r.to_s if r.is_a?(String) && !r.empty?
         end
       end
+
       %w[response result output text].each do |k|
         v = out[k]
         return v.to_s if v.is_a?(String) && !v.empty?
       end
+
       ""
     end
   end

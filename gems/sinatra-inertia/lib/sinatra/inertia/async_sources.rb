@@ -12,7 +12,7 @@
 
 if defined?(::HomuraRuntime) && defined?(::HomuraRuntime::AsyncRegistry)
   ::HomuraRuntime::AsyncRegistry.register_async_source do
-    async_method "Sinatra::Inertia::Response", :to_h
-    async_method "Sinatra::Inertia::Response", :to_json
+    async_method("Sinatra::Inertia::Response", :to_h)
+    async_method("Sinatra::Inertia::Response", :to_json)
   end
 end

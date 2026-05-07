@@ -44,7 +44,7 @@ module Homura
     private
 
     def debug_mail_forbidden_body
-      '<!DOCTYPE html><html lang="ja"><meta charset="utf-8"><title>403 Forbidden</title><body><p>Forbidden.</p></body></html>'
+      "<!DOCTYPE html><html lang=\"ja\"><meta charset=\"utf-8\"><title>403 Forbidden</title><body><p>Forbidden.</p></body></html>"
     end
   end
 end

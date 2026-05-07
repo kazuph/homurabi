@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "sinatra/base"
+
 require_relative "inertia/version"
 require_relative "inertia/errors"
 require_relative "inertia/deferred"
@@ -33,36 +34,39 @@ module Sinatra
     def self.registered(app)
       # Default settings. `page_*` is the recommended application-facing API;
       # `inertia_*` remains supported for existing apps and lower-level tuning.
-      app.set :inertia_version, "1" unless app.respond_to?(:inertia_version)
-      app.set :inertia_layout, :layout unless app.respond_to?(:inertia_layout)
+      app.set(:inertia_version, "1") unless app.respond_to?(:inertia_version)
+      app.set(:inertia_layout, :layout) unless app.respond_to?(:inertia_layout)
       unless app.respond_to?(:inertia_encrypt_history)
-        app.set :inertia_encrypt_history, false
+        app.set(:inertia_encrypt_history, false)
       end
+
       unless app.respond_to?(:inertia_csrf_protection)
-        app.set :inertia_csrf_protection, true
+        app.set(:inertia_csrf_protection, true)
       end
-      app.set :inertia_share_blocks, []
+
+      app.set(:inertia_share_blocks, [])
 
       # Mount CSRF middleware (double-submit XSRF-TOKEN cookie that
       # @inertiajs/* clients honour). Opt-out via
       # `set :inertia_csrf_protection, false` when the consumer ships
       # its own (e.g. Rack::Protection::AuthenticityToken).
       if app.settings.inertia_csrf_protection
-        app.use Sinatra::Inertia::CSRFMiddleware
+        app.use(Sinatra::Inertia::CSRFMiddleware)
       end
 
       # Mount protocol middleware (version mismatch + 303 redirect promotion).
-      app.use Sinatra::Inertia::Middleware,
-              version:
-                lambda {
-                  version =
-                    if app.settings.respond_to?(:page_version)
-                      app.settings.page_version
-                    else
-                      app.settings.inertia_version
-                    end
-                  version.respond_to?(:call) ? version.call.to_s : version.to_s
-                }
+      app.use(
+        Sinatra::Inertia::Middleware,
+        version: lambda {
+          version = if app.settings.respond_to?(:page_version)
+            app.settings.page_version
+          else
+            app.settings.inertia_version
+          end
+
+          version.respond_to?(:call) ? version.call.to_s : version.to_s
+        }
+      )
 
       # Class-level DSL: `share_props { ... }` registers a block whose return
       # value is merged into every page's props.
@@ -75,7 +79,7 @@ module Sinatra
         inertia_share(&block)
       end
 
-      app.helpers Sinatra::Inertia::Helpers
+      app.helpers(Sinatra::Inertia::Helpers)
     end
 
     # Convenience module-level constructors so code can write

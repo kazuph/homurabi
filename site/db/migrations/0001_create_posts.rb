@@ -4,10 +4,10 @@
 Sequel.migration do
   change do
     create_table(:posts) do
-      primary_key :id
-      String :title, null: false
-      String :body
-      Time :created_at, default: Sequel::CURRENT_TIMESTAMP
+      primary_key(:id)
+      String(:title, null: false)
+      String(:body)
+      Time(:created_at, default: Sequel::CURRENT_TIMESTAMP)
     end
   end
 end

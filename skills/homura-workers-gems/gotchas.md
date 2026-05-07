@@ -7,6 +7,12 @@
 - Generated apps should feel Rake-first: `bundle exec rake dev|build|deploy`.
 - For `--with-db` scaffolds, also expose `bundle exec rake db:migrate:compile|local|remote`.
 
+## Repo maintenance / formatting
+
+- For repository maintenance guidance, treat `fables-tales/rubyfmt` as the
+  canonical formatter.
+- Do not steer contributors back to `stree` / `syntax_tree` for formatting.
+
 ## Async Sinatra routes
 
 In this repo's Opal-on-Workers runtime:

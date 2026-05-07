@@ -63,16 +63,14 @@ module Cloudflare
       return new(cron: "", scheduled_time: Time.now) if `#{js_event} == null`
 
       cron = `(#{js_event}.cron == null ? '' : String(#{js_event}.cron))`
-      type =
-        `(#{js_event}.type == null ? 'scheduled' : String(#{js_event}.type))`
+      type = `(#{js_event}.type == null ? 'scheduled' : String(#{js_event}.type))`
       has_sched = `(#{js_event}.scheduledTime != null)`
-      sched_t =
-        if has_sched
-          sched_ms = `Number(#{js_event}.scheduledTime)`
-          Time.at(sched_ms.to_f / 1000.0)
-        else
-          Time.now
-        end
+      sched_t = if has_sched
+        sched_ms = `Number(#{js_event}.scheduledTime)`
+        Time.at(sched_ms.to_f / 1000.0)
+      else
+        Time.now
+      end
 
       new(cron: cron, scheduled_time: sched_t, type: type, raw: js_event)
     end
@@ -121,11 +119,10 @@ module Cloudflare
       event = ScheduledEvent.from_js(js_event)
       target = resolve_app
       if target.nil?
-        warn "[Cloudflare::Scheduled] no app registered; ignoring scheduled event"
-        return(
-          { "fired" => 0, "total" => 0, "results" => [], "error" => "no_app" }
-        )
+        warn("[Cloudflare::Scheduled] no app registered; ignoring scheduled event")
+        return ({"fired" => 0, "total" => 0, "results" => [], "error" => "no_app"})
       end
+
       target.dispatch_scheduled(event, js_env, js_ctx).__await__
     end
 
@@ -171,6 +168,7 @@ module Cloudflare
       if candidate.nil? && defined?(::Rack::Handler::Homura)
         candidate = ::Rack::Handler::Homura.app
       end
+
       return nil if candidate.nil?
       # Sinatra app classes respond to `dispatch_scheduled` (added by
       # Sinatra::Scheduled). Plain Rack apps would be instances and
@@ -180,7 +178,7 @@ module Cloudflare
       if candidate.respond_to?(:dispatch_scheduled)
         candidate
       elsif candidate.respond_to?(:class) &&
-            candidate.class.respond_to?(:dispatch_scheduled)
+          candidate.class.respond_to?(:dispatch_scheduled)
         candidate.class
       else
         candidate

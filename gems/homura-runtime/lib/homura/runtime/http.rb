@@ -76,7 +76,8 @@ module Cloudflare
       response_klass = Cloudflare::HTTPResponse
       err_klass = Cloudflare::HTTPError
       headers_to_hash = method(:js_headers_to_hash)
-      _ = headers_to_hash # silence opal lint
+      # silence opal lint
+      _ = headers_to_hash
 
       # NOTE: the multi-line backtick below returns a Promise BECAUSE it
       # is assigned to `js_promise` (and `js_promise.__await__` awaits
@@ -87,8 +88,7 @@ module Cloudflare
       # expression. See the single-line IIFE pattern used in
       # lib/homura/runtime/{cache,queue,durable_object}.rb#put for
       # the alternative that survives either position. (Phase 11B audit.)
-      js_promise =
-        `
+      js_promise = `
         (async function() {
           var init = { method: #{method_str}, headers: #{js_headers}, redirect: 'follow' };
           if (#{js_body} !== nil && #{js_body} != null) { init.body = #{js_body}; }
@@ -144,6 +144,7 @@ module Cloudflare
         vs = v.to_s
         `#{js_obj}[#{ks}] = #{vs}`
       end
+
       js_obj
     end
 

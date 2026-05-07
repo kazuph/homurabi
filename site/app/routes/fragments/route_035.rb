@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 # Route fragment 35 — api /api/chat/messages
-get "/api/chat/messages" do
-  content_type "application/json"
+get("/api/chat/messages") do
+  content_type("application/json")
   gate = ai_demos_block_or_nil
   next gate if gate
   auth_status, auth_result = authenticate_or_401
@@ -10,15 +10,15 @@ get "/api/chat/messages" do
   history = load_chat_history(session_id)
   # Include a pre-rendered HTML for each message so the client can
   # show Markdown-formatted history without re-running a JS parser.
-  history_enriched =
-    history.map do |m|
-      role = m["role"].to_s
-      content = m["content"].to_s
-      item = { "role" => role, "content" => content }
-      # Only assistant replies are converted — user messages are
-      # authored text and stay as-is to preserve the exact payload.
-      item["content_html"] = markdown_html(content) if role == "assistant"
-      item
-    end
-  { "session" => session_id, "history" => history_enriched }.to_json
+  history_enriched = history.map do |m|
+    role = m["role"].to_s
+    content = m["content"].to_s
+    item = {"role" => role, "content" => content}
+    # Only assistant replies are converted — user messages are
+    # authored text and stay as-is to preserve the exact payload.
+    item["content_html"] = markdown_html(content) if role == "assistant"
+    item
+  end
+
+  {"session" => session_id, "history" => history_enriched}.to_json
 end

@@ -1,25 +1,22 @@
 # frozen_string_literal: true
 # Route fragment 40 — demo /demo/do
-get "/demo/do" do
-  content_type "application/json"
+get("/demo/do") do
+  content_type("application/json")
   unless binding_demos_enabled?
-    status 404
-    next(
-      {
-        "error" => "binding demos disabled (set HOMURA_ENABLE_BINDING_DEMOS=1)"
-      }.to_json
-    )
+    status(404)
+    next ({
+      "error" => "binding demos disabled (set HOMURA_ENABLE_BINDING_DEMOS=1)"
+    }.to_json)
   end
+
   ns = do_counter
   if ns.nil?
-    status 503
-    next(
-      {
-        "error" =>
-          "DurableObject binding COUNTER not bound (wrangler.toml missing [[durable_objects.bindings]])"
-      }.to_json
-    )
+    status(503)
+    next ({
+      "error" => "DurableObject binding COUNTER not bound (wrangler.toml missing [[durable_objects.bindings]])"
+    }.to_json)
   end
+
   name = (params["name"] || "global").to_s
   action = (params["action"] || "inc").to_s
   stub = ns.get_by_name(name)

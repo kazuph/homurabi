@@ -78,13 +78,14 @@ module Sinatra
       routes.each_value do |entries|
         return true if entries.respond_to?(:any?) && entries.any?
       end
+
       false
     end
   end
 end
 
 if defined?(Sinatra::Base) && defined?(Cloudflare::BindingHelpers)
-  Sinatra::Base.helpers Cloudflare::BindingHelpers
+  Sinatra::Base.helpers(Cloudflare::BindingHelpers)
 end
 
 # Kept for backward compatibility with code that still wires up at_exit

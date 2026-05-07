@@ -15,6 +15,8 @@
 
 `__await__` / `# await:` などの Opal / Workers 非同期変換の内部表現は、表面 API・README・docs・examples・template にできる限り露出させない。ユーザーが書く Ruby は同期的な Ruby / Sinatra / Rack の形を保ち、必要な非同期境界は gem / build pipeline / runtime 側で吸収する。内部実装やテストで必要な場合でも、公開 example にコピーされる説明・コードには出さない。
 
+repo の Ruby formatter は **fables-tales/rubyfmt** を使う。Stripe の formatter rollout 記事で前提になっているものと同じ系統の formatter であり、この repo でもそれを正として扱う。`stree` / `syntax_tree` を formatter として再導入しない。formatter 導線・CI・hook・README・skill・llms.txt を変更するときも、この前提を崩さない。
+
 v1 未満では互換性維持を優先しない。理想のインターフェイスに届いていない既存 surface は、Ruby / Sinatra / Rack の驚き最小に反する限り、alias や互換レイヤーで延命せず破壊的に置き換える。特に CLI は「古い名前も残す」より「最終形に一本化する」を優先する。
 
 ## リネーム / 撲滅作業は常に「全部やる」

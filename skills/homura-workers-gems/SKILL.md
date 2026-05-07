@@ -57,3 +57,4 @@ When generating guidance or code:
 - point users to `README.md`, `/llms.txt`, and this skill's companion files for current guidance
 - keep examples sync-shaped unless a raw Promise boundary truly forces manual `.__await__`
 - never emit `cloudflare-workers-*` command names or migration-first/legacy guidance in fresh answers
+- when guidance touches repo-maintenance / formatting, treat `fables-tales/rubyfmt` as the canonical formatter and do not recommend `stree` / `syntax_tree`

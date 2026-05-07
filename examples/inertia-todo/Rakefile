@@ -2,7 +2,7 @@
 
 require "rake/clean"
 
-task default: :build
+task(default: :build)
 
 CLEAN.include(
   "build/app_assets.rb",
@@ -14,16 +14,16 @@ CLEAN.include(
 
 def run!(*argv)
   ok = system(*argv)
-  exit 1 unless ok
+  exit(1) unless ok
 end
 
-desc "Opal + Workers bundle"
-task :build do
+desc("Opal + Workers bundle")
+task(:build) do
   run!("bundle", "exec", "homura", "build", "--standalone", "--with-db")
 end
 
-desc "Start local dev server through portless (no port collisions)"
-task dev: :build do
+desc("Start local dev server through portless (no port collisions)")
+task(dev: :build) do
   app_name = File.basename(__dir__)
   exec(
     "portless",
@@ -34,19 +34,19 @@ task dev: :build do
   )
 end
 
-desc "Deploy the current app"
-task deploy: :build do
+desc("Deploy the current app")
+task(deploy: :build) do
   run!("npx", "wrangler", "deploy")
 end
 
-namespace :db do
-  namespace :migrate do
+namespace(:db) do
+  namespace(:migrate) do
     def d1_database_name
       ENV["CLOUDFLARE_D1_DATABASE"] || "inertia-todo"
     end
 
-    desc "Compile Sequel migrations to Wrangler SQL in db/migrate/"
-    task :compile do
+    desc("Compile Sequel migrations to Wrangler SQL in db/migrate/")
+    task(:compile) do
       run!(
         "bundle",
         "exec",
@@ -58,8 +58,8 @@ namespace :db do
       )
     end
 
-    desc "Apply compiled D1 migrations locally"
-    task local: :compile do
+    desc("Apply compiled D1 migrations locally")
+    task(local: :compile) do
       run!(
         "bundle",
         "exec",
@@ -70,8 +70,8 @@ namespace :db do
       )
     end
 
-    desc "Apply compiled D1 migrations remotely"
-    task remote: :compile do
+    desc("Apply compiled D1 migrations remotely")
+    task(remote: :compile) do
       run!(
         "bundle",
         "exec",

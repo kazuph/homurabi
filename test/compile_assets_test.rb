@@ -8,10 +8,10 @@ failed = 0
 
 def assert(label)
   yield
-  puts "PASS #{label}"
+  puts("PASS #{label}")
   true
 rescue => e
-  warn "FAIL #{label}: #{e.class}: #{e.message}"
+  warn("FAIL #{label}: #{e.class}: #{e.message}")
   false
 end
 
@@ -26,11 +26,10 @@ Dir.mktmpdir do |dir|
   )
   File.write(
     File.join(public_dir, "sample.svg"),
-    '<svg xmlns="http://www.w3.org/2000/svg"></svg>'
+    "<svg xmlns=\"http://www.w3.org/2000/svg\"></svg>"
   )
 
-  script =
-    File.expand_path("../gems/homura-runtime/exe/compile-assets", __dir__)
+  script = File.expand_path("../gems/homura-runtime/exe/compile-assets", __dir__)
   Dir.chdir(dir) do
     system(
       "ruby",
@@ -41,7 +40,8 @@ Dir.mktmpdir do |dir|
       "embedded_assets.rb",
       "--namespace",
       "CompileAssetsTest"
-    ) or abort("compile-assets failed")
+    ) or
+      abort("compile-assets failed")
   end
 
   module ::Cloudflare
@@ -72,45 +72,46 @@ Dir.mktmpdir do |dir|
     end
   end
 
-  load out_path
+  load(out_path)
 
-  ok =
-    assert("binary asset is returned as RawResponse via EmbeddedBinaryBody") do
-      app = ->(_env) { [404, {}, ["miss"]] }
-      status, headers, body =
-        CompileAssetsTest::Middleware.new(app).call(
-          "PATH_INFO" => "/sample.png"
-        )
-      raise "status=#{status}" unless status == 200
-      unless headers["content-type"] == "image/png"
-        raise "content-type=#{headers["content-type"]}"
-      end
-      unless body.is_a?(Array) && body.length == 1
-        raise "expected single-element rack body"
-      end
-      unless body.first.is_a?(Cloudflare::RawResponse)
-        raise "binary body not converted to RawResponse"
-      end
+  ok = assert("binary asset is returned as RawResponse via EmbeddedBinaryBody") do
+    app = -> (_env) { [404, {}, ["miss"]] }
+    status, headers, body = CompileAssetsTest::Middleware.new(app).call(
+      "PATH_INFO" => "/sample.png"
+    )
+    raise "status=#{status}" unless status == 200
+    unless headers["content-type"] == "image/png"
+      raise "content-type=#{headers["content-type"]}"
     end
+
+    unless body.is_a?(Array) && body.length == 1
+      raise "expected single-element rack body"
+    end
+
+    unless body.first.is_a?(Cloudflare::RawResponse)
+      raise "binary body not converted to RawResponse"
+    end
+  end
+
   passed += 1 if ok
   failed += 1 unless ok
 
-  ok =
-    assert("text asset stays a plain String body") do
-      app = ->(_env) { [404, {}, ["miss"]] }
-      status, headers, body =
-        CompileAssetsTest::Middleware.new(app).call(
-          "PATH_INFO" => "/sample.svg"
-        )
-      raise "status=#{status}" unless status == 200
-      unless headers["content-type"] == "image/svg+xml"
-        raise "content-type=#{headers["content-type"]}"
-      end
-      raise "expected plain string body" unless body.first.is_a?(String)
-      unless headers["content-length"] == body.first.bytesize.to_s
-        raise "content-length missing"
-      end
+  ok = assert("text asset stays a plain String body") do
+    app = -> (_env) { [404, {}, ["miss"]] }
+    status, headers, body = CompileAssetsTest::Middleware.new(app).call(
+      "PATH_INFO" => "/sample.svg"
+    )
+    raise "status=#{status}" unless status == 200
+    unless headers["content-type"] == "image/svg+xml"
+      raise "content-type=#{headers["content-type"]}"
     end
+
+    raise "expected plain string body" unless body.first.is_a?(String)
+    unless headers["content-length"] == body.first.bytesize.to_s
+      raise "content-length missing"
+    end
+  end
+
   passed += 1 if ok
   failed += 1 unless ok
 end
@@ -120,8 +121,7 @@ Dir.mktmpdir do |dir|
   out_path = File.join(dir, "embedded_assets.rb")
   FileUtils.mkdir_p(public_dir)
 
-  script =
-    File.expand_path("../gems/homura-runtime/exe/compile-assets", __dir__)
+  script = File.expand_path("../gems/homura-runtime/exe/compile-assets", __dir__)
   Dir.chdir(dir) do
     system(
       "ruby",
@@ -132,24 +132,24 @@ Dir.mktmpdir do |dir|
       "embedded_assets.rb",
       "--namespace",
       "EmptyCompileAssetsTest"
-    ) or abort("compile-assets failed for empty dir")
+    ) or
+      abort("compile-assets failed for empty dir")
   end
 
-  ok =
-    assert("empty public directory still emits pass-through middleware") do
-      load out_path
-      app = ->(_env) { [404, {}, ["miss"]] }
-      status, headers, body =
-        EmptyCompileAssetsTest::Middleware.new(app).call(
-          "PATH_INFO" => "/missing.txt"
-        )
-      raise "status=#{status}" unless status == 404
-      raise "headers=#{headers.inspect}" unless headers == {}
-      raise "body=#{body.inspect}" unless body == ["miss"]
-    end
+  ok = assert("empty public directory still emits pass-through middleware") do
+    load(out_path)
+    app = -> (_env) { [404, {}, ["miss"]] }
+    status, headers, body = EmptyCompileAssetsTest::Middleware.new(app).call(
+      "PATH_INFO" => "/missing.txt"
+    )
+    raise "status=#{status}" unless status == 404
+    raise "headers=#{headers.inspect}" unless headers == {}
+    raise "body=#{body.inspect}" unless body == ["miss"]
+  end
+
   passed += 1 if ok
   failed += 1 unless ok
 end
 
-puts "\n#{passed} passed, #{failed} failed"
+puts("\n#{passed} passed, #{failed} failed")
 exit(failed.zero? ? 0 : 1)

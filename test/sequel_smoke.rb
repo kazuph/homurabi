@@ -26,25 +26,27 @@ module SequelSmoke
     result = block.call
     if result
       @passed += 1
-      $stdout.puts "  PASS  #{label}"
+      $stdout.puts("  PASS  #{label}")
     else
       @failed += 1
       @errors << label
-      $stdout.puts "  FAIL  #{label}"
+      $stdout.puts("  FAIL  #{label}")
     end
+
   rescue Exception => e
     @failed += 1
     @errors << "#{label} (#{e.class}: #{e.message})"
-    $stdout.puts "  CRASH #{label} — #{e.class}: #{e.message}"
+    $stdout.puts("  CRASH #{label} — #{e.class}: #{e.message}")
   end
 
   def self.assert_equal(label, expected, actual)
     assert(label) do
       ok = (expected == actual)
       unless ok
-        $stdout.puts "         expected: #{expected.inspect}"
-        $stdout.puts "         actual:   #{actual.inspect}"
+        $stdout.puts("         expected: #{expected.inspect}")
+        $stdout.puts("         actual:   #{actual.inspect}")
       end
+
       ok
     end
   end
@@ -53,9 +55,10 @@ module SequelSmoke
     assert(label) do
       ok = haystack.to_s.include?(needle)
       unless ok
-        $stdout.puts "         expected to include: #{needle.inspect}"
-        $stdout.puts "         actual:              #{haystack.to_s.inspect}"
+        $stdout.puts("         expected to include: #{needle.inspect}")
+        $stdout.puts("         actual:              #{haystack.to_s.inspect}")
       end
+
       ok
     end
   end
@@ -69,12 +72,13 @@ module SequelSmoke
 
   def self.report
     total = @passed + @failed
-    $stdout.puts ""
-    $stdout.puts "#{total} tests, #{@passed} passed, #{@failed} failed"
+    $stdout.puts("")
+    $stdout.puts("#{total} tests, #{@passed} passed, #{@failed} failed")
     if @errors.any?
-      $stdout.puts "Failures:"
-      @errors.each { |e| $stdout.puts "  - #{e}" }
+      $stdout.puts("Failures:")
+      @errors.each { |e| $stdout.puts("  - #{e}") }
     end
+
     @failed == 0
   end
 end
@@ -90,6 +94,7 @@ def build_js_row(pairs)
       `#{js}[#{key}] = #{value}`
     end
   end
+
   js
 end
 
@@ -136,7 +141,7 @@ class MockD1Database
   def initialize
     @statements = []
     @rows = []
-    @run_meta = { "last_row_id" => 42, "changes" => 1 }
+    @run_meta = {"last_row_id" => 42, "changes" => 1}
     @schema_rows = {}
   end
 
@@ -164,9 +169,10 @@ class MockD1Database
     if sql.include?("PRAGMA table_xinfo")
       table = bindings.first
       if table.nil? &&
-           (m = sql.match(/PRAGMA\s+table_xinfo\((['"]?)([^'")]+)\1\)/i))
+          (m = sql.match(/PRAGMA\s+table_xinfo\((['"]?)([^'")]+)\1\)/i))
         table = m[2]
       end
+
       @schema_rows.fetch(table.to_s, [])
     else
       @rows
@@ -178,13 +184,13 @@ end
 # Tests
 # ---------------------------------------------------------------------
 
-$stdout.puts "=== homura Phase 12 — Sequel smoke ==="
-$stdout.puts ""
+$stdout.puts("=== homura Phase 12 — Sequel smoke ===")
+$stdout.puts("")
 
 mock = MockD1Database.new
 db = Sequel.connect(adapter: :d1, d1: mock)
 
-$stdout.puts "--- SQL DSL (offline, SQLite dialect) ---"
+$stdout.puts("--- SQL DSL (offline, SQLite dialect) ---")
 
 SequelSmoke.assert_equal(
   "DB[:users].sql emits SELECT * FROM users",
@@ -222,28 +228,30 @@ SequelSmoke.assert_equal(
   db[:users].where(id: [1, 2, 3]).sql
 )
 
-$stdout.puts ""
-$stdout.puts "--- Adapter wiring ---"
+$stdout.puts("")
+$stdout.puts("--- Adapter wiring ---")
 
 SequelSmoke.assert("adapter_scheme is :d1") { db.adapter_scheme == :d1 }
 SequelSmoke.assert("database_type is :sqlite (shared dialect)") do
   db.database_type == :sqlite
 end
+
 SequelSmoke.assert("SingleConnectionPool is used") do
   db.pool.class.name == "Sequel::SingleConnectionPool"
 end
+
 SequelSmoke.assert("integer_booleans defaults to true for D1") do
   db.integer_booleans == true
 end
 
-$stdout.puts ""
-$stdout.puts "--- Mock D1 round-trip ---"
+$stdout.puts("")
+$stdout.puts("--- Mock D1 round-trip ---")
 
-mock.rows = [{ "id" => 1, "name" => "alice" }, { "id" => 2, "name" => "bob" }]
+mock.rows = [{"id" => 1, "name" => "alice"}, {"id" => 2, "name" => "bob"}]
 rows = db[:users].all.__await__
 SequelSmoke.assert_equal(
   "Dataset#all returns rows from D1 (await resolves Promise chain)",
-  [{ "id" => 1, "name" => "alice" }, { "id" => 2, "name" => "bob" }],
+  [{"id" => 1, "name" => "alice"}, {"id" => 2, "name" => "bob"}],
   rows
 )
 
@@ -253,11 +261,10 @@ SequelSmoke.assert_include(
   "SELECT * FROM `users`"
 )
 
-$stdout.puts ""
-$stdout.puts "--- JS row conversion guards ---"
+$stdout.puts("")
+$stdout.puts("--- JS row conversion guards ---")
 
-js_row_with_undefined =
-  `({ id: 1, due_date: undefined, created_at: 1700000000 })`
+js_row_with_undefined = `({ id: 1, due_date: undefined, created_at: 1700000000 })`
 row_with_undefined = Cloudflare.js_object_to_hash(js_row_with_undefined)
 SequelSmoke.assert_equal(
   "js_object_to_hash normalizes undefined properties to nil",
@@ -275,8 +282,7 @@ SequelSmoke.assert_equal(
   row_with_undefined["created_at"]
 )
 
-js_rows_mixed =
-  `[
+js_rows_mixed = `[
   { id: 1, due_date: undefined, created_at: 1700000000 },
   { id: 2, due_date: 1735689600, created_at: 1700000100 }
 ]`
@@ -409,8 +415,7 @@ mixed_row_cases = [
     valued_value: 1_735_689_601
   },
   {
-    label:
-      "multiple nullable keys in first row do not poison second row falsy values",
+    label: "multiple nullable keys in first row do not poison second row falsy values",
     rows: [
       [
         ["id", 25],
@@ -448,29 +453,27 @@ SequelSmoke.assert_matrix(
   rows = Cloudflare.js_rows_to_ruby(js_rows)
   nil_row = rows.find { |row| row["id"] == test_case[:nil_row_id] }
   valued_row = rows.find { |row| row["id"] == test_case[:valued_row_id] }
-  rows.map { |row| row["id"] } ==
-    [test_case[:nil_row_id], test_case[:valued_row_id]] &&
+  rows.map { |row| row["id"] } == [test_case[:nil_row_id], test_case[:valued_row_id]] &&
     nil_row[test_case[:nil_key]].nil? &&
     valued_row[test_case[:valued_key]] == test_case[:valued_value] &&
     (test_case[:extra_checks] || {}).all? { |k, v| valued_row[k] == v }
 end
 
-nested_js_row =
-  build_js_row(
+nested_js_row = build_js_row(
+  [
+    ["id", 31],
     [
-      ["id", 31],
-      [
-        "meta",
-        build_js_row(
-          [
-            %w[due_date __HOMURA_SENTINEL_UNDEFINED__],
-            ["completed", false],
-            ["priority", 0]
-          ]
-        )
-      ]
+      "meta",
+      build_js_row(
+        [
+          %w[due_date __HOMURA_SENTINEL_UNDEFINED__],
+          ["completed", false],
+          ["priority", 0]
+        ]
+      )
     ]
-  )
+  ]
+)
 nested_row = Cloudflare.js_object_to_hash(nested_js_row)
 SequelSmoke.assert_equal(
   "js_object_to_hash normalizes undefined inside nested plain objects",
@@ -506,7 +509,7 @@ mock.schema_rows["todos"] = [
     "pk" => 0
   }
 ]
-mock.rows = [{ "id" => 1, "completed" => 0, "priority" => 0 }]
+mock.rows = [{"id" => 1, "completed" => 0, "priority" => 0}]
 rows = db[:todos].all.__await__
 SequelSmoke.assert_equal(
   "Dataset#all coerces boolean columns from D1 schema",
@@ -519,7 +522,7 @@ SequelSmoke.assert_equal(
   rows.first["priority"]
 )
 
-mock.rows = [{ "id" => 2, "completed" => "t", "priority" => 1 }]
+mock.rows = [{"id" => 2, "completed" => "t", "priority" => 1}]
 rows = db[:todos].all.__await__
 SequelSmoke.assert_equal(
   "Dataset#all coerces string-backed true booleans from D1 schema",
@@ -528,7 +531,7 @@ SequelSmoke.assert_equal(
 )
 
 mock.rows = []
-mock.run_meta = { "last_row_id" => 99, "changes" => 1 }
+mock.run_meta = {"last_row_id" => 99, "changes" => 1}
 id = db[:users].insert(name: "carol").__await__
 SequelSmoke.assert_equal(
   "Dataset#insert returns last_insert_rowid from D1 meta",
@@ -536,8 +539,8 @@ SequelSmoke.assert_equal(
   id
 )
 
-$stdout.puts ""
-$stdout.puts "--- JOIN / GROUP BY / subquery SQL ---"
+$stdout.puts("")
+$stdout.puts("--- JOIN / GROUP BY / subquery SQL ---")
 
 SequelSmoke.assert_include(
   "inner_join emits INNER JOIN",
@@ -563,11 +566,11 @@ SequelSmoke.assert_include(
   "SELECT `author_id` FROM `posts`"
 )
 
-$stdout.puts ""
-$stdout.puts "--- Transactions (mock) ---"
+$stdout.puts("")
+$stdout.puts("--- Transactions (mock) ---")
 
 mock.rows = []
-mock.run_meta = { "last_row_id" => 0, "changes" => 0 }
+mock.run_meta = {"last_row_id" => 0, "changes" => 0}
 mock.statements.clear
 begin
   db
@@ -579,8 +582,9 @@ begin
   tx_worked = true
 rescue ::Exception => e
   tx_worked = false
-  $stdout.puts "         transaction raised: #{e.class}: #{e.message}"
+  $stdout.puts("         transaction raised: #{e.class}: #{e.message}")
 end
+
 SequelSmoke.assert("DB.transaction block completes without raising") do
   tx_worked
 end
@@ -592,8 +596,8 @@ SequelSmoke.assert("BEGIN and COMMIT reached the mock binding") do
     sqls.any? { |s| s.include?("COMMIT") }
 end
 
-$stdout.puts ""
-$stdout.puts "--- Count / first (SQL emission only) ---"
+$stdout.puts("")
+$stdout.puts("--- Count / first (SQL emission only) ---")
 
 # Note: full round-trip of Dataset#count / #first via mock D1 is
 # covered by the in-Worker /test/sequel self-test (app/hello.rb +
@@ -614,8 +618,8 @@ SequelSmoke.assert_include(
   "count"
 )
 
-$stdout.puts ""
-$stdout.puts "--- Identifier / schema SQL primitives ---"
+$stdout.puts("")
+$stdout.puts("--- Identifier / schema SQL primitives ---")
 
 # create_table / alter_table are run via homura db:migrate:compile (CRuby
 # side) so we don't exercise them inside the Opal bundle here.
@@ -700,5 +704,5 @@ SequelSmoke.assert_equal(
   db[:todos].insert_sql(done: ::Sequel.lit("1 - done"))
 )
 
-$stdout.puts ""
+$stdout.puts("")
 SequelSmoke.report ? exit(0) : exit(1)

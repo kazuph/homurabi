@@ -1,13 +1,13 @@
 # frozen_string_literal: true
 # Route fragment 51 — demo /phase11a/upload
-get "/phase11a/upload" do
+get("/phase11a/upload") do
   @title = "Phase 11A — image upload demo"
   unless foundations_demos_enabled?
-    status 404
-    @content =
-      "<p>foundations demos disabled (set HOMURA_ENABLE_FOUNDATIONS_DEMOS=1).</p>"
-    next erb :layout
+    status(404)
+    @content = "<p>foundations demos disabled (set HOMURA_ENABLE_FOUNDATIONS_DEMOS=1).</p>"
+    next erb(:layout)
   end
+
   @images = []
   @non_image_count = 0
   if bucket
@@ -22,19 +22,22 @@ get "/phase11a/upload" do
       if ct.start_with?("image/")
         filename = row["key"].to_s.split("/").last.to_s
         display_name = filename.sub(/\A[0-9a-f]+-/, "")
-        @images << {
-          "key" => row["key"],
-          "download_url" => "/phase11a/download/#{row["key"]}",
-          "filename" => display_name,
-          "content_type" => ct,
-          "size" => row["size"],
-          "note" => nil # R2 doesn't preserve our custom note
-        }
+        @images <<
+          {
+            "key" => row["key"],
+            "download_url" => "/phase11a/download/#{row["key"]}",
+            "filename" => display_name,
+            "content_type" => ct,
+            "size" => row["size"],
+            # R2 doesn't preserve our custom note
+            "note" => nil
+          }
       else
         @non_image_count += 1
       end
     end
   end
-  @content = erb :phase11a_upload
-  erb :layout
+
+  @content = erb(:phase11a_upload)
+  erb(:layout)
 end

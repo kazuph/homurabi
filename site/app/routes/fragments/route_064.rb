@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 # Route fragment 64 — demo /docs/auto-await
-get "/docs/auto-await" do
+get("/docs/auto-await") do
   @title = "Auto-Await — homura Docs"
   @docs_page = "auto-await"
   @docs_section = :guides
@@ -12,6 +12,6 @@ get "/docs/auto-await" do
     %w[diagnostic 診断モード],
     %w[limits 制限とフォールバック]
   ]
-  @docs_inner = erb :docs_auto_await
-  erb :layout_docs
+  @docs_inner = erb(:docs_auto_await)
+  erb(:layout_docs)
 end

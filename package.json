@@ -6,6 +6,7 @@
   "description": "homura gem monorepo (homura-runtime / sinatra-homura / sequel-d1 / sinatra-inertia). The canonical Cloudflare Worker application lives under site/.",
   "scripts": {
     "preflight": "npm run format:ruby:check && npm test",
+    "format:ruby:install": "ruby bin/install-rubyfmt",
     "format:ruby": "ruby bin/format-ruby",
     "format:ruby:check": "ruby bin/format-ruby --check",
     "test:e2e:ai-examples": "playwright test tests/e2e/ai-examples.spec.ts --reporter=line",

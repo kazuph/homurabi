@@ -20,11 +20,13 @@ require "securerandom"
 require "base64"
 require "jwt"
 require "homura_markdown"
+
 # Phase 11A — HTTP foundations. `faraday` is the compat shim living
 # under vendor/ (NOT the real ruby-faraday gem — see file header for
 # the rationale). The Cloudflare::Multipart parser and the SSEStream
 # helper are auto-required from lib/homura/runtime.rb.
 require "faraday"
+
 # Phase 12 — Sequel (vendored v5.103.0) + D1 adapter (`sequel-d1` gem).
 # `Sequel.connect(adapter: :d1, d1: …)` uses the per-request D1 binding
 # from `d1` (wired by homura-runtime), and Dataset DSL compiles
@@ -71,8 +73,10 @@ class App < Sinatra::Base
   #     end
   # ------------------------------------------------------------------
 
-  JWT_ACCESS_TTL = 3600 # 1 hour
-  JWT_REFRESH_TTL = 86_400 * 30 # 30 days
+  # 1 hour
+  JWT_ACCESS_TTL = 3600
+  # 30 days
+  JWT_REFRESH_TTL = 86_400 * 30
 
   helpers Homura::JwtKeyHelpers
 
@@ -80,8 +84,7 @@ class App < Sinatra::Base
   # Phase 9 — Cron Trigger handlers (see also /test/scheduled* routes).
   # ------------------------------------------------------------------
   schedule "*/5 * * * *", name: "heartbeat" do |event|
-    enabled =
-      cf_env && `(#{cf_env}.HOMURA_ENABLE_SCHEDULED_DEMOS || '')`.to_s == "1"
+    enabled = cf_env && `(#{cf_env}.HOMURA_ENABLE_SCHEDULED_DEMOS || '')`.to_s == "1"
     next unless enabled
     # Insert one row into D1's heartbeats table per cron firing.
     # Falls back to a no-op when DB is not bound (test envs).
@@ -99,8 +102,7 @@ class App < Sinatra::Base
   end
 
   schedule "0 */1 * * *", name: "hourly-housekeeping" do |event|
-    enabled =
-      cf_env && `(#{cf_env}.HOMURA_ENABLE_SCHEDULED_DEMOS || '')`.to_s == "1"
+    enabled = cf_env && `(#{cf_env}.HOMURA_ENABLE_SCHEDULED_DEMOS || '')`.to_s == "1"
     next unless enabled
     # Demo: bump a KV counter so we can prove hourly cron runs from
     # outside a test by inspecting `/kv/cron:hourly-counter` over HTTP.
@@ -115,6 +117,7 @@ class App < Sinatra::Base
           prev = 0
         end
       end
+
       payload = {
         "count" => prev + 1,
         "last_cron" => event.cron,
@@ -142,10 +145,11 @@ class App < Sinatra::Base
     primary: "@cf/google/gemma-4-26b-a4b-it",
     fallback: "@cf/openai/gpt-oss-120b"
   }.freeze
-  CHAT_HISTORY_LIMIT = 32 # last N messages kept in KV per session
-  CHAT_HISTORY_TTL = 86_400 * 7 # 1 week
-  CHAT_SYSTEM_PROMPT =
-    "You are homura, a friendly Sinatra-on-Cloudflare-Workers assistant. Reply concisely. If the user writes Japanese, reply in Japanese. If the user writes English, reply in English."
+  # last N messages kept in KV per session
+  CHAT_HISTORY_LIMIT = 32
+  # 1 week
+  CHAT_HISTORY_TTL = 86_400 * 7
+  CHAT_SYSTEM_PROMPT = "You are homura, a friendly Sinatra-on-Cloudflare-Workers assistant. Reply concisely. If the user writes Japanese, reply in Japanese. If the user writes English, reply in English."
 
   # Workers AI response shaping lives in `Homura::ChatHistoryClassMethods#extract_ai_text`.
   extend Homura::ChatHistoryClassMethods
@@ -201,6 +205,7 @@ class App < Sinatra::Base
     else
       batch.ack_all
     end
+
     batch.size
   end
 
@@ -239,11 +244,13 @@ class App < Sinatra::Base
           )
           msg.ack
         end
+
         i += 1
       end
     else
       batch.ack_all
     end
+
     batch.size
   end
 
@@ -255,9 +262,8 @@ class App < Sinatra::Base
   # sees the increments after a WebSocket session.
   Cloudflare::DurableObject.define_web_socket_handlers(
     "HomuraCounterDO",
-    on_message: ->(ws, message, state) do
-      text =
-        `typeof #{message} === 'string' ? #{message} : (typeof Buffer !== 'undefined' && Buffer.isBuffer(#{message}) ? #{message}.toString('utf8') : '')`
+    on_message: -> (ws, message, state) do
+      text = `typeof #{message} === 'string' ? #{message} : (typeof Buffer !== 'undefined' && Buffer.isBuffer(#{message}) ? #{message}.toString('utf8') : '')`
       # Fire-and-forget the storage increment inside the async IIFE
       # so the ws.send is not blocked by the round-trip. We pass the
       # JS state into a single-line async fn to avoid the multi-line
@@ -266,7 +272,7 @@ class App < Sinatra::Base
       `(async function(ws, state, text) { try { var prev = (await state.storage.get('count')) || 0; var next = (typeof prev === 'number' ? prev : parseInt(prev, 10) || 0) + 1; await state.storage.put('count', next); ws.send('echo:' + text + ' count=' + next); } catch (e) { try { ws.send('error: ' + String(e && e.message || e)); } catch (_) {} } })(#{ws}, #{js_state_raw}, #{text})`
       nil
     end,
-    on_close: ->(ws, code, reason, _clean, _state) do
+    on_close: -> (ws, code, reason, _clean, _state) do
       # Mirror the close back to the client so both sides agree on
       # the shutdown code. Hibernation API requires an explicit
       # server-side close call.
@@ -275,7 +281,7 @@ class App < Sinatra::Base
       `(function(ws, c, r) { try { ws.close(c, r); } catch (_) {} })(#{ws}, #{c}, #{r})`
       nil
     end,
-    on_error: ->(ws, err, _state) do
+    on_error: -> (ws, err, _state) do
       # Just log the error — nothing meaningful to do beyond record it.
       `try { globalThis.console.error('[HomuraCounterDO.ws] error:', #{err}); } catch (_) {}`
       nil
@@ -295,7 +301,7 @@ class App < Sinatra::Base
       state.storage.put("count", next_count)
       [
         200,
-        { "content-type" => "application/json" },
+        {"content-type" => "application/json"},
         {
           "count" => next_count,
           "previous" => prev,
@@ -308,14 +314,14 @@ class App < Sinatra::Base
       state.storage.delete("count")
       [
         200,
-        { "content-type" => "application/json" },
-        { "reset" => true, "do_id" => state.id }.to_json
+        {"content-type" => "application/json"},
+        {"reset" => true, "do_id" => state.id}.to_json
       ]
     else
       [
         200,
-        { "content-type" => "application/json" },
-        { "count" => prev, "path" => path, "do_id" => state.id }.to_json
+        {"content-type" => "application/json"},
+        {"count" => prev, "path" => path, "do_id" => state.id}.to_json
       ]
     end
   end
@@ -346,6 +352,7 @@ class App < Sinatra::Base
   # by `bin/inline-routes-for-opal` before Opal compile — plain `require` of
   # route files would register on main, not App. Source: canonical_all.rb.
   require "routes_app_class_eval"
+
 end
 
-run App
+run(App)

@@ -3,8 +3,7 @@
 require "sinatra"
 
 MODEL = "@cf/moonshotai/kimi-k2.6"
-SYSTEM_PROMPT =
-  "You are a helpful assistant. Reply clearly and keep the answer under 280 characters.".freeze
+SYSTEM_PROMPT = "You are a helpful assistant. Reply clearly and keep the answer under 280 characters.".freeze
 MAX_PROMPT_CHARS = 600
 MAX_REPLY_CHARS = 280
 
@@ -13,9 +12,8 @@ def h(text)
 end
 
 def page(prompt: "", reply: nil, error: nil)
-  error_html = error ? %(<p class="error" role="alert">#{h(error)}</p>) : ""
-  reply_html =
-    reply ? %(<section><h2>Reply</h2><pre>#{h(reply)}</pre></section>) : ""
+  error_html = error ? "<p class=\"error\" role=\"alert\">#{h(error)}</p>" : ""
+  reply_html = reply ? "<section><h2>Reply</h2><pre>#{h(reply)}</pre></section>" : ""
 
   <<~HTML
     <!doctype html>
@@ -52,31 +50,30 @@ def page(prompt: "", reply: nil, error: nil)
   HTML
 end
 
-get "/" do
-  content_type "text/html; charset=utf-8"
+get("/") do
+  content_type("text/html; charset=utf-8")
   page
 end
 
-post "/chat" do
-  content_type "text/html; charset=utf-8"
+post("/chat") do
+  content_type("text/html; charset=utf-8")
   prompt = params["prompt"].to_s.strip[0, MAX_PROMPT_CHARS]
   if prompt.empty?
-    status 422
+    status(422)
     next page(prompt: prompt, error: "Enter a message first.")
   end
 
-  reply =
-    ai
-      .chat_text(prompt, model: MODEL, system: SYSTEM_PROMPT, max_tokens: 200)
-      .to_s
-      .strip[
-      0,
-      MAX_REPLY_CHARS
-    ]
+  reply = ai
+    .chat_text(prompt, model: MODEL, system: SYSTEM_PROMPT, max_tokens: 200)
+    .to_s
+    .strip[
+    0,
+    MAX_REPLY_CHARS
+  ]
   reply = "The model returned an empty reply." if reply.empty?
 
   page(prompt: prompt, reply: reply)
 rescue Cloudflare::AIError => e
-  status 502
+  status(502)
   page(prompt: prompt, error: e.message)
 end

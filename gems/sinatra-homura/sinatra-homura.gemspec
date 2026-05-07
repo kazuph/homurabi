@@ -28,22 +28,21 @@ Gem::Specification.new do |spec|
     "documentation_uri"
   ] = "https://homura.kazu-san.workers.dev/docs/sinatra"
 
-  spec.files =
-    Dir.chdir(__dir__) do
-      Dir[
-        "lib/**/*",
-        "vendor/**/*",
-        "exe/*",
-        "bin/*",
-        "templates/**/*",
-        "README.md",
-        "CHANGELOG.md"
-      ].select { |f| File.file?(f) }
-    end
+  spec.files = Dir.chdir(__dir__) do
+    Dir[
+      "lib/**/*",
+      "vendor/**/*",
+      "exe/*",
+      "bin/*",
+      "templates/**/*",
+      "README.md",
+      "CHANGELOG.md"
+    ].select { |f| File.file?(f) }
+  end
   spec.require_paths = ["lib"]
   spec.bindir = "bin"
   spec.executables = ["homura"]
 
-  spec.add_runtime_dependency "homura-runtime", ">= 0.3.5", "< 0.4"
-  spec.add_runtime_dependency "opal-homura", "= 1.8.3.rc1.5"
+  spec.add_runtime_dependency("homura-runtime", ">= 0.3.5", "< 0.4")
+  spec.add_runtime_dependency("opal-homura", "= 1.8.3.rc1.5")
 end

@@ -21,10 +21,9 @@ unless success
   abort("bin/install-git-hooks: failed to configure core.hooksPath")
 end
 
-configured_path, status =
-  Open3.capture2("git", "config", "--local", "--get", "core.hooksPath")
+configured_path, status = Open3.capture2("git", "config", "--local", "--get", "core.hooksPath")
 unless status.success? && configured_path.strip == hooks_path
   abort("bin/install-git-hooks: could not verify core.hooksPath")
 end
 
-puts "Configured core.hooksPath=#{hooks_path}"
+puts("Configured core.hooksPath=#{hooks_path}")

@@ -27,54 +27,57 @@ $failed = 0
 def ok(label, cond, note = nil)
   if cond
     $passed += 1
-    puts "  PASS  #{label}"
+    puts("  PASS  #{label}")
   else
     $failed += 1
-    puts "  FAIL  #{label}#{note ? " — #{note}" : ""}"
+    puts("  FAIL  #{label}#{note ? " — #{note}" : ""}")
   end
 end
 
-puts "--- classic top-level Sinatra smoke ---"
+puts("--- classic top-level Sinatra smoke ---")
 
 # At this point vendor/sinatra.rb has already run:
 #   require 'sinatra/main'
 #   require 'sinatra_opal_patches'
 #   enable :inline_templates
 # If the Delegator fix is effective, that `enable` call succeeded.
-ok "enable :inline_templates reached (no NoMethodError)", true
+ok("enable :inline_templates reached (no NoMethodError)", true)
 
 # Top-level `get` / `post` — classic-mode DSL that routes through
 # Sinatra::Delegator to Sinatra::Application.
-get "/classic" do
-  content_type "text/plain"
+get("/classic") do
+  content_type("text/plain")
   "classic hello"
 end
 
-post "/classic/echo" do
-  content_type "text/plain"
+post("/classic/echo") do
+  content_type("text/plain")
   request.body.rewind
   "echo: #{request.body.read}"
 end
 
 before { @seen = true }
 
-ok "Sinatra::Application registered a route",
-   Sinatra::Application.routes["GET"].any? { |r| r[0].match("/classic") }
-ok "Sinatra::Application registered POST /classic/echo",
-   Sinatra::Application.routes["POST"].any? { |r| r[0].match("/classic/echo") }
-ok "before filter registered", !Sinatra::Application.filters[:before].empty?
+ok(
+  "Sinatra::Application registered a route",
+  Sinatra::Application.routes["GET"].any? { |r| r[0].match("/classic") }
+)
+ok(
+  "Sinatra::Application registered POST /classic/echo",
+  Sinatra::Application.routes["POST"].any? { |r| r[0].match("/classic/echo") }
+)
+ok("before filter registered", !Sinatra::Application.filters[:before].empty?)
 
 # Exercise dispatch
-status, headers, body =
-  Sinatra::Application.call(
-    "REQUEST_METHOD" => "GET",
-    "PATH_INFO" => "/classic",
-    "QUERY_STRING" => "",
-    "HTTP_HOST" => "test.local",
-    "rack.input" => StringIO.new("")
-  )
+status, headers, body = Sinatra::Application.call(
+  "REQUEST_METHOD" => "GET",
+  "PATH_INFO" => "/classic",
+  "QUERY_STRING" => "",
+  "HTTP_HOST" => "test.local",
+  "rack.input" => StringIO.new("")
+)
 
-ok "GET /classic returns 200", status == 200
+ok("GET /classic returns 200", status == 200)
 
 # Copilot (PR #12) pointed out that `body.each { |b| @out = b }.then { true }`
 # always evaluates truthy even if the block never fires. Collect the
@@ -92,11 +95,16 @@ collected = ""
 if body.respond_to?(:each)
   body.each { |chunk| collected = collected + chunk.to_s }
 end
-ok '  — response body is "classic hello"',
-   collected == "classic hello",
-   "got #{collected.inspect}"
-ok "  — Content-Type is text/plain*",
-   (headers["content-type"] || "").start_with?("text/plain")
+
+ok(
+  "  — response body is \"classic hello\"",
+  collected == "classic hello",
+  "got #{collected.inspect}"
+)
+ok(
+  "  — Content-Type is text/plain*",
+  (headers["content-type"] || "").start_with?("text/plain")
+)
 
 # ---- Lazy-discovery regression (sinatra-homura 0.2.23) -----------------
 # Classic-style apps are now allowed to omit the trailing
@@ -115,24 +123,28 @@ ok "  — Content-Type is text/plain*",
 # cached `@app`, then call `ensure_rack_app!` directly and assert it
 # registered `Sinatra::Application` (which already has routes from the
 # classic `get '/classic' do … end` block above).
-puts ""
-puts "--- lazy first-fetch app discovery ---"
+puts("")
+puts("--- lazy first-fetch app discovery ---")
 
 original_app = Rack::Handler::Homura.app
 Rack::Handler::Homura.app = nil
-ok "  — handler @app cleared for the test", Rack::Handler::Homura.app.nil?
+ok("  — handler @app cleared for the test", Rack::Handler::Homura.app.nil?)
 
 discovered = Sinatra::Homura.ensure_rack_app!
-ok "  — ensure_rack_app! discovers Sinatra::Application",
-   discovered == Sinatra::Application,
-   "got #{discovered.inspect}"
-ok "  — handler.app now points at Sinatra::Application",
-   Rack::Handler::Homura.app == Sinatra::Application
+ok(
+  "  — ensure_rack_app! discovers Sinatra::Application",
+  discovered == Sinatra::Application,
+  "got #{discovered.inspect}"
+)
+ok(
+  "  — handler.app now points at Sinatra::Application",
+  Rack::Handler::Homura.app == Sinatra::Application
+)
 
 # Restore so the rest of the smoke-suite (if anything follows) sees the
 # original handler state.
 Rack::Handler::Homura.app = original_app if original_app
 
-puts ""
-puts "#{$passed + $failed} tests, #{$passed} passed, #{$failed} failed"
+puts("")
+puts("#{$passed + $failed} tests, #{$passed} passed, #{$failed} failed")
 exit($failed == 0 ? 0 : 1)

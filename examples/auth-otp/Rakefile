@@ -2,7 +2,7 @@
 
 require "rake/clean"
 
-task default: :build
+task(default: :build)
 
 CLEAN.include(
   "build/app_assets.rb",
@@ -14,16 +14,16 @@ CLEAN.include(
 
 def run!(*argv)
   ok = system(*argv)
-  exit 1 unless ok
+  exit(1) unless ok
 end
 
-desc "Opal + Workers bundle"
-task :build do
+desc("Opal + Workers bundle")
+task(:build) do
   run!("bundle", "exec", "homura", "build", "--standalone", "--with-db")
 end
 
-desc "Start local dev server through portless (no port collisions)"
-task dev: :build do
+desc("Start local dev server through portless (no port collisions)")
+task(dev: :build) do
   app_name = File.basename(__dir__)
   exec(
     "portless",
@@ -34,19 +34,19 @@ task dev: :build do
   )
 end
 
-desc "Deploy the current app"
-task deploy: :build do
+desc("Deploy the current app")
+task(deploy: :build) do
   run!("npx", "wrangler", "deploy")
 end
 
-namespace :db do
-  namespace :migrate do
+namespace(:db) do
+  namespace(:migrate) do
     def d1_database_name
       ENV["CLOUDFLARE_D1_DATABASE"] || "auth-otp"
     end
 
-    desc "Compile Sequel migrations to Wrangler SQL in db/migrate/"
-    task :compile do
+    desc("Compile Sequel migrations to Wrangler SQL in db/migrate/")
+    task(:compile) do
       run!(
         "bundle",
         "exec",
@@ -58,8 +58,8 @@ namespace :db do
       )
     end
 
-    desc "Apply compiled D1 migrations locally"
-    task local: :compile do
+    desc("Apply compiled D1 migrations locally")
+    task(local: :compile) do
       run!(
         "bundle",
         "exec",
@@ -70,8 +70,8 @@ namespace :db do
       )
     end
 
-    desc "Apply compiled D1 migrations remotely"
-    task remote: :compile do
+    desc("Apply compiled D1 migrations remotely")
+    task(remote: :compile) do
       run!(
         "bundle",
         "exec",
@@ -85,7 +85,7 @@ namespace :db do
   end
 end
 
-namespace :mailpit do
+namespace(:mailpit) do
   pid_file = "/tmp/auth-otp-mailpit.pid"
   log_file = "/tmp/auth-otp-mailpit.log"
 
@@ -99,30 +99,30 @@ namespace :mailpit do
     false
   end
 
-  desc "Start mailpit (SMTP:1025, Web UI / API:8025)"
-  task :start do
+  desc("Start mailpit (SMTP:1025, Web UI / API:8025)")
+  task(:start) do
     if mailpit_alive?(pid_file)
-      puts "mailpit already running (pid=#{File.read(pid_file)})"
+      puts("mailpit already running (pid=#{File.read(pid_file)})")
       next
     end
-    pid =
-      Process.spawn(
-        "/opt/homebrew/bin/mailpit",
-        "--smtp",
-        "127.0.0.1:1025",
-        "--listen",
-        "127.0.0.1:8025",
-        out: log_file,
-        err: log_file
-      )
+
+    pid = Process.spawn(
+      "/opt/homebrew/bin/mailpit",
+      "--smtp",
+      "127.0.0.1:1025",
+      "--listen",
+      "127.0.0.1:8025",
+      out: log_file,
+      err: log_file
+    )
     Process.detach(pid)
     File.write(pid_file, pid.to_s)
-    sleep 1
-    puts "mailpit started pid=#{pid} (web/api: http://127.0.0.1:8025)"
+    sleep(1)
+    puts("mailpit started pid=#{pid} (web/api: http://127.0.0.1:8025)")
   end
 
-  desc "Stop mailpit"
-  task :stop do
+  desc("Stop mailpit")
+  task(:stop) do
     next unless File.exist?(pid_file)
     pid = File.read(pid_file).to_i
     begin
@@ -130,20 +130,22 @@ namespace :mailpit do
     rescue Errno::ESRCH, Errno::EPERM
       # already gone
     end
+
     File.delete(pid_file)
-    puts "mailpit stopped"
+    puts("mailpit stopped")
   end
 
-  desc "Clear all messages in mailpit"
-  task :clear do
+  desc("Clear all messages in mailpit")
+  task(:clear) do
     require "net/http"
+
     Net::HTTP.start("127.0.0.1", 8025) { |h| h.delete("/api/v1/messages") }
-    puts "mailpit messages cleared"
+    puts("mailpit messages cleared")
   end
 end
 
-desc "End-to-end smoke against portless+mailpit"
-task :e2e do
+desc("End-to-end smoke against portless+mailpit")
+task(:e2e) do
   require "net/http"
   require "json"
   require "uri"
@@ -152,7 +154,7 @@ task :e2e do
   # `+` 入り email を使って sinatra-homura 0.2.17 の cookie `+` percent-decode 修正を検証する
   email = ENV["E2E_EMAIL"] || "demo+#{Time.now.to_i}@example.com"
 
-  puts "[e2e] base=#{base} email=#{email}"
+  puts("[e2e] base=#{base} email=#{email}")
 
   # 0) clear mailpit so we can find OUR mail unambiguously
   Net::HTTP.start("127.0.0.1", 8025) { |h| h.delete("/api/v1/messages") }
@@ -162,52 +164,51 @@ task :e2e do
   unless resp.is_a?(Net::HTTPSuccess) || resp.is_a?(Net::HTTPRedirection)
     raise "login failed: #{resp.code} #{resp.body[0, 300]}"
   end
-  puts "[e2e] /login → #{resp.code}"
+
+  puts("[e2e] /login → #{resp.code}")
 
   # 2) mailpit からメール取得 → OTP 抽出
-  msgs =
-    JSON.parse(
-      Net::HTTP.get(URI("http://127.0.0.1:8025/api/v1/messages?limit=10"))
-    )
-  msg_summary =
-    msgs["messages"].find do |m|
-      (m["To"] || []).any? { |t| t["Address"] == email }
-    end
+  msgs = JSON.parse(
+    Net::HTTP.get(URI("http://127.0.0.1:8025/api/v1/messages?limit=10"))
+  )
+  msg_summary = msgs["messages"].find do |m|
+    (m["To"] || []).any? { |t| t["Address"] == email }
+  end
+
   raise "no mail in mailpit for #{email}: #{msgs.inspect}" unless msg_summary
 
-  msg =
-    JSON.parse(
-      Net::HTTP.get(
-        URI("http://127.0.0.1:8025/api/v1/message/#{msg_summary["ID"]}")
-      )
+  msg = JSON.parse(
+    Net::HTTP.get(
+      URI("http://127.0.0.1:8025/api/v1/message/#{msg_summary["ID"]}")
     )
+  )
   body_text = msg["Text"] || msg["HTML"]
   code = body_text[/\d{6}/] or
-    raise "no 6-digit OTP in mail: #{body_text.inspect}"
-  puts "[e2e] mailpit mail received id=#{msg_summary["ID"]} otp=#{code}"
+    raise("no 6-digit OTP in mail: #{body_text.inspect}")
+  puts("[e2e] mailpit mail received id=#{msg_summary["ID"]} otp=#{code}")
 
   # 3) /verify で検証 → cookie 取得
   uri = URI("#{base}/verify")
   http = Net::HTTP.new(uri.host, uri.port)
-  req =
-    Net::HTTP::Post
-      .new(uri)
-      .tap { |r| r.set_form_data("email" => email, "code" => code) }
+  req = Net::HTTP::Post
+    .new(uri)
+    .tap { |r| r.set_form_data("email" => email, "code" => code) }
   resp = http.request(req)
   unless resp.is_a?(Net::HTTPRedirection) || resp.code.to_i == 303
     raise "verify failed: #{resp.code} #{resp.body[0, 300]}"
   end
-  raw_cookie = resp["set-cookie"] or raise "no session cookie"
+
+  raw_cookie = resp["set-cookie"] or raise("no session cookie")
   # Strip cookie attributes (path=/, max-age=..., httponly, samesite=...).
   # We send only `<name>=<value>` back as the Cookie request header.
   cookie = raw_cookie.split(";").first.to_s.strip
   raise "no session=... cookie" unless cookie.start_with?("session=")
-  puts "[e2e] /verify → #{resp.code} cookie=#{cookie[0, 60]}..."
+  puts("[e2e] /verify → #{resp.code} cookie=#{cookie[0, 60]}...")
 
   # 4) ログイン後 / で email が見える
   body = Net::HTTP.get(URI("#{base}/"), "Cookie" => cookie)
   raise "after login / unexpected: #{body[0, 300]}" unless body.include?(email)
-  puts "[e2e] / shows logged-in email"
+  puts("[e2e] / shows logged-in email")
 
   # 5) /logout
   req = Net::HTTP::Post.new(URI("#{base}/logout"))
@@ -216,13 +217,14 @@ task :e2e do
   unless resp.is_a?(Net::HTTPRedirection) || resp.code.to_i == 303
     raise "logout failed: #{resp.code} #{resp.body[0, 300]}"
   end
-  puts "[e2e] /logout → #{resp.code}"
 
-  puts "E2E OK: email=#{email}, otp=#{code}"
+  puts("[e2e] /logout → #{resp.code}")
+
+  puts("E2E OK: email=#{email}, otp=#{code}")
 end
 
-desc "End-to-end smoke through real browser (headed)"
-task "e2e:headed" do
+desc("End-to-end smoke through real browser (headed)")
+task("e2e:headed") do
   require "playwright"
   require "net/http"
   require "json"
@@ -246,14 +248,13 @@ task "e2e:headed" do
     pw
       .chromium
       .launch(headless: false, slowMo: 350) do |browser|
-        ctx =
-          browser.new_context(
-            record_video_dir: artifacts,
-            viewport: {
-              width: 1024,
-              height: 720
-            }
-          )
+        ctx = browser.new_context(
+          record_video_dir: artifacts,
+          viewport: {
+            width: 1024,
+            height: 720
+          }
+        )
         page = ctx.new_page
         page.goto("#{base}/")
         page.screenshot(path: File.join(artifacts, "01-top-unauth.png"))
@@ -269,31 +270,30 @@ task "e2e:headed" do
         msgs = nil
         summary = nil
         30.times do
-          sleep 0.3
-          msgs =
-            JSON.parse(
-              Net::HTTP.get(
-                URI("http://127.0.0.1:8025/api/v1/messages?limit=10")
-              )
-            )
-          summary =
-            (msgs["messages"] || []).find do |m|
-              (m["To"] || []).any? { |t| t["Address"] == email }
-            end
-          break if summary
-        end
-        raise "mailpit にメールが届かなかった (email=#{email})" unless summary
-
-        msg =
-          JSON.parse(
+          sleep(0.3)
+          msgs = JSON.parse(
             Net::HTTP.get(
-              URI("http://127.0.0.1:8025/api/v1/message/#{summary["ID"]}")
+              URI("http://127.0.0.1:8025/api/v1/messages?limit=10")
             )
           )
+          summary = (msgs["messages"] || []).find do |m|
+            (m["To"] || []).any? { |t| t["Address"] == email }
+          end
+
+          break if summary
+        end
+
+        raise "mailpit にメールが届かなかった (email=#{email})" unless summary
+
+        msg = JSON.parse(
+          Net::HTTP.get(
+            URI("http://127.0.0.1:8025/api/v1/message/#{summary["ID"]}")
+          )
+        )
         body_text = msg["Text"] || msg["HTML"]
         code = body_text[/\d{6}/]
         raise "OTP 抽出失敗: #{body_text.inspect}" unless code
-        puts "[e2e:headed] mailpit OTP=#{code}"
+        puts("[e2e:headed] mailpit OTP=#{code}")
 
         page.goto(
           "#{base}/verify?email=#{URI.encode_www_form_component(email)}"
@@ -311,10 +311,11 @@ task "e2e:headed" do
         page.wait_for_load_state(state: "networkidle")
         page.screenshot(path: File.join(artifacts, "06-after-logout.png"))
 
-        sleep (ENV["HOLD"] || 4).to_i # マスターに目視時間
+        # マスターに目視時間
+        sleep((ENV["HOLD"] || 4).to_i)
         ctx.close
       end
   end
 
-  puts "[e2e:headed] artifacts → #{artifacts}"
+  puts("[e2e:headed] artifacts → #{artifacts}")
 end

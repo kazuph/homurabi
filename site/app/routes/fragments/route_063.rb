@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 # Route fragment 63 — demo /docs/runtime
-get "/docs/runtime" do
+get("/docs/runtime") do
   @title = "homura-runtime — homura Docs"
   @docs_page = "runtime"
   @docs_section = :reference
@@ -15,6 +15,6 @@ get "/docs/runtime" do
     %w[entrypoint worker.entrypoint.mjs],
     %w[matrix できること / できないこと]
   ]
-  @docs_inner = erb :docs_runtime
-  erb :layout_docs
+  @docs_inner = erb(:docs_runtime)
+  erb(:layout_docs)
 end

@@ -37,10 +37,10 @@ $failed = 0
 def ok(label, cond, note = nil)
   if cond
     $passed += 1
-    puts "  PASS  #{label}"
+    puts("  PASS  #{label}")
   else
     $failed += 1
-    puts "  FAIL  #{label}#{note ? " — #{note}" : ""}"
+    puts("  FAIL  #{label}#{note ? " — #{note}" : ""}")
   end
 end
 
@@ -55,12 +55,12 @@ def ok_safe(label)
   ok(label, cond)
 rescue ::Exception => e
   $failed += 1
-  puts "  FAIL  #{label} — #{e.class}: #{e.message[0, 200]}"
+  puts("  FAIL  #{label} — #{e.class}: #{e.message[0, 200]}")
 end
 
 def section(title)
   puts
-  puts "--- #{title} ---"
+  puts("--- #{title} ---")
 end
 
 # ---------------------------------------------------------------------
@@ -73,12 +73,12 @@ end
 class MockD1
   def execute(sql)
     PromiseV2.value(
-      [{ "id" => 1, "name" => "kazu" }, { "id" => 2, "name" => "homura" }]
+      [{"id" => 1, "name" => "kazu"}, {"id" => 2, "name" => "homura"}]
     )
   end
 
   def get_first_row(sql, binds)
-    PromiseV2.value({ "id" => binds.first, "name" => "found" })
+    PromiseV2.value({"id" => binds.first, "name" => "found"})
   end
 end
 
@@ -109,19 +109,19 @@ class MockJWT
     parts = token.split(".", 3)
     alg = parts[0]
     payload = parts[1] ? JSON.parse(parts[1]) : {}
-    PromiseV2.value([payload, { "alg" => alg }])
+    PromiseV2.value([payload, {"alg" => alg}])
   end
 end
 
 class MockHTTP
   def self.fetch(url)
-    PromiseV2.value({ "url" => url, "status" => 200 })
+    PromiseV2.value({"url" => url, "status" => 200})
   end
 end
 
 class MockAI
   def self.run(model, inputs)
-    PromiseV2.value({ "model" => model, "reply" => "hello" })
+    PromiseV2.value({"model" => model, "reply" => "hello"})
   end
 end
 
@@ -141,49 +141,53 @@ end
 
 # Sentinel Proc — auto-await list includes `run` and `send`; this
 # exercises block-returning calls across the async boundary.
-run_it =
-  proc do |label, value|
-    PromiseV2.value({ "label" => label, "value" => value })
-  end
+run_it = proc do |label, value|
+  PromiseV2.value({"label" => label, "value" => value})
+end
 
 # ---------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------
 
-section "D1 execute / get_first_row auto-await"
+section("D1 execute / get_first_row auto-await")
 db = MockD1.new
 rows = db.execute("SELECT id, name FROM users")
 ok_safe("db.execute returns Array (auto-awaited PromiseV2)") do
   rows.is_a?(Array)
 end
+
 ok_safe("  — first row is Hash with expected id") do
   rows.is_a?(Array) && rows.first.is_a?(Hash) && rows.first["id"] == 1
 end
+
 row = db.get_first_row("SELECT ...", [42])
 ok_safe("db.get_first_row returns Hash (auto-awaited)") do
   row.is_a?(Hash) && row["id"] == 42
 end
 
-section "Sequel-like Dataset#all auto-await"
-ds = MockDataset.new([{ "id" => 10, "n" => "a" }, { "id" => 20, "n" => "b" }])
+section("Sequel-like Dataset#all auto-await")
+ds = MockDataset.new([{"id" => 10, "n" => "a"}, {"id" => 20, "n" => "b"}])
 arr = ds.all
 ok_safe("ds.all returns Array (auto-awaited)") do
   arr.is_a?(Array) && arr.size == 2
 end
+
 ok_safe("  — second row id is 20") do
   arr.is_a?(Array) && arr[1].is_a?(Hash) && arr[1]["id"] == 20
 end
 
-section "Sequel-like Dataset#first auto-await (PromiseV2)"
+section("Sequel-like Dataset#first auto-await (PromiseV2)")
 one = ds.first
 ok_safe("ds.first returns Hash (auto-awaited)") do
   one.is_a?(Hash) && one["id"] == 10
 end
 
-section "JWT encode / decode auto-await"
-tok = MockJWT.encode({ "sub" => "demo" }, "sekrit", "HS256")
-ok "JWT.encode returns String (auto-awaited)",
-   tok.is_a?(String) && tok.start_with?("HS256.")
+section("JWT encode / decode auto-await")
+tok = MockJWT.encode({"sub" => "demo"}, "sekrit", "HS256")
+ok(
+  "JWT.encode returns String (auto-awaited)",
+  tok.is_a?(String) && tok.start_with?("HS256.")
+)
 # Multiple assignment against an auto-awaited call — this is the exact
 # shape used in app/hello.rb's `/api/me` route
 # (`payload, header = JWT.decode(...)` with `decode` in the auto-await
@@ -191,55 +195,69 @@ ok "JWT.encode returns String (auto-awaited)",
 # future compiler change would make multi-assign stop unwrapping the
 # Promise correctly.
 payload, header = MockJWT.decode(tok, "sekrit", true, {})
-ok "JWT.decode payload has sub (auto-awaited + multi-assign)",
-   payload.is_a?(Hash) && payload["sub"] == "demo"
-ok "JWT.decode header has alg (auto-awaited + multi-assign)",
-   header.is_a?(Hash) && header["alg"] == "HS256"
+ok(
+  "JWT.decode payload has sub (auto-awaited + multi-assign)",
+  payload.is_a?(Hash) && payload["sub"] == "demo"
+)
+ok(
+  "JWT.decode header has alg (auto-awaited + multi-assign)",
+  header.is_a?(Hash) && header["alg"] == "HS256"
+)
 
-section "HTTP fetch auto-await"
+section("HTTP fetch auto-await")
 res = MockHTTP.fetch("https://example.invalid/ping")
-ok "HTTP.fetch returns Hash (auto-awaited)",
-   res.is_a?(Hash) && res["status"] == 200
+ok(
+  "HTTP.fetch returns Hash (auto-awaited)",
+  res.is_a?(Hash) && res["status"] == 200
+)
 
-section "Workers AI run auto-await"
-ai = MockAI.run("@cf/demo", { messages: [] })
-ok "AI.run returns Hash (auto-awaited)",
-   ai.is_a?(Hash) && ai["reply"] == "hello"
+section("Workers AI run auto-await")
+ai = MockAI.run("@cf/demo", {messages: []})
+ok(
+  "AI.run returns Hash (auto-awaited)",
+  ai.is_a?(Hash) && ai["reply"] == "hello"
+)
 
-section "KV put with explicit __await__ (control: Sinatra DSL conflict)"
+section("KV put with explicit __await__ (control: Sinatra DSL conflict)")
 kv = MockKV.new
 kv.put("k1", "v1").__await__
-ok "kv.fetch returns stored value (put manually awaited)",
-   kv.fetch("k1") == "v1"
+ok(
+  "kv.fetch returns stored value (put manually awaited)",
+  kv.fetch("k1") == "v1"
+)
 
-section "Proc#send (auto-await) — carrier for run.call style helpers"
+section("Proc#send (auto-await) — carrier for run.call style helpers")
 # `send` is in our auto-await list. For the mock, `.send` is defined as
 # the Queue DSL entry; calling it returns the label+value hash.
 class QueueWrapper
   def send(body)
-    PromiseV2.value({ "enqueued" => body })
+    PromiseV2.value({"enqueued" => body})
   end
 end
-q = QueueWrapper.new
-ack = q.send({ "hello" => "queue" })
-ok "queue.send auto-awaits to Hash",
-   ack.is_a?(Hash) && ack["enqueued"]["hello"] == "queue"
 
-section "Chained method: bucket.list.first (only first wants await)"
+q = QueueWrapper.new
+ack = q.send({"hello" => "queue"})
+ok(
+  "queue.send auto-awaits to Hash",
+  ack.is_a?(Hash) && ack["enqueued"]["hello"] == "queue"
+)
+
+section("Chained method: bucket.list.first (only first wants await)")
 # Demonstrates that a chain `list.first` — where `list` returns a
 # Promise — needs an explicit `.__await__` on the intermediate if the
 # chain-end method isn't auto-awaited (here `list` is auto-awaited,
 # `first` is handled by `.first` auto-await in this file).
 class MockBucket
   def list(prefix)
-    PromiseV2.value([{ "key" => "#{prefix}a" }, { "key" => "#{prefix}b" }])
+    PromiseV2.value([{"key" => "#{prefix}a"}, {"key" => "#{prefix}b"}])
   end
 end
+
 b = MockBucket.new
 list = b.list("pfx-")
-ok "bucket.list returns Array (auto-awaited)", list.is_a?(Array)
-ok "  — first entry key is pfx-a", list.first["key"] == "pfx-a"
+ok("bucket.list returns Array (auto-awaited)", list.is_a?(Array))
+ok("  — first entry key is pfx-a", list.first["key"] == "pfx-a")
 
-section "Summary"
-puts "\n#{$passed + $failed} tests, #{$passed} passed, #{$failed} failed"
+section("Summary")
+puts("\n#{$passed + $failed} tests, #{$passed} passed, #{$failed} failed")
 exit($failed == 0 ? 0 : 1)

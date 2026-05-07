@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "json"
+
 require_relative "response"
 
 module Sinatra
@@ -22,14 +23,14 @@ module Sinatra
 
         version = current_inertia_version
         shared = current_inertia_shared
-        encrypt =
-          if !@inertia_encrypt_history_override.nil?
-            @inertia_encrypt_history_override == true
-          elsif settings.respond_to?(:inertia_encrypt_history)
-            settings.inertia_encrypt_history == true
-          else
-            false
-          end
+        encrypt = if !@inertia_encrypt_history_override.nil?
+          @inertia_encrypt_history_override == true
+        elsif settings.respond_to?(:inertia_encrypt_history)
+          settings.inertia_encrypt_history == true
+        else
+          false
+        end
+
         clear = @inertia_clear_history == true
 
         # Set the protocol response headers BEFORE we touch any async
@@ -41,8 +42,8 @@ module Sinatra
         # regardless of how the underlying runtime schedules the
         # awaited continuation.
         if inertia_request?
-          content_type "application/json; charset=utf-8"
-          headers "X-Inertia" => "true", "Vary" => "X-Inertia"
+          content_type("application/json; charset=utf-8")
+          headers("X-Inertia" => "true", "Vary" => "X-Inertia")
         end
 
         # Read errors *before* sweeping so the response carries them, then
@@ -52,18 +53,17 @@ module Sinatra
         errors_payload = inertia_errors_payload
         sweep_inertia_session!
 
-        response_obj =
-          Sinatra::Inertia::Response.new(
-            component: component,
-            props: props,
-            request: request,
-            version: version,
-            url: request.fullpath,
-            encrypt_history: encrypt,
-            clear_history: clear,
-            shared: shared,
-            errors: errors_payload
-          )
+        response_obj = Sinatra::Inertia::Response.new(
+          component: component,
+          props: props,
+          request: request,
+          version: version,
+          url: request.fullpath,
+          encrypt_history: encrypt,
+          clear_history: clear,
+          shared: shared,
+          errors: errors_payload
+        )
         page_hash = response_obj.to_h
         page_json = page_hash.to_json
 
@@ -71,7 +71,7 @@ module Sinatra
 
         @page = page_hash
         @page_json = ::Rack::Utils.escape_html(page_json)
-        erb layout, layout: false
+        erb(layout, layout: false)
       end
 
       # Natural page-rendering API: `render 'Component', props_hash`.
@@ -93,8 +93,9 @@ module Sinatra
             props: kwargs[:props] || {},
             layout: kwargs[:layout]
           )
-        elsif first.is_a?(String) && args.length <= 2 &&
-              (args.length == 1 || args[1].is_a?(Hash))
+        elsif first.is_a?(String) &&
+            args.length <= 2 &&
+            (args.length == 1 || args[1].is_a?(Hash))
           layout = kwargs.delete(:layout)
           props = {}
           props.merge!(args[1]) if args[1].is_a?(Hash)
@@ -156,18 +157,19 @@ module Sinatra
           v = instance_exec(&b)
           merged = deep_merge(merged, v) if v.is_a?(Hash)
         end
+
         merged
       end
 
       # ------------------------------------------------------------------
       # Asset version
       def current_inertia_version
-        v =
-          if settings.respond_to?(:page_version)
-            settings.page_version
-          elsif settings.respond_to?(:inertia_version)
-            settings.inertia_version
-          end
+        v = if settings.respond_to?(:page_version)
+          settings.page_version
+        elsif settings.respond_to?(:inertia_version)
+          settings.inertia_version
+        end
+
         v.respond_to?(:call) ? v.call.to_s : v.to_s
       end
 

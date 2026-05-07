@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 # Route fragment 62 — demo /docs/sequel-d1
-get "/docs/sequel-d1" do
+get("/docs/sequel-d1") do
   @title = "sequel-d1 — homura Docs"
   @docs_page = "sequel-d1"
   @docs_section = :reference
@@ -15,6 +15,6 @@ get "/docs/sequel-d1" do
     %w[opal Opal ビルドパス],
     %w[matrix できること / できないこと]
   ]
-  @docs_inner = erb :docs_sequel_d1
-  erb :layout_docs
+  @docs_inner = erb(:docs_sequel_d1)
+  erb(:layout_docs)
 end

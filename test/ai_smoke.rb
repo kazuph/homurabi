@@ -69,25 +69,26 @@ module SmokeTest
   # shared globalThis.__test_ai_response_queue__.
   def self.assert(label, &block)
     raw = block.call
-    result =
-      if `(#{raw} != null && typeof #{raw} === 'object' && typeof #{raw}.then === 'function')`
-        raw.__await__
-      else
-        raw
-      end
+    result = if `(#{raw} != null && typeof #{raw} === 'object' && typeof #{raw}.then === 'function')`
+      raw.__await__
+    else
+      raw
+    end
+
     if result
       @passed += 1
-      $stdout.puts "  PASS  #{label}"
+      $stdout.puts("  PASS  #{label}")
     else
       @failed += 1
       @errors << label
-      $stdout.puts "  FAIL  #{label}"
+      $stdout.puts("  FAIL  #{label}")
     end
+
     nil
   rescue Exception => e
     @failed += 1
     @errors << "#{label} (#{e.class}: #{e.message})"
-    $stdout.puts "  CRASH #{label} — #{e.class}: #{e.message}"
+    $stdout.puts("  CRASH #{label} — #{e.class}: #{e.message}")
     nil
   end
 
@@ -107,12 +108,13 @@ module SmokeTest
 
   def self.report
     total = @passed + @failed
-    $stdout.puts ""
-    $stdout.puts "#{total} tests, #{@passed} passed, #{@failed} failed"
+    $stdout.puts("")
+    $stdout.puts("#{total} tests, #{@passed} passed, #{@failed} failed")
     if @errors.any?
-      $stdout.puts "Failures:"
-      @errors.each { |e| $stdout.puts "  - #{e}" }
+      $stdout.puts("Failures:")
+      @errors.each { |e| $stdout.puts("  - #{e}") }
     end
+
     @failed == 0
   end
 end
@@ -149,13 +151,13 @@ def last_call_raw
   `globalThis.__test_ai_calls__[#{idx}]`
 end
 
-$stdout.puts "=== homura Phase 10 — Workers AI smoke ==="
-$stdout.puts ""
+$stdout.puts("=== homura Phase 10 — Workers AI smoke ===")
+$stdout.puts("")
 
 # ---------------------------------------------------------------------
 # 1. Cloudflare::AI.run basic
 # ---------------------------------------------------------------------
-$stdout.puts "--- Cloudflare::AI.run ---"
+$stdout.puts("--- Cloudflare::AI.run ---")
 
 SmokeTest
   .assert!("returns Hash with response/usage keys") do
@@ -164,12 +166,13 @@ SmokeTest
       "response" => "hello from mock",
       "usage" => `({ prompt_tokens: 3 })`
     )
-    out =
-      Cloudflare::AI.run(
+    out = Cloudflare::AI
+      .run(
         "@cf/google/gemma-4-26b-a4b-it",
-        { messages: [{ role: "user", content: "hi" }] },
+        {messages: [{role: "user", content: "hi"}]},
         binding: binding
-      ).__await__
+      )
+      .__await__
     out.is_a?(Hash) && out["response"] == "hello from mock"
   end
   .__await__
@@ -178,14 +181,18 @@ SmokeTest
   .assert!("forwards model id and Hash inputs to env.AI.run") do
     binding = fresh_binding
     push_response("response" => "ok")
-    Cloudflare::AI.run(
-      "@cf/google/gemma-4-26b-a4b-it",
-      { messages: [{ role: "user", content: "こんにちは" }], max_tokens: 64 },
-      binding: binding
-    ).__await__
+    Cloudflare::AI
+      .run(
+        "@cf/google/gemma-4-26b-a4b-it",
+        {messages: [{role: "user", content: "こんにちは"}], max_tokens: 64},
+        binding: binding
+      )
+      .__await__
     c = last_call
-    c && c["model"] == "@cf/google/gemma-4-26b-a4b-it" &&
-      c["inputs"].is_a?(Hash) && c["inputs"]["max_tokens"] == 64 &&
+    c &&
+      c["model"] == "@cf/google/gemma-4-26b-a4b-it" &&
+      c["inputs"].is_a?(Hash) &&
+      c["inputs"]["max_tokens"] == 64 &&
       c["inputs"]["messages"].is_a?(Array) &&
       c["inputs"]["messages"][0]["content"] == "こんにちは"
   end
@@ -195,11 +202,13 @@ SmokeTest
   .assert!("symbol keys in inputs become string keys in JS") do
     binding = fresh_binding
     push_response("response" => "ok")
-    Cloudflare::AI.run(
-      "@cf/openai/gpt-oss-120b",
-      { messages: [{ role: :user, content: "sym" }], stream: false },
-      binding: binding
-    ).__await__
+    Cloudflare::AI
+      .run(
+        "@cf/openai/gpt-oss-120b",
+        {messages: [{role: :user, content: "sym"}], stream: false},
+        binding: binding
+      )
+      .__await__
     c = last_call
     c["inputs"]["messages"][0]["role"] == "user" && c["inputs"].key?("stream")
   end
@@ -210,11 +219,12 @@ SmokeTest
     binding = fresh_binding
     ai = Cloudflare::AI::Binding.new(binding)
     push_response("response" => "wrapper ok")
-    out =
-      ai.run(
+    out = ai
+      .run(
         "@cf/google/gemma-4-26b-a4b-it",
-        messages: [{ role: "user", content: "hi via wrapper" }]
-      ).__await__
+        messages: [{role: "user", content: "hi via wrapper"}]
+      )
+      .__await__
     c = last_call
     out["response"] == "wrapper ok" &&
       c["inputs"]["messages"][0]["content"] == "hi via wrapper"
@@ -223,7 +233,7 @@ SmokeTest
 
 SmokeTest
   .assert!("Cloudflare::Bindings.ai wraps env cloudflare.AI") do
-    env = { "cloudflare.AI" => fresh_binding }
+    env = {"cloudflare.AI" => fresh_binding}
     ai = Cloudflare::Bindings.ai(env)
     ai.is_a?(Cloudflare::AI::Binding) && ai.available?
   end
@@ -233,14 +243,17 @@ SmokeTest
   .assert!("AIError raised when binding is nil") do
     raised = false
     begin
-      Cloudflare::AI.run(
-        "@cf/google/gemma-4-26b-a4b-it",
-        { messages: [] },
-        binding: nil
-      ).__await__
+      Cloudflare::AI
+        .run(
+          "@cf/google/gemma-4-26b-a4b-it",
+          {messages: []},
+          binding: nil
+        )
+        .__await__
     rescue Cloudflare::AIError
       raised = true
     end
+
     raised
   end
   .__await__
@@ -251,14 +264,17 @@ SmokeTest
     push_throw("quota exceeded")
     raised = false
     begin
-      Cloudflare::AI.run(
-        "@cf/google/gemma-4-26b-a4b-it",
-        { messages: [{ role: "user", content: "x" }] },
-        binding: binding
-      ).__await__
+      Cloudflare::AI
+        .run(
+          "@cf/google/gemma-4-26b-a4b-it",
+          {messages: [{role: "user", content: "x"}]},
+          binding: binding
+        )
+        .__await__
     rescue Cloudflare::AIError => e
       raised = e.message.include?("quota exceeded")
     end
+
     raised
   end
   .__await__
@@ -266,13 +282,12 @@ SmokeTest
 # ---------------------------------------------------------------------
 # 2. Streaming wrapper
 # ---------------------------------------------------------------------
-$stdout.puts ""
-$stdout.puts "--- Cloudflare::AI::Stream (stream: true) ---"
+$stdout.puts("")
+$stdout.puts("--- Cloudflare::AI::Stream (stream: true) ---")
 
 SmokeTest
   .assert!("stream:true returns Cloudflare::AI::Stream wrapper") do
-    binding =
-      `({
+    binding = `({
     run: async function(model, inputs) {
       // Real Workers AI returns a ReadableStream<Uint8Array>; we mock
       // with a stream that emits one chunk and closes.
@@ -284,12 +299,13 @@ SmokeTest
       });
     }
   })`
-    out =
-      Cloudflare::AI.run(
+    out = Cloudflare::AI
+      .run(
         "@cf/google/gemma-4-26b-a4b-it",
-        { messages: [{ role: "user", content: "hi" }], stream: true },
+        {messages: [{role: "user", content: "hi"}], stream: true},
         binding: binding
-      ).__await__
+      )
+      .__await__
     out.is_a?(Cloudflare::AI::Stream) && out.sse_stream? == true
   end
   .__await__
@@ -297,22 +313,23 @@ SmokeTest
 # ---------------------------------------------------------------------
 # 3. Higher-level helpers
 # ---------------------------------------------------------------------
-$stdout.puts ""
-$stdout.puts "--- Cloudflare::AI convenience helpers ---"
+$stdout.puts("")
+$stdout.puts("--- Cloudflare::AI convenience helpers ---")
 
 SmokeTest
   .assert!("chat_text builds system + user messages and extracts text") do
     binding = fresh_binding
     ai = Cloudflare::AI::Binding.new(binding)
     push_response(
-      "choices" => [{ "message" => { "content" => "chat helper ok" } }]
+      "choices" => [{"message" => {"content" => "chat helper ok"}}]
     )
-    out =
-      ai.chat_text(
+    out = ai
+      .chat_text(
         "Say hello",
         system: "Reply briefly.",
         max_tokens: 32
-      ).__await__
+      )
+      .__await__
     raw = last_call_raw
     out == "chat helper ok" &&
       `#{raw}.inputs.messages.length === 2 && #{raw}.inputs.messages[0].role === 'system' && #{raw}.inputs.messages[1].content === 'Say hello' && #{raw}.inputs.max_tokens === 32 && #{raw}.inputs.chat_template_kwargs.thinking === false`
@@ -339,13 +356,12 @@ SmokeTest
   .assert!("transcribe_text sends UploadedFile bytes as byte array") do
     binding = fresh_binding
     ai = Cloudflare::AI::Binding.new(binding)
-    audio =
-      Cloudflare::UploadedFile.new(
-        name: "audio",
-        filename: "voice.wav",
-        content_type: "audio/wav",
-        bytes_binstr: "abc"
-      )
+    audio = Cloudflare::UploadedFile.new(
+      name: "audio",
+      filename: "voice.wav",
+      content_type: "audio/wav",
+      bytes_binstr: "abc"
+    )
     push_response("text" => "spoken words")
     out = ai.transcribe_text(audio, language: "ja").__await__
     raw = last_call_raw
@@ -357,8 +373,7 @@ SmokeTest
 SmokeTest
   .assert!("speak returns BinaryBody and forces returnRawResponse") do
     `globalThis.__test_ai_reset__()`
-    binding =
-      `({
+    binding = `({
       run: async function(model, inputs, options) {
         globalThis.__test_ai_calls__.push({ model: model, inputs: inputs, options: options });
         return new Response('mock-mp3', { headers: { 'content-type': 'audio/mpeg' } });
@@ -367,8 +382,10 @@ SmokeTest
     ai = Cloudflare::AI::Binding.new(binding)
     out = ai.speak("hello world", speaker: "luna").__await__
     c = last_call
-    out.is_a?(Cloudflare::BinaryBody) && out.content_type == "audio/mpeg" &&
-      c["model"] == "@cf/deepgram/aura-1" && c["inputs"]["speaker"] == "luna" &&
+    out.is_a?(Cloudflare::BinaryBody) &&
+      out.content_type == "audio/mpeg" &&
+      c["model"] == "@cf/deepgram/aura-1" &&
+      c["inputs"]["speaker"] == "luna" &&
       c["options"]["returnRawResponse"] == true
   end
   .__await__
@@ -376,8 +393,7 @@ SmokeTest
 SmokeTest
   .assert!("speak_data_url returns an embeddable data URL") do
     `globalThis.__test_ai_reset__()`
-    binding =
-      `({
+    binding = `({
       run: async function(model, inputs, options) {
         globalThis.__test_ai_calls__.push({ model: model, inputs: inputs, options: options });
         return new Response(new Uint8Array([72, 73]), { headers: { 'content-type': 'audio/mpeg' } });
@@ -391,10 +407,9 @@ SmokeTest
 
 SmokeTest
   .assert!("build_js_response passes RawResponse through unchanged") do
-    raw =
-      Cloudflare::RawResponse.new(
-        `new Response('audio-body', { headers: { 'content-type': 'audio/mpeg' } })`
-      )
+    raw = Cloudflare::RawResponse.new(
+      `new Response('audio-body', { headers: { 'content-type': 'audio/mpeg' } })`
+    )
     js_response = Rack::Handler::Homura.send(:build_js_response, 200, {}, raw)
     `#{js_response} === #{raw.js_response}` &&
       `#{js_response}.headers.get('content-type') === 'audio/mpeg'`
@@ -403,10 +418,9 @@ SmokeTest
 
 SmokeTest
   .assert!("build_js_response passes wrapped RawResponse chunks through too") do
-    raw =
-      Cloudflare::RawResponse.new(
-        `new Response('audio-body', { headers: { 'content-type': 'audio/mpeg' } })`
-      )
+    raw = Cloudflare::RawResponse.new(
+      `new Response('audio-body', { headers: { 'content-type': 'audio/mpeg' } })`
+    )
     js_response = Rack::Handler::Homura.send(:build_js_response, 200, {}, [raw])
     `#{js_response} === #{raw.js_response}` &&
       `#{js_response}.headers.get('content-type') === 'audio/mpeg'`
@@ -417,12 +431,9 @@ SmokeTest
   .assert!(
     "build_js_response passes plain stream/content_type chunks through"
   ) do
-    stream =
-      `new ReadableStream({ start(controller) { controller.enqueue(new TextEncoder().encode('audio-body')); controller.close(); } })`
-    plain =
-      `({ stream: #{stream}, content_type: 'audio/mpeg', cache_control: 'public, max-age=60' })`
-    js_response =
-      Rack::Handler::Homura.send(:build_js_response, 200, {}, [plain])
+    stream = `new ReadableStream({ start(controller) { controller.enqueue(new TextEncoder().encode('audio-body')); controller.close(); } })`
+    plain = `({ stream: #{stream}, content_type: 'audio/mpeg', cache_control: 'public, max-age=60' })`
+    js_response = Rack::Handler::Homura.send(:build_js_response, 200, {}, [plain])
     `#{js_response}.headers.get('content-type') === 'audio/mpeg'` &&
       `#{js_response}.headers.get('cache-control') === 'public, max-age=60'`
   end
@@ -433,19 +444,20 @@ SmokeTest
 #    asserts the building block behaves predictably under failure +
 #    immediately-empty conditions).
 # ---------------------------------------------------------------------
-$stdout.puts ""
-$stdout.puts "--- Fallback / empty-response handling ---"
+$stdout.puts("")
+$stdout.puts("--- Fallback / empty-response handling ---")
 
 SmokeTest
   .assert!("first call returns empty string -> caller can detect") do
     binding = fresh_binding
     push_response("response" => "")
-    out =
-      Cloudflare::AI.run(
+    out = Cloudflare::AI
+      .run(
         "@cf/google/gemma-4-26b-a4b-it",
-        { messages: [] },
+        {messages: []},
         binding: binding
-      ).__await__
+      )
+      .__await__
     out["response"] == ""
   end
   .__await__
@@ -455,17 +467,20 @@ SmokeTest
     binding = fresh_binding
     push_response("response" => "")
     push_response("response" => "fallback won")
-    Cloudflare::AI.run(
-      "@cf/google/gemma-4-26b-a4b-it",
-      { messages: [] },
-      binding: binding
-    ).__await__
-    out2 =
-      Cloudflare::AI.run(
-        "@cf/openai/gpt-oss-120b",
-        { messages: [] },
+    Cloudflare::AI
+      .run(
+        "@cf/google/gemma-4-26b-a4b-it",
+        {messages: []},
         binding: binding
-      ).__await__
+      )
+      .__await__
+    out2 = Cloudflare::AI
+      .run(
+        "@cf/openai/gpt-oss-120b",
+        {messages: []},
+        binding: binding
+      )
+      .__await__
     call_count == 2 && out2["response"] == "fallback won"
   end
   .__await__
@@ -474,15 +489,15 @@ SmokeTest
 # 5. KV-style history persistence (smoke verifying the JSON round trip
 #    that the chat route relies on; this is "what would KV store?").
 # ---------------------------------------------------------------------
-$stdout.puts ""
-$stdout.puts "--- chat history JSON round-trip ---"
+$stdout.puts("")
+$stdout.puts("--- chat history JSON round-trip ---")
 
 SmokeTest
   .assert!("history Array<Hash> JSON encode/decode preserves roles+content") do
     history = [
-      { "role" => "user", "content" => "ping" },
-      { "role" => "assistant", "content" => "pong from mock" },
-      { "role" => "user", "content" => "日本語テスト" }
+      {"role" => "user", "content" => "ping"},
+      {"role" => "assistant", "content" => "pong from mock"},
+      {"role" => "user", "content" => "日本語テスト"}
     ]
     raw = history.to_json
     back = JSON.parse(raw)
@@ -492,12 +507,13 @@ SmokeTest
 
 SmokeTest
   .assert!("history truncation keeps only last N entries") do
-    history =
-      (1..50).map do |i|
-        { "role" => i.even? ? "assistant" : "user", "content" => "msg #{i}" }
-      end
+    history = (1..50).map do |i|
+      {"role" => i.even? ? "assistant" : "user", "content" => "msg #{i}"}
+    end
+
     trimmed = history.last(32)
-    trimmed.size == 32 && trimmed.first["content"] == "msg 19" &&
+    trimmed.size == 32 &&
+      trimmed.first["content"] == "msg 19" &&
       trimmed.last["content"] == "msg 50"
   end
   .__await__

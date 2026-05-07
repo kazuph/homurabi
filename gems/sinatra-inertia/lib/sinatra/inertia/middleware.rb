@@ -32,7 +32,7 @@ module Sinatra
           location = env["REQUEST_URI"] || build_url(env)
           return [
             409,
-            { "X-Inertia-Location" => location, "Vary" => "X-Inertia" },
+            {"X-Inertia-Location" => location, "Vary" => "X-Inertia"},
             []
           ]
         end
@@ -44,8 +44,9 @@ module Sinatra
         # requests: a Sinatra app may serve plain REST endpoints alongside
         # Inertia pages, and rewriting their 302s would silently change
         # HTTP semantics for non-Inertia clients.
-        if status == 302 && env[INERTIA_HEADER] == "true" &&
-             %w[POST PUT PATCH DELETE].include?(env["REQUEST_METHOD"])
+        if status == 302 &&
+            env[INERTIA_HEADER] == "true" &&
+            %w[POST PUT PATCH DELETE].include?(env["REQUEST_METHOD"])
           status = 303
         end
 

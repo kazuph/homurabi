@@ -12,15 +12,17 @@ module Sinatra
     # responses, or interpolated into the layout's `data-page` attribute
     # for full HTML responses.
     class Response
-      attr_reader :component,
-                  :props,
-                  :request,
-                  :version,
-                  :url,
-                  :encrypt_history,
-                  :clear_history,
-                  :shared,
-                  :errors
+      attr_reader(
+        :component,
+        :props,
+        :request,
+        :version,
+        :url,
+        :encrypt_history,
+        :clear_history,
+        :shared,
+        :errors
+      )
 
       def initialize(
         component:,
@@ -70,8 +72,7 @@ module Sinatra
           key = keys[i]
           value = merged_props[key]
           k = key.to_sym
-          included, materialized =
-            decide(value, k, partial, partial_data, partial_except)
+          included, materialized = decide(value, k, partial, partial_data, partial_except)
           if included
             resolved[k] = await_if_promise(materialized)
             if value.is_a?(Prop) && value.merge? && !reset.include?(k)
@@ -80,6 +81,7 @@ module Sinatra
           elsif value.is_a?(Prop) && value.deferred?
             (deferred_groups[value.group] ||= []) << k.to_s
           end
+
           i += 1
         end
 
@@ -144,6 +146,7 @@ module Sinatra
               return false, nil if partial_data && !partial_data.include?(key)
               return false, nil if partial_except&.include?(key)
             end
+
             return true, value.resolve
           end
         end
@@ -155,6 +158,7 @@ module Sinatra
             return false, nil if partial_data && !partial_data.include?(key)
             return false, nil if partial_except&.include?(key)
           end
+
           return true, value.call
         end
 
@@ -163,6 +167,7 @@ module Sinatra
           return false, nil if partial_data && !partial_data.include?(key)
           return false, nil if partial_except&.include?(key)
         end
+
         [true, value]
       end
 
@@ -183,8 +188,9 @@ module Sinatra
       # via `.__await__`. On MRI this branch is dead code (no Cloudflare
       # constant, no js_promise?), so plain Ruby tests are unaffected.
       def await_if_promise(value)
-        if defined?(::Cloudflare) && ::Cloudflare.respond_to?(:js_promise?) &&
-             ::Cloudflare.js_promise?(value)
+        if defined?(::Cloudflare) &&
+            ::Cloudflare.respond_to?(:js_promise?) &&
+            ::Cloudflare.js_promise?(value)
           value.__await__
         else
           value

@@ -88,6 +88,7 @@ module Cloudflare
     # a chunked streaming response.
     def each
     end
+
     def close
     end
 
@@ -113,6 +114,7 @@ module Cloudflare
         rescue StandardError
           # best-effort; never let logging fail the cleanup branch
         end
+
       ensure
         # `.__await__` here too, for the same reason: the ensure clause
         # must not return until the writer is actually closed (otherwise
@@ -170,10 +172,10 @@ module Cloudflare
       # enforced but the promise graph stays flat (Copilot review #3 —
       # prior implementation pushed every write into an unbounded
       # array which would leak memory on long-running streams).
-      @tail =
-        `#{@tail}.then(function() { return #{w}.write(#{enc}.encode(#{s})); })`
+      @tail = `#{@tail}.then(function() { return #{w}.write(#{enc}.encode(#{s})); })`
       self
     end
+
     alias_method :<<, :write
 
     # Helper: emit a well-formed SSE event. `data` is split on LF and
@@ -217,7 +219,8 @@ module Cloudflare
       # error to the client via the HTTP layer. Single-line x-string
       # so Opal emits it as an expression (see Multipart#to_uint8_array
       # for the same gotcha).
-      `(async function(t, wr){ try { await t; } catch(e) {} try { await wr.close(); } catch(e) {} })(#{tail}, #{w})`.__await__
+      `(async function(t, wr){ try { await t; } catch(e) {} try { await wr.close(); } catch(e) {} })(#{tail}, #{w})`
+        .__await__
       self
     end
 
@@ -273,22 +276,23 @@ module Sinatra
     def stream(keep_open: false, type: :plain, headers: nil, &block)
       ctx = env["cloudflare.ctx"]
       extra_headers = headers || {}
-      merged =
-        case type
-        when :sse, :event_stream
-          extra_headers # SSE defaults は SSEStream 側で入る
-        else
-          # Plain streaming — start from an empty default set so
-          # the SSE headers don't get force-injected into e.g. a
-          # log-tailing or chunked-JSON endpoint.
-          { "content-type" => "text/plain; charset=utf-8" }.merge(extra_headers)
-        end
+      merged = case type
+      when :sse, :event_stream
+        # SSE defaults は SSEStream 側で入る
+        extra_headers
+      else
+        # Plain streaming — start from an empty default set so
+        # the SSE headers don't get force-injected into e.g. a
+        # log-tailing or chunked-JSON endpoint.
+        {"content-type" => "text/plain; charset=utf-8"}.merge(extra_headers)
+      end
+
       ::Cloudflare::SSEStream.new(headers: merged, ctx: ctx, &block)
     end
 
     # Register the helper on a Sinatra app. Use `register Sinatra::Streaming`.
     def self.registered(app)
-      app.helpers Streaming
+      app.helpers(Streaming)
     end
   end
 end

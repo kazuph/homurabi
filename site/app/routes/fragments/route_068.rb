@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 # Route fragment 68 — demo /docs/email
-get "/docs/email" do
+get("/docs/email") do
   @title = "Cloudflare Email Service — homura Docs"
   @docs_page = "email"
   @docs_section = :reference
@@ -17,6 +17,6 @@ get "/docs/email" do
     %w[debug /debug/mail],
     %w[links 公式リンク]
   ]
-  @docs_inner = erb :docs_email
-  erb :layout_docs
+  @docs_inner = erb(:docs_email)
+  erb(:layout_docs)
 end

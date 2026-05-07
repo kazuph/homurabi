@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 # Route fragment 30 — login /login
-post "/login" do
+post("/login") do
   username = params["username"].to_s.strip
   return_to = params["return_to"].to_s
   # Reject protocol-relative (`//evil.example`) and anything with
@@ -16,8 +16,8 @@ post "/login" do
   if username.empty? || username.length > 64 || username.include?(":")
     @title = "Login — homura"
     @login_error = "username is required (1-64 chars, no colon)"
-    @content = erb :login
-    next erb :layout
+    @content = erb(:login)
+    next erb(:layout)
   end
 
   # mint_session_cookie is sync (HMAC-SHA256 via node:crypto).
@@ -36,5 +36,5 @@ post "/login" do
   )
   # 303 See Other — explicitly tells the client to follow up with
   # GET, avoiding any ambiguous POST-replay semantics around 302.
-  redirect return_to, 303
+  redirect(return_to, 303)
 end
